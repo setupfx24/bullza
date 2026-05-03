@@ -16,10 +16,13 @@ async def get_dashboard_stats(db: AsyncSession) -> DashboardStats:
     today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
     from packages.common.src.models import TradingAccount
 
-    # Total Users: matches User Management page — all except admin/super_admin.
+    # Total Users: matches User Management page — real customers only.
+    # Excludes admins/super_admins AND the shared demo user(s) so the
+    # dashboard count agrees with the user-list page.
     total_users_q = await db.execute(
         select(func.count(User.id)).where(
             User.role.notin_(["admin", "super_admin"]),
+            User.is_demo == False,  # noqa: E712 — SQLAlchemy needs `==`, not `is`
         )
     )
     total_users = total_users_q.scalar() or 0
