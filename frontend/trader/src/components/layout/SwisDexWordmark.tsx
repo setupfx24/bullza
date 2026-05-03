@@ -45,8 +45,8 @@ export function SwisDexWordmark({
           textClassName,
         )}
       >
-        <span className="text-text-primary">FX</span>
-        <span className="text-[#55a630]">Artha</span>
+        <span className="text-text-primary">Swis</span>
+        <span className="text-[#55a630]">Dex</span>
       </span>
     </span>
   );

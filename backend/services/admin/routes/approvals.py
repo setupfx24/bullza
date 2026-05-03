@@ -11,8 +11,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from packages.common.src.database import get_db
 from packages.common.src.models import User
 
-from ..dependencies import require_permission, write_audit_log
-from ..services import approval_service
+# Absolute imports — admin app puts /app on PYTHONPATH; relative imports
+# from a sibling package raise "attempted relative import beyond top-level
+# package" because the routes/ folder isn't a child of a package.
+from dependencies import require_permission, write_audit_log
+from services import approval_service
 
 router = APIRouter()
 

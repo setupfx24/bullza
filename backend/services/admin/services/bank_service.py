@@ -1,4 +1,5 @@
 """Admin Bank Service — CRUD for bank accounts, QR upload/serve."""
+import os
 import re
 import uuid
 from pathlib import Path
@@ -13,7 +14,11 @@ from packages.common.src.admin_schemas import BankAccountIn, BankAccountOut
 from packages.common.src.path_safety import PathTraversalError, safe_join_under_base
 from dependencies import write_audit_log
 
-UPLOAD_DIR = Path(__file__).resolve().parent.parent.parent.parent / "uploads" / "qr"
+# Read from BANK_UPLOAD_DIR env var (set by docker-compose to /app/uploads/banks).
+# The previous Path(__file__).parent×4 / "uploads" / "qr" computation resolved
+# to "/uploads/qr" inside the admin container (one too many .parent calls
+# given the container's /app layout) and crashed boot with PermissionError.
+UPLOAD_DIR = Path(os.environ.get("BANK_UPLOAD_DIR", "/app/uploads/banks"))
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/stores/authStore';
 import { Lock, Mail, Loader2, AlertCircle, Eye, EyeOff, ShieldCheck } from 'lucide-react';
@@ -16,7 +16,6 @@ const STEPS = [
 export default function LoginPage() {
   const router = useRouter();
   const login = useAuthStore((s) => s.login);
-  const refreshAdminProfile = useAuthStore((s) => s.refreshAdminProfile);
   const authRehydrated = useAuthRehydrated();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -24,11 +23,23 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
+  // Run the "skip-to-dashboard-if-already-logged-in" probe exactly once on
+  // mount, regardless of how many times deps change. Prior version put
+  // refreshAdminProfile/router in the deps array — those are stable in
+  // theory but Next.js's app-router useRouter occasionally returns a fresh
+  // object on hydration, which retriggered the effect, which re-ran the
+  // /auth/me fetch, which set zustand state, which re-rendered, which …
+  // (infinite reload visible to the user as the page never settling).
+  const probedRef = useRef(false);
   useEffect(() => {
-    if (!authRehydrated) return;
-    // If the cookie is still valid, skip the form.
-    void refreshAdminProfile().then((ok) => { if (ok) router.replace('/dashboard'); });
-  }, [authRehydrated, refreshAdminProfile, router]);
+    if (!authRehydrated || probedRef.current) return;
+    probedRef.current = true;
+    void useAuthStore.getState().refreshAdminProfile().then((ok) => {
+      if (ok) router.replace('/dashboard');
+    }).catch(() => { /* 401 is the expected case on the login page */ });
+    // Empty dep array — we only want this once per mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authRehydrated]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

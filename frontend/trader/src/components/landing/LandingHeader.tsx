@@ -11,7 +11,7 @@ export default function LandingHeader() {
           <Link href="/" className="flex items-center gap-2 shrink-0">
             <img src="/images/swisdex-logo.png" alt="SwisDex" className="h-9 sm:h-10 w-auto object-contain" />
             <span className="font-bold italic tracking-tight text-lg select-none">
-              <span className="text-gray-800">FX</span><span className="text-blue-600">Artha</span>
+              <span className="text-gray-800">Swis</span><span className="text-[#55a630]">Dex</span>
             </span>
           </Link>
 

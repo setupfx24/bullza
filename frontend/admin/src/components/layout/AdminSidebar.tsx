@@ -115,7 +115,7 @@ export default function AdminSidebar() {
           <Link href="/" className="flex items-center gap-2 min-w-0">
             <img src="/logo.png" alt="SwisDex" className="w-7 h-7 object-contain shrink-0" />
             <span className="font-bold tracking-tight text-sm select-none">
-              <span className="text-text-primary">FX</span><span className="text-[#55a630]">Artha</span>
+              <span className="text-text-primary">Swis</span><span className="text-[#55a630]">Dex</span>
             </span>
           </Link>
         )}

@@ -114,8 +114,8 @@ export default function AppSidebar() {
         <div className="flex items-center justify-between px-4 pt-4 pb-3 gap-2">
           <Link href="/dashboard" className="flex items-center gap-2 min-w-0">
             <span className="inline-flex items-baseline font-bold italic tracking-tight text-xl select-none">
-              <span className="text-text-primary">FX</span>
-              <span className="text-[#55a630]">Artha</span>
+              <span className="text-text-primary">Swis</span>
+              <span className="text-[#55a630]">Dex</span>
             </span>
           </Link>
           <button
