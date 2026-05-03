@@ -101,7 +101,21 @@ class AdminApi {
 
     if (res.status === 401) {
       this.clearToken();
-      if (typeof window !== 'undefined') window.location.href = '/login';
+      // CRITICAL: don't redirect when:
+      //  (a) the call is a session probe (/auth/me) — the login page calls
+      //      this on mount intentionally to skip the form for already-logged-
+      //      in users; a 401 here is the expected case and MUST NOT cause a
+      //      page reload, or we get an infinite reload loop;
+      //  (b) we're already on /login.
+      // Without this guard, every /me 401 hard-reloaded /login, which
+      // re-mounted, called /me again, 401 again, loop. ~2 reloads/sec.
+      if (typeof window !== 'undefined') {
+        const onLoginPage = window.location.pathname.startsWith('/login');
+        const isAuthProbe = path.includes('/auth/me');
+        if (!onLoginPage && !isAuthProbe) {
+          window.location.href = '/login';
+        }
+      }
       throw new Error('Unauthorized');
     }
 
@@ -144,7 +158,12 @@ class AdminApi {
 
     if (res.status === 401) {
       this.clearToken();
-      if (typeof window !== 'undefined') window.location.href = '/login';
+      if (typeof window !== 'undefined') {
+        const onLoginPage = window.location.pathname.startsWith('/login');
+        if (!onLoginPage) {
+          window.location.href = '/login';
+        }
+      }
       throw new Error('Unauthorized');
     }
 
