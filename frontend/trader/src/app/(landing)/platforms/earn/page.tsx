@@ -21,7 +21,7 @@ export default function EarnMarketingPage() {
           <span className="fx-gold-text">Trading.</span>
         </h1>
         <p className="mt-6 max-w-2xl text-base md:text-lg leading-relaxed" style={{ color: 'var(--fx-text-2)' }}>
-          Your activity on FX Artha turns into rewards, progression, and real
+          Your activity on SwisDex turns into rewards, progression, and real
           benefits. Trade. Engage. Progress. Earn.
         </p>
         <div className="mt-8 flex flex-wrap gap-3">

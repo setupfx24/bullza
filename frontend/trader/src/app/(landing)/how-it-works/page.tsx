@@ -15,14 +15,14 @@ export default function HowItWorksPage() {
 
       {/* Hero */}
       <section className="fx-container relative z-10 pt-28 md:pt-36 pb-16">
-        <p className="text-xs uppercase tracking-[0.25em] text-[#55a630]/85 mb-3">How FX Artha Works</p>
+        <p className="text-xs uppercase tracking-[0.25em] text-[#55a630]/85 mb-3">How SwisDex Works</p>
         <h1 className="fx-headline text-[40px] sm:text-[52px] md:text-[64px] xl:text-[72px] leading-tight max-w-4xl">
           Not a Broker.
           <br />
           <span className="fx-gold-text">A Trading Protocol.</span>
         </h1>
         <p className="mt-6 max-w-2xl text-base md:text-lg leading-relaxed" style={{ color: 'var(--fx-text-2)' }}>
-          FX Artha does not hold your funds. Your trades operate through a
+          SwisDex does not hold your funds. Your trades operate through a
           structured smart contract system. Execution is automated. Control
           stays with you.
         </p>
@@ -39,7 +39,7 @@ export default function HowItWorksPage() {
       {/* Broker vs Protocol */}
       <section className="fx-container relative z-10 py-16">
         <h2 className="text-2xl md:text-3xl font-bold mb-2" style={{ color: 'var(--fx-text)' }}>
-          Traditional Broker vs FX Artha
+          Traditional Broker vs SwisDex
         </h2>
         <p className="text-sm mb-10 max-w-2xl" style={{ color: 'var(--fx-text-2)' }}>
           We don&apos;t hold your money. The system manages execution.
@@ -51,7 +51,7 @@ export default function HowItWorksPage() {
             'Execution lacks transparency',
             'Manual intervention possible',
           ]} />
-          <Card title="FX Artha Protocol" tone="ok" items={[
+          <Card title="SwisDex Protocol" tone="ok" items={[
             'Funds interact with smart contract layer',
             'No custody held by platform',
             'Trades execute via system logic',
@@ -100,14 +100,14 @@ export default function HowItWorksPage() {
       {/* Comparison table */}
       <section className="fx-container relative z-10 py-16">
         <h2 className="text-2xl md:text-3xl font-bold mb-6" style={{ color: 'var(--fx-text)' }}>
-          FX Artha vs Traditional Brokers
+          SwisDex vs Traditional Brokers
         </h2>
         <div className="overflow-hidden rounded-xl border border-[#55a630]/20">
           <table className="w-full text-sm">
             <thead className="text-xs uppercase tracking-wider text-[#55a630]/90">
               <tr>
                 <th className="text-left px-4 py-3 bg-[rgba(85,166,48,0.06)]">Feature</th>
-                <th className="text-left px-4 py-3 bg-[rgba(85,166,48,0.06)]">FX Artha</th>
+                <th className="text-left px-4 py-3 bg-[rgba(85,166,48,0.06)]">SwisDex</th>
                 <th className="text-left px-4 py-3 bg-[rgba(85,166,48,0.06)]">Traditional Broker</th>
               </tr>
             </thead>
@@ -151,7 +151,7 @@ export default function HowItWorksPage() {
 const STEPS = [
   { eyebrow: 'Step', title: 'Connect Wallet', body: 'Securely connect your wallet to access the platform.' },
   { eyebrow: 'Step', title: 'Access Your Dashboard', body: 'Manage your profile, settings, and activity through your CRM.' },
-  { eyebrow: 'Step', title: 'Create Trading Account', body: 'Choose FX Artha native or an external integration.' },
+  { eyebrow: 'Step', title: 'Create Trading Account', body: 'Choose SwisDex native or an external integration.' },
   { eyebrow: 'Step', title: 'Allocate Funds to Contract', body: 'Funds move into a secure smart contract layer, not a broker.' },
   { eyebrow: 'Step', title: 'Execute Trades', body: 'Trade normally using your selected account.' },
   { eyebrow: 'Step', title: 'Automatic P&L Settlement', body: 'Profits credit, losses deduct — automatically.' },
