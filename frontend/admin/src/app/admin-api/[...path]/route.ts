@@ -36,6 +36,10 @@ const HOP_BY_HOP = new Set([
   'te',
   'trailer',
   'content-length',
+  // Critical: Node's fetch auto-decompresses gzip/br response bodies via
+  // arrayBuffer(). If we then re-emit Content-Encoding to the browser,
+  // it tries to decompress already-decompressed bytes → garbage.
+  'content-encoding',
 ]);
 
 async function segmentsFromParams(params: Promise<{ path?: string[] }>): Promise<string[]> {
@@ -60,6 +64,9 @@ async function proxy(req: NextRequest, segments: string[]): Promise<NextResponse
   // detection works regardless of the docker-internal http hop.
   headers.set('x-forwarded-proto', 'https');
   headers.set('x-forwarded-host', req.headers.get('host') || '');
+  // Don't ask the upstream for compression — Node's fetch auto-decompresses
+  // and we don't want to re-emit a stale Content-Encoding to the browser.
+  headers.set('accept-encoding', 'identity');
 
   const method = req.method.toUpperCase();
   const hasBody = !['GET', 'HEAD'].includes(method);
