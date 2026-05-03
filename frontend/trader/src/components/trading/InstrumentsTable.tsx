@@ -374,10 +374,10 @@ export default function InstrumentsTable({ onExitMarkets, onViewNews }: Instrume
                   className={clsx(
                     'text-right text-[13px] font-mono font-semibold tabular-nums tracking-tight',
                     bFlash === 'up'
-                      ? 'text-[#d6a93d]'
+                      ? 'text-[#55a630]'
                       : bFlash === 'down'
                         ? 'text-[#ef5350]'
-                        : 'text-[#d6a93d]',
+                        : 'text-[#55a630]',
                   )}
                 >
                   {tick ? tick.bid.toFixed(digits) : '—'}
@@ -388,10 +388,10 @@ export default function InstrumentsTable({ onExitMarkets, onViewNews }: Instrume
                   className={clsx(
                     'text-right text-[13px] font-mono font-semibold tabular-nums tracking-tight',
                     aFlash === 'up'
-                      ? 'text-[#d6a93d]'
+                      ? 'text-[#55a630]'
                       : aFlash === 'down'
                         ? 'text-[#ef5350]'
-                        : 'text-[#d6a93d]',
+                        : 'text-[#55a630]',
                   )}
                 >
                   {tick ? tick.ask.toFixed(digits) : '—'}

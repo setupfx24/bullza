@@ -21,7 +21,6 @@ from packages.common.src.insurance.claims import maybe_pay as insurance_maybe_pa
 from . import rewards_service
 from packages.common.src.database import AsyncSessionLocal
 from packages.common.src.redis_client import redis_client, PriceChannel
-from packages.common.src.kafka_client import produce_event, KafkaTopics
 from packages.common.src.notify import create_notification
 from packages.common.src.market_hours import is_market_open
 from packages.common.src import corecen_trade_client
@@ -101,13 +100,6 @@ def calc_pnl(
         account_currency,
         symbol=getattr(instrument, "symbol", None),
     )
-
-
-async def fire_event(topic, key, data):
-    try:
-        await asyncio.wait_for(produce_event(topic, key, data), timeout=1.0)
-    except Exception:
-        pass
 
 
 # ─── Orders ───────────────────────────────────────────────────────────────
@@ -457,15 +449,6 @@ async def place_order(
                     logger.error("IB commission error: %s", e)
                 await bg_db.commit()
         asyncio.create_task(_post_order_tasks())
-
-    asyncio.create_task(fire_event(KafkaTopics.ORDERS, str(order.id), {
-        "event": "order_placed",
-        "order_id": str(order.id),
-        "symbol": instrument.symbol,
-        "side": req.side,
-        "lots": str(req.lots),
-        "status": str(order.status),
-    }))
 
     try:
         await redis_client.publish(f"account:{account.id}", json.dumps({
@@ -911,7 +894,7 @@ async def close_position(position_id: UUID, req, user_id: UUID, db: AsyncSession
 
     await db.commit()
 
-    # Fire-and-forget: notification, Kafka event, Redis publish — don't block response
+    # Fire-and-forget: notification, Redis publish — don't block response
     _pos_symbol = pos.instrument.symbol if pos.instrument else ""
     _pos_id = str(pos.id)
     _acct_id = str(account.id)
@@ -939,14 +922,6 @@ async def close_position(position_id: UUID, req, user_id: UUID, db: AsyncSession
             pass
 
     asyncio.create_task(_post_close_tasks())
-    asyncio.create_task(fire_event(KafkaTopics.TRADES, _pos_id, {
-        "event": "position_closed",
-        "position_id": _pos_id,
-        "symbol": _pos_symbol,
-        "profit": _profit_str,
-        "partial": is_partial,
-    }))
-
     # ── A-Book: forward close to Corecen LP ──────────────────────────
     _close_price_f = float(close_price)
     _result_profit_f = float(result_profit)

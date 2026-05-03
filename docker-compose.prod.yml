@@ -15,16 +15,7 @@ services:
   redis:
     restart: always
 
-  zookeeper:
-    restart: always
-
-  kafka:
-    restart: always
-
-  # ── Disable Kafka UI in production ──────────────────────────
-  kafka-ui:
-    profiles:
-      - debug
+  # zookeeper / kafka / kafka-ui removed (see docker-compose.yml note).
 
   # ── Backend services — restart policy + localhost-only ports ──
   admin-api:

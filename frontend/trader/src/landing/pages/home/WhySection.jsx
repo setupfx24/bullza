@@ -38,7 +38,7 @@ export default function WhySection() {
                   border: '1px solid var(--fx-line)',
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.borderColor = 'rgba(214,169,61,0.4)'
+                  e.currentTarget.style.borderColor = 'rgba(85,166,48,0.4)'
                   e.currentTarget.style.transform = 'translateY(-2px)'
                 }}
                 onMouseLeave={(e) => {
@@ -50,7 +50,7 @@ export default function WhySection() {
                   className="shrink-0 w-12 h-12 rounded-xl flex items-center justify-center"
                   style={{
                     background: 'var(--fx-gold-soft)',
-                    border: '1px solid rgba(214,169,61,0.28)',
+                    border: '1px solid rgba(85,166,48,0.28)',
                   }}
                 >
                   <Icon size={20} style={{ color: 'var(--fx-gold-light)' }} />

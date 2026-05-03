@@ -1,6 +1,6 @@
 import uuid
 
-from fastapi import APIRouter, Body, Depends, Query, Request
+from fastapi import APIRouter, Body, Depends, Query, Request, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from packages.common.src.database import get_db
@@ -131,10 +131,18 @@ async def update_employee_permissions(
 async def login_as_employee(
     employee_id: uuid.UUID,
     request: Request,
+    response: Response,
     admin: User = Depends(get_current_admin),
     db: AsyncSession = Depends(get_db),
 ):
-    return await employee_service.login_as_employee(
+    out = await employee_service.login_as_employee(
         employee_id=employee_id, admin=admin,
         ip_address=request.client.host if request.client else None, db=db,
     )
+    # Mirror /auth/login: bake the impersonation JWT into the same
+    # httpOnly swisdex_admin cookie the rest of the admin app reads from.
+    token = out.get("access_token") if isinstance(out, dict) else getattr(out, "access_token", None)
+    if token:
+        from .auth import _set_admin_cookie  # local import avoids circular at module load
+        _set_admin_cookie(response, request, token)
+    return out

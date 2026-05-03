@@ -26,7 +26,7 @@ export function SwisDexWordmark({
         title="Trading home"
         className={cn(
           'flex items-center justify-center rounded-md hover:bg-bg-hover w-9 h-9 transition-colors',
-          'focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-2 focus-visible:outline-[#d6a93d]',
+          'focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-2 focus-visible:outline-[#55a630]',
           className,
         )}
       >
@@ -41,12 +41,12 @@ export function SwisDexWordmark({
       <span
         className={cn(
           'inline-flex items-baseline font-bold italic tracking-tight',
-          'text-xl sm:text-2xl drop-shadow-[0_0_20px_rgba(214,169,61,0.12)]',
+          'text-xl sm:text-2xl drop-shadow-[0_0_20px_rgba(85,166,48,0.12)]',
           textClassName,
         )}
       >
         <span className="text-text-primary">FX</span>
-        <span className="text-[#d6a93d]">Artha</span>
+        <span className="text-[#55a630]">Artha</span>
       </span>
     </span>
   );
@@ -55,7 +55,7 @@ export function SwisDexWordmark({
     <Link
       href={href}
       className={cn(
-        'min-w-0 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#d6a93d]/60 focus-visible:rounded-md',
+        'min-w-0 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#55a630]/60 focus-visible:rounded-md',
         className,
       )}
     >

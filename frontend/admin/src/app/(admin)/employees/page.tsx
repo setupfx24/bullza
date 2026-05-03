@@ -295,18 +295,15 @@ export default function EmployeesPage() {
                         <div className="flex items-center justify-end gap-1.5">
                           <button onClick={async () => {
                             try {
+                              // Backend sets the swisdex_admin httpOnly cookie on the response;
+                              // hard-reload makes the next page boot with the impersonated session.
                               const res = await adminApi.post<{ access_token: string; employee_email: string; employee_role: string }>(`/employees/${emp.id}/login-as`);
                               toast.success(`Logging in as ${res.employee_email} (${res.employee_role})`);
                               if (typeof window !== 'undefined') {
-                                adminApi.setToken(res.access_token);
-                                useAuthStore.setState({
-                                  token: res.access_token,
-                                  isAuthenticated: true,
-                                  admin: null,
-                                });
+                                useAuthStore.setState({ admin: null, isAuthenticated: false });
                                 setTimeout(() => {
                                   window.location.replace('/dashboard');
-                                }, 500);
+                                }, 300);
                               }
                             } catch (e: any) { toast.error(e.message || 'Failed to login as employee'); }
                           }} className="px-2 py-1 rounded-md text-xxs font-medium text-buy border border-buy/30 hover:bg-buy/15 transition-fast" title="Login As Employee">

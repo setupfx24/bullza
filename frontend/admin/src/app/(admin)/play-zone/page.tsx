@@ -143,7 +143,7 @@ export default function PlayZoneAdminPage() {
       <header className="flex items-center justify-between gap-3 flex-wrap">
         <div>
           <h1 className="text-xl font-semibold text-text-primary flex items-center gap-2">
-            Play Zone <Sparkles size={18} className="text-[#d6a93d]" />
+            Play Zone <Sparkles size={18} className="text-[#55a630]" />
           </h1>
           <p className="text-xs text-text-tertiary mt-0.5">Schedule + cancel Lottery and Bidding rounds.</p>
         </div>
@@ -158,7 +158,7 @@ export default function PlayZoneAdminPage() {
           <button
             type="button"
             onClick={() => setModal(tab)}
-            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[#d6a93d] text-bg-base text-xs font-bold hover:brightness-110"
+            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[#55a630] text-bg-base text-xs font-bold hover:brightness-110"
           >
             <Plus size={12} /> New {tab === 'lottery' ? 'Lottery' : 'Bidding'} Round
           </button>
@@ -173,7 +173,7 @@ export default function PlayZoneAdminPage() {
             onClick={() => setTab(k)}
             className={
               'inline-flex items-center gap-1 px-4 py-1.5 rounded-md text-xs font-medium transition-colors ' +
-              (tab === k ? 'bg-[#d6a93d]/15 text-text-primary border border-[#d6a93d]/40' : 'text-text-secondary hover:text-text-primary border border-transparent')
+              (tab === k ? 'bg-[#55a630]/15 text-text-primary border border-[#55a630]/40' : 'text-text-secondary hover:text-text-primary border border-transparent')
             }
           >
             {k === 'lottery' ? <Ticket size={12} /> : <Gavel size={12} />}
@@ -331,7 +331,7 @@ function Modal({
             type="button"
             onClick={onSubmit}
             disabled={submitting}
-            className="inline-flex items-center gap-1 px-4 py-1.5 rounded-md bg-[#d6a93d] text-bg-base text-xs font-bold disabled:opacity-50"
+            className="inline-flex items-center gap-1 px-4 py-1.5 rounded-md bg-[#55a630] text-bg-base text-xs font-bold disabled:opacity-50"
           >
             {submitting && <Loader2 size={11} className="animate-spin" />}
             Create
@@ -353,7 +353,7 @@ function Field({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="mt-1 w-full px-3 py-2 rounded-md bg-bg-base border border-border-primary text-sm text-text-primary tabular-nums focus:border-[#d6a93d] focus:outline-none"
+        className="mt-1 w-full px-3 py-2 rounded-md bg-bg-base border border-border-primary text-sm text-text-primary tabular-nums focus:border-[#55a630] focus:outline-none"
       />
     </label>
   );
@@ -368,7 +368,7 @@ function Select({
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="mt-1 w-full px-3 py-2 rounded-md bg-bg-base border border-border-primary text-sm text-text-primary focus:border-[#d6a93d] focus:outline-none"
+        className="mt-1 w-full px-3 py-2 rounded-md bg-bg-base border border-border-primary text-sm text-text-primary focus:border-[#55a630] focus:outline-none"
       >
         {options.map((o) => <option key={o} value={o}>{o}</option>)}
       </select>

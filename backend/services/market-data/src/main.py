@@ -13,7 +13,6 @@ from packages.common.src.redis_client import (
     redis_client,
     publish_price,
 )
-from packages.common.src.kafka_client import close_producer
 
 from .feed_handler import FeedSimulator, INSTRUMENTS
 from .infoway_config import usable_infoway_api_key
@@ -246,7 +245,6 @@ class MarketDataService:
         logger.info("Shutting down Market Data Service...")
         self.running = False
         await self.feed.stop()
-        await close_producer()
         await redis_client.close()
 
 

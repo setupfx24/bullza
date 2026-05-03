@@ -19,7 +19,6 @@ class Settings(BaseSettings):
     DATABASE_URL: str = "postgresql+asyncpg://swisdex:swisdex_dev@localhost:5432/swisdex"
     TIMESCALE_URL: str = "postgresql+asyncpg://swisdex:swisdex_dev@localhost:5433/marketdata"
     REDIS_URL: str = "redis://localhost:6379/0"
-    KAFKA_BOOTSTRAP_SERVERS: str = "localhost:9092"
 
     JWT_SECRET: str = "dev-secret-change-in-production"
     JWT_ALGORITHM: str = "HS256"

@@ -23,7 +23,6 @@ from packages.common.src.models import (
     SpreadConfig, ChargeConfig, Transaction, User,
 )
 from packages.common.src.redis_client import redis_client, PriceChannel
-from packages.common.src.kafka_client import produce_event, KafkaTopics
 from packages.common.src import corecen_trade_client
 
 logger = logging.getLogger("b-book-engine")
@@ -315,14 +314,6 @@ class MatchingEngine:
             "close_price": str(close_price),
             "profit": str(profit),
         }))
-
-        await produce_event(KafkaTopics.TRADES, str(pos.id), {
-            "event": f"position_closed_{reason}",
-            "position_id": str(pos.id),
-            "account_id": str(pos.account_id),
-            "symbol": instrument.symbol,
-            "profit": str(profit),
-        })
 
         # ── A-Book: forward SL/TP close to Corecen LP ────────────────────
         # Pass Decimal through; the Corecen client's _js_val handles the

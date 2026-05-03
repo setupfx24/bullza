@@ -15,7 +15,7 @@ export default function StakingMarketingPage() {
 
       {/* Hero */}
       <section className="fx-container relative z-10 pt-28 md:pt-36 pb-16">
-        <p className="text-xs uppercase tracking-[0.25em] text-[#d6a93d]/85 mb-3">Staking</p>
+        <p className="text-xs uppercase tracking-[0.25em] text-[#55a630]/85 mb-3">Staking</p>
         <h1 className="fx-headline text-[40px] sm:text-[52px] md:text-[64px] xl:text-[72px] leading-tight max-w-4xl">
           Provide Liquidity.
           <br />
@@ -27,10 +27,10 @@ export default function StakingMarketingPage() {
           Your choice.
         </p>
         <div className="mt-8 flex flex-wrap gap-3">
-          <Link href="/earn/staking" className="inline-flex items-center gap-2 px-5 py-3 rounded-lg bg-[#d6a93d] text-bg-base font-bold text-sm hover:brightness-110">
+          <Link href="/earn/staking" className="inline-flex items-center gap-2 px-5 py-3 rounded-lg bg-[#55a630] text-bg-base font-bold text-sm hover:brightness-110">
             Start Staking <ArrowRight size={14} />
           </Link>
-          <Link href="#plans" className="inline-flex items-center gap-2 px-5 py-3 rounded-lg border border-[#d6a93d]/40 text-text-primary text-sm hover:border-[#d6a93d]/70">
+          <Link href="#plans" className="inline-flex items-center gap-2 px-5 py-3 rounded-lg border border-[#55a630]/40 text-text-primary text-sm hover:border-[#55a630]/70">
             Explore Options
           </Link>
         </div>
@@ -38,7 +38,7 @@ export default function StakingMarketingPage() {
 
       {/* Overview */}
       <section className="fx-container relative z-10 py-12">
-        <div className="rounded-xl border border-[#d6a93d]/20 p-6 md:p-8 bg-[rgba(255,255,255,0.02)] max-w-3xl">
+        <div className="rounded-xl border border-[#55a630]/20 p-6 md:p-8 bg-[rgba(255,255,255,0.02)] max-w-3xl">
           <h2 className="text-xl md:text-2xl font-bold mb-3" style={{ color: 'var(--fx-text)' }}>
             What is Staking in FX Artha?
           </h2>
@@ -48,7 +48,7 @@ export default function StakingMarketingPage() {
             decentralized structure where they contribute to the trading
             ecosystem.
           </p>
-          <p className="text-sm font-semibold text-[#d6a93d]">
+          <p className="text-sm font-semibold text-[#55a630]">
             &ldquo;You are not depositing — you are participating.&rdquo;
           </p>
         </div>
@@ -110,10 +110,10 @@ export default function StakingMarketingPage() {
 
       {/* Trading bonus */}
       <section className="fx-container relative z-10 py-12">
-        <div className="rounded-xl border border-[#d6a93d]/40 p-6 md:p-8 bg-[rgba(214,169,61,0.06)]">
+        <div className="rounded-xl border border-[#55a630]/40 p-6 md:p-8 bg-[rgba(85,166,48,0.06)]">
           <div className="flex items-center gap-2 mb-3">
-            <Sparkles size={20} className="text-[#d6a93d]" />
-            <span className="text-xs uppercase tracking-wider text-[#d6a93d]">Key Feature</span>
+            <Sparkles size={20} className="text-[#55a630]" />
+            <span className="text-xs uppercase tracking-wider text-[#55a630]">Key Feature</span>
           </div>
           <h2 className="text-2xl md:text-3xl font-bold mb-3" style={{ color: 'var(--fx-text)' }}>
             Unlock Trading Power with Staking
@@ -132,8 +132,8 @@ export default function StakingMarketingPage() {
 
       {/* CTA */}
       <section className="fx-container relative z-10 py-20">
-        <div className="rounded-2xl border border-[#d6a93d]/30 p-10 md:p-14 text-center bg-[rgba(214,169,61,0.04)]">
-          <Coins size={28} className="text-[#d6a93d] mx-auto mb-4" />
+        <div className="rounded-2xl border border-[#55a630]/30 p-10 md:p-14 text-center bg-[rgba(85,166,48,0.04)]">
+          <Coins size={28} className="text-[#55a630] mx-auto mb-4" />
           <h2 className="text-2xl md:text-3xl font-bold mb-3" style={{ color: 'var(--fx-text)' }}>
             Start Providing Liquidity Today
           </h2>
@@ -141,10 +141,10 @@ export default function StakingMarketingPage() {
             Flexible participation or long-term commitment — choose your path.
           </p>
           <div className="flex justify-center gap-3 flex-wrap">
-            <Link href="/earn/staking" className="inline-flex items-center gap-2 px-6 py-3 rounded-lg bg-[#d6a93d] text-bg-base font-bold text-sm hover:brightness-110">
+            <Link href="/earn/staking" className="inline-flex items-center gap-2 px-6 py-3 rounded-lg bg-[#55a630] text-bg-base font-bold text-sm hover:brightness-110">
               Start Staking <ArrowRight size={14} />
             </Link>
-            <Link href="/auth/register" className="inline-flex items-center gap-2 px-6 py-3 rounded-lg border border-[#d6a93d]/40 text-text-primary text-sm hover:border-[#d6a93d]/70">
+            <Link href="/auth/register" className="inline-flex items-center gap-2 px-6 py-3 rounded-lg border border-[#55a630]/40 text-text-primary text-sm hover:border-[#55a630]/70">
               Create Account
             </Link>
           </div>
@@ -158,10 +158,10 @@ function ModeCard({
   icon: Icon, title, tag, features, tagline,
 }: { icon: any; title: string; tag: string; features: string[]; tagline: string }) {
   return (
-    <div className="rounded-xl border border-[#d6a93d]/25 p-6 bg-[rgba(255,255,255,0.02)]">
+    <div className="rounded-xl border border-[#55a630]/25 p-6 bg-[rgba(255,255,255,0.02)]">
       <div className="flex items-center gap-2 mb-3">
-        <Icon size={20} className="text-[#d6a93d]" />
-        <span className="text-[10.5px] uppercase tracking-wider text-[#d6a93d]/85 px-2 py-0.5 rounded-full border border-[#d6a93d]/30 bg-[#d6a93d]/5">
+        <Icon size={20} className="text-[#55a630]" />
+        <span className="text-[10.5px] uppercase tracking-wider text-[#55a630]/85 px-2 py-0.5 rounded-full border border-[#55a630]/30 bg-[#55a630]/5">
           {tag}
         </span>
       </div>
@@ -169,7 +169,7 @@ function ModeCard({
       <ul className="space-y-2 mb-4">
         {features.map((f) => (
           <li key={f} className="flex items-start gap-2 text-sm" style={{ color: 'var(--fx-text-2)' }}>
-            <Check size={14} className="mt-0.5 shrink-0 text-[#d6a93d]" />
+            <Check size={14} className="mt-0.5 shrink-0 text-[#55a630]" />
             <span>{f}</span>
           </li>
         ))}
@@ -186,10 +186,10 @@ function PlanCard({
     <div className={
       'rounded-xl p-6 border ' +
       (highlighted
-        ? 'border-[#d6a93d] bg-[rgba(214,169,61,0.08)]'
-        : 'border-[#d6a93d]/25 bg-[rgba(255,255,255,0.02)]')
+        ? 'border-[#55a630] bg-[rgba(85,166,48,0.08)]'
+        : 'border-[#55a630]/25 bg-[rgba(255,255,255,0.02)]')
     }>
-      <p className="text-sm font-semibold uppercase tracking-wider text-[#d6a93d] mb-2">{duration}</p>
+      <p className="text-sm font-semibold uppercase tracking-wider text-[#55a630] mb-2">{duration}</p>
       <p className="text-5xl font-extrabold tabular-nums mb-1" style={{ color: 'var(--fx-text)' }}>{apy}</p>
       <p className="text-xs uppercase tracking-wider text-text-tertiary mb-4">APY</p>
       <p className="text-xs leading-relaxed" style={{ color: 'var(--fx-text-2)' }}>{tagline}</p>

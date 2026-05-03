@@ -22,7 +22,6 @@ from packages.common.src.models import (
     OrderSide, SwapConfig, Notification, Transaction, User,
 )
 from packages.common.src.redis_client import redis_client, PriceChannel
-from packages.common.src.kafka_client import produce_event, KafkaTopics
 from packages.common.src.config import get_settings
 from packages.common.src import corecen_trade_client
 

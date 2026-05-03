@@ -47,40 +47,11 @@ services:
       timeout: 3s
       retries: 5
 
-  zookeeper:
-    image: confluentinc/cp-zookeeper:7.6.0
-    environment:
-      ZOOKEEPER_CLIENT_PORT: 2181
-      ZOOKEEPER_TICK_TIME: 2000
-    # No host port binding — only kafka connects via Docker network (zookeeper:2181)
-
-  kafka:
-    image: confluentinc/cp-kafka:7.6.0
-    depends_on:
-      - zookeeper
-    # No host port binding — all services connect via Docker network (kafka:29092)
-    environment:
-      KAFKA_BROKER_ID: 1
-      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_INTERNAL://kafka:29092
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_INTERNAL:PLAINTEXT
-      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
-      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
-    healthcheck:
-      test: ["CMD", "kafka-broker-api-versions", "--bootstrap-server", "localhost:9092"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-  kafka-ui:
-    image: provectuslabs/kafka-ui:latest
-    depends_on:
-      - kafka
-    ports:
-      - "8080:8080"
-    environment:
-      KAFKA_CLUSTERS_0_NAME: swisdex
-      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
+  # Kafka / Zookeeper / Kafka-UI removed.
+  # The kafka_client.py producer no-ops gracefully when no broker is reachable;
+  # all current produce_event() call sites are fire-and-forget event mirrors
+  # with no consumer wired. Re-enable in future by restoring a "kafka:" service
+  # definition (see git history) and setting KAFKA_BOOTSTRAP_SERVERS in .env.
 
   # Admin dashboard API (port 8001)
   # Loads secrets from backend/.env (Compose does NOT auto-load that path for ${VAR} substitution).
@@ -126,9 +97,6 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-      # Kafka "healthy" can block for a long time; gateway only needs broker up
-      kafka:
-        condition: service_started
     environment:
       BANNERS_UPLOAD_DIR: /app/uploads/banners
       WALLET_UPLOAD_ROOT: /app/uploads/wallet
@@ -155,8 +123,6 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-      kafka:
-        condition: service_started
     volumes:
       - ./backend/services/market-data:/app/services/market_data
       - ./backend/packages:/app/packages
@@ -173,8 +139,6 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-      kafka:
-        condition: service_started
     volumes:
       - ./backend/services/b-book-engine:/app/services/b_book_engine
       - ./backend/packages:/app/packages
@@ -191,8 +155,6 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-      kafka:
-        condition: service_started
     volumes:
       - ./backend/services/risk-engine:/app/services/risk_engine
       - ./backend/packages:/app/packages

@@ -316,12 +316,12 @@ export default function OrderPanel() {
           <div className="flex items-center gap-1">
             <span
               className={clsx('font-bold', isTradingTerminal ? 'text-[9px]' : 'text-[10px]')}
-              style={{ color: marketStatus.isOpen ? '#d6a93d' : '#f57c00' }}
+              style={{ color: marketStatus.isOpen ? '#55a630' : '#f57c00' }}
             >
               {marketStatus.isOpen ? 'OPEN' : 'CLOSED'}
             </span>
             {isConnected ? (
-              <Wifi size={isTradingTerminal ? 11 : 12} className="text-[#d6a93d]" />
+              <Wifi size={isTradingTerminal ? 11 : 12} className="text-[#55a630]" />
             ) : (
               <WifiOff size={isTradingTerminal ? 11 : 12} className="text-[#f57c00]" />
             )}
@@ -358,7 +358,7 @@ export default function OrderPanel() {
                   color: orderTab === t ? 'var(--text-primary)' : 'var(--text-tertiary)',
                   borderBottom:
                     orderTab === t
-                      ? `2px solid ${isTradingTerminal ? '#2962FF' : '#d6a93d'}`
+                      ? `2px solid ${isTradingTerminal ? '#2962FF' : '#55a630'}`
                       : '2px solid transparent',
                 }}
               >
@@ -388,13 +388,13 @@ export default function OrderPanel() {
                 onClick={() => setSide('buy')}
                 className={clsx(obPad, 'rounded-lg flex flex-col items-center justify-center transition-all duration-150 active:scale-[0.98]')}
                 style={{
-                  background: side === 'buy' ? 'rgba(214,169,61,0.15)' : 'var(--bg-secondary)',
-                  border: side === 'buy' ? '1px solid #d6a93d' : '1px solid var(--border-primary)',
-                  color: side === 'buy' ? '#d6a93d' : 'var(--text-secondary)',
+                  background: side === 'buy' ? 'rgba(85,166,48,0.15)' : 'var(--bg-secondary)',
+                  border: side === 'buy' ? '1px solid #55a630' : '1px solid var(--border-primary)',
+                  color: side === 'buy' ? '#55a630' : 'var(--text-secondary)',
                 }}
              >
                 <div className={clsx('font-bold uppercase tracking-wider', isTradingTerminal ? 'text-[10px] mb-0' : 'text-sm mb-0.5')}>Buy</div>
-                <div className={clsx('font-mono font-bold', isTradingTerminal ? 'text-[13px]' : 'text-[15px]', side === 'buy' && 'text-[#d6a93d]')}>{tick ? tick.ask.toFixed(digits) : '---'}</div>
+                <div className={clsx('font-mono font-bold', isTradingTerminal ? 'text-[13px]' : 'text-[15px]', side === 'buy' && 'text-[#55a630]')}>{tick ? tick.ask.toFixed(digits) : '---'}</div>
                 <div className={clsx('text-text-tertiary', isTradingTerminal ? 'text-[8px] mt-0.5' : 'text-[9px] mt-1')}>Ask</div>
              </button>
           </div>
@@ -424,7 +424,7 @@ export default function OrderPanel() {
               <div
                 onClick={() => { setTpEnabled((p) => !p); if (tpEnabled) setTakeProfit(''); }}
                 className="w-8 h-[18px] rounded-full relative transition-colors cursor-pointer border border-border-primary"
-                style={{ background: tpEnabled ? '#d6a93d' : 'var(--bg-secondary)' }}
+                style={{ background: tpEnabled ? '#55a630' : 'var(--bg-secondary)' }}
               >
                 <div className="absolute top-[3px] w-2.5 h-2.5 rounded-full bg-white transition-all shadow-sm" style={{ left: tpEnabled ? '18px' : '3px' }} />
               </div>
@@ -498,14 +498,14 @@ export default function OrderPanel() {
           {/* TP input */}
           {tpEnabled && (
             <div className="pt-2">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-[#d6a93d] mb-1.5 block">Take Profit</span>
+              <span className="text-[10px] font-bold uppercase tracking-wider text-[#55a630] mb-1.5 block">Take Profit</span>
               <input
                 type="number"
                 value={takeProfit}
                 onChange={(e) => setTakeProfit(e.target.value)}
                 step={execPrice > 100 ? 0.01 : 0.00001}
                 placeholder={`e.g. ${(execPrice * (side === 'buy' ? 1.02 : 0.98)).toFixed(digits)}`}
-                className="w-full text-sm font-mono py-2.5 px-3 rounded-lg focus:outline-none bg-bg-secondary border border-[#d6a93d]/30 text-[#d6a93d]"
+                className="w-full text-sm font-mono py-2.5 px-3 rounded-lg focus:outline-none bg-bg-secondary border border-[#55a630]/30 text-[#55a630]"
               />
             </div>
           )}
@@ -533,8 +533,8 @@ export default function OrderPanel() {
                 {[
                   { label: 'Exec. Price', value: execPrice > 0 ? execPrice.toFixed(digits) : '—', color: 'var(--text-primary)' },
                   { label: 'Margin Required', value: `$${marginRequired.toFixed(2)}`, color: !hasEnoughMargin ? '#ef5350' : 'var(--text-secondary)' },
-                  { label: 'Free Margin', value: `$${freeMargin.toFixed(2)}`, color: !hasEnoughMargin ? '#ef5350' : '#d6a93d' },
-                  { label: 'Feed', value: isConnected ? '● Connected' : '○ Disconnected', color: isConnected ? '#d6a93d' : '#f57c00' },
+                  { label: 'Free Margin', value: `$${freeMargin.toFixed(2)}`, color: !hasEnoughMargin ? '#ef5350' : '#55a630' },
+                  { label: 'Feed', value: isConnected ? '● Connected' : '○ Disconnected', color: isConnected ? '#55a630' : '#f57c00' },
                 ].map((row) => (
                   <div key={row.label} className="flex items-center justify-between">
                     <span className="text-[11px] text-text-tertiary">{row.label}</span>
@@ -554,9 +554,9 @@ export default function OrderPanel() {
                 disabled={!hasEnoughMargin || !activeAccount || (orderTab === 'market' && !marketStatus.isOpen)}
                 className="w-full py-4 rounded-xl text-[15px] font-black tracking-wide uppercase transition-transform duration-75 disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.96]"
                 style={{
-                  background: side === 'buy' ? '#d6a93d' : '#ef5350',
+                  background: side === 'buy' ? '#55a630' : '#ef5350',
                   color: '#fff',
-                  boxShadow: side === 'buy' ? '0 4px 20px rgba(214,169,61,0.2)' : '0 4px 20px rgba(239,83,80,0.2)',
+                  boxShadow: side === 'buy' ? '0 4px 20px rgba(85,166,48,0.2)' : '0 4px 20px rgba(239,83,80,0.2)',
                 }}
               >
                 {`${side === 'buy' ? 'Buy' : 'Sell'} ${selectedSymbol}`}
@@ -581,11 +581,11 @@ export default function OrderPanel() {
             </div>
             <div className="flex items-center justify-between gap-1 px-1 text-[9px] text-text-tertiary">
               <span className="truncate">Mrgn ${marginRequired.toFixed(2)}</span>
-              <span className={clsx('shrink-0 font-mono', hasEnoughMargin ? 'text-[#d6a93d]' : 'text-[#ef5350]')}>
+              <span className={clsx('shrink-0 font-mono', hasEnoughMargin ? 'text-[#55a630]' : 'text-[#ef5350]')}>
                 Free ${freeMargin.toFixed(2)}
               </span>
               <span
-                className={clsx('shrink-0 font-mono', isConnected ? 'text-[#d6a93d]' : 'text-[#f57c00]')}
+                className={clsx('shrink-0 font-mono', isConnected ? 'text-[#55a630]' : 'text-[#f57c00]')}
                 title={isConnected ? 'Feed connected' : 'Feed disconnected'}
               >
                 {isConnected ? '●' : '○'}
@@ -600,9 +600,9 @@ export default function OrderPanel() {
               disabled={!hasEnoughMargin || !activeAccount || (orderTab === 'market' && !marketStatus.isOpen)}
               className="w-full py-2.5 rounded-lg text-sm font-black tracking-wide uppercase transition-transform duration-75 disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.96]"
               style={{
-                background: side === 'buy' ? '#d6a93d' : '#ef5350',
+                background: side === 'buy' ? '#55a630' : '#ef5350',
                 color: '#fff',
-                boxShadow: side === 'buy' ? '0 2px 12px rgba(214,169,61,0.2)' : '0 2px 12px rgba(239,83,80,0.2)',
+                boxShadow: side === 'buy' ? '0 2px 12px rgba(85,166,48,0.2)' : '0 2px 12px rgba(239,83,80,0.2)',
               }}
             >
               {`${side === 'buy' ? 'Buy' : 'Sell'} ${selectedSymbol}`}
@@ -705,7 +705,7 @@ function LeveragePicker({
                 className={clsx(
                   'w-full text-left px-2 py-1 text-[11px] font-mono transition-colors',
                   v === account.leverage
-                    ? 'bg-[#d6a93d]/15 text-[#d6a93d] font-bold'
+                    ? 'bg-[#55a630]/15 text-[#55a630] font-bold'
                     : 'text-text-secondary hover:bg-bg-hover hover:text-text-primary',
                 )}
               >

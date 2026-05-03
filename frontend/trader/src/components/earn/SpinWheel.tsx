@@ -26,7 +26,7 @@ type SpinResult = {
   new_ac_balance: number;
 };
 
-const SLICE_COLOURS = ['#d6a93d', '#9c7a30', '#c69a37', '#7a5e26', '#e0bc63', '#8c6c2b', '#b58a35'];
+const SLICE_COLOURS = ['#55a630', '#9c7a30', '#c69a37', '#7a5e26', '#e0bc63', '#8c6c2b', '#b58a35'];
 
 export default function SpinWheel({
   onResult,
@@ -143,19 +143,19 @@ export default function SpinWheel({
           style={{
             borderLeft: '14px solid transparent',
             borderRight: '14px solid transparent',
-            borderTop: '22px solid #d6a93d',
+            borderTop: '22px solid #55a630',
             filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.5))',
           }}
         />
         {/* Wheel */}
         <div
           ref={wheelRef}
-          className="absolute inset-0 rounded-full border-4 border-[#d6a93d]/45 overflow-hidden"
+          className="absolute inset-0 rounded-full border-4 border-[#55a630]/45 overflow-hidden"
           style={{
             background: conicGradient,
             transform: `rotate(${angle}deg)`,
             transition: spinning ? 'transform 3.4s cubic-bezier(0.17, 0.67, 0.30, 0.99)' : 'none',
-            boxShadow: '0 0 32px rgba(214,169,61,0.18), inset 0 0 32px rgba(0,0,0,0.4)',
+            boxShadow: '0 0 32px rgba(85,166,48,0.18), inset 0 0 32px rgba(0,0,0,0.4)',
           }}
         >
           {prizes.map((p, i) => {
@@ -184,10 +184,10 @@ export default function SpinWheel({
         {/* Center hub */}
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
           <div
-            className="w-16 h-16 rounded-full bg-bg-base border-2 border-[#d6a93d] flex items-center justify-center"
-            style={{ boxShadow: '0 0 18px rgba(214,169,61,0.5)' }}
+            className="w-16 h-16 rounded-full bg-bg-base border-2 border-[#55a630] flex items-center justify-center"
+            style={{ boxShadow: '0 0 18px rgba(85,166,48,0.5)' }}
           >
-            <Sparkles size={22} className="text-[#d6a93d]" />
+            <Sparkles size={22} className="text-[#55a630]" />
           </div>
         </div>
       </div>
@@ -196,7 +196,7 @@ export default function SpinWheel({
         type="button"
         onClick={handleSpin}
         disabled={spinning || acBalance < costAc}
-        className="inline-flex items-center gap-2 px-7 py-3 rounded-lg text-sm font-bold bg-[#d6a93d] text-bg-base hover:brightness-110 disabled:opacity-60 transition-all"
+        className="inline-flex items-center gap-2 px-7 py-3 rounded-lg text-sm font-bold bg-[#55a630] text-bg-base hover:brightness-110 disabled:opacity-60 transition-all"
       >
         {spinning ? (
           <>

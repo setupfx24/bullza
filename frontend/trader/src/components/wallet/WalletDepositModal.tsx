@@ -158,7 +158,7 @@ export default function WalletDepositModal({
       onClick={onClose}
     >
       <div
-        className="relative w-full max-w-md rounded-2xl border border-[#d6a93d]/30 bg-bg-secondary shadow-2xl overflow-hidden"
+        className="relative w-full max-w-md rounded-2xl border border-[#55a630]/30 bg-bg-secondary shadow-2xl overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         <button
@@ -172,7 +172,7 @@ export default function WalletDepositModal({
 
         <div className="px-6 pt-6 pb-3 border-b border-border-primary">
           <h2 className="text-base font-semibold text-text-primary flex items-center gap-2">
-            <Wallet size={16} className="text-[#d6a93d]" /> Crypto deposit
+            <Wallet size={16} className="text-[#55a630]" /> Crypto deposit
           </h2>
           <p className="text-xs text-text-tertiary mt-1">
             ${amountUsd.toFixed(2)} via {labelForAsset(cryptoAsset)}
@@ -242,7 +242,7 @@ function DepositBody({
         <button
           type="button"
           onClick={onClose}
-          className="mt-2 px-5 py-2 rounded-md bg-[#d6a93d] text-bg-base text-sm font-bold"
+          className="mt-2 px-5 py-2 rounded-md bg-[#55a630] text-bg-base text-sm font-bold"
         >
           Done
         </button>
@@ -271,7 +271,7 @@ function DepositBody({
 
   return (
     <div className="px-6 py-5 space-y-4">
-      <div className="flex items-center gap-3 p-3 rounded-lg bg-[#d6a93d]/5 border border-[#d6a93d]/25">
+      <div className="flex items-center gap-3 p-3 rounded-lg bg-[#55a630]/5 border border-[#55a630]/25">
         <div className="bg-white p-2 rounded shrink-0">
           <QRCodeCanvas value={deposit.pay_address} size={88} bgColor="#ffffff" fgColor="#000000" />
         </div>
@@ -410,7 +410,7 @@ function Countdown({ deposit, expired }: { deposit: CreatedDeposit; expired: boo
   }
   return (
     <p className="text-[11px] text-text-tertiary flex items-center gap-1.5">
-      <Clock size={11} className="text-[#d6a93d]" /> Payment window: {remaining}
+      <Clock size={11} className="text-[#55a630]" /> Payment window: {remaining}
     </p>
   );
 }

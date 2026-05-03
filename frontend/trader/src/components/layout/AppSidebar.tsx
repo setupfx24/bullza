@@ -115,7 +115,7 @@ export default function AppSidebar() {
           <Link href="/dashboard" className="flex items-center gap-2 min-w-0">
             <span className="inline-flex items-baseline font-bold italic tracking-tight text-xl select-none">
               <span className="text-text-primary">FX</span>
-              <span className="text-[#d6a93d]">Artha</span>
+              <span className="text-[#55a630]">Artha</span>
             </span>
           </Link>
           <button
@@ -149,10 +149,10 @@ export default function AppSidebar() {
                       size={17}
                       strokeWidth={1.85}
                       className={cn(
-                        'shrink-0 transition-[filter,color] sidebar-icon-glow text-[#d6a93d]',
+                        'shrink-0 transition-[filter,color] sidebar-icon-glow text-[#55a630]',
                         groupActive
-                          ? 'drop-shadow-[0_0_8px_rgba(214,169,61,0.55)]'
-                          : 'drop-shadow-[0_0_6px_rgba(214,169,61,0.35)]',
+                          ? 'drop-shadow-[0_0_8px_rgba(85,166,48,0.55)]'
+                          : 'drop-shadow-[0_0_6px_rgba(85,166,48,0.35)]',
                       )}
                     />
                     <span className="truncate flex-1 text-left">{entry.label}</span>
@@ -179,7 +179,7 @@ export default function AppSidebar() {
                                 : 'text-text-secondary hover:text-text-primary hover:bg-bg-hover border border-transparent',
                             )}
                           >
-                            <child.icon size={14} strokeWidth={1.85} className="shrink-0 text-[#d6a93d]/85" />
+                            <child.icon size={14} strokeWidth={1.85} className="shrink-0 text-[#55a630]/85" />
                             <span className="truncate">{child.label}</span>
                           </Link>
                         );
@@ -210,10 +210,10 @@ export default function AppSidebar() {
                   size={17}
                   strokeWidth={1.85}
                   className={cn(
-                    'shrink-0 transition-[filter,color] sidebar-icon-glow text-[#d6a93d]',
+                    'shrink-0 transition-[filter,color] sidebar-icon-glow text-[#55a630]',
                     isActive
-                      ? 'drop-shadow-[0_0_8px_rgba(214,169,61,0.55)]'
-                      : 'drop-shadow-[0_0_6px_rgba(214,169,61,0.35)]',
+                      ? 'drop-shadow-[0_0_8px_rgba(85,166,48,0.55)]'
+                      : 'drop-shadow-[0_0_6px_rgba(85,166,48,0.35)]',
                   )}
                 />
                 <span className="truncate">{entry.label}</span>

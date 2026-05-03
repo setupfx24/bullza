@@ -13,7 +13,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from packages.common.src.config import get_settings
 from packages.common.src.database import get_db, AsyncSessionLocal
 from packages.common.src.redis_client import redis_client, PriceChannel
-from packages.common.src.kafka_client import close_producer
 from packages.common.src.auth import decode_token
 from packages.common.src.models import TradingAccount
 from packages.common.src.instrumentation import init_sentry, add_middleware_stack
@@ -96,7 +95,6 @@ async def lifespan(app: FastAPI):
     await stats_engine.stop()
     await copy_engine.stop()
     await sltp_engine.stop()
-    await close_producer()
     await redis_client.close()
 
 

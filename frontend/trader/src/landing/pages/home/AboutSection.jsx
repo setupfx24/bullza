@@ -19,9 +19,9 @@ export default function AboutSection() {
             <div className="relative">
               <div className="relative rounded-lg overflow-hidden aspect-square w-full max-w-md mx-auto border border-white/[0.08]">
                 <img
-                  src="/images/image1.png"
+                  src="/images/swisdex-logo.png"
                   alt="SwisDex Trading"
-                  className="w-full h-full object-cover"
+                  className="w-full h-full object-contain p-12 bg-gradient-to-br from-primary-bg to-primary-secondary"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-primary-bg/80 via-transparent to-transparent" />
 
