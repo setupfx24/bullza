@@ -1,0 +1,179 @@
+from functools import lru_cache
+
+from pydantic import AliasChoices, Field, model_validator
+from pydantic_settings import BaseSettings
+
+
+# Sentinel default values that MUST be overridden in any non-development environment.
+# Startup fails fast if ENVIRONMENT != "development" and any of these are still in use.
+_INSECURE_DEFAULTS: dict[str, set[str]] = {
+    "JWT_SECRET":         {"dev-secret-change-in-production", "", "changeme"},
+    "USER_JWT_SECRET":    {"dev-secret-change-in-production", "", "changeme"},
+    "ADMIN_JWT_SECRET":   {"admin-secret-change-in-production", "dev-secret-change-in-production", "", "changeme"},
+    "ADMIN_PASSWORD":     {"SwisDexAdmin2025!", "FXArthaAdmin2025!", "admin", "password", ""},
+}
+
+
+class Settings(BaseSettings):
+    ENVIRONMENT: str = "development"
+    DATABASE_URL: str = "postgresql+asyncpg://swisdex:swisdex_dev@localhost:5432/swisdex"
+    TIMESCALE_URL: str = "postgresql+asyncpg://swisdex:swisdex_dev@localhost:5433/marketdata"
+    REDIS_URL: str = "redis://localhost:6379/0"
+    KAFKA_BOOTSTRAP_SERVERS: str = "localhost:9092"
+
+    JWT_SECRET: str = "dev-secret-change-in-production"
+    JWT_ALGORITHM: str = "HS256"
+    # Short-lived access JWT (browser cookie + optional JSON for legacy clients).
+    JWT_ACCESS_EXPIRY_MINUTES: int = Field(
+        default=45,
+        validation_alias=AliasChoices("JWT_ACCESS_EXPIRY_MINUTES", "JWT_EXPIRY_MINUTES"),
+    )
+    # Refresh token row expiry in DB (rotation); still enforced when validating refresh.
+    JWT_REFRESH_EXPIRY_DAYS: int = 7
+    # If True, both access + refresh HttpOnly cookies omit Max-Age (browser session cookies).
+    # Closing the browser session clears them — user must log in again. If False, cookies use
+    # Max-Age (access ~JWT_ACCESS_EXPIRY_MINUTES, refresh JWT_REFRESH_EXPIRY_DAYS) so login
+    # survives browser restarts.
+    JWT_REFRESH_SESSION_COOKIE: bool = True
+    # Still return access_token in login/register JSON (phase out when all clients use cookies only).
+    JWT_INCLUDE_LEGACY_JSON_TOKEN: bool = True
+
+    # HttpOnly auth cookies (trader web). Secure derived from request HTTPS unless overridden.
+    ACCESS_TOKEN_COOKIE_NAME: str = "pt_access"
+    REFRESH_TOKEN_COOKIE_NAME: str = "pt_refresh"
+    COOKIE_SAMESITE: str = "strict"  # lax | strict | none
+    # If None, Secure flag follows the incoming request (HTTPS / X-Forwarded-Proto).
+    COOKIE_SECURE: bool | None = None
+    # Cookie Domain attribute. Set to a parent domain (e.g. ".swisdex.com") to share
+    # the auth session across the apex and subdomains (trade.*, etc.). Leave empty to
+    # let the browser set a host-only cookie (works for single-host dev/local setups).
+    COOKIE_DOMAIN: str = ""
+
+    # Google OAuth (Sign in / Sign up with Google). Verifies id_token audience offline
+    # against Google's JWKS — no client secret stored on our infra. When empty, the
+    # /auth/google endpoint returns 503 and the frontend hides the button.
+    GOOGLE_CLIENT_ID: str = ""
+
+    ADMIN_JWT_SECRET: str = "admin-secret-change-in-production"
+    ADMIN_JWT_ALGORITHM: str = "HS256"
+    ADMIN_JWT_EXPIRY_HOURS: int = 8
+
+    ADMIN_EMAIL: str = "admin@swisdex.com"
+    ADMIN_PASSWORD: str = "SwisDexAdmin2025!"
+    USER_JWT_SECRET: str = "dev-secret-change-in-production"
+    USER_JWT_ALGORITHM: str = "HS256"
+
+    CORS_ORIGINS: str = "http://localhost:3000,http://localhost:3001"
+    CORS_ALLOW_METHODS: str = "GET,POST,PUT,PATCH,DELETE,OPTIONS"
+    CORS_ALLOW_HEADERS: str = "Authorization,Content-Type,X-Requested-With,Accept,X-Api-Key,X-Api-Secret"
+
+    # Public trader app URL (password reset links). No trailing slash.
+    TRADER_APP_URL: str = "http://localhost:3000"
+
+    # Optional SMTP — required for password-reset emails in non-dev. If SMTP_HOST is empty, reset links are only logged in development.
+    SMTP_HOST: str = ""
+    SMTP_PORT: int = 587
+    SMTP_USER: str = ""
+    SMTP_PASSWORD: str = ""
+    SMTP_FROM: str = ""
+    SMTP_USE_TLS: bool = True
+
+    # Market data provider (Infoway.io) — fallback when Corecen LP not configured
+    INFOWAY_API_KEY: str = ""
+    INFOWAY_API_URL: str = "https://api.infoway.io"
+
+    # Corecen LP (primary market data source). When CORECEN_LP_ENABLED=true the
+    # market-data service stops running its own Infoway / simulator feed and
+    # consumes ticks pushed from Corecen via POST /api/lp/prices/batch (HMAC).
+    CORECEN_LP_ENABLED: bool = False
+    # HMAC credentials — must match SWISDEX_API_KEY / SWISDEX_API_SECRET in the Corecen .env.
+    CORECEN_LP_API_KEY: str = ""
+    CORECEN_LP_API_SECRET: str = ""
+    # Reject pushes older than this many ms (same tolerance as Corecen's HMAC middleware).
+    CORECEN_LP_TIMESTAMP_TOLERANCE_MS: int = 60_000
+
+    # Corecen Broker API (A-Book trade forwarding). When an A-Book user opens/closes
+    # a position, SwisDex pushes the trade to Corecen's broker API for LP routing.
+    # These credentials are the API key/secret registered in Corecen's admin panel
+    # for the SwisDex broker account.
+    CORECEN_BROKER_API_URL: str = ""       # e.g. https://api.corecen.com
+    CORECEN_BROKER_API_KEY: str = ""       # ck_... from Corecen broker API keys
+    CORECEN_BROKER_API_SECRET: str = ""    # cs_... from Corecen broker API keys
+
+    MARGIN_CALL_LEVEL: float = 80.0
+    STOP_OUT_LEVEL: float = 50.0
+    MAX_OPEN_TRADES: int = 200
+    DEFAULT_LEVERAGE: int = 100
+
+    # Sentry error tracking (leave empty to disable)
+    SENTRY_DSN: str = ""
+    SENTRY_TRACES_SAMPLE_RATE: float = 0.1
+
+    # SlowAPI middleware-level limit (currently disabled — per-endpoint
+    # rate_limit_http() in auth_service.py provides Redis sliding-window
+    # throttling on the actual brute-force surfaces). Kept for future use.
+    RATE_LIMIT_DEFAULT: str = "1000000/minute"
+    RATE_LIMIT_AUTH: str = "1000000/minute"
+    RATE_LIMIT_TRADING: str = "1000000/minute"
+
+    # Request body size limit (bytes) — 10 MB default
+    MAX_REQUEST_SIZE: int = 10 * 1024 * 1024
+
+    # OxaPay crypto payment gateway (legacy — kept mounted for in-flight + historical deposits)
+    OXAPAY_MERCHANT_KEY: str = ""
+    OXAPAY_SANDBOX: bool = False
+    OXAPAY_CALLBACK_BASE_URL: str = ""  # public gateway URL for webhooks, e.g. "https://api.yourdomain.com"
+
+    # NOWPayments crypto payment gateway (current default for new deposits).
+    NOWPAYMENTS_API_KEY: str = ""
+    NOWPAYMENTS_IPN_SECRET: str = ""    # IPN HMAC secret from dashboard
+    NOWPAYMENTS_SANDBOX: bool = False
+    NOWPAYMENTS_CALLBACK_BASE_URL: str = ""  # e.g. "https://api.swisdex.com"
+
+    # Absolute path recommended in production (writable volume). Relative paths are resolved from gateway CWD.
+    KYC_UPLOAD_ROOT: str = "uploads/kyc"
+    # Deposit proof screenshots + user payout QR for manual withdrawals (gateway). Mount same path in admin for review.
+    WALLET_UPLOAD_ROOT: str = "uploads/wallet"
+
+    # ─── Admin financial-action thresholds (USD) ──────────────────────────
+    # Withdrawals at or above this amount require a second admin to approve
+    # (4-eyes rule). Add-fund / deduct-fund go through the same gate.
+    ADMIN_DUAL_APPROVAL_THRESHOLD: float = 1000.0
+    # Hard cap for any single admin balance mutation (defense-in-depth, even
+    # for a super_admin). Set to 0 to disable.
+    ADMIN_BALANCE_MUTATION_CAP: float = 100_000.0
+
+    class Config:
+        env_file = ".env"
+
+    # ─── Fail-closed validation ───────────────────────────────────────────
+    @model_validator(mode="after")
+    def _enforce_production_secrets(self) -> "Settings":
+        """In any non-development environment, refuse to start if critical
+        secrets are still set to their well-known defaults. This eliminates
+        the most dangerous misconfiguration class — accidentally shipping
+        with `dev-secret-change-in-production` as the JWT signing key."""
+        if self.ENVIRONMENT.lower() in ("development", "dev", "local", "test"):
+            return self
+        bad: list[str] = []
+        for field, defaults in _INSECURE_DEFAULTS.items():
+            value = getattr(self, field, None)
+            if value in defaults:
+                bad.append(field)
+        if bad:
+            raise RuntimeError(
+                "Refusing to start: the following secrets are still at "
+                "insecure defaults — set them via environment variables: "
+                + ", ".join(sorted(bad))
+            )
+        # Reuse of the same secret across user/admin tokens is also unsafe.
+        if self.JWT_SECRET == self.ADMIN_JWT_SECRET:
+            raise RuntimeError(
+                "Refusing to start: JWT_SECRET and ADMIN_JWT_SECRET must be different."
+            )
+        return self
+
+
+@lru_cache()
+def get_settings() -> Settings:
+    return Settings()
