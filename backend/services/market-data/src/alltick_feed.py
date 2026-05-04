@@ -335,24 +335,30 @@ class AllTickFeed:
                         try:
                             msg = json.loads(raw)
                         except (json.JSONDecodeError, TypeError):
+                            logger.warning(
+                                "AllTick [conn-%d] non-JSON frame: %r",
+                                conn_idx,
+                                raw[:200] if isinstance(raw, (str, bytes)) else raw,
+                            )
                             continue
                         cmd = msg.get("cmd_id")
                         if cmd == CMD_PUSH_ORDERBOOK:
                             self._emit_orderbook(msg.get("data") or {})
                         elif cmd == CMD_PUSH_TRADE:
-                            # We don't subscribe to trades (22004) — but if a
-                            # plan delivers them anyway, ignore quietly.
                             continue
                         elif cmd == CMD_HEARTBEAT:
-                            # Heartbeat ack — fine.
                             continue
                         else:
-                            # Sub ack / error / unknown — log error frames only.
-                            err = msg.get("error") or msg.get("err_msg") or msg.get("err_code")
-                            if err:
-                                logger.warning(
-                                    "AllTick [conn-%d] error frame: %s", conn_idx, msg,
-                                )
+                            # Anything we didn't ask for — log raw so we can
+                            # decode AllTick's actual subscribe ACK / error /
+                            # symbol-rejection response. Truncated to 1KB to
+                            # keep logs sane. Remove this verbose block once
+                            # the symbol-code map is confirmed.
+                            payload = json.dumps(msg)[:1000]
+                            logger.info(
+                                "AllTick [conn-%d] non-tick frame cmd_id=%s body=%s",
+                                conn_idx, cmd, payload,
+                            )
             except asyncio.CancelledError:
                 break
             except Exception as exc:
