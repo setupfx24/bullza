@@ -1,13 +1,24 @@
 'use client'
 
 import { useEffect } from 'react'
+import { usePathname } from 'next/navigation'
 import { PopupProvider } from '@/landing/components/PopupContext'
 import ScrollProgress from '@/landing/components/animations/ScrollProgress'
 import Navbar from '@/landing/components/Navbar'
 import Footer from '@/landing/components/Footer'
 import '@/landing/landing.css'
 
+/**
+ * Landing layout — wraps every page under (landing). The home page (/)
+ * brings its own self-contained chrome (see /swisdex/HomePage), so we
+ * skip the legacy Navbar/Footer + scrub the body padding on that exact
+ * path. All inner pages (about, contact, how-it-works, etc.) keep the
+ * existing landing chrome unchanged.
+ */
 export default function LandingLayout({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname()
+  const isHome = pathname === '/'
+
   /* Override trader-app theme for landing pages */
   useEffect(() => {
     const html = document.documentElement
@@ -20,6 +31,16 @@ export default function LandingLayout({ children }: { children: React.ReactNode 
       html.style.color = '#000000'
     }
   }, [])
+
+  if (isHome) {
+    // Bare wrapper — HomePage renders its own Navbar + CtaFooter.
+    return (
+      <PopupProvider>
+        <ScrollProgress />
+        {children}
+      </PopupProvider>
+    )
+  }
 
   return (
     <PopupProvider>

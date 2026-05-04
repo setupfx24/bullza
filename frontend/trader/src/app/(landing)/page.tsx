@@ -1,43 +1,13 @@
-'use client'
+import SwisDexHomePage from '@/swisdex/HomePage'
 
-import HeroSection from '@/landing/pages/home/HeroSection'
-import WhySection from '@/landing/pages/home/WhySection'
-import MarketsSection from '@/landing/pages/home/MarketsSection'
-import AccountsSection from '@/landing/pages/home/AccountsSection'
-// import PlatformSection from '@/landing/pages/home/PlatformSection'
-import ConditionsSection from '@/landing/pages/home/ConditionsSection'
-import ToolsSection from '@/landing/pages/home/ToolsSection'
-import EducationSection from '@/landing/pages/home/EducationSection'
-import PaymentsSection from '@/landing/pages/home/PaymentsSection'
-import SecuritySection from '@/landing/pages/home/SecuritySection'
-import AboutSection from '@/landing/pages/home/AboutSection'
-import VisionMissionSection from '@/landing/pages/home/VisionMissionSection'
-// import PartnerProgramSection from '@/landing/pages/home/PartnerProgramSection'
-import IslamicAccountSection from '@/landing/pages/home/IslamicAccountSection'
-import LiveMarketChartsSection from '@/landing/pages/home/LiveMarketChartsSection'
-import StartTradingSection from '@/landing/pages/home/StartTradingSection'
-import BottomSection from '@/landing/pages/home/BottomSection'
-
+/**
+ * Public homepage at swisdex.com/.
+ *
+ * Renders the cinematic SwisDex marketing site (ported from the
+ * standalone swisdex_web Vite project) which brings its own Navbar,
+ * footer, fonts and dark-only theme. The (landing) layout detects the
+ * `/` path and suppresses its legacy chrome so the two don't stack.
+ */
 export default function LandingHomePage() {
-  return (
-    <>
-      <HeroSection />
-      <WhySection />
-      <MarketsSection />
-      <AccountsSection />
-      {/* <PlatformSection /> */}
-      <ConditionsSection />
-      <ToolsSection />
-      <LiveMarketChartsSection />
-      <EducationSection />
-      <PaymentsSection />
-      <SecuritySection />
-      <AboutSection />
-      <VisionMissionSection />
-      <IslamicAccountSection />
-      {/* <PartnerProgramSection /> */}
-      <StartTradingSection />
-      <BottomSection />
-    </>
-  )
+  return <SwisDexHomePage />
 }
