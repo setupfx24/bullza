@@ -174,7 +174,7 @@ def symmetric_quote_from_mid(
 ) -> Tuple[Decimal, Decimal]:
     """Build executable bid/ask symmetrically around mid (streamed quotes).
 
-    Infoway and other feeds contribute a mid reference; platform spread from
+    AllTick and other feeds contribute a mid reference; platform spread from
     admin spread_configs (default / segment / instrument / user) is applied
     here so the terminal and order fill prices match.
     """

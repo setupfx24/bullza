@@ -9,7 +9,7 @@ logger = logging.getLogger("market-data.store")
 
 
 def _parse_tick_time(ts: str) -> datetime:
-    """Infoway / feed timestamps are ISO strings; asyncpg needs datetime."""
+    """AllTick / feed timestamps are ISO strings; asyncpg needs datetime."""
     t = (ts or "").strip()
     if not t:
         return datetime.now(timezone.utc)

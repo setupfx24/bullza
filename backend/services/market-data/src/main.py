@@ -15,8 +15,8 @@ from packages.common.src.redis_client import (
 )
 
 from .feed_handler import FeedSimulator, INSTRUMENTS
-from .infoway_config import usable_infoway_api_key
-from .infoway_feed import InfowayFeed
+from .alltick_config import usable_alltick_token
+from .alltick_feed import AllTickFeed
 from .corecen_lp_feed import CorecenLPFeed
 from .bar_aggregator import BarAggregator
 from .seed_bars import seed as seed_bars
@@ -34,7 +34,7 @@ except Exception:
 
 settings = get_settings()
 
-# If Infoway (or another feed) stops sending a symbol, Redis keeps a frozen tick; refresh
+# If the upstream feed stops sending a symbol, Redis keeps a frozen tick; refresh
 # with last mid + current admin spread so Spr matches config until live ticks resume.
 STALE_TICK_AFTER_SEC = 90.0
 STALE_REFRESH_INTERVAL_SEC = 30.0
@@ -42,9 +42,9 @@ STALE_REFRESH_INTERVAL_SEC = 30.0
 
 class MarketDataService:
     def __init__(self):
-        raw_key = (settings.INFOWAY_API_KEY or "").strip()
+        raw_token = (getattr(settings, "ALLTICK_TOKEN", "") or "").strip()
         self._tick_count = 0
-        self._infoway_watchdog_armed = False
+        self._alltick_watchdog_armed = False
         if getattr(settings, "CORECEN_LP_ENABLED", False):
             if not settings.CORECEN_LP_API_KEY or not settings.CORECEN_LP_API_SECRET:
                 logger.error(
@@ -53,19 +53,19 @@ class MarketDataService:
                 )
             self.feed = CorecenLPFeed()
             logger.info("Price feed: Corecen LP (receiving pushes on /api/lp/prices/batch)")
-        elif usable_infoway_api_key(raw_key):
-            self.feed = InfowayFeed(raw_key, INSTRUMENTS)
-            self._infoway_watchdog_armed = True
-            logger.info("Price feed: Infoway WebSocket (depth)")
+        elif usable_alltick_token(raw_token):
+            self.feed = AllTickFeed(raw_token, INSTRUMENTS)
+            self._alltick_watchdog_armed = True
+            logger.info("Price feed: AllTick WebSocket (orderbook depth)")
         else:
             self.feed = FeedSimulator(tick_rate_multiplier=1.0)
-            if raw_key:
+            if raw_token:
                 logger.warning(
-                    "INFOWAY_API_KEY unset or looks like a placeholder — using simulated feed + Binance crypto"
+                    "ALLTICK_TOKEN unset or looks like a placeholder — using simulated feed + Binance crypto"
                 )
             else:
                 logger.warning(
-                    "INFOWAY_API_KEY not set — using simulated forex/indices + Binance crypto"
+                    "ALLTICK_TOKEN not set — using simulated forex/indices + Binance crypto"
                 )
         self.aggregator = BarAggregator()
         self.store = TickStore()
@@ -94,8 +94,8 @@ class MarketDataService:
             asyncio.create_task(self.aggregator.run_aggregation_loop()),
             asyncio.create_task(self._auto_seed_bars()),
         ]
-        if self._infoway_watchdog_armed:
-            tasks.append(asyncio.create_task(self._infoway_fallback_watchdog()))
+        if self._alltick_watchdog_armed:
+            tasks.append(asyncio.create_task(self._alltick_fallback_watchdog()))
 
         await asyncio.gather(*tasks)
 
@@ -201,24 +201,26 @@ class MarketDataService:
             self.aggregator.update(symbol, bid, ask, ts)
             self._tick_count += 1
 
-    async def _infoway_fallback_watchdog(self) -> None:
-        """If Infoway never delivers ticks (bad key, network, symbol mismatch), use simulator."""
+    async def _alltick_fallback_watchdog(self) -> None:
+        """If AllTick never delivers ticks (bad token, expired plan, network,
+        symbol mismatch), fall back to the simulator so quotes appear."""
         try:
             await asyncio.sleep(55.0)
         except asyncio.CancelledError:
             raise
         if not self.running or self._tick_count > 0:
             return
-        if not isinstance(self.feed, InfowayFeed):
+        if not isinstance(self.feed, AllTickFeed):
             return
         logger.error(
-            "Infoway: no ticks in 55s — check INFOWAY_API_KEY, outbound HTTPS/WSS, and symbol codes. "
+            "AllTick: no ticks in 55s — check ALLTICK_TOKEN, outbound WSS to "
+            "quote.alltick.co, plan symbol limits, and weekend/closed-market state. "
             "Falling back to simulated feed so quotes appear."
         )
         try:
             await self.feed.stop()
         except Exception as exc:
-            logger.warning("Stopping Infoway feed: %s", exc)
+            logger.warning("Stopping AllTick feed: %s", exc)
         self.feed = FeedSimulator(tick_rate_multiplier=1.0)
         asyncio.create_task(self.feed.start())
 

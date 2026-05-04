@@ -6,7 +6,7 @@ POST and RPUSHes each tick onto the Redis list `lp:incoming_ticks`. This feed
 BLPOPs that list and hands the tick to the market-data tick processor so the
 normal pipeline (admin spread widening, TimescaleDB storage, bar aggregation,
 price channel publish) runs unchanged — only the data source has moved from
-Infoway to Corecen LP.
+the AllTick stream to Corecen LP.
 """
 from __future__ import annotations
 
@@ -26,7 +26,7 @@ LP_TICK_QUEUE = "lp:incoming_ticks"  # must match gateway lp_receiver.py
 
 class CorecenLPFeed:
     """Drains LP ticks from Redis and exposes the same get_tick() API as the
-    other feed implementations (InfowayFeed / FeedSimulator)."""
+    other feed implementations (AllTickFeed / FeedSimulator)."""
 
     def __init__(self) -> None:
         self._tick_queue: asyncio.Queue = asyncio.Queue(maxsize=50_000)
@@ -41,7 +41,7 @@ class CorecenLPFeed:
         self._running = True
         logger.info("Corecen LP feed starting — draining %s", LP_TICK_QUEUE)
         self._drain_task = asyncio.create_task(self._drain_loop(), name="corecen-lp-drain")
-        # Keep start() alive while the drain task runs (matches InfowayFeed).
+        # Keep start() alive while the drain task runs (matches AllTickFeed).
         try:
             await self._drain_task
         except asyncio.CancelledError:

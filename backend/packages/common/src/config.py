@@ -77,12 +77,20 @@ class Settings(BaseSettings):
     SMTP_FROM: str = ""
     SMTP_USE_TLS: bool = True
 
-    # Market data provider (Infoway.io) — fallback when Corecen LP not configured
-    INFOWAY_API_KEY: str = ""
-    INFOWAY_API_URL: str = "https://api.infoway.io"
+    # ─── AllTick — primary market-data provider ─────────────────────────
+    # Real-time forex / metals / crypto / indices CFD ticks via WebSocket.
+    # Get a token at https://alltick.co (paid plan required for full
+    # symbol coverage; free tier limits to 5 symbols / 1 connection).
+    # When ALLTICK_TOKEN is empty or a placeholder, market-data falls back
+    # to FeedSimulator + Binance (crypto only) so the platform still runs
+    # in dev / unfunded environments.
+    ALLTICK_TOKEN: str = ""
+    # Override only if AllTick directs you to a regional endpoint.
+    ALLTICK_FOREX_WS_URL: str = "wss://quote.alltick.co/quote-b-ws-api"
+    ALLTICK_STOCK_WS_URL: str = "wss://quote.alltick.co/quote-stock-b-ws-api"
 
-    # Corecen LP (primary market data source). When CORECEN_LP_ENABLED=true the
-    # market-data service stops running its own Infoway / simulator feed and
+    # Corecen LP (alternate primary market data source). When CORECEN_LP_ENABLED=true
+    # the market-data service stops running its own AllTick / simulator feed and
     # consumes ticks pushed from Corecen via POST /api/lp/prices/batch (HMAC).
     CORECEN_LP_ENABLED: bool = False
     # HMAC credentials — must match SWISDEX_API_KEY / SWISDEX_API_SECRET in the Corecen .env.

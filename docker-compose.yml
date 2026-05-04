@@ -115,9 +115,11 @@ services:
       - path: ./.env
         required: false
     environment:
-      # Ensure key is in process env (Compose substitution + container env)
-      INFOWAY_API_KEY: ${INFOWAY_API_KEY:-}
-      INFOWAY_API_URL: ${INFOWAY_API_URL:-https://api.infoway.io}
+      # AllTick is the production tick source (real-time WS depth feed).
+      # If ALLTICK_TOKEN is empty / placeholder, market-data drops back to
+      # FeedSimulator + Binance for crypto so dev environments still tick.
+      ALLTICK_TOKEN: ${ALLTICK_TOKEN:-}
+      ALLTICK_FOREX_WS_URL: ${ALLTICK_FOREX_WS_URL:-wss://quote.alltick.co/quote-b-ws-api}
     depends_on:
       timescaledb:
         condition: service_healthy

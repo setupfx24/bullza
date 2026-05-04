@@ -1,6 +1,8 @@
-"""Feed Handler — Infoway (see `infoway_feed`) when `INFOWAY_API_KEY` is set.
+"""Feed Handler — production data via AllTick (see `alltick_feed`) when
+`ALLTICK_TOKEN` is set, or Corecen LP receiver when `CORECEN_LP_ENABLED=true`.
 
-Fallback (no API key): Binance for crypto + GBM simulator for other symbols.
+Fallback (no token): Binance for crypto + GBM simulator for other symbols.
+This module owns the FeedSimulator class used as that fallback.
 """
 
 import asyncio
