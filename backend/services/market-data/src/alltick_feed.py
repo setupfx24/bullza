@@ -226,11 +226,17 @@ class AllTickFeed:
             self._tick_queue.put_nowait(tick)
 
     def _emit_orderbook(self, data: dict) -> None:
-        """Parse a CMD_PUSH_ORDERBOOK payload and enqueue a normalised tick."""
+        """Parse a CMD_PUSH_ORDERBOOK (22999) payload and enqueue a tick.
+
+        Kept as a fallback path in case AllTick ever streams orderbook
+        depth for our asset class (currently they don't — see _run_socket
+        which subscribes via CMD_SUB_TRADES instead). If 22999 frames
+        arrive anyway, we treat them the same as orderbook would deliver.
+        """
         code = data.get("code")
         symbol = _platform_code_for(str(code or ""), self._instruments)
         if not symbol:
-            return  # symbol we don't price internally — ignore silently
+            return
 
         bid_list = data.get("bid_list") or []
         ask_list = data.get("ask_list") or []
@@ -246,21 +252,59 @@ class AllTickFeed:
 
         info = self._instruments[symbol]
         decimals = int(info["decimals"])
-        # Collapse the LP's own bid/ask to a mid; the platform spread is
-        # applied downstream in main.py via spread_cache.widen(). Same
-        # contract the FeedSimulator used.
         mid = round((bid + ask) / 2.0, decimals)
         timestamp = _parse_iso_ts(data.get("tick_time"))
 
-        # AllTick does not provide volume for forex / metals / CFDs (per docs).
-        # Synthesise a plausible value for downstream consumers that expect one;
-        # store / aggregator just need it non-zero for tick counting.
         vol = 1
         try:
             v_b = int(float(bid_list[0].get("volume") or 0))
             v_a = int(float(ask_list[0].get("volume") or 0))
             if v_b + v_a > 0:
                 vol = v_b + v_a
+        except (TypeError, ValueError):
+            pass
+
+        self._enqueue({
+            "symbol": symbol,
+            "bid": mid,
+            "ask": mid,
+            "timestamp": timestamp,
+            "volume": vol,
+        })
+
+    def _emit_trade(self, data: dict) -> None:
+        """Parse a CMD_PUSH_TRADE (22998) payload — the primary feed for
+        forex / metals / crypto / CFDs on AllTick. Schema (per their docs):
+
+            {"code": "EURUSD", "seq": "...", "tick_time": "1605509068",
+             "price": "1.08234", "volume": "300", "trade_direction": 1}
+
+        We use `price` as the mid — platform bid/ask spread is applied
+        downstream by spread_cache.widen() in main.py. Same contract the
+        FeedSimulator and orderbook path used.
+        """
+        code = data.get("code")
+        symbol = _platform_code_for(str(code or ""), self._instruments)
+        if not symbol:
+            return  # not in our instruments dict
+
+        try:
+            price = float(data.get("price"))
+        except (TypeError, ValueError):
+            return
+        if price <= 0:
+            return
+
+        info = self._instruments[symbol]
+        decimals = int(info["decimals"])
+        mid = round(price, decimals)
+        timestamp = _parse_iso_ts(data.get("tick_time"))
+
+        vol = 1
+        try:
+            v = int(float(data.get("volume") or 0))
+            if v > 0:
+                vol = v
         except (TypeError, ValueError):
             pass
 
@@ -295,9 +339,20 @@ class AllTickFeed:
 
     async def _run_socket(self, conn_idx: int, codes: List[str]) -> None:
         """Long-lived connection: subscribe once, heartbeat, consume pushes,
-        reconnect with capped exponential backoff on any failure."""
+        reconnect with capped exponential backoff on any failure.
+
+        IMPORTANT: we subscribe with CMD_SUB_TRADES (22004) — the
+        real-time tick-by-tick / last-price feed. AllTick's CMD_SUB_ORDERBOOK
+        (22002) is also accepted on this token but does NOT push 22999
+        frames for forex / metals / crypto / CFDs (it's stocks-oriented),
+        which leaves the stream silent until the watchdog fires. 22004
+        delivers a single `price` per tick (the last trade) which we use
+        as the mid; platform spread is still applied downstream by
+        spread_cache.widen() so admin spread config keeps working.
+        """
         url = self._ws_url()
-        symbol_list = [{"code": c, "depth_level": DEPTH_LEVEL} for c in codes]
+        # Trade-tick subscription needs only `code` per symbol (no depth_level).
+        symbol_list = [{"code": c} for c in codes]
         backoff = RECONNECT_BACKOFF_BASE
 
         while self._running:
@@ -309,20 +364,20 @@ class AllTickFeed:
                     ping_interval=20,
                     ping_timeout=25,
                     close_timeout=10,
-                    max_size=4 * 1024 * 1024,  # depth payloads can be ~kB
+                    max_size=4 * 1024 * 1024,
                 ) as ws:
                     sub_payload = {
-                        "cmd_id": CMD_SUB_ORDERBOOK,
+                        "cmd_id": CMD_SUB_TRADES,
                         "seq_id": self._next_seq(),
                         "trace": _trace(),
                         "data": {"symbol_list": symbol_list},
                     }
                     await ws.send(json.dumps(sub_payload))
                     logger.info(
-                        "AllTick [conn-%d] subscribed orderbook for %d symbols",
+                        "AllTick [conn-%d] subscribed trade ticks for %d symbols",
                         conn_idx, len(codes),
                     )
-                    backoff = RECONNECT_BACKOFF_BASE  # successful connect → reset
+                    backoff = RECONNECT_BACKOFF_BASE
 
                     hb_task = asyncio.create_task(
                         self._heartbeat_loop(ws),
@@ -342,10 +397,13 @@ class AllTickFeed:
                             )
                             continue
                         cmd = msg.get("cmd_id")
-                        if cmd == CMD_PUSH_ORDERBOOK:
+                        if cmd == CMD_PUSH_TRADE:
+                            self._emit_trade(msg.get("data") or {})
+                        elif cmd == CMD_PUSH_ORDERBOOK:
+                            # Defensive — AllTick may also push orderbook
+                            # if a different sub is added later. Same shape
+                            # handler as before.
                             self._emit_orderbook(msg.get("data") or {})
-                        elif cmd == CMD_PUSH_TRADE:
-                            continue
                         elif cmd == CMD_HEARTBEAT:
                             continue
                         else:
