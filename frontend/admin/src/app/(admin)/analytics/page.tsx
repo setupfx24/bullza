@@ -1,10 +1,45 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { adminApi } from '@/lib/api';
 import { cn } from '@/lib/utils';
-import { Loader2, RefreshCw, DollarSign, TrendingUp, AlertTriangle, BarChart3, Users, CreditCard, Gift, GitBranch } from 'lucide-react';
+import { Loader2, RefreshCw, DollarSign, TrendingUp, AlertTriangle, BarChart3, Users, CreditCard, Gift, GitBranch, Calendar } from 'lucide-react';
 import toast from 'react-hot-toast';
+
+/** YYYY-MM-DD in local time (avoids the UTC-shift `toISOString()` pitfall). */
+function ymd(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+/** Quick-pick presets for the analytics date filter. Each returns a [start,end]
+ *  YYYY-MM-DD pair that the API consumes as inclusive bounds. */
+function presetRange(key: PresetKey): [string, string] {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const yesterday = new Date(today); yesterday.setDate(yesterday.getDate() - 1);
+  const dayBefore = new Date(today); dayBefore.setDate(dayBefore.getDate() - 2);
+  const last7Start = new Date(today); last7Start.setDate(last7Start.getDate() - 6);
+  const last30Start = new Date(today); last30Start.setDate(last30Start.getDate() - 29);
+  switch (key) {
+    case 'today':       return [ymd(today), ymd(today)];
+    case 'yesterday':   return [ymd(yesterday), ymd(yesterday)];
+    case 'day_before':  return [ymd(dayBefore), ymd(dayBefore)];
+    case 'last_7':      return [ymd(last7Start), ymd(today)];
+    case 'last_30':     return [ymd(last30Start), ymd(today)];
+  }
+}
+
+type PresetKey = 'today' | 'yesterday' | 'day_before' | 'last_7' | 'last_30';
+const PRESETS: { key: PresetKey; label: string }[] = [
+  { key: 'today',      label: 'Today' },
+  { key: 'yesterday',  label: 'Yesterday' },
+  { key: 'day_before', label: 'Day Before' },
+  { key: 'last_7',     label: 'Last 7 days' },
+  { key: 'last_30',    label: 'Last 30 days' },
+];
 
 interface RevenueStats {
   total_revenue: number;
@@ -68,12 +103,29 @@ export default function AnalyticsPage() {
   const [exposure, setExposure] = useState<ExposureRow[]>([]);
   const [profitableUsers, setProfitableUsers] = useState<ProfitableUser[]>([]);
   const [loading, setLoading] = useState(true);
+  const [activePreset, setActivePreset] = useState<PresetKey | 'custom' | null>(null);
+  // Default to "Today" when the page first loads — gives the admin instant
+  // numbers without forcing a click. They can switch presets or pick custom.
+  const [startDate, setStartDate] = useState<string>(() => ymd(new Date()));
+  const [endDate, setEndDate] = useState<string>(() => ymd(new Date()));
+
+  const rangeLabel = useMemo(() => {
+    if (!activePreset) return null;
+    if (activePreset === 'custom') {
+      return startDate === endDate ? startDate : `${startDate} → ${endDate}`;
+    }
+    return PRESETS.find((p) => p.key === activePreset)?.label ?? null;
+  }, [activePreset, startDate, endDate]);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
+      const params = new URLSearchParams();
+      if (startDate) params.set('start_date', startDate);
+      if (endDate) params.set('end_date', endDate);
+      const dashUrl = `/analytics/dashboard${params.toString() ? `?${params}` : ''}`;
       const [dashRes, expRes] = await Promise.all([
-        adminApi.get<any>('/analytics/dashboard'),
+        adminApi.get<any>(dashUrl),
         adminApi.get<{ exposure: ExposureRow[]; profitable_users?: ProfitableUser[] }>('/analytics/exposure'),
       ]);
       setData(dashRes);
@@ -84,9 +136,23 @@ export default function AnalyticsPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [startDate, endDate]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
+
+  const applyPreset = (key: PresetKey) => {
+    const [s, e] = presetRange(key);
+    setStartDate(s);
+    setEndDate(e);
+    setActivePreset(key);
+  };
+
+  // On first render set the default preset so the highlight ring starts on
+  // "Today" and matches the default start/end dates above.
+  useEffect(() => {
+    if (activePreset === null) setActivePreset('today');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   if (loading) return <><div className="flex items-center justify-center h-96"><Loader2 size={20} className="animate-spin text-text-tertiary" /></div></>;
 
@@ -101,9 +167,66 @@ export default function AnalyticsPage() {
           <button onClick={fetchData} className="p-1.5 rounded-md border border-border-primary text-text-secondary hover:bg-bg-hover transition-fast"><RefreshCw size={14} /></button>
         </div>
 
+        {/* Date-range filter — quick presets + custom calendar */}
+        <div className="bg-bg-secondary border border-border-primary rounded-md p-3">
+          <div className="flex items-center gap-2 mb-2.5">
+            <Calendar size={13} className="text-text-tertiary" />
+            <span className="text-xxs uppercase tracking-wide text-text-tertiary font-medium">Date Range</span>
+            {rangeLabel && (
+              <span className="text-xxs text-text-secondary ml-1">· {rangeLabel}</span>
+            )}
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            {PRESETS.map((p) => (
+              <button
+                key={p.key}
+                onClick={() => applyPreset(p.key)}
+                className={cn(
+                  'px-2.5 py-1 rounded-md text-xs font-medium border transition-fast',
+                  activePreset === p.key
+                    ? 'bg-buy/15 border-buy/40 text-buy'
+                    : 'border-border-primary text-text-secondary hover:bg-bg-hover',
+                )}
+              >
+                {p.label}
+              </button>
+            ))}
+            <span className="mx-1 text-text-tertiary text-xxs">|</span>
+            <input
+              type="date"
+              value={startDate}
+              max={endDate || undefined}
+              onChange={(e) => { setStartDate(e.target.value); setActivePreset('custom'); }}
+              className="px-2 py-1 rounded-md text-xs bg-bg-input border border-border-primary text-text-primary"
+            />
+            <span className="text-xxs text-text-tertiary">to</span>
+            <input
+              type="date"
+              value={endDate}
+              min={startDate || undefined}
+              onChange={(e) => { setEndDate(e.target.value); setActivePreset('custom'); }}
+              className="px-2 py-1 rounded-md text-xs bg-bg-input border border-border-primary text-text-primary"
+            />
+          </div>
+        </div>
+
         {/* Revenue Cards */}
         {data && (
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
+            {data.custom_range && (
+              <div className="bg-bg-secondary border-2 border-buy/40 rounded-md p-4 ring-1 ring-buy/20">
+                <h3 className="text-xxs text-buy uppercase tracking-wide font-semibold mb-2 flex items-center gap-1.5">
+                  <Calendar size={11} /> Selected Range
+                </h3>
+                <p className="text-xl font-semibold text-text-primary font-mono tabular-nums mb-3">${fmt(data.custom_range.total_revenue)}</p>
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div><p className="text-xxs text-text-tertiary">Commission</p><p className="text-text-primary font-mono">${fmt(data.custom_range.commission_revenue)}</p></div>
+                  <div><p className="text-xxs text-text-tertiary">Swap</p><p className="text-text-primary font-mono">${fmt(data.custom_range.swap_revenue)}</p></div>
+                  <div><p className="text-xxs text-text-tertiary">Spread</p><p className="text-text-primary font-mono">${fmt(data.custom_range.spread_revenue)}</p></div>
+                  <div><p className="text-xxs text-text-tertiary">Net P&L</p><p className={cn('font-mono font-medium', data.custom_range.net_pnl >= 0 ? 'text-success' : 'text-danger')}>{data.custom_range.net_pnl >= 0 ? '+' : ''}${fmt(data.custom_range.net_pnl)}</p></div>
+                </div>
+              </div>
+            )}
             <RevenueCard title="Today" stats={data.today} />
             <RevenueCard title="This Week" stats={data.this_week} />
             <RevenueCard title="This Month" stats={data.this_month} />
