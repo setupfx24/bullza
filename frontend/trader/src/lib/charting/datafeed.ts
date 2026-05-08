@@ -124,7 +124,15 @@ function generateSyntheticBars(
   const count = Math.min(Math.floor((toAligned - fromAligned) / resSec) + 1, 500);
   const startSec = toAligned - (count - 1) * resSec;
 
-  const seed = symbol.split('').reduce((a, c) => a + c.charCodeAt(0), 0) + Math.floor(startSec / 86400);
+  // Seed must be STABLE across timeframe switches. Previously it included
+  // floor(startSec / 86400) (a per-day offset), which changes when the user
+  // changes resolution because resSec * (count - 1) shifts startSec across
+  // day boundaries. That made the chart look like an entirely different
+  // history every time the trader clicked 5m → 1h → 4h.
+  // Now seeded only by symbol — pattern stays consistent across TF switches.
+  // (Right architectural fix is to use real OHLC from AllTick REST; this
+  // keeps the synthetic fallback usable until that lands.)
+  const seed = symbol.split('').reduce((a, c) => a + c.charCodeAt(0), 0);
   const rand = seededRand(seed);
 
   const increments = Array.from({ length: count }, () => (rand() - 0.5) * volatility * 2);

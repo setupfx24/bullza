@@ -2,14 +2,28 @@
 
 import { motion } from 'motion/react';
 import Link from 'next/link';
-import { ArrowUpRight } from 'lucide-react';
+import {
+  ArrowUpRight,
+  Network,
+  ShieldCheck,
+  BadgeCheck,
+  type LucideIcon,
+} from 'lucide-react';
 import { useRef } from 'react';
 import { BubbleText } from '../ui/BubbleText';
 import { Button } from '../ui/Button';
 import { TypewriterText } from './TypewriterText';
 import { LiveTickerBar } from './LiveTickerBar';
 import LineWaves from './LineWaves';
-import { HERO } from '../data';
+import { HERO, HERO_TRUST_PILLS } from '../data';
+
+// Icon name -> lucide component. Kept tiny so we don't ship the full
+// lucide bundle just for hero pills.
+const TRUST_ICON_MAP: Record<string, LucideIcon> = {
+  Network,
+  ShieldCheck,
+  BadgeCheck,
+};
 
 export function Hero() {
   const heroRef = useRef<HTMLElement>(null);
@@ -68,11 +82,38 @@ export function Hero() {
             className="mt-6 font-body text-base md:text-lg text-foreground/70 max-w-2xl leading-relaxed min-h-[3em]"
           />
 
+          {/* Three trust pills — Decentralised Exchange / Insured Trade / Licensed Broker.
+              First read for any visitor; positions SwisDex against custodial brokers. */}
+          <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 1.2, duration: 0.6 }}
+            className="mt-8 flex flex-wrap items-center justify-center gap-3 pointer-events-auto"
+          >
+            {HERO_TRUST_PILLS.map((p) => {
+              const Icon = TRUST_ICON_MAP[p.icon] ?? ShieldCheck;
+              return (
+                <div
+                  key={p.label}
+                  className="liquid-glass rounded-full pl-2 pr-4 py-2 flex items-center gap-2.5"
+                  title={p.sub}
+                >
+                  <span className="liquid-glass-strong rounded-full size-7 flex items-center justify-center shrink-0">
+                    <Icon className="size-3.5 text-[#7dc24f]" />
+                  </span>
+                  <span className="font-display uppercase tracking-wide text-xs sm:text-sm text-foreground whitespace-nowrap">
+                    {p.label}
+                  </span>
+                </div>
+              );
+            })}
+          </motion.div>
+
           <motion.div
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 1.4, duration: 0.6 }}
-            className="mt-10 flex items-center gap-3 flex-wrap justify-center pointer-events-auto"
+            className="mt-8 flex items-center gap-3 flex-wrap justify-center pointer-events-auto"
           >
             <Button variant="hero" asChild>
               <Link href={HERO.ctaHref}>
