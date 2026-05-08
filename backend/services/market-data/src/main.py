@@ -19,7 +19,7 @@ from .alltick_config import usable_alltick_token
 from .alltick_feed import AllTickFeed
 from .corecen_lp_feed import CorecenLPFeed
 from .bar_aggregator import BarAggregator
-from .seed_bars import seed as seed_bars
+from .seed_bars import seed as seed_bars, flush_non_crypto_keys
 from .spread_cache import StreamSpreadCache, RELOAD_INTERVAL_SEC
 from .store import TickStore
 
@@ -225,19 +225,46 @@ class MarketDataService:
         asyncio.create_task(self.feed.start())
 
     async def _auto_seed_bars(self) -> None:
-        """Wait for first ticks to arrive, then seed historical bars if Redis is empty."""
+        """Wait for first ticks to arrive, then seed historical bars.
+
+        On every startup we drop any non-crypto `bars:*:*` keys first.
+        Those used to be filled with simulated random-walk data when
+        AllTick wasn't yet integrated; the keys have no TTL so they
+        survive across deploys until explicitly deleted. After the
+        flush, `seed_bars()` repopulates from real AllTick history
+        (and Binance for crypto). Crypto bars are left untouched —
+        they were always real.
+
+        The crypto-presence check is kept as a fast-path: if BTCUSD
+        already has 50+ bars in Redis we short-circuit so a normal
+        restart doesn't re-fetch all crypto bars unnecessarily.
+        """
         try:
             await asyncio.sleep(30.0)  # give feed time to start delivering ticks
         except asyncio.CancelledError:
             raise
         if not self.running:
             return
-        # Check if bars already exist for a common symbol
+
+        # Drop simulated non-crypto bars from any earlier deploy so the seed
+        # below replaces them with real AllTick data. No-op on a fresh deploy
+        # (nothing to delete) so this is safe to run unconditionally.
+        try:
+            flushed = await flush_non_crypto_keys()
+            if flushed:
+                logger.info("Auto-seed: flushed %d stale non-crypto bar keys", flushed)
+        except Exception as exc:
+            logger.warning("Auto-seed flush failed (continuing): %s", exc)
+
         sample_count = await redis_client.llen("bars:BTCUSD:5m")
         if sample_count >= 50:
-            logger.info("Bars already seeded (%d bars for BTCUSD:5m), skipping auto-seed", sample_count)
-            return
-        logger.info("Auto-seeding historical bars (first run or bars missing)...")
+            logger.info(
+                "Bars already seeded for crypto (%d bars for BTCUSD:5m); "
+                "running seed for non-crypto only",
+                sample_count,
+            )
+        else:
+            logger.info("Auto-seeding historical bars (first run or bars missing)...")
         try:
             await seed_bars()
         except Exception as exc:

@@ -4,20 +4,24 @@ Run once (or on demand) to backfill chart history so the TradingView
 Advanced Chart has candles to display immediately.
 
 Usage (inside the market-data container):
-    python -m src.seed_bars
+    python -m src.seed_bars                 # standard reseed
+    python -m src.seed_bars --force         # reseed even if Redis has bars
+    python -m src.seed_bars --flush-non-crypto  # drop simulated history first
 
 Crypto symbols: fetches REAL historical klines from Binance public API.
-Other symbols: generates simulated bars anchored to the current live price.
+Non-crypto symbols: fetches REAL historical klines from AllTick REST.
+Falls back to skipping (NOT simulated bars) if AllTick is unavailable —
+serving an empty chart is better than serving believable lies.
 """
+import argparse
 import asyncio
 import json
 import logging
-import math
-import random
-import time
 
 import httpx
 
+from packages.common.src.alltick_rest import fetch_klines as alltick_fetch_klines
+from packages.common.src.config import get_settings
 from packages.common.src.redis_client import redis_client
 
 logger = logging.getLogger("seed-bars")
@@ -48,14 +52,6 @@ BINANCE_PAIRS: dict[str, str] = {
 
 BARS_COUNT = 500
 
-VOLATILITY = {
-    "forex": 0.0001,
-    "crypto": 0.003,
-    "indices": 0.001,
-    "commodities": 0.0015,
-    "stocks": 0.002,
-}
-
 
 def _guess_segment(symbol: str) -> str:
     s = symbol.upper()
@@ -66,6 +62,38 @@ def _guess_segment(symbol: str) -> str:
     if s in ("US30", "US500", "NAS100", "UK100", "GER40"):
         return "indices"
     return "forex"
+
+
+async def flush_non_crypto_keys() -> int:
+    """Delete `bars:*:*` Redis keys for non-crypto symbols.
+
+    The previous version of this seeder generated simulated random-walk
+    bars for forex / metals / CFDs / indices. Those keys have no TTL so
+    they linger across deploys; deleting them forces the AllTick branch
+    below to repopulate with real history. Crypto bars are left alone
+    (they come from real Binance data and are correct).
+
+    Returns the number of keys deleted.
+    """
+    cursor = 0
+    deleted = 0
+    while True:
+        cursor, keys = await redis_client.scan(cursor, match="bars:*:*", count=200)
+        for key in keys:
+            # `bars:{SYMBOL}:{TIMEFRAME}`
+            parts = key.split(":")
+            if len(parts) != 3:
+                continue
+            sym = parts[1].upper()
+            if sym in BINANCE_PAIRS:
+                continue
+            await redis_client.delete(key)
+            deleted += 1
+        if cursor == 0:
+            break
+    if deleted:
+        logger.info("Flushed %d simulated non-crypto bar keys", deleted)
+    return deleted
 
 
 async def _fetch_binance_klines(symbol: str, tf_name: str, count: int = 500) -> list[dict]:
@@ -103,52 +131,13 @@ async def _fetch_binance_klines(symbol: str, tf_name: str, count: int = 500) -> 
     return bars
 
 
-def _generate_bars(base_price: float, segment: str, tf_seconds: int, count: int) -> list[dict]:
-    """Walk backwards from now, generating simulated OHLCV bars anchored to current price."""
-    vol = VOLATILITY.get(segment, 0.001)
-    bar_vol = vol * math.sqrt(tf_seconds / 60)
-
-    now = int(time.time())
-    bar_start = (now // tf_seconds) * tf_seconds
-
-    bars = []
-    price = base_price
-
-    # Generate bars going backwards from current price
-    for i in range(count, 0, -1):
-        t = bar_start - i * tf_seconds
-        change = random.gauss(0, bar_vol) * price
-        open_p = price
-        moves = [open_p]
-        for _ in range(4):
-            moves.append(moves[-1] + random.gauss(0, bar_vol * 0.5) * price)
-        close_p = moves[-1]
-        high_p = max(moves) + abs(random.gauss(0, bar_vol * 0.2) * price)
-        low_p = min(moves) - abs(random.gauss(0, bar_vol * 0.2) * price)
-
-        high_p = max(high_p, open_p, close_p)
-        low_p = min(low_p, open_p, close_p)
-
-        bars.append({
-            "time": t,
-            "open": round(open_p, 6),
-            "high": round(high_p, 6),
-            "low": round(low_p, 6),
-            "close": round(close_p, 6),
-            "volume": round(random.uniform(10, 1000), 2),
-            "tick_count": random.randint(5, 200),
-        })
-
-        price = close_p + change * 0.3
-
-    return bars
-
-
 async def seed(force: bool = False):
     """Read current prices from Redis and seed historical bars.
 
-    For crypto symbols, fetches real bars from Binance.
-    For other symbols, generates simulated bars from current price.
+    For crypto symbols, fetches real bars from Binance public API.
+    For non-crypto symbols, fetches real bars from AllTick REST.
+    Symbols with no real data available are skipped (we never
+    generate fake bars — that was the bug this fix closes).
     """
     # Discover symbols from tick:* keys (available even before bar aggregation starts)
     symbols: set[str] = set()
@@ -183,35 +172,21 @@ async def seed(force: bool = False):
 
     logger.info("Found %d symbols: %s", len(symbols), ", ".join(sorted(symbols)))
 
+    settings = get_settings()
+    alltick_token = (settings.ALLTICK_TOKEN or "").strip()
+
     for sym in sorted(symbols):
         segment = _guess_segment(sym)
         is_crypto = sym in BINANCE_PAIRS
+        source = "binance" if is_crypto else ("alltick" if alltick_token else "skip")
 
-        # Get current price for non-crypto simulation
-        mid = 0.0
-        if not is_crypto:
-            raw = await redis_client.get(f"tick:{sym}")
-            if raw:
-                try:
-                    d = json.loads(raw)
-                    mid = (float(d.get("bid", 0)) + float(d.get("ask", 0))) / 2
-                except Exception:
-                    pass
-            if mid <= 0:
-                raw = await redis_client.get(f"bar:current:{sym}:1m")
-                if raw:
-                    try:
-                        d = json.loads(raw)
-                        mid = (float(d.get("open", 0)) + float(d.get("close", 0))) / 2
-                    except Exception:
-                        pass
-            if mid <= 0:
-                logger.info("Skipping %s — no current price available", sym)
-                continue
+        if not is_crypto and not alltick_token:
+            logger.info("Skipping %s — no ALLTICK_TOKEN configured", sym)
+            continue
 
-        logger.info("Seeding %s (segment=%s, source=%s)", sym, segment, "binance" if is_crypto else "simulated")
+        logger.info("Seeding %s (segment=%s, source=%s)", sym, segment, source)
 
-        for tf_name, tf_seconds in TIMEFRAMES.items():
+        for tf_name, _tf_seconds in TIMEFRAMES.items():
             list_key = f"bars:{sym}:{tf_name}"
 
             if not force:
@@ -226,9 +201,21 @@ async def seed(force: bool = False):
                     logger.warning("  %s:%s Binance fetch returned 0 bars", sym, tf_name)
                     continue
             else:
-                bars = _generate_bars(mid, segment, tf_seconds, BARS_COUNT)
+                # Real history from AllTick REST. If AllTick is down or the
+                # symbol isn't supported, return [] and skip — never fall
+                # back to simulated bars.
+                bars = await alltick_fetch_klines(
+                    sym, tf_name, count=BARS_COUNT, token=alltick_token,
+                )
+                if not bars:
+                    logger.warning("  %s:%s AllTick fetch returned 0 bars", sym, tf_name)
+                    continue
 
-            # Clear old data and write new bars
+            # Clear old data and write new bars. lpush newest-first to match
+            # the BarAggregator's live-write convention (see bar_aggregator.py).
+            # AllTick / Binance fetchers return bars sorted oldest → newest;
+            # iterating in that order with lpush lands the newest bar at
+            # index 0, which is what get_bars() and the chart expect.
             pipe = redis_client.pipeline()
             pipe.delete(list_key)
             for bar in bars:
@@ -239,12 +226,31 @@ async def seed(force: bool = False):
             await pipe.execute()
             logger.info("  %s:%s → %d bars seeded", sym, tf_name, len(bars))
 
-            # Small delay to avoid rate-limiting on Binance
-            if is_crypto:
-                await asyncio.sleep(0.2)
+            # Small delay between requests. AllTick paid plans cap at ~10/s
+            # and the rest module already enforces concurrency + spacing,
+            # but a per-loop sleep keeps any single seed run from monopolising
+            # the rate budget while live ticks are also flowing.
+            await asyncio.sleep(0.15)
 
     logger.info("Done seeding all symbols.")
 
 
+async def _cli_main():
+    parser = argparse.ArgumentParser(description="Seed historical OHLCV bars into Redis.")
+    parser.add_argument(
+        "--force", action="store_true",
+        help="Reseed even if Redis already has bars for a symbol/timeframe.",
+    )
+    parser.add_argument(
+        "--flush-non-crypto", action="store_true",
+        help="Drop existing non-crypto `bars:*:*` keys before seeding so any "
+             "leftover simulated history is replaced with real AllTick data.",
+    )
+    args = parser.parse_args()
+    if args.flush_non_crypto:
+        await flush_non_crypto_keys()
+    await seed(force=args.force)
+
+
 if __name__ == "__main__":
-    asyncio.run(seed())
+    asyncio.run(_cli_main())

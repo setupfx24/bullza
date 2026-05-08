@@ -5,6 +5,8 @@ import time as _time
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from packages.common.src.alltick_rest import fetch_klines as alltick_fetch_klines
+from packages.common.src.config import get_settings
 from packages.common.src.database import get_db
 from packages.common.src.redis_client import redis_client
 from packages.common.src.schemas import InstrumentResponse, TickData
@@ -146,6 +148,80 @@ async def get_price(symbol: str):
     return await instrument_service.get_price(symbol=symbol)
 
 
+async def _backfill_alltick_bars(
+    sym: str, tf: str, *, end_ts: int = 0,
+) -> list[dict]:
+    """On-demand AllTick REST backfill for non-crypto symbols.
+
+    Called when Redis returns fewer bars than the chart needs (cold cache
+    on first deploy, or the user pans/scrolls to history older than the
+    1000-bar Redis ring). Writes the result back into Redis so the next
+    request is warm. Returns the bars (oldest → newest).
+    """
+    settings = get_settings()
+    token = (settings.ALLTICK_TOKEN or "").strip()
+    if not token:
+        return []
+
+    try:
+        bars = await alltick_fetch_klines(sym, tf, count=1000, end_ts=end_ts, token=token)
+    except Exception as exc:
+        _logger.warning("alltick on-demand fetch failed for %s %s: %s", sym, tf, exc)
+        return []
+
+    if not bars:
+        return []
+
+    # Merge with whatever's in Redis (dedup by timestamp), then re-write the
+    # full list so the next request is warm. We use lpush + ltrim 1000 to
+    # match BarAggregator's convention (newest at index 0). Bars are emitted
+    # by alltick_rest as oldest→newest, so iterating in that order with lpush
+    # leaves the newest bar at index 0 of the Redis list — what get_bars
+    # below expects on the read path.
+    list_key = f"bars:{sym}:{tf}"
+    existing_raw = await redis_client.lrange(list_key, 0, 999)
+    seen_ts = set()
+    merged: list[dict] = []
+    for raw in existing_raw:
+        try:
+            b = _json.loads(raw)
+            t = int(b.get("time", 0))
+            if t in seen_ts:
+                continue
+            seen_ts.add(t)
+            merged.append({
+                "time": t,
+                "open": float(b["open"]),
+                "high": float(b["high"]),
+                "low": float(b["low"]),
+                "close": float(b["close"]),
+                "volume": float(b.get("volume", 0.0)),
+                "tick_count": int(b.get("tick_count") or 0),
+            })
+        except Exception:
+            continue
+    for b in bars:
+        if b["time"] in seen_ts:
+            continue
+        seen_ts.add(b["time"])
+        merged.append(b)
+    merged.sort(key=lambda x: x["time"])
+
+    # Write back. lpush in reverse order so newest ends at head.
+    try:
+        pipe = redis_client.pipeline()
+        pipe.delete(list_key)
+        for b in merged:
+            entry = {**b, "symbol": sym, "timeframe": tf}
+            pipe.lpush(list_key, _json.dumps(entry))
+        pipe.ltrim(list_key, 0, 999)
+        await pipe.execute()
+    except Exception as exc:
+        _logger.warning("alltick cache writeback failed for %s %s: %s", sym, tf, exc)
+
+    return merged
+
+
 @router.get("/{symbol}/bars")
 @_limiter.exempt
 async def get_bars(
@@ -156,34 +232,44 @@ async def get_bars(
 ):
     """Return OHLCV bars for the TradingView charting library.
 
-    Priority:
-    1. Real bars from Redis (BarAggregator)
-    2. Binance REST API fallback (crypto symbols)
-    3. Empty response
+    Sources, in priority order:
+      1. Real completed bars from Redis (populated by BarAggregator going
+         forward, and by `seed_bars` / on-demand AllTick going back).
+      2. Binance REST fallback for crypto when Redis is empty or stale.
+      3. AllTick REST fallback for non-crypto when Redis is empty or the
+         requested `from_time` walks back further than what's cached.
+         The fallback writes the result back into Redis so the next request
+         is warm.
+      4. Current in-progress bar appended from `bar:current:{sym}:{tf}`.
 
-    Bars are stored by BarAggregator in Redis as a list (newest first).
-    We read up to 1000 bars, filter by time range, sort ascending, and
-    append the current in-progress bar so the chart stays live.
+    Returns `{s, bars, noData}`. `noData=true` lets the frontend's synthetic
+    fallback kick in for the rare case where every source fails — the result
+    is labelled in the UI so traders aren't fooled by simulated history.
     """
     tf = _TV_RESOLUTION_TO_TF.get(resolution, "5m")
     sym = symbol.upper()
     _TF_SECONDS = {"1m": 60, "5m": 300, "15m": 900, "30m": 1800, "1h": 3600, "4h": 14400, "1d": 86400}
     bar_sec = _TF_SECONDS.get(tf, 300)
+    is_crypto = sym in _BINANCE_PAIRS
+
+    def _filter_window(b: dict) -> bool:
+        t = int(b.get("time", 0))
+        if from_time and t < from_time:
+            return False
+        if to_time and t > to_time:
+            return False
+        return True
 
     # --- 1. Completed bars from Redis (lpush → newest first) ---
     raw_list: list[bytes] = await redis_client.lrange(f"bars:{sym}:{tf}", 0, 999)
-
-    bars = []
+    bars: list[dict] = []
     for raw in raw_list:
         try:
             b = _json.loads(raw)
-            t = int(b.get("time", 0))
-            if from_time and t < from_time:
-                continue
-            if to_time and t > to_time:
+            if not _filter_window(b):
                 continue
             bars.append({
-                "time": t,
+                "time": int(b.get("time", 0)),
                 "open": float(b["open"]),
                 "high": float(b["high"]),
                 "low": float(b["low"]),
@@ -196,18 +282,37 @@ async def get_bars(
     # Sort oldest → newest (TradingView requires ascending order)
     bars.sort(key=lambda x: x["time"])
 
-    # --- 2. Binance fallback for crypto when Redis is empty or stale ---
     now_epoch = int(_time.time())
     has_recent = bars and (now_epoch - bars[-1]["time"]) < bar_sec * 3
-    if not has_recent and sym in _BINANCE_PAIRS:
+
+    # --- 2. Binance fallback for crypto when Redis is empty or stale ---
+    if not has_recent and is_crypto:
         binance_bars = await _fetch_binance_klines(sym, resolution, from_time, to_time)
         if binance_bars:
-            # Merge: keep Redis bars that don't overlap, then add Binance bars
-            binance_times = {b["time"] for b in binance_bars}
-            bars = [b for b in bars if b["time"] not in binance_times] + binance_bars
+            existing_ts = {b["time"] for b in bars}
+            bars = bars + [b for b in binance_bars if b["time"] not in existing_ts]
             bars.sort(key=lambda x: x["time"])
 
-    # --- 3. Append current in-progress bar ---
+    # --- 3. AllTick fallback for non-crypto when Redis is thin or pre-from ---
+    # Triggers when:
+    #   • Redis returned fewer bars than fits the visible window, or
+    #   • the user is panning/scrolling further back than what's cached
+    #     (`from_time` older than the oldest Redis bar).
+    needs_alltick_backfill = (
+        not is_crypto
+        and (not has_recent or len(bars) < 50 or (from_time and (not bars or from_time < bars[0]["time"])))
+    )
+    if needs_alltick_backfill:
+        # Walk back from the oldest bar we already have so we extend rather
+        # than refetch what's in cache. end_ts=0 means "latest" — appropriate
+        # for the cold-cache case.
+        end_ts = bars[0]["time"] if bars and from_time and from_time < bars[0]["time"] else 0
+        merged = await _backfill_alltick_bars(sym, tf, end_ts=end_ts)
+        if merged:
+            bars = [b for b in merged if _filter_window(b)]
+            bars.sort(key=lambda x: x["time"])
+
+    # --- 4. Append current in-progress bar ---
     current_raw = await redis_client.get(f"bar:current:{sym}:{tf}")
     if current_raw:
         try:
