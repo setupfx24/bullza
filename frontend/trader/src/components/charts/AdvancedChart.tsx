@@ -97,9 +97,15 @@ function AdvancedChartInner() {
         'header_symbol_search',
         'display_market_status',
         'popup_hints',
+        // Study templates require a save_load_adapter (or client_id +
+        // user_id + backend routes at {library_path}{client_id}/{user_id}/
+        // study_templates) to read/write. Without those TV emits a 404
+        // on /charting_library/undefined/undefined/study_templates and
+        // surfaces an unhandled promise rejection on every chart mount.
+        // Re-enable once the SaveLoadAdapter is wired in broker.ts.
+        'study_templates',
       ],
       enabled_features: [
-        'study_templates',
         'side_toolbar_in_fullscreen_mode',
         'trading_notifications',
         'show_trading_notifications_history',
