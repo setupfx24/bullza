@@ -14,6 +14,10 @@ class RegisterRequest(BaseModel):
     phone: Optional[str] = None
     country: Optional[str] = None
     referral_code: Optional[str] = None
+    # When True the registration flow also provisions a demo trading
+    # account (USD 10k starting balance) alongside the user record so
+    # the trader can explore the platform without a deposit.
+    create_demo: bool = False
 
 
 class LoginRequest(BaseModel):

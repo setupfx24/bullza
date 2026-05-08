@@ -440,6 +440,7 @@ async def register_user(
     referral_code: str | None,
     request: Request,
     db: AsyncSession,
+    create_demo: bool = False,
 ) -> JSONResponse:
     from packages.common.src.settings_store import get_bool_setting
 
@@ -471,6 +472,13 @@ async def register_user(
 
     if referral_code:
         await _consume_referral(db, user.id, referral_code)
+
+    # Optional demo trading account — provisioned alongside the user
+    # record when the signup form's 'Also create demo account' box is
+    # ticked. The same idempotent helper is used by demo_login, so a
+    # double-create is a no-op.
+    if create_demo:
+        await _ensure_demo_trading_account(db, user)
 
     response = await issue_auth_json_response(
         user, request, db, status_code=201, user_audit_action="REGISTER",
