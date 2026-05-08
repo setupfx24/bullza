@@ -179,6 +179,7 @@ async def activate(
     await wallet_service.charge_insurance_fee(
         db=db,
         user_id=user_id,
+        account_id=acct.id,
         amount=fee_dec,
         policy_id=policy.id,
         description=(

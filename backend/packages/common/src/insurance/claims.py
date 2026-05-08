@@ -43,7 +43,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..models import (
     InsurancePolicy, InsuranceClaim, Position, TradeHistory,
-    Transaction, User,
+    TradingAccount, Transaction,
 )
 from .config import InsuranceConfig, load_config
 from .volatility import get_atr
@@ -223,21 +223,25 @@ async def maybe_pay(
             )
             return None
 
-        # Credit wallet
-        user_q = await db.execute(
-            select(User).where(User.id == policy.user_id).with_for_update()
+        # Credit the trading account that took the loss — the same pool
+        # the fee was debited from at activation, so the user sees the
+        # claim land back where they expect (their trading balance).
+        account_q = await db.execute(
+            select(TradingAccount).where(TradingAccount.id == policy.account_id).with_for_update()
         )
-        user = user_q.scalar_one_or_none()
-        if user is None:
+        account = account_q.scalar_one_or_none()
+        if account is None:
             return None
-        prev = Decimal(str(user.main_wallet_balance or 0))
+        prev = Decimal(str(account.balance or 0))
         new_balance = prev + claim_amount
-        user.main_wallet_balance = new_balance
+        account.balance = new_balance
+        if account.equity is not None:
+            account.equity = Decimal(str(account.equity)) + claim_amount
 
         tx = Transaction(
             id=uuid.uuid4(),
             user_id=policy.user_id,
-            account_id=None,
+            account_id=policy.account_id,
             type="insurance_payout",
             amount=claim_amount,
             balance_after=new_balance,
