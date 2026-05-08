@@ -35,14 +35,18 @@ export function createBroker(host: any): any {
   const acc = getActiveAccount();
   _currentAccountId = acc?.id || '';
 
-  // Poll positions and push updates to TV every 3s. Includes stopLoss /
-  // takeProfit so TradingView's chart auto-renders the SL/TP horizontal
-  // lines + the entry-price line for every open position. Without those
-  // fields the chart silently omits the lines (no error; just no draw).
-  setInterval(async () => {
+  // Push live updates to TV's broker host. The chart renders three things
+  // off the data we push here:
+  //   1) Position entry-price line — from positionUpdate(...)
+  //   2) Live P&L pill on the entry line — from plUpdate(positionId, pl)
+  //   3) SL / TP dashed lines with "SL | 0.01 Lots" pills — from the
+  //      bracket child orders returned by orders() (see below). They
+  //      auto-redraw whenever orderUpdate or ordersFullUpdate is called.
+  // Polling at 1s gives a smooth P&L badge without hammering the API
+  // (positions / prices are already in the local store from the WS feed).
+  setInterval(() => {
     try {
-      const acc = getActiveAccount();
-      if (!acc) return;
+      if (!getActiveAccount()) return;
       const positions = getPositions();
       const prices = getPrices();
 
@@ -55,16 +59,65 @@ export function createBroker(host: any): any {
           side: pos.side === 'buy' ? OrderSide.Buy : OrderSide.Sell,
           qty: pos.lots,
           avgPrice: pos.open_price,
-          unrealizedPl: pos.profit || 0,
+          pl: pos.profit || 0,
           ...(cp != null ? { last: cp } : {}),
-          // Surface SL/TP as fields TV's chart layer recognises so it
-          // draws the dashed horizontal lines automatically.
-          ...(pos.stop_loss != null ? { stopLoss: pos.stop_loss } : {}),
-          ...(pos.take_profit != null ? { takeProfit: pos.take_profit } : {}),
         });
+        _host?.plUpdate?.(pos.id, pos.profit || 0);
+      }
+
+      const a = getActiveAccount();
+      if (a) {
+        _host?.equityUpdate?.(a.equity ?? a.balance ?? 0);
       }
     } catch {}
-  }, 3000);
+  }, 1000);
+
+  // ── Bracket-order encoding ────────────────────────────────────────────
+  // TV draws the labelled SL/TP lines from child orders attached to a
+  // position via parentId + parentType. We synthesise these on the fly
+  // from each position's stop_loss / take_profit fields. IDs are stable
+  // (`{posId}__sl` / `{posId}__tp`) so TV diffs them correctly between
+  // orders() calls and only redraws when the price actually changes.
+  const slId = (posId: string) => `${posId}__sl`;
+  const tpId = (posId: string) => `${posId}__tp`;
+  function buildBracketOrders(): any[] {
+    const out: any[] = [];
+    for (const p of getPositions()) {
+      const oppSide = p.side === 'buy' ? OrderSide.Sell : OrderSide.Buy;
+      if (p.stop_loss != null) {
+        out.push({
+          id: slId(p.id),
+          parentId: p.id,
+          parentType: ParentType.Position,
+          symbol: p.symbol,
+          type: OrderType.Stop,
+          side: oppSide,
+          qty: p.lots,
+          stopPrice: p.stop_loss,
+          status: OrderStatus.Working,
+        });
+      }
+      if (p.take_profit != null) {
+        out.push({
+          id: tpId(p.id),
+          parentId: p.id,
+          parentType: ParentType.Position,
+          symbol: p.symbol,
+          type: OrderType.Limit,
+          side: oppSide,
+          qty: p.lots,
+          limitPrice: p.take_profit,
+          status: OrderStatus.Working,
+        });
+      }
+    }
+    return out;
+  }
+  function bracketParentAndKind(id: string): { posId: string; kind: 'sl' | 'tp' } | null {
+    if (id.endsWith('__sl')) return { posId: id.slice(0, -4), kind: 'sl' };
+    if (id.endsWith('__tp')) return { posId: id.slice(0, -4), kind: 'tp' };
+    return null;
+  }
 
   return {
     /* ─── Connection ─── */
@@ -120,11 +173,12 @@ export function createBroker(host: any): any {
     /* ─── Orders ─── */
     async orders(): Promise<any[]> {
       const acc = getActiveAccount();
-      if (!acc) return [];
+      if (!acc) return buildBracketOrders();
+      let pending: any[] = [];
       try {
         const res = await api.get<any>(`/orders/?account_id=${acc.id}&status=pending`);
         const items = Array.isArray(res) ? res : (res?.items ?? []);
-        return items.map((o: any) => ({
+        pending = items.map((o: any) => ({
           id: o.id,
           symbol: o.symbol,
           side: o.side === 'buy' ? OrderSide.Buy : OrderSide.Sell,
@@ -135,15 +189,21 @@ export function createBroker(host: any): any {
           status: OrderStatus.Working,
           filledQty: 0,
         }));
-      } catch {
-        return [];
-      }
+      } catch {}
+      // Bracket child orders are appended after the pending list. TV uses
+      // parentId + parentType to identify them and renders them as SL/TP
+      // lines on the chart instead of as standalone pending orders.
+      return [...pending, ...buildBracketOrders()];
     },
 
     /* ─── Positions ─── */
     async positions(): Promise<any[]> {
       const positions = getPositions();
       const prices = getPrices();
+      // SL/TP intentionally not on the Position object — TV ignores them
+      // there for chart rendering. They surface as bracket child orders
+      // via orders() (see buildBracketOrders) which is what the chart
+      // layer actually uses to draw the labelled SL/TP lines.
       return positions.map((p) => {
         const tick = prices[p.symbol];
         const cp = tick ? (p.side === 'buy' ? tick.bid : tick.ask) : p.current_price || p.open_price;
@@ -153,11 +213,8 @@ export function createBroker(host: any): any {
           side: p.side === 'buy' ? OrderSide.Buy : OrderSide.Sell,
           qty: p.lots,
           avgPrice: p.open_price,
-          unrealizedPl: p.profit || 0,
+          pl: p.profit || 0,
           last: cp,
-          // Required for TV to draw SL / TP horizontal lines on the chart.
-          ...(p.stop_loss != null ? { stopLoss: p.stop_loss } : {}),
-          ...(p.take_profit != null ? { takeProfit: p.take_profit } : {}),
         };
       });
     },
@@ -171,7 +228,7 @@ export function createBroker(host: any): any {
       return positions.map((p) => ({
         symbol: p.symbol,
         price: p.open_price,
-        time: new Date(p.opened_at || p.created_at || Date.now()).getTime(),
+        time: new Date(p.created_at || Date.now()).getTime(),
         side: p.side === 'buy' ? OrderSide.Buy : OrderSide.Sell,
         qty: p.lots,
       }));
@@ -219,10 +276,13 @@ export function createBroker(host: any): any {
             avgPrice: fillPx,
           });
 
-          // Refresh positions from store
+          // Refresh positions, then nudge TV to re-fetch orders so the
+          // SL/TP bracket lines render immediately on the new position
+          // (otherwise they only appear on the next 1s poll tick).
           setTimeout(() => {
-            void 0 /* positions update via WS */;
-          }, 500);
+            useTradingStore.getState().refreshPositions().catch(() => {});
+            _host?.ordersFullUpdate?.();
+          }, 300);
         }
 
         return { orderId };
@@ -233,6 +293,23 @@ export function createBroker(host: any): any {
     },
 
     async modifyOrder(order: any): Promise<void> {
+      // Dragging a bracket SL/TP line on the chart routes through here.
+      // Resolve back to the parent position and call editPositionBrackets
+      // so we hit the position-modify endpoint instead of the order one
+      // (the bracket orders we surface are synthetic — they don't exist
+      // server-side as orders, only as fields on the position).
+      const meta = bracketParentAndKind(order.id);
+      if (meta) {
+        const newPrice = meta.kind === 'sl' ? order.stopPrice : order.limitPrice;
+        const positions = getPositions();
+        const pos = positions.find((p) => p.id === meta.posId);
+        const brackets: any = {
+          stopLoss: meta.kind === 'sl' ? newPrice : pos?.stop_loss,
+          takeProfit: meta.kind === 'tp' ? newPrice : pos?.take_profit,
+        };
+        return (this as any).editPositionBrackets(meta.posId, brackets);
+      }
+
       try {
         const body: any = {};
         if (order.limitPrice != null) body.price = order.limitPrice;
@@ -247,11 +324,52 @@ export function createBroker(host: any): any {
     },
 
     async cancelOrder(orderId: string): Promise<void> {
+      // Removing an SL/TP line from the chart maps to clearing the
+      // corresponding field on the parent position, not deleting an
+      // order (synthetic bracket — has no server-side order row).
+      const meta = bracketParentAndKind(orderId);
+      if (meta) {
+        const positions = getPositions();
+        const pos = positions.find((p) => p.id === meta.posId);
+        try {
+          await api.put(`/positions/${meta.posId}`, {
+            stop_loss: meta.kind === 'sl' ? null : pos?.stop_loss ?? null,
+            take_profit: meta.kind === 'tp' ? null : pos?.take_profit ?? null,
+          });
+          _host?.orderUpdate({ id: orderId, status: OrderStatus.Canceled });
+          await useTradingStore.getState().refreshPositions().catch(() => {});
+          _host?.ordersFullUpdate?.();
+        } catch (e: any) {
+          _host?.showNotification?.('Cancel Failed', e?.message || 'Failed', 0);
+          throw e;
+        }
+        return;
+      }
+
       try {
         await api.delete(`/orders/${orderId}`);
         _host?.orderUpdate({ id: orderId, status: OrderStatus.Canceled });
       } catch (e: any) {
         _host?.showNotification?.('Cancel Failed', e?.message || 'Failed', 0);
+        throw e;
+      }
+    },
+
+    // Drag-edit / Edit-position dialog for SL/TP. TV calls this when:
+    //   • user drags an SL or TP line on the chart
+    //   • user opens the position context menu → Edit position…
+    // After server confirms, refresh positions + ask TV to re-fetch
+    // orders so the bracket lines redraw at the new prices.
+    async editPositionBrackets(positionId: string, brackets: any): Promise<void> {
+      try {
+        await api.put(`/positions/${positionId}`, {
+          stop_loss: brackets?.stopLoss ?? null,
+          take_profit: brackets?.takeProfit ?? null,
+        });
+        await useTradingStore.getState().refreshPositions().catch(() => {});
+        _host?.ordersFullUpdate?.();
+      } catch (e: any) {
+        _host?.showNotification?.('Modify Failed', e?.message || 'Failed', 0);
         throw e;
       }
     },
