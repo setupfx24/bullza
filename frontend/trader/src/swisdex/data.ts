@@ -35,12 +35,26 @@ export const HERO = {
   pill: 'Crypto & Forex Investment Platform',
   pillBadge: 'Live',
   headline: 'Trade Smarter Grow Faster',
-  sub: 'SwisDex is the next-generation trading platform built for serious investors — institutional-grade execution, transparent returns, and round-the-clock market access.',
+  sub: 'SwisDex is a decentralised exchange with on-chain insured trades and licensed broker-grade execution — your funds stay in your wallet, your trades stay protected.',
   ctaPrimary: 'Get Started',
   ctaSecondary: 'Learn How It Works',
   ctaHref: SIGNUP_HREF,
   ctaSecondaryHref: '/how-it-works',
 };
+
+/**
+ * Three trust pills rendered above the hero CTAs — the first words a
+ * first-time visitor reads. Communicates "what we do" before any scroll:
+ * decentralised execution, on-chain trade insurance, regulated broker.
+ *
+ * Icon names are lucide-react component names — resolved in Hero.tsx via
+ * an iconMap so we don't ship the entire icon catalog client-side.
+ */
+export const HERO_TRUST_PILLS = [
+  { icon: 'Network',    label: 'Decentralised Exchange', sub: 'Non-custodial. Your wallet, your keys.' },
+  { icon: 'ShieldCheck', label: 'Insured Trade',          sub: 'Every position is policy-backed.' },
+  { icon: 'BadgeCheck', label: 'Licensed Broker',         sub: 'Institutional-grade execution.' },
+] as const;
 
 export const LIVE_TICKER = [
   { pair: 'BTC/USD',   price: '67,420',  change: '+1.82%', up: true },
