@@ -35,7 +35,10 @@ export function createBroker(host: any): any {
   const acc = getActiveAccount();
   _currentAccountId = acc?.id || '';
 
-  // Poll positions and push updates to TV every 3s
+  // Poll positions and push updates to TV every 3s. Includes stopLoss /
+  // takeProfit so TradingView's chart auto-renders the SL/TP horizontal
+  // lines + the entry-price line for every open position. Without those
+  // fields the chart silently omits the lines (no error; just no draw).
   setInterval(async () => {
     try {
       const acc = getActiveAccount();
@@ -45,8 +48,7 @@ export function createBroker(host: any): any {
 
       for (const pos of positions) {
         const tick = prices[pos.symbol];
-        if (!tick) continue;
-        const cp = pos.side === 'buy' ? tick.bid : tick.ask;
+        const cp = tick ? (pos.side === 'buy' ? tick.bid : tick.ask) : undefined;
         _host?.positionUpdate({
           id: pos.id,
           symbol: pos.symbol,
@@ -54,7 +56,11 @@ export function createBroker(host: any): any {
           qty: pos.lots,
           avgPrice: pos.open_price,
           unrealizedPl: pos.profit || 0,
-          ...(cp ? { last: cp } : {}),
+          ...(cp != null ? { last: cp } : {}),
+          // Surface SL/TP as fields TV's chart layer recognises so it
+          // draws the dashed horizontal lines automatically.
+          ...(pos.stop_loss != null ? { stopLoss: pos.stop_loss } : {}),
+          ...(pos.take_profit != null ? { takeProfit: pos.take_profit } : {}),
         });
       }
     } catch {}
@@ -149,12 +155,26 @@ export function createBroker(host: any): any {
           avgPrice: p.open_price,
           unrealizedPl: p.profit || 0,
           last: cp,
+          // Required for TV to draw SL / TP horizontal lines on the chart.
+          ...(p.stop_loss != null ? { stopLoss: p.stop_loss } : {}),
+          ...(p.take_profit != null ? { takeProfit: p.take_profit } : {}),
         };
       });
     },
 
     async executions(symbol: string): Promise<any[]> {
-      return [];
+      // Returning fills here lets TV draw entry markers (triangle/circle)
+      // on the candle where the position opened — so the trader can see
+      // exactly when and at what price they entered, in addition to the
+      // horizontal entry-price line that the position rendering provides.
+      const positions = getPositions().filter((p) => p.symbol === symbol);
+      return positions.map((p) => ({
+        symbol: p.symbol,
+        price: p.open_price,
+        time: new Date(p.opened_at || p.created_at || Date.now()).getTime(),
+        side: p.side === 'buy' ? OrderSide.Buy : OrderSide.Sell,
+        qty: p.lots,
+      }));
     },
 
     /* ─── Trade Actions ─── */
@@ -183,7 +203,11 @@ export function createBroker(host: any): any {
         const orderId = res?.id || res?.order_id || `tv_${Date.now()}`;
 
         if (isMarket && res?.position_id) {
-          // Market order filled immediately → show as position
+          // Market order filled immediately → show as position. avgPrice
+          // must be the actual fill price (returned by the API), NOT
+          // order.limitPrice (which is meaningless for a market order).
+          // Wrong avgPrice produced incorrect entry-price lines on chart.
+          const fillPx = res?.filled_price || res?.fill_price || res?.avg_price || res?.price || 0;
           _host?.orderUpdate({
             id: orderId,
             symbol: sym,
@@ -192,7 +216,7 @@ export function createBroker(host: any): any {
             qty: order.qty,
             status: OrderStatus.Filled,
             filledQty: order.qty,
-            avgPrice: order.limitPrice || 0,
+            avgPrice: fillPx,
           });
 
           // Refresh positions from store
@@ -263,7 +287,7 @@ export function createBroker(host: any): any {
       return {
         configFlags: {
           supportOrderBrackets: false,
-          supportPositionBrackets: true,
+          supportPositionBrackets: true,    // SL/TP attached to position
           supportClosePosition: true,
           supportReversePosition: false,
           supportNativeReversePosition: false,
@@ -276,6 +300,13 @@ export function createBroker(host: any): any {
           supportEditAmount: true,
           showQuantityInsteadOfAmount: true,
           supportLevel2Data: false,
+          // Required for TV to render the entry / SL / TP horizontal lines
+          // + execution markers on the chart. Without these flags TV
+          // silently skips the draw even when positions() returns SL/TP.
+          showNotificationsLog: true,
+          supportPLUpdate: true,
+          supportPositionNetting: false,
+          positionPLInInstrumentCurrency: false,
         },
         durations: [],
       };

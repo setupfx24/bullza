@@ -279,7 +279,7 @@ export const fxArthaDatafeed: IBasicDataFeed = {
       const sym = (symbolInfo.ticker || symbolInfo.name).toUpperCase();
       const { from, to } = periodParams;
 
-      // 1. Crypto → Binance (real data, fast)
+      // 1. Crypto → Binance (real OHLCV, fastest path).
       if (BINANCE_PAIRS[sym]) {
         const bars = await fetchBinanceKlines(sym, String(resolution), from, to);
         if (bars.length > 0) {
@@ -288,20 +288,11 @@ export const fxArthaDatafeed: IBasicDataFeed = {
         }
       }
 
-      // 2. Non-crypto → synthetic candles from live price
-      //    Wait for a price tick if it hasn't arrived yet (WebSocket may still be connecting)
-      const tick = await waitForPrice(sym);
-      if (tick && tick.bid > 0) {
-        const mid = (tick.bid + tick.ask) / 2;
-        const spread = Math.abs(tick.ask - tick.bid);
-        const bars = generateSyntheticBars(sym, mid, spread, String(resolution), from, to);
-        if (bars.length > 0) {
-          onResult(bars, { noData: false });
-          return;
-        }
-      }
-
-      // 3. Fallback: try backend
+      // 2. Non-crypto → REAL aggregated bars from our backend
+      //    (TimescaleDB hypertable populated by market-data's BarAggregator
+      //    from live AllTick ticks). Bars across timeframes agree by
+      //    construction (5m == aggregation of five 1m, 1h == twelve 5m,
+      //    etc.) so switching TF no longer shuffles the historical pattern.
       try {
         const params = new URLSearchParams({
           resolution: String(resolution), from: String(from), to: String(to),
@@ -319,7 +310,22 @@ export const fxArthaDatafeed: IBasicDataFeed = {
             return;
           }
         }
-      } catch { /* backend unavailable */ }
+      } catch { /* backend unavailable — fall through to synthetic */ }
+
+      // 3. Last resort — synthetic walk anchored to the current live mid.
+      //    Used only if both backend and Binance failed (fresh deploy with
+      //    no aggregated bars in TimescaleDB yet). Synthetic bars do NOT
+      //    aggregate across TFs, so this is intentionally the final fallback.
+      const tick = await waitForPrice(sym);
+      if (tick && tick.bid > 0) {
+        const mid = (tick.bid + tick.ask) / 2;
+        const spread = Math.abs(tick.ask - tick.bid);
+        const bars = generateSyntheticBars(sym, mid, spread, String(resolution), from, to);
+        if (bars.length > 0) {
+          onResult(bars, { noData: false });
+          return;
+        }
+      }
 
       onResult([], { noData: true });
     } catch (err) {
