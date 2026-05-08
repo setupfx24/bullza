@@ -106,6 +106,14 @@ function AdvancedChartInner() {
         'pinch_scale',
         'horz_touch_drag_scroll',
         'vert_touch_drag_scroll',
+        // Surface TradingView's bell-icon "Add alert" button on the chart
+        // toolbar. Without backend alert persistence (broker.ts has no
+        // subscribePriceAlerts/createPriceAlert handlers wired) these are
+        // ephemeral — kept in the browser session only and lost on reload.
+        // Persistent alerts require a price_alerts DB table + evaluation
+        // engine; tracked as a follow-up.
+        'create_alert_button_on_chart',
+        'price_alert_dialog',
       ],
       overrides: {
         'mainSeriesProperties.style': 1, // candles
