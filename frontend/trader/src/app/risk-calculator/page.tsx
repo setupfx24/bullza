@@ -6,6 +6,7 @@ import { Info, Calculator, Search, ChevronDown, X } from 'lucide-react';
 import DashboardShell from '@/components/layout/DashboardShell';
 import { useTradingStore, type InstrumentInfo, type TradingAccount } from '@/stores/tradingStore';
 import api from '@/lib/api/client';
+import { usdPipValuePerLot, usdMarginPerLot, suggestedLotSize } from '@/lib/trading/riskMath';
 
 type CalcTab = 'margin' | 'pnl' | 'lotsize' | 'swap';
 
@@ -264,6 +265,8 @@ export default function RiskCalculatorPage() {
                 max_lot: Number(i.max_lot ?? 100),
                 lot_step: Number(i.lot_step ?? 0.01),
                 contract_size: Number(i.contract_size ?? 100000),
+                base_currency: i.base_currency ? String(i.base_currency) : null,
+                quote_currency: i.quote_currency ? String(i.quote_currency) : null,
               })),
             );
           }
@@ -300,6 +303,8 @@ export default function RiskCalculatorPage() {
   const digits = instrumentInfo?.digits ?? 5;
   const pipSize = instrumentInfo?.pip_size ?? 0.0001;
   const contractSize = instrumentInfo?.contract_size ?? 100000;
+  const baseCcy = instrumentInfo?.base_currency;
+  const quoteCcy = instrumentInfo?.quote_currency;
   const selectedAccount = accounts.find((a) => a.id === selectedAccountId) || activeAccount;
   const balance = selectedAccount?.balance ?? 10000;
   const accountLeverage = selectedAccount?.leverage ?? 100;
@@ -310,26 +315,35 @@ export default function RiskCalculatorPage() {
   }));
 
   // ── Margin calc ──
+  // Uses currency-aware helper: USDJPY-style (USD-base) pairs no longer
+  // multiply by price (was reporting margin in JPY, off by ~150×).
   const marginResult = useMemo(() => {
     const ep = parseFloat(entryPrice) || (tick ? (side === 'buy' ? tick.ask : tick.bid) : 0);
     const lev = accountLeverage;
     const lot = parseFloat(lots) || 0;
     if (!ep || !lot) return null;
-    const margin = (lot * contractSize * ep) / lev;
-    return { margin, ep, lot, lev };
-  }, [entryPrice, accountLeverage, lots, side, tick, contractSize]);
+    const perLot = usdMarginPerLot(
+      { pipSize, contractSize, price: ep, symbol, base: baseCcy, quote: quoteCcy },
+      lev,
+    );
+    return { margin: perLot * lot, ep, lot, lev };
+  }, [entryPrice, accountLeverage, lots, side, tick, contractSize, pipSize, symbol, baseCcy, quoteCcy]);
 
   // ── P&L calc ──
+  // Pip value depends on which side of the pair USD is on. The previous
+  // formula understated EURUSD by ~10% (gave $9.09/pip instead of $10/pip).
   const pnlResult = useMemo(() => {
     const ep = parseFloat(entryPrice);
     const xp = parseFloat(exitPrice);
     const lot = parseFloat(lots) || 0;
     if (!ep || !xp || !lot) return null;
     const pips = side === 'buy' ? (xp - ep) / pipSize : (ep - xp) / pipSize;
-    const pipVal = (pipSize / ep) * contractSize;
+    const pipVal = usdPipValuePerLot({
+      pipSize, contractSize, price: ep, symbol, base: baseCcy, quote: quoteCcy,
+    });
     const pnl = lot * pips * pipVal;
     return { pnl, pips, pipVal };
-  }, [entryPrice, exitPrice, lots, side, pipSize, contractSize]);
+  }, [entryPrice, exitPrice, lots, side, pipSize, contractSize, symbol, baseCcy, quoteCcy]);
 
   // ── Lot size calc ──
   const lotResult = useMemo(() => {
@@ -338,24 +352,34 @@ export default function RiskCalculatorPage() {
     const rp = parseFloat(riskPercent);
     if (!ep || !sl || !rp || ep <= 0 || sl <= 0) return null;
     const riskAmt = balance * (rp / 100);
-    const slPips = Math.abs(ep - sl) / pipSize;
+    const slDist = Math.abs(ep - sl);
+    const slPips = slDist / pipSize;
     if (slPips <= 0) return null;
-    const pipVal = (pipSize / ep) * contractSize;
-    const lotSize = riskAmt / (slPips * pipVal);
+    const pipVal = usdPipValuePerLot({
+      pipSize, contractSize, price: ep, symbol, base: baseCcy, quote: quoteCcy,
+    });
+    const lotSize = suggestedLotSize(
+      { pipSize, contractSize, price: ep, symbol, base: baseCcy, quote: quoteCcy },
+      riskAmt, slDist,
+    );
     return { lotSize: Math.max(0.01, parseFloat(lotSize.toFixed(2))), riskAmt, slPips, pipVal };
-  }, [entryPrice, stopLoss, riskPercent, balance, side, tick, pipSize, contractSize]);
+  }, [entryPrice, stopLoss, riskPercent, balance, side, tick, pipSize, contractSize, symbol, baseCcy, quoteCcy]);
 
   // ── Swap calc (simplified estimate) ──
+  // Exact swap depends on broker overnight rates; we approximate "0.5 pip/day"
+  // priced via the corrected pip-value helper. UI labels the result approximate.
   const swapResult = useMemo(() => {
     const lot = parseFloat(lots) || 0;
     const days = parseInt(daysHeld) || 1;
     if (!lot) return null;
-    // Simplified: typical swap ~0.5-2 pips/day for most pairs
-    const swapPerLotPerDay = 0.5;
-    const dailySwap = lot * swapPerLotPerDay * ((pipSize / (tick?.bid || 1)) * contractSize);
+    const px = tick?.bid || parseFloat(entryPrice) || 1;
+    const pipVal = usdPipValuePerLot({
+      pipSize, contractSize, price: px, symbol, base: baseCcy, quote: quoteCcy,
+    });
+    const dailySwap = lot * 0.5 * pipVal;
     const totalSwap = dailySwap * days;
     return { dailySwap, totalSwap, days };
-  }, [lots, daysHeld, tick, pipSize, contractSize]);
+  }, [lots, daysHeld, tick, entryPrice, pipSize, contractSize, symbol, baseCcy, quoteCcy]);
 
   const handleCalculate = () => {
     // Auto-fill entry from live if empty
