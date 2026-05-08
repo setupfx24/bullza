@@ -14,11 +14,19 @@ export const BRAND = {
   logo: '/images/swisdex-logo.png',
 };
 
+// Nav targets: scroll-to-anchor for sections that already exist on the home
+// (Hero/Services/Pourquoi/Process/Faq), and absolute URLs for inner landing
+// pages that exist as separate routes. Routes like /markets and /accounts
+// were avoided because they live under the auth-protected dashboard
+// (/dashboard/accounts, /wallet/markets) — landing visitors hitting those
+// got bounced to /auth/login by the auth middleware. Everything below is
+// publicly reachable without a session.
 export const NAV_ITEMS: { label: string; href: string }[] = [
   { label: 'Home',         href: '/' },
-  { label: 'Markets',      href: '/markets' },
-  { label: 'Accounts',     href: '/accounts' },
-  { label: 'How it Works', href: '/how-it-works' },
+  { label: 'Services',     href: '/#services' },
+  { label: 'Why Us',       href: '/#why-choose' },
+  { label: 'How it Works', href: '/#process' },
+  { label: 'FAQ',          href: '/#faq' },
   { label: 'About',        href: '/company/about' },
   { label: 'Contact',      href: '/company/contact' },
 ];
@@ -110,8 +118,8 @@ export const CTA = {
 export const FOOTER_QUICK_LINKS = [
   { label: 'Home',         href: '/' },
   { label: 'About Us',     href: '/company/about' },
-  { label: 'Markets',      href: '/markets' },
-  { label: 'Accounts',     href: '/accounts' },
+  { label: 'Services',     href: '/#services' },
+  { label: 'Why Us',       href: '/#why-choose' },
   { label: 'How it Works', href: '/how-it-works' },
   { label: 'Contact',      href: '/company/contact' },
 ];
