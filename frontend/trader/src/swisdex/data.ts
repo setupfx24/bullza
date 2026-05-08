@@ -17,7 +17,7 @@ export const BRAND = {
 export const NAV_ITEMS: { label: string; href: string }[] = [
   { label: 'Home',         href: '/' },
   { label: 'Markets',      href: '/markets' },
-  { label: 'Accounts',     href: '/accounts' },
+  { label: 'Accounts',     href: '/account-types' },
   { label: 'How it Works', href: '/how-it-works' },
   { label: 'About',        href: '/company/about' },
   { label: 'Contact',      href: '/company/contact' },
@@ -111,7 +111,7 @@ export const FOOTER_QUICK_LINKS = [
   { label: 'Home',         href: '/' },
   { label: 'About Us',     href: '/company/about' },
   { label: 'Markets',      href: '/markets' },
-  { label: 'Accounts',     href: '/accounts' },
+  { label: 'Accounts',     href: '/account-types' },
   { label: 'How it Works', href: '/how-it-works' },
   { label: 'Contact',      href: '/company/contact' },
 ];

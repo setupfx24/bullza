@@ -4,8 +4,9 @@ import { useEffect } from 'react'
 import { usePathname } from 'next/navigation'
 import { PopupProvider } from '@/landing/components/PopupContext'
 import ScrollProgress from '@/landing/components/animations/ScrollProgress'
-import Navbar from '@/landing/components/Navbar'
 import Footer from '@/landing/components/Footer'
+import { Navbar as SwisDexNavbar } from '@/swisdex/components/Navbar'
+import '@/swisdex/styles.css'
 import '@/landing/landing.css'
 
 /**
@@ -45,8 +46,8 @@ export default function LandingLayout({ children }: { children: React.ReactNode 
   return (
     <PopupProvider>
       <ScrollProgress />
-      <div className="landing-root min-h-screen bg-[#08090b] text-white">
-        <Navbar />
+      <div className="swisdex-home landing-root min-h-screen">
+        <SwisDexNavbar />
         {children}
         <Footer />
       </div>

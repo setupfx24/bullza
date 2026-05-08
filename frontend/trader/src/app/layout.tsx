@@ -38,7 +38,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           }}
         />
       </head>
-      <body className="min-h-full">
+      <body className="min-h-full" suppressHydrationWarning>
         <Suspense fallback={null}>
           <TopLoader />
         </Suspense>

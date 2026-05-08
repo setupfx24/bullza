@@ -3,6 +3,7 @@
 import './styles.css';
 import { Navbar } from './components/Navbar';
 import { Hero } from './components/Hero';
+import { LiveChartSection } from './components/LiveChartSection';
 import { ServicesBento } from './components/ServicesBento';
 import { Pourquoi } from './components/Pourquoi';
 import { Process } from './components/Process';
@@ -25,6 +26,7 @@ export default function SwisDexHomePage() {
       <Navbar />
       <main>
         <Hero />
+        <LiveChartSection />
         <ServicesBento />
         <Pourquoi />
         <Process />
