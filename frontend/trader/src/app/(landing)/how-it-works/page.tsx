@@ -5,7 +5,7 @@
  * Copy adapted from DETAILED_CONTENT_HOW_IT_WORKS_PAGE.docx (May 2026 client deck).
  */
 import Link from 'next/link';
-import { Wallet, ShieldCheck, Cpu, ArrowRight, Check, Zap } from 'lucide-react';
+import { Wallet, ShieldCheck, Cpu, ArrowRight, Check, Zap, Headphones, Users, Target, BarChart3 } from 'lucide-react';
 
 export default function HowItWorksPage() {
   return (
@@ -124,6 +124,46 @@ export default function HowItWorksPage() {
         </div>
       </section>
 
+      {/* Why Trade with SwisDex */}
+      <section className="fx-container relative z-10 py-16 md:py-24">
+        <h2
+          className="text-3xl md:text-4xl lg:text-5xl font-bold text-center mb-12 md:mb-14"
+          style={{ color: 'var(--fx-text)' }}
+        >
+          Why Trade with SwisDex?
+        </h2>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <WhyCard
+            icon={Zap}
+            title="Deep Liquidity, Fast Execution"
+            sub="sub-millisecond order fills"
+          />
+          <WhyCard
+            icon={Headphones}
+            title="24/7 Dedicated Support"
+            sub="live chat, phone & e-mail"
+          />
+          <WhyCard
+            icon={Users}
+            title="Copy Successful Traders"
+            sub="with our Social Trading products"
+          />
+          <WhyCard
+            icon={Target}
+            title="Raw, Institutional-Grade Spreads"
+            sub="from 0.0 pips"
+            wide
+          />
+          <WhyCard
+            icon={BarChart3}
+            title="Advanced Order Types"
+            sub="limit, stop-limit, one-click trading"
+            wide
+          />
+        </div>
+      </section>
+
       {/* CTA */}
       <section className="fx-container relative z-10 py-20">
         <div className="rounded-2xl border border-[#55a630]/30 p-10 md:p-14 text-center bg-[rgba(85,166,48,0.04)]">
@@ -191,6 +231,38 @@ function Pillar({ icon: Icon, title, body }: { icon: any; title: string; body: s
       <Icon size={24} className="text-[#55a630] mb-3" />
       <h3 className="font-semibold mb-1.5" style={{ color: 'var(--fx-text)' }}>{title}</h3>
       <p className="text-sm leading-relaxed" style={{ color: 'var(--fx-text-2)' }}>{body}</p>
+    </div>
+  );
+}
+
+function WhyCard({
+  icon: Icon, title, sub, wide,
+}: { icon: any; title: string; sub: string; wide?: boolean }) {
+  return (
+    <div
+      className={`rounded-2xl p-6 flex items-center gap-5 ${wide ? 'lg:col-span-3 xl:col-span-1' : ''}`}
+      style={{
+        background: 'rgba(255,255,255,0.03)',
+        border: '1px solid var(--fx-line)',
+      }}
+    >
+      <div
+        className="shrink-0 size-14 rounded-xl flex items-center justify-center"
+        style={{
+          background: 'rgba(85,166,48,0.18)',
+          border: '1px solid rgba(85,166,48,0.4)',
+        }}
+      >
+        <Icon size={26} className="text-[#55a630]" />
+      </div>
+      <div>
+        <h3 className="font-semibold text-base md:text-lg leading-tight" style={{ color: 'var(--fx-text)' }}>
+          {title}
+        </h3>
+        <p className="mt-1 text-sm" style={{ color: 'var(--fx-text-3)' }}>
+          {sub}
+        </p>
+      </div>
     </div>
   );
 }

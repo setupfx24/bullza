@@ -2,28 +2,14 @@
 
 import { motion } from 'motion/react';
 import Link from 'next/link';
-import {
-  ArrowUpRight,
-  Network,
-  ShieldCheck,
-  BadgeCheck,
-  type LucideIcon,
-} from 'lucide-react';
+import { ArrowUpRight } from 'lucide-react';
 import { useRef } from 'react';
 import { BubbleText } from '../ui/BubbleText';
 import { Button } from '../ui/Button';
 import { TypewriterText } from './TypewriterText';
 import { LiveTickerBar } from './LiveTickerBar';
 import LineWaves from './LineWaves';
-import { HERO, HERO_TRUST_PILLS } from '../data';
-
-// Icon name -> lucide component. Kept tiny so we don't ship the full
-// lucide bundle just for hero pills.
-const TRUST_ICON_MAP: Record<string, LucideIcon> = {
-  Network,
-  ShieldCheck,
-  BadgeCheck,
-};
+import { HERO } from '../data';
 
 export function Hero() {
   const heroRef = useRef<HTMLElement>(null);
@@ -71,43 +57,19 @@ export function Hero() {
             <BubbleText
               text={HERO.headline}
               as="h1"
-              className="font-display uppercase text-[clamp(36px,5.5vw,88px)] leading-[1.05] tracking-[-0.02em] text-foreground whitespace-nowrap font-light"
+              className="font-display uppercase text-[clamp(28px,4.2vw,68px)] leading-[1.05] tracking-[-0.02em] text-foreground whitespace-nowrap font-bold"
             />
           </motion.div>
 
           <TypewriterText
             text={HERO.sub}
-            duration={5}
+            duration={6}
+            holdDuration={5}
+            eraseDuration={2.5}
+            pauseDuration={1.5}
             startDelay={0.9}
             className="mt-6 font-body text-base md:text-lg text-foreground/70 max-w-2xl leading-relaxed min-h-[3em]"
           />
-
-          {/* Three trust pills — Decentralised Exchange / Insured Trade / Licensed Broker.
-              First read for any visitor; positions SwisDex against custodial brokers. */}
-          <motion.div
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 1.2, duration: 0.6 }}
-            className="mt-8 flex flex-wrap items-center justify-center gap-3 pointer-events-auto"
-          >
-            {HERO_TRUST_PILLS.map((p) => {
-              const Icon = TRUST_ICON_MAP[p.icon] ?? ShieldCheck;
-              return (
-                <div
-                  key={p.label}
-                  className="liquid-glass rounded-full pl-2 pr-4 py-2 flex items-center gap-2.5"
-                  title={p.sub}
-                >
-                  <span className="liquid-glass-strong rounded-full size-7 flex items-center justify-center shrink-0">
-                    <Icon className="size-3.5 text-[#7dc24f]" />
-                  </span>
-                  <span className="font-display uppercase tracking-wide text-xs sm:text-sm text-foreground whitespace-nowrap">
-                    {p.label}
-                  </span>
-                </div>
-              );
-            })}
-          </motion.div>
 
           <motion.div
             initial={{ opacity: 0, y: 12 }}

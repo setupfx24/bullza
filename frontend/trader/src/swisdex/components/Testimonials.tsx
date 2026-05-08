@@ -1,6 +1,6 @@
 'use client';
 
-import { Quote } from 'lucide-react';
+import { Quote, Star } from 'lucide-react';
 import { BlurText } from './BlurText';
 import { TESTIMONIALS } from '../data';
 
@@ -13,17 +13,10 @@ function Card({ t }: { t: T }) {
       <p className="font-body text-foreground/85 italic leading-relaxed text-[15px]">
         &ldquo;{t.quote}&rdquo;
       </p>
-      <div className="mt-auto flex items-center gap-3">
-        <div
-          className="size-9 rounded-full bg-gradient-to-br from-primary/60 to-secondary/60 shrink-0"
-          aria-hidden
-        />
-        <div className="flex flex-col">
-          <span className="font-body font-medium text-sm">{t.name}</span>
-          <span className="font-body text-xs text-foreground/55 uppercase tracking-wide">
-            {t.role}
-          </span>
-        </div>
+      <div className="mt-auto flex gap-1 text-primary" aria-label="5 out of 5 stars">
+        {Array.from({ length: 5 }).map((_, i) => (
+          <Star key={i} className="size-4 fill-current" aria-hidden />
+        ))}
       </div>
     </div>
   );

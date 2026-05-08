@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { ArrowUpRight, Repeat, BarChart3, Coins, Bitcoin, LineChart } from 'lucide-react';
+import { LiveChartSection } from '@/swisdex/components/LiveChartSection';
 
 const MARKETS = [
   { title: 'Forex',       href: '/trading/forex',       Icon: Repeat,    blurb: 'Trade 60+ currency pairs — majors, minors, exotics. Tight spreads, deep liquidity, 24/5.' },
@@ -65,6 +66,8 @@ export default function MarketsPage() {
           </Link>
         </div>
       </section>
+
+      <LiveChartSection />
     </main>
   );
 }

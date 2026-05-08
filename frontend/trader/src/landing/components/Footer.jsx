@@ -130,27 +130,45 @@ export default function Footer() {
           ))}
         </div>
 
-        {/* Risk warning */}
+        {/* Risk warning + Restricted regions */}
         <div
-          className="mt-12 md:mt-16 p-5 md:p-6 rounded-2xl"
+          className="mt-12 md:mt-16 p-6 md:p-8 rounded-2xl space-y-7"
           style={{
             background: 'var(--fx-bg-elev)',
             border: '1px solid var(--fx-line)',
           }}
         >
-          <p
-            className="text-[11px] uppercase tracking-[0.16em] font-semibold mb-2"
-            style={{ color: 'var(--fx-gold-light)' }}
-          >
-            Risk Warning
-          </p>
-          <p className="text-xs md:text-[13px] leading-relaxed" style={{ color: 'var(--fx-text-3)' }}>
-            Trading forex and contracts for difference (CFDs) carries a high level of risk
-            and may not be suitable for all investors. You could lose more than your initial
-            investment. Past performance is not indicative of future results. Please ensure
-            you fully understand the risks involved and seek independent advice if necessary.
-            SwisDex does not provide investment advice.
-          </p>
+          <div>
+            <h3
+              className="text-lg md:text-xl font-semibold mb-3"
+              style={{ color: 'var(--fx-text)' }}
+            >
+              Risk Warning
+            </h3>
+            <p className="text-xs md:text-[13px] leading-relaxed" style={{ color: 'var(--fx-text-3)' }}>
+              Please note that forex trading and trading in other leveraged products involves a
+              significant level of risk and is not suitable for all investors. Trading in financial
+              instruments may result in losses as well as profits and your losses can be greater than
+              your initial invested capital. Before undertaking any such transactions, you should
+              ensure that you fully understand the risks involved and seek independent advice if
+              necessary. SwisDex does not provide investment advice.
+            </p>
+          </div>
+
+          <div>
+            <h3
+              className="text-lg md:text-xl font-semibold mb-3"
+              style={{ color: 'var(--fx-text)' }}
+            >
+              Restricted Regions
+            </h3>
+            <p className="text-xs md:text-[13px] leading-relaxed" style={{ color: 'var(--fx-text-3)' }}>
+              SwisDex Ltd does not provide services for citizens/residents of the USA, Cuba, Iraq,
+              Myanmar, North Korea, and Sudan. The services of SwisDex Ltd are not intended for
+              distribution to, or use by, any person in any country or jurisdiction where such
+              distribution or use would be contrary to local law or regulation.
+            </p>
+          </div>
         </div>
 
         {/* Bottom bar */}
@@ -159,7 +177,7 @@ export default function Footer() {
           style={{ borderTop: '1px solid var(--fx-line)' }}
         >
           <p className="text-xs" style={{ color: 'var(--fx-text-3)' }}>
-            © {year} SwisDex Ltd. All rights reserved.
+            © 2010–{year} SwisDex Ltd. All rights reserved. · Founded in 2010
           </p>
           <div className="flex flex-wrap gap-x-5 gap-y-2 text-xs" style={{ color: 'var(--fx-text-3)' }}>
             <Link to="/privacy" className="hover:underline">Privacy Policy</Link>

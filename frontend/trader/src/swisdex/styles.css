@@ -4,15 +4,12 @@
    (which keeps its own dark theme).
    ───────────────────────────────────────────────────────────────────── */
 
-@import "@fontsource/oswald/300.css";
-@import "@fontsource/oswald/400.css";
-@import "@fontsource/oswald/500.css";
-@import "@fontsource/oswald/600.css";
-@import "@fontsource/oswald/700.css";
-@import "@fontsource/inter/300.css";
-@import "@fontsource/inter/400.css";
-@import "@fontsource/inter/500.css";
-@import "@fontsource/inter/600.css";
+@import "@fontsource/montserrat/300.css";
+@import "@fontsource/montserrat/400.css";
+@import "@fontsource/montserrat/500.css";
+@import "@fontsource/montserrat/600.css";
+@import "@fontsource/montserrat/700.css";
+@import "@fontsource/montserrat/800.css";
 
 .swisdex-home {
   /* ── Raw palette (HSL triplets, no hsl() so Tailwind alpha works) ── */
@@ -40,8 +37,8 @@
   --ring:                     var(--brand-green);
   --radius:                   0.75rem;
 
-  --font-display: 'Oswald', 'Impact', 'Arial Narrow', sans-serif;
-  --font-body:    'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  --font-display: 'Montserrat', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  --font-body:    'Montserrat', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
 
   --gutter: clamp(20px, 4.2vw, 56px);
   --max:    1440px;
@@ -50,6 +47,7 @@
   background: hsl(var(--background));
   color: hsl(var(--foreground));
   font-family: var(--font-body);
+  word-spacing: 0.14em;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }

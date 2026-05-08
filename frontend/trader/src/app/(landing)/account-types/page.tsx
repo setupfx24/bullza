@@ -119,6 +119,109 @@ export default function AccountTypesPage() {
           ))}
         </div>
       </section>
+
+      <FeatureComparison />
     </main>
+  );
+}
+
+const COLUMN_HEADERS = [
+  { name: 'Standard', gradient: 'linear-gradient(180deg, #1f2937 0%, #0a0a0a 100%)' }, // neutral slate
+  { name: 'Pro',      gradient: 'linear-gradient(180deg, #55a630 0%, #1a3210 100%)' }, // brand green
+  { name: 'ECN',      gradient: 'linear-gradient(180deg, #d00000 0%, #3d0000 100%)' }, // brand red
+];
+
+const INSTRUMENTS = ['Forex', 'Metal', 'Crypto', 'Energies', 'Stocks', 'Indices'];
+
+const FEATURE_ROWS: Array<{ label: string; values: React.ReactNode[] }> = [
+  { label: 'Minimum Deposit', values: ['$100', '$5,000', '$5,000'] },
+  { label: 'Spread',          values: ['From 1.5 pips', 'Ultra-tight', 'From 0.0 pips'] },
+  { label: 'Commission',      values: ['No Commission', 'No Commission', 'Up to $3.50 each side per lot'] },
+  { label: 'Maximum Leverage', values: ['1:500', '1:500', '1:500'] },
+  {
+    label: 'Instruments',
+    values: [0, 1, 2].map((i) => (
+      <div key={i} className="flex flex-wrap justify-center gap-1.5 max-w-[220px] mx-auto">
+        {INSTRUMENTS.map((inst) => (
+          <span key={inst} className="text-[11px] px-2.5 py-0.5 rounded-full liquid-glass text-foreground/85">
+            {inst}
+          </span>
+        ))}
+      </div>
+    )),
+  },
+  { label: 'Minimum lot size',          values: ['0.01', '0.01', '0.01'] },
+  {
+    label: 'Maximum lot size',
+    values: Array(3).fill(
+      <span className="block text-[13px] leading-snug">
+        200 (7:00 – 20:59 GMT +0),
+        <br />
+        60 (21:00 – 6:59 GMT +0)
+      </span>
+    ),
+  },
+  { label: 'Maximum Number of positions', values: ['Unlimited', 'Unlimited', 'Unlimited'] },
+  { label: 'Hedged Margin',                values: ['0%', '0%', '0%'] },
+  { label: 'Margin call',                  values: ['30%', '30%', '30%'] },
+  { label: 'Stop out',                     values: ['0% (See details about stocks)', '0% (See details about stocks)', '0% (See details about stocks)'] },
+  {
+    label: 'Order execution',
+    values: [
+      'Market',
+      <span key="pro" className="block text-[13px] leading-snug">
+        Instant (Forex, metals, energies, stocks, indices), market (crypto)
+      </span>,
+      'Market',
+    ],
+  },
+  { label: 'Swap-Free', values: ['Available', 'Available', 'Available'] },
+];
+
+function FeatureComparison() {
+  return (
+    <section className="mx-auto max-w-[1200px] px-[var(--gutter)] pb-24">
+      <h2 className="font-display uppercase tracking-tight text-foreground text-3xl sm:text-4xl md:text-5xl text-center mb-12">
+        Feature Comparison
+      </h2>
+
+      <div className="overflow-x-auto -mx-[var(--gutter)] px-[var(--gutter)]">
+        <div className="min-w-[760px] rounded-2xl overflow-hidden border border-foreground/15">
+          <table className="w-full" style={{ borderCollapse: 'collapse' }}>
+            <thead>
+              <tr>
+                <th className="w-[220px] bg-foreground/[0.04] border-r border-foreground/15" />
+                {COLUMN_HEADERS.map((c, idx) => (
+                  <th
+                    key={c.name}
+                    className={`px-4 py-5 text-center font-display uppercase tracking-[0.16em] text-sm text-white ${idx < COLUMN_HEADERS.length - 1 ? 'border-r border-white/10' : ''}`}
+                    style={{ background: c.gradient }}
+                  >
+                    {c.name}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {FEATURE_ROWS.map((row, i) => (
+                <tr key={row.label} className="border-t border-foreground/10">
+                  <td className="px-5 py-5 text-sm text-foreground/75 align-middle bg-foreground/[0.04] border-r border-foreground/15">
+                    {row.label}
+                  </td>
+                  {row.values.map((v, j) => (
+                    <td
+                      key={j}
+                      className={`px-4 py-5 text-center text-sm text-foreground/90 align-middle bg-foreground/[0.02] ${j < row.values.length - 1 ? 'border-r border-foreground/10' : ''}`}
+                    >
+                      {v}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
   );
 }
