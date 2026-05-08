@@ -324,8 +324,25 @@ export default function UsersPage() {
       } else if (modalType !== 'add-fund' && modalAccountId) {
         payload.account_id = modalAccountId;
       }
-      await adminApi.post(`/users/${modalUser.id}/${modalType}`, payload);
-      toast.success(`${FUND_LABELS[modalType as FundAction]} successful`);
+      // Backend returns HTTP 202 with detail.code='approval_required' when the
+      // amount is >= ADMIN_DUAL_APPROVAL_THRESHOLD (default $1000). The fund is
+      // NOT applied yet — a second admin must approve via /admin/approvals.
+      // The API client treats 202 as success and returns the body, so without
+      // this branch we'd show "successful" while the user's wallet stays the
+      // same. Surface the pending state explicitly instead.
+      const resp = await adminApi.post<{ detail?: { code?: string; request_id?: string; threshold_usd?: number; message?: string } }>(
+        `/users/${modalUser.id}/${modalType}`,
+        payload,
+      );
+      if (resp?.detail?.code === 'approval_required') {
+        toast(
+          `Pending — amount ≥ $${resp.detail.threshold_usd?.toLocaleString() ?? '1,000'}. ` +
+          `A second admin must approve this in /approvals.`,
+          { icon: '⏳', duration: 6000 },
+        );
+      } else {
+        toast.success(`${FUND_LABELS[modalType as FundAction]} successful`);
+      }
       closeModal();
       fetchUsers();
     } catch (e) {
@@ -649,6 +666,9 @@ export default function UsersPage() {
                 <p className="text-sm font-semibold text-buy">Funds go to Main Wallet</p>
                 <p className="text-xs text-text-secondary mt-0.5 leading-relaxed">
                   The amount will be credited to the user&apos;s <strong>main wallet</strong>. The user must then transfer funds to their trading account from the Wallet page.
+                </p>
+                <p className="text-[11px] text-text-tertiary mt-1.5 leading-snug">
+                  Amounts of <strong>$1,000 or more</strong> require a second admin to approve in <strong>/approvals</strong> before the wallet is credited.
                 </p>
               </div>
             </div>
