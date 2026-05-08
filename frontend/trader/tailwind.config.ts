@@ -79,7 +79,7 @@ const config: Config = {
         'gradient-section-alt': 'linear-gradient(180deg, #101114 0%, #08090b 100%)',
       },
       fontFamily: {
-        sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+        sans: ['Montserrat', 'system-ui', '-apple-system', 'sans-serif'],
         mono: ['JetBrains Mono', 'Menlo', 'monospace'],
       },
       fontSize: {

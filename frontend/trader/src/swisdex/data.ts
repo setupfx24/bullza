@@ -14,19 +14,16 @@ export const BRAND = {
   logo: '/images/swisdex-logo.png',
 };
 
-// Nav targets: scroll-to-anchor for sections that already exist on the home
-// (Hero/Services/Pourquoi/Process/Faq), and absolute URLs for inner landing
-// pages that exist as separate routes. Routes like /markets and /accounts
-// were avoided because they live under the auth-protected dashboard
-// (/dashboard/accounts, /wallet/markets) — landing visitors hitting those
-// got bounced to /auth/login by the auth middleware. Everything below is
-// publicly reachable without a session.
+// Nav targets all resolve to public landing routes. /markets and
+// /account-types are explicit pages with their own content; AuthProvider
+// allow-lists them so unauthenticated visitors are not bounced to login.
+// (The trader-app /accounts route is auth-gated for account management,
+// hence the marketing tier overview lives at /account-types.)
 export const NAV_ITEMS: { label: string; href: string }[] = [
   { label: 'Home',         href: '/' },
-  { label: 'Services',     href: '/#services' },
-  { label: 'Why Us',       href: '/#why-choose' },
-  { label: 'How it Works', href: '/#process' },
-  { label: 'FAQ',          href: '/#faq' },
+  { label: 'Markets',      href: '/markets' },
+  { label: 'Accounts',     href: '/account-types' },
+  { label: 'How it Works', href: '/how-it-works' },
   { label: 'About',        href: '/company/about' },
   { label: 'Contact',      href: '/company/contact' },
 ];
@@ -102,22 +99,40 @@ export const STATS = [
 ] as const;
 
 export const TESTIMONIALS = [
-  { quote: 'SwisDex completely changed how I invest. The AI does all the heavy lifting and I just watch my portfolio grow.',   name: 'James R.',  role: 'United States' },
-  { quote: 'I was skeptical at first, but the results speak for themselves. My returns have exceeded every expectation.',     name: 'Amara K.',  role: 'United Kingdom' },
-  { quote: 'The educational resources helped me understand crypto deeply. The platform is seamless and transparent.',         name: 'Liam T.',   role: 'Australia' },
-  { quote: 'The Growth plan paid for itself in the first cycle. SwisDex delivers what other platforms only promise.',         name: 'Sophia M.', role: 'Germany' },
-  { quote: 'Cold-storage security and live human oversight gave me confidence to invest a serious amount. No regrets.',       name: 'Daniel K.', role: 'Canada' },
-  { quote: 'The dashboard is beautifully designed. I can see every trade my AI is making and the profits add up daily.',      name: 'Priya N.',  role: 'Singapore' },
+  { quote: 'The interface is clean and easy to navigate.' },
+  { quote: 'Account setup was straightforward and quick.' },
+  { quote: 'I like how simple the trading dashboard feels.' },
+  { quote: 'The platform performance has been smooth so far.' },
+  { quote: 'Good mobile experience and responsive layout.' },
+  { quote: 'Transactions appeared quickly in the dashboard.' },
+  { quote: 'Customer support replied within a reasonable time.' },
+  { quote: 'The verification process was simple to complete.' },
+  { quote: 'Professional interface with a strong focus on usability.' },
+  { quote: 'Efficient execution and a polished trading environment.' },
+  { quote: 'A modern platform built with simplicity in mind.' },
 ] as const;
 
 export const FAQ = [
-  { q: "How does SwisDex's AI trading work?",                   a: 'Our proprietary AI engine analyses thousands of market signals per second across crypto and forex pairs, executing high-probability trades automatically. You retain full visibility into every trade in your dashboard.' },
-  { q: 'What is the minimum investment to get started?',        a: 'The Starter plan begins at $500. New members also receive a $200 welcome bonus credited to their first deposit. You can upgrade plans at any time as your portfolio scales.' },
-  { q: 'How are my funds and assets protected?',                a: 'All client assets are held in offline cold-storage wallets, segregated from operational funds. Bank-grade SSL encryption, ISO-compliant infrastructure, and 24/7 security monitoring.' },
-  { q: 'Can I withdraw my profits at any time?',                a: 'Yes. Withdrawals are processed within standard plan windows — Starter (7 days), Growth (14 days), Premium (30 days). Elite members enjoy priority withdrawals.' },
-  { q: 'Do I need trading experience to use SwisDex?',          a: 'No. SwisDex is built for investors at every experience level. The AI handles all trading decisions automatically; the educational library helps you learn at your own pace.' },
-  { q: 'What returns can I realistically expect?',              a: 'Returns vary by plan. These are projections based on AI performance — past results do not guarantee future returns and trading involves risk.' },
-  { q: 'Is SwisDex available worldwide?',                       a: 'SwisDex serves clients in 40+ countries. Multi-currency deposits and withdrawals; 24/7 support in 12 languages. Some jurisdictions may have local restrictions.' },
+  {
+    q: 'What is the minimum deposit required to start trading?',
+    a: 'The minimum deposit depends on your account type. Standard accounts start from $100, while Pro and ECN accounts require a minimum of $5,000. A free Demo account with $10,000 in virtual funds is also available — no commitment, identical execution conditions to a live account.',
+  },
+  {
+    q: 'Which deposit and withdrawal methods are available, and how long do they take?',
+    a: 'We support bank wire transfers, Visa/Mastercard, Skrill, Neteller, cryptocurrency, and local bank options including UPI. Card and e-wallet deposits are typically instant; bank wires and crypto withdrawals usually settle within 1–3 business days. All deposits are 100% fee-free.',
+  },
+  {
+    q: 'Which trading platforms and devices are supported?',
+    a: 'SwisDex offers a fast web platform accessible from any modern browser, plus dedicated iOS and Android mobile apps. All platforms sync to a single account, so your positions, alerts, and watchlists stay in sync across every device.',
+  },
+  {
+    q: 'What leverage options are available, and how does margin work?',
+    a: 'Maximum leverage is up to 1:500 across forex, metals, energies, and indices. Hedged positions carry 0% margin requirement. Margin call kicks in at 30% and stop-out at 0% (with stock-specific rules — see contract specifications). Use leverage responsibly.',
+  },
+  {
+    q: 'What lot sizes can I trade?',
+    a: 'Minimum lot size is 0.01 across all instruments. Maximum is 200 lots between 7:00–20:59 GMT and 60 lots between 21:00–6:59 GMT. There are no limits on the number of open positions per account.',
+  },
 ] as const;
 
 export const CTA = {
@@ -132,8 +147,8 @@ export const CTA = {
 export const FOOTER_QUICK_LINKS = [
   { label: 'Home',         href: '/' },
   { label: 'About Us',     href: '/company/about' },
-  { label: 'Services',     href: '/#services' },
-  { label: 'Why Us',       href: '/#why-choose' },
+  { label: 'Markets',      href: '/markets' },
+  { label: 'Accounts',     href: '/account-types' },
   { label: 'How it Works', href: '/how-it-works' },
   { label: 'Contact',      href: '/company/contact' },
 ];
@@ -151,7 +166,7 @@ export const FOOTER_LINKS = [
   { label: 'Risk Disclaimer',  href: '/risk' },
 ];
 
-export const COPYRIGHT = `© ${new Date().getFullYear()} SwisDex. All Rights Reserved.`;
+export const COPYRIGHT = `© 2010–${new Date().getFullYear()} SwisDex. All Rights Reserved. · Founded in 2010`;
 
 export const RISK_DISCLAIMER =
   'Trading cryptocurrencies and forex involves significant risk. Past performance is not indicative of future results. Invest only what you can afford to lose.';

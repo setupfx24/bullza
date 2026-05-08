@@ -74,6 +74,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const isAuthPage = pathname?.startsWith('/auth');
       const isLandingPage =
         pathname === '/' ||
+        pathname === '/markets' ||
+        pathname === '/account-types' ||
+        pathname === '/how-it-works' ||
         pathname?.startsWith('/company') ||
         pathname?.startsWith('/education') ||
         ['/trading/forex', '/trading/commodities', '/trading/indices', '/trading/crypto'].includes(pathname || '') ||
@@ -97,6 +100,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const isAuthPage = pathname?.startsWith('/auth');
     const isLanding =
       pathname === '/' ||
+      pathname === '/markets' ||
+      pathname === '/account-types' ||
+      pathname === '/how-it-works' ||
       pathname?.startsWith('/company') ||
       pathname?.startsWith('/education') ||
       ['/trading/forex', '/trading/commodities', '/trading/indices', '/trading/crypto'].includes(pathname || '') ||

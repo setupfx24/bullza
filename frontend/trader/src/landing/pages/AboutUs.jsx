@@ -6,13 +6,6 @@ import StatBox from '../components/StatBox'
 import ScrollReveal, { ScrollRevealGroup, ScrollRevealItem } from '../components/animations/ScrollReveal'
 
 const AboutUs = () => {
-  const team = [
-    { name: 'John Mitchell', role: 'Chief Executive Officer', image: '👨‍💼' },
-    { name: 'Sarah Chen', role: 'Chief Technology Officer', image: '👩‍💻' },
-    { name: 'Michael Roberts', role: 'Chief Financial Officer', image: '👨‍💼' },
-    { name: 'Emma Thompson', role: 'Head of Trading', image: '👩‍💼' }
-  ]
-
   return (
     <div className="min-h-screen pt-20">
       <section className="section-padding hero-banner">
@@ -112,27 +105,6 @@ const AboutUs = () => {
                 </p>
               </Card>
             </ScrollRevealItem>
-          </ScrollRevealGroup>
-        </div>
-      </section>
-
-      <section className="section-padding bg-primary-secondary">
-        <div className="container-custom">
-          <ScrollReveal variant="fadeUp">
-            <h2 className="text-3xl md:text-4xl font-bold text-white text-center mb-12">
-              Leadership Team
-            </h2>
-          </ScrollReveal>
-          <ScrollRevealGroup className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-            {team.map((member, index) => (
-              <ScrollRevealItem key={index}>
-                <Card className="text-center">
-                  <div className="text-6xl mb-4">{member.image}</div>
-                  <h3 className="text-xl font-semibold text-white mb-2">{member.name}</h3>
-                  <p className="text-text-secondary">{member.role}</p>
-                </Card>
-              </ScrollRevealItem>
-            ))}
           </ScrollRevealGroup>
         </div>
       </section>

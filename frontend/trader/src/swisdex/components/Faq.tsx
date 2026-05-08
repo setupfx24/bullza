@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useEffect, useState } from 'react';
 import { ArrowUpRight } from 'lucide-react';
 import {
   Accordion,
@@ -13,6 +14,9 @@ import { Button } from '../ui/Button';
 import { FAQ } from '../data';
 
 export function Faq() {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+
   return (
     <section id="faq" className="relative py-28 md:py-40 border-t border-border">
       <div
@@ -41,22 +45,34 @@ export function Faq() {
           </div>
         </div>
 
-        <Accordion type="single" collapsible className="w-full">
-          {FAQ.map((item, i) => (
-            <AccordionItem
-              key={i}
-              value={`item-${i}`}
-              className="border-border"
-            >
-              <AccordionTrigger className="font-display uppercase text-lg md:text-xl tracking-tight py-6 hover:no-underline data-[state=open]:text-primary text-left">
-                {item.q}
-              </AccordionTrigger>
-              <AccordionContent className="font-body text-foreground/70 text-[15px] leading-relaxed pb-6 max-w-[60ch]">
-                {item.a}
-              </AccordionContent>
-            </AccordionItem>
-          ))}
-        </Accordion>
+        {mounted ? (
+          <Accordion type="single" collapsible className="w-full">
+            {FAQ.map((item, i) => (
+              <AccordionItem
+                key={i}
+                value={`item-${i}`}
+                className="border-border"
+              >
+                <AccordionTrigger className="font-display uppercase text-lg md:text-xl tracking-tight py-6 hover:no-underline data-[state=open]:text-primary text-left">
+                  {item.q}
+                </AccordionTrigger>
+                <AccordionContent className="font-body text-foreground/70 text-[15px] leading-relaxed pb-6 max-w-[60ch]">
+                  {item.a}
+                </AccordionContent>
+              </AccordionItem>
+            ))}
+          </Accordion>
+        ) : (
+          <div className="w-full" suppressHydrationWarning>
+            {FAQ.map((item, i) => (
+              <div key={i} className="border-b border-border">
+                <div className="font-display uppercase text-lg md:text-xl tracking-tight py-6 text-left">
+                  {item.q}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </section>
   );
