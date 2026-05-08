@@ -5,6 +5,7 @@ import { clsx } from 'clsx';
 import toast from 'react-hot-toast';
 import { User, Shield, Bell, Monitor, ChevronRight, Sun, Moon, Palette } from 'lucide-react';
 import { useUIStore } from '@/stores/uiStore';
+import { useTradingStore } from '@/stores/tradingStore';
 import { Button } from '@/components/ui/Button';
 import DashboardShell from '@/components/layout/DashboardShell';
 import LinkedWalletCard from '@/components/profile/LinkedWalletCard';
@@ -217,9 +218,20 @@ export default function ProfilePage() {
 
   const { theme, setTheme } = useUIStore();
 
-  const initials =
-    `${(profile?.first_name?.[0] ?? '').toUpperCase()}${(profile?.last_name?.[0] ?? '').toUpperCase()}` || 'U';
-  const username = profile?.email ? profile.email.split('@')[0] : '';
+  // Demo accounts are practice / virtual-funds — the active session may
+  // belong to a real user, but we anonymise the profile surface so the
+  // trader can demo without their KYC name being on display. Profile
+  // edits are still allowed (they save against the underlying user
+  // record), but the avatar / display name show "Demo Account" while
+  // the active account is a demo.
+  const isDemo = !!useTradingStore((s) => s.activeAccount?.is_demo);
+  const displayFirst = isDemo ? 'Demo' : (profile?.first_name ?? '');
+  const displayLast = isDemo ? 'Account' : (profile?.last_name ?? '');
+  const displayEmail = isDemo ? 'demo@swisdex.com' : (profile?.email ?? '');
+  const initials = isDemo
+    ? 'DA'
+    : (`${(profile?.first_name?.[0] ?? '').toUpperCase()}${(profile?.last_name?.[0] ?? '').toUpperCase()}` || 'U');
+  const username = isDemo ? 'demo' : (profile?.email ? profile.email.split('@')[0] : '');
 
   const inputCls =
     'w-full bg-bg-secondary border border-border-primary rounded-xl py-3 px-4 text-sm text-text-primary focus:outline-none focus:border-accent/50 focus:ring-1 focus:ring-accent/20 transition-colors placeholder:text-text-tertiary disabled:opacity-50 disabled:cursor-not-allowed';
@@ -318,85 +330,97 @@ export default function ProfilePage() {
                   </div>
                 </div>
                 <div>
-                  <p className="text-sm font-semibold text-text-primary">{profile?.first_name} {profile?.last_name}</p>
-                  <p className="text-xs text-text-tertiary">{profile?.email}</p>
-                  <p className={clsx('text-[10px] mt-0.5', profile?.kyc_status === 'verified' ? 'text-accent' : 'text-warning')}>
-                    {profile?.kyc_status === 'verified' ? 'Verified Account' : `KYC: ${profile?.kyc_status ?? 'not started'}`}
+                  <p className="text-sm font-semibold text-text-primary">{displayFirst} {displayLast}</p>
+                  <p className="text-xs text-text-tertiary">{displayEmail}</p>
+                  <p className={clsx('text-[10px] mt-0.5', isDemo ? 'text-text-secondary' : (profile?.kyc_status === 'verified' ? 'text-accent' : 'text-warning'))}>
+                    {isDemo
+                      ? 'Practice mode — virtual funds'
+                      : (profile?.kyc_status === 'verified' ? 'Verified Account' : `KYC: ${profile?.kyc_status ?? 'not started'}`)}
                   </p>
                 </div>
               </div>
 
-              <div className="space-y-4">
-                {/* Username (read-only) */}
-                <div>
-                  <label className={labelCls}>Username</label>
-                  <input
-                    type="text"
-                    value={`@${username}`}
-                    disabled
-                    className={`${inputCls} opacity-50 cursor-not-allowed`}
-                  />
+              {isDemo ? (
+                <div className="rounded-lg border border-accent/30 bg-accent/[0.06] px-4 py-4 text-sm text-text-secondary leading-relaxed">
+                  <p className="font-semibold text-text-primary mb-1">Practice mode</p>
+                  <p>
+                    Personal details are hidden while you're trading on a demo account.
+                    Switch to your live account to view or edit profile, KYC, and contact info.
+                  </p>
                 </div>
-
-                {/* Name row */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              ) : (
+                <div className="space-y-4">
+                  {/* Username (read-only) */}
                   <div>
-                    <label className={labelCls}>First Name</label>
-                    <input type="text" value={firstName} onChange={(e) => setFirstName(e.target.value)} className={inputCls} />
-                  </div>
-                  <div>
-                    <label className={labelCls}>Last Name</label>
-                    <input type="text" value={lastName} onChange={(e) => setLastName(e.target.value)} className={inputCls} />
-                  </div>
-                </div>
-
-                {/* Email + Phone */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className={labelCls}>Email</label>
+                    <label className={labelCls}>Username</label>
                     <input
-                      type="email"
-                      defaultValue={profile?.email ?? ''}
+                      type="text"
+                      value={`@${username}`}
                       disabled
                       className={`${inputCls} opacity-50 cursor-not-allowed`}
                     />
                   </div>
+
+                  {/* Name row */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className={labelCls}>First Name</label>
+                      <input type="text" value={firstName} onChange={(e) => setFirstName(e.target.value)} className={inputCls} />
+                    </div>
+                    <div>
+                      <label className={labelCls}>Last Name</label>
+                      <input type="text" value={lastName} onChange={(e) => setLastName(e.target.value)} className={inputCls} />
+                    </div>
+                  </div>
+
+                  {/* Email + Phone */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className={labelCls}>Email</label>
+                      <input
+                        type="email"
+                        defaultValue={profile?.email ?? ''}
+                        disabled
+                        className={`${inputCls} opacity-50 cursor-not-allowed`}
+                      />
+                    </div>
+                    <div>
+                      <label className={labelCls}>Phone Number</label>
+                      <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} className={inputCls} />
+                    </div>
+                  </div>
+
+                  {/* Street address */}
                   <div>
-                    <label className={labelCls}>Phone Number</label>
-                    <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} className={inputCls} />
+                    <label className={labelCls}>Street Address</label>
+                    <input type="text" value={address} onChange={(e) => setAddress(e.target.value)} placeholder="House number, street" className={inputCls} />
+                  </div>
+
+                  {/* City + State */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className={labelCls}>City</label>
+                      <input type="text" value={city} onChange={(e) => setCity(e.target.value)} className={inputCls} />
+                    </div>
+                    <div>
+                      <label className={labelCls}>State / Province</label>
+                      <input type="text" value={state} onChange={(e) => setState(e.target.value)} className={inputCls} />
+                    </div>
+                  </div>
+
+                  {/* Postal */}
+                  <div>
+                    <label className={labelCls}>Postal / Zip Code</label>
+                    <input type="text" value={postal} onChange={(e) => setPostal(e.target.value)} className={inputCls} placeholder="" />
+                  </div>
+
+                  <div className="flex justify-end pt-1">
+                    <Button variant="primary" onClick={handleSaveProfile} loading={savingProfile}>
+                      Save Changes
+                    </Button>
                   </div>
                 </div>
-
-                {/* Street address */}
-                <div>
-                  <label className={labelCls}>Street Address</label>
-                  <input type="text" value={address} onChange={(e) => setAddress(e.target.value)} placeholder="House number, street" className={inputCls} />
-                </div>
-
-                {/* City + State */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className={labelCls}>City</label>
-                    <input type="text" value={city} onChange={(e) => setCity(e.target.value)} className={inputCls} />
-                  </div>
-                  <div>
-                    <label className={labelCls}>State / Province</label>
-                    <input type="text" value={state} onChange={(e) => setState(e.target.value)} className={inputCls} />
-                  </div>
-                </div>
-
-                {/* Postal */}
-                <div>
-                  <label className={labelCls}>Postal / Zip Code</label>
-                  <input type="text" value={postal} onChange={(e) => setPostal(e.target.value)} className={inputCls} placeholder="" />
-                </div>
-
-                <div className="flex justify-end pt-1">
-                  <Button variant="primary" onClick={handleSaveProfile} loading={savingProfile}>
-                    Save Changes
-                  </Button>
-                </div>
-              </div>
+              )}
             </div>
 
             {/* Trading Accounts section */}

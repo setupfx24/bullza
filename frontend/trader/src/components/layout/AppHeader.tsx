@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useShellStore } from '@/stores/shellStore';
 import { useAuthStore } from '@/stores/authStore';
+import { useTradingStore } from '@/stores/tradingStore';
 import { NotificationBell } from '@/components/NotificationListener';
 import EarnChip from '@/components/earn/EarnChip';
 import api from '@/lib/api/client';
@@ -26,16 +27,26 @@ export default function AppHeader() {
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
-  const handle = user?.first_name
-    ? [user.first_name, user.last_name].filter(Boolean).join(' ')
-    : user?.email ? user.email.split('@')[0] : 'Trader';
-  const initials = user
-    ? (
-        user.first_name?.[0] && user.last_name?.[0]
-          ? `${user.first_name[0]}${user.last_name[0]}`
-          : user.first_name?.[0] || user.email?.[0] || 'U'
-      ).toUpperCase()
-    : 'U';
+  // Anonymise the header label / initials when the active account is a
+  // demo (practice / virtual funds). The user record may carry their real
+  // KYC name, but on a demo account we surface a generic "Demo Account"
+  // identity so screen-shares / screenshots from practice sessions don't
+  // leak personal info. Live-account selection restores the real name.
+  const isDemo = !!useTradingStore((s) => s.activeAccount?.is_demo);
+  const handle = isDemo
+    ? 'Demo Account'
+    : (user?.first_name
+        ? [user.first_name, user.last_name].filter(Boolean).join(' ')
+        : user?.email ? user.email.split('@')[0] : 'Trader');
+  const initials = isDemo
+    ? 'DA'
+    : (user
+        ? (
+            user.first_name?.[0] && user.last_name?.[0]
+              ? `${user.first_name[0]}${user.last_name[0]}`
+              : user.first_name?.[0] || user.email?.[0] || 'U'
+          ).toUpperCase()
+        : 'U');
 
   useEffect(() => {
     let cancelled = false;
