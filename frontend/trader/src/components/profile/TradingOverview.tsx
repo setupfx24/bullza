@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState, useCallback } from 'react';
+import { useMemo, useState, useCallback, useRef } from 'react';
 import {
   addMonths,
   eachDayOfInterval,
@@ -262,6 +262,33 @@ export default function TradingOverview({ data }: { data?: TradingDashboardData 
 
   const s = d.calendar.summary;
 
+  // Hidden native month input — used to power direct month-picker on the
+  // calendar header. Clicking the visible "MMM yyyy" label calls
+  // showPicker() so the OS date wheel pops up; selecting a month writes
+  // back to calMonth. Modern browsers (Chrome 99+, Edge, Safari 16.4+,
+  // Firefox 122+) support showPicker(); the fallback `.click()` covers
+  // older browsers by routing through the input's normal focus behaviour.
+  const monthInputRef = useRef<HTMLInputElement>(null);
+  const openMonthPicker = useCallback(() => {
+    const el = monthInputRef.current;
+    if (!el) return;
+    try {
+      // showPicker() is the spec-defined way to open a native picker
+      // programmatically. Older browsers throw NotSupportedError, in
+      // which case we fall back to .click() / .focus().
+      (el as HTMLInputElement & { showPicker?: () => void }).showPicker?.();
+    } catch {
+      el.click();
+      el.focus();
+    }
+  }, []);
+  const onMonthInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const v = e.target.value; // "YYYY-MM"
+    if (!v) return;
+    const next = parseISO(`${v}-01`);
+    if (!isNaN(next.getTime())) setCalMonth(next);
+  }, []);
+
   return (
     <div className="space-y-8 text-text-primary pb-8">
       <TradingJournalSection journal={j} />
@@ -311,19 +338,56 @@ export default function TradingOverview({ data }: { data?: TradingDashboardData 
                 type="button"
                 onClick={() => setCalMonth(subMonths(calMonth, 1))}
                 className="p-1.5 rounded-lg border border-border-primary hover:bg-bg-hover text-text-secondary"
+                aria-label="Previous month"
               >
                 <ChevronLeft className="w-4 h-4" />
               </button>
-              <span className="text-sm font-semibold text-text-primary min-w-[100px] text-center">
-                {format(calMonth, 'MMM yyyy')}
-              </span>
+              {/* Month label is now a button — click to open the OS month
+                  picker. Anchors a visually-hidden <input type="month">
+                  which the OS pops the picker against. */}
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={openMonthPicker}
+                  className="text-sm font-semibold text-text-primary min-w-[100px] text-center px-2 py-1 rounded-md hover:bg-bg-hover transition-colors cursor-pointer"
+                  title="Click to jump to a specific month"
+                >
+                  {format(calMonth, 'MMM yyyy')}
+                </button>
+                <input
+                  ref={monthInputRef}
+                  type="month"
+                  value={format(calMonth, 'yyyy-MM')}
+                  max={format(new Date(), 'yyyy-MM')}
+                  onChange={onMonthInputChange}
+                  // Visually hidden but still focusable so showPicker()
+                  // (and the .click() fallback) work in every browser.
+                  className="absolute inset-0 w-full h-full opacity-0 pointer-events-none"
+                  aria-hidden
+                  tabIndex={-1}
+                />
+              </div>
               <button
                 type="button"
                 onClick={() => setCalMonth(addMonths(calMonth, 1))}
                 className="p-1.5 rounded-lg border border-border-primary hover:bg-bg-hover text-text-secondary"
+                aria-label="Next month"
               >
                 <ChevronRight className="w-4 h-4" />
               </button>
+              {/* Quick-jump back to the current month — useful when the
+                  user has navigated several months back. Only shown when
+                  the calendar isn't already on the current month. */}
+              {!isSameMonth(calMonth, new Date()) && (
+                <button
+                  type="button"
+                  onClick={() => setCalMonth(startOfMonth(new Date()))}
+                  className="px-2 py-1 rounded-md text-[11px] font-semibold border border-[#55a630]/40 bg-[#55a630]/10 text-[#55a630] hover:bg-[#55a630]/20 transition-colors"
+                  title="Jump to current month"
+                >
+                  Today
+                </button>
+              )}
             </div>
           </div>
 
