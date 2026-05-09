@@ -266,17 +266,21 @@ export default function AdminNotificationBell() {
         className={cn(
           'relative flex items-center justify-center w-9 h-9 rounded-lg transition-fast',
           'bg-bg-primary/40 border border-border-primary/30 text-text-secondary hover:text-text-primary hover:bg-bg-hover',
+          // Subtle red glow on the button itself when items pending — nudges
+          // peripheral vision towards the bell even when the admin's eyes
+          // aren't on the top bar.
+          total > 0 && 'border-danger/40 shadow-[0_0_0_1px_rgba(239,68,68,0.35)]',
         )}
         title="Notifications"
         aria-label={`Notifications — ${total} pending items`}
         aria-expanded={open}
       >
-        <Bell size={15} />
+        <Bell size={15} className={total > 0 ? 'notif-bell-ring text-danger' : ''} />
         {total > 0 && (
           <span
             className={cn(
               'absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full text-[9px] font-bold',
-              'flex items-center justify-center bg-danger text-white animate-pulse',
+              'flex items-center justify-center bg-danger text-white notif-badge-blink',
             )}
           >
             {total > 99 ? '99+' : total}

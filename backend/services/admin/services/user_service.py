@@ -75,7 +75,20 @@ async def list_users(
     page: int, per_page: int, search: str | None,
     status_filter: str | None, kyc_filter: str | None,
     group_id: str | None, db: AsyncSession,
+    date_from: str | None = None,
+    date_to:   str | None = None,
 ) -> dict:
+    from datetime import datetime, time, timezone
+
+    def _parse_date(value: str | None, *, end_of_day: bool) -> datetime | None:
+        if not value:
+            return None
+        try:
+            d = datetime.strptime(value, "%Y-%m-%d").date()
+        except ValueError:
+            raise HTTPException(status_code=400, detail=f"Invalid date '{value}', expected YYYY-MM-DD")
+        return datetime.combine(d, time.max if end_of_day else time.min, tzinfo=timezone.utc)
+
     query = select(User).where(User.role.notin_(["admin", "super_admin"]), User.is_demo == False)
 
     if search:
@@ -92,6 +105,15 @@ async def list_users(
         query = query.where(User.status == status_filter)
     if kyc_filter:
         query = query.where(User.kyc_status == kyc_filter)
+    # Created-at range — used by the admin Users page's date-range filter
+    # (Today / Yesterday / Last 7 / Last 30 / Custom). Bounds are inclusive
+    # of the picked dates: start at 00:00 UTC, end at 23:59:59 UTC.
+    df = _parse_date(date_from, end_of_day=False)
+    dt = _parse_date(date_to, end_of_day=True)
+    if df is not None:
+        query = query.where(User.created_at >= df)
+    if dt is not None:
+        query = query.where(User.created_at <= dt)
 
     count_q = select(func.count()).select_from(query.subquery())
     total = (await db.execute(count_q)).scalar() or 0
