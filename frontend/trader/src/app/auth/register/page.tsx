@@ -136,8 +136,12 @@ function RegisterContent() {
         phone: form.phone.trim(),
         referral_code: form.referral_code || undefined,
       });
-      toast.success('Account created successfully!');
-      router.push('/accounts');
+      // Account created — backend has emailed a verify link. Send the
+      // user to a "check your inbox" page rather than the dashboard;
+      // they'll be blocked at /auth/me (or first protected fetch) until
+      // they click the link, so a hard redirect avoids confusing flicker.
+      toast.success('Account created — check your inbox to verify.');
+      router.push(`/auth/check-email?email=${encodeURIComponent(form.email)}`);
     } catch (err: any) {
       toast.error(err.message || 'Registration failed');
     } finally {

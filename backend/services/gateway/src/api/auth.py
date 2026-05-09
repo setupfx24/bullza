@@ -21,6 +21,8 @@ from ..services.auth_service import (
     setup_2fa as _setup_2fa, verify_2fa as _verify_2fa,
     change_password as _change_password, get_me as _get_me, logout_user,
     client_ip_for_inet,
+    confirm_email_verification as _confirm_email_verification,
+    resend_verification_email as _resend_verification_email,
 )
 from ..services import wallet_auth_service
 
@@ -59,6 +61,33 @@ async def register(req: RegisterRequest, request: Request, db: AsyncSession = De
         )
     except AuthServiceError as e:
         raise HTTPException(status_code=e.status_code, detail=e.detail)
+
+
+@router.get("/verify-email")
+async def verify_email(token: str, db: AsyncSession = Depends(get_db)):
+    """Verify the email address using the signed token from the click-link.
+    Idempotent — clicking the link twice still returns 200."""
+    try:
+        await _confirm_email_verification(token, db=db)
+    except AuthServiceError as e:
+        raise HTTPException(status_code=e.status_code, detail=e.detail)
+    return {"message": "Email verified — you can now sign in.", "verified": True}
+
+
+class _ResendVerifyBody(__import__("pydantic").BaseModel):
+    email: str
+
+
+@router.post("/resend-verification", response_model=MessageResponse)
+async def resend_verification(body: _ResendVerifyBody, request: Request, db: AsyncSession = Depends(get_db)):
+    """Resend the verify-email link. Rate-limited (3 per 10 min per IP) and
+    silently no-ops for unknown / already-verified addresses so we don't
+    leak account existence."""
+    try:
+        await _resend_verification_email(email=body.email, request=request, db=db)
+    except AuthServiceError as e:
+        raise HTTPException(status_code=e.status_code, detail=e.detail)
+    return {"message": "If that email is registered and unverified, we've sent a new link."}
 
 
 @router.post("/login")

@@ -1,7 +1,7 @@
 'use client';
 
 import { Suspense, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { motion, AnimatePresence, MotionConfig } from 'framer-motion';
 import { useEffect } from 'react';
@@ -82,6 +82,8 @@ function AuthInput({
 /* ═══════ PAGE ═══════ */
 export default function LoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const justVerified = searchParams.get('verified') === '1';
   const { login, demoLogin, forgotPassword, isLoading } = useAuthStore();
   const [activeStep, setActiveStep] = useState(1);
 
@@ -132,6 +134,22 @@ export default function LoginPage() {
       const msg = err instanceof Error ? err.message : '';
       if (msg.includes('2FA') && !msg.includes('Invalid')) {
         setNeed2FA(true);
+      } else if (msg.includes('email_unverified') || msg.includes('confirm your email')) {
+        // Backend returned 403 with code=email_unverified. Bounce the user
+        // back to /auth/check-email with their address pre-filled so the
+        // resend-link button works without retyping.
+        toast(
+          'Please confirm your email before signing in. We just sent a fresh link.',
+          { icon: '✉️', duration: 6000 },
+        );
+        try {
+          await fetch('/api/v1/auth/resend-verification', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email }),
+          });
+        } catch { /* silent — non-critical */ }
+        router.push(`/auth/check-email?email=${encodeURIComponent(email)}`);
       } else {
         setErrorDialog({ title: 'Sign-in failed', message: authErrorMessage(err, 'login') });
       }
@@ -266,6 +284,24 @@ export default function LoginPage() {
                       <h2 className="auth-form__title">Sign In</h2>
                       <p className="auth-form__subtitle">Enter your credentials to access your account.</p>
                     </motion.div>
+
+                    {justVerified && (
+                      <motion.div
+                        {...fadeUp(0.32)}
+                        style={{
+                          background: 'rgba(85, 166, 48, 0.10)',
+                          border: '1px solid rgba(85, 166, 48, 0.35)',
+                          borderRadius: 10,
+                          padding: '10px 12px',
+                          marginTop: 4,
+                          display: 'flex', alignItems: 'flex-start', gap: 8,
+                          fontSize: 13, color: '#86c66c',
+                        }}
+                      >
+                        <span aria-hidden style={{ fontSize: 14, marginTop: 1 }}>✓</span>
+                        <span>Email verified. You can now sign in.</span>
+                      </motion.div>
+                    )}
 
                     <motion.div {...fadeUp(0.37)}>
                       <AuthInput

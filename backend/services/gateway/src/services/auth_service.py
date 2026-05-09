@@ -244,6 +244,83 @@ def _send_welcome_email(user: User, *, via_google: bool) -> None:
         logger.warning("welcome email scheduling failed for %s: %s", user.email, e)
 
 
+# ─── Email verification ───────────────────────────────────────────────────
+
+EMAIL_VERIFY_EXPIRES_HOURS = 24
+EMAIL_VERIFY_TOKEN_TYPE = "email_verify"
+
+
+def _build_verify_url(user: User) -> str:
+    """Sign a 24h JWT for email verification and return the click-through URL.
+    The token has type=email_verify so it can't be reused as a session token
+    even if a server-side bug accepted it on the wrong route."""
+    from packages.common.src.auth import create_email_verify_token
+    st = get_settings()
+    base = (st.TRADER_APP_URL or "https://trade.swisdex.com").rstrip("/")
+    token, _exp = create_email_verify_token(
+        str(user.id), expires_hours=EMAIL_VERIFY_EXPIRES_HOURS,
+    )
+    return f"{base}/auth/verify-email?token={token}"
+
+
+def _send_verify_email(user: User, request: Request | None = None) -> None:
+    """Schedule the verify-your-email link. Fire-and-forget like welcome."""
+    try:
+        from packages.common.src.smtp_mail import (
+            send_email, smtp_configured, fire_and_forget,
+        )
+        if not smtp_configured():
+            return
+        from packages.common.src.email_templates.verify_email import render_verify_email
+        verify_url = _build_verify_url(user)
+        subject, html, text = render_verify_email(
+            first_name=user.first_name,
+            verify_url=verify_url,
+            expires_hours=EMAIL_VERIFY_EXPIRES_HOURS,
+        )
+        fire_and_forget(send_email(user.email, subject, html, text=text))
+    except Exception as e:
+        logger.warning("verify-email scheduling failed for %s: %s", user.email, e)
+
+
+async def confirm_email_verification(token: str, db: AsyncSession) -> User:
+    """Validate a verify token and flip user.email_verified=True.
+
+    Idempotent: if the user is already verified we still resolve OK so the
+    user clicking the link twice (e.g. once in their preview pane, once in
+    the inbox) doesn't see an error. Raises AuthServiceError on bad/expired
+    tokens or unknown users."""
+    from packages.common.src.auth import decode_email_verify_token
+    payload = decode_email_verify_token(token)
+    if not payload or payload.get("type") != EMAIL_VERIFY_TOKEN_TYPE:
+        raise AuthServiceError("Verification link is invalid or expired", 400)
+    user_id = payload.get("sub")
+    if not user_id:
+        raise AuthServiceError("Verification link is invalid", 400)
+    res = await db.execute(select(User).where(User.id == UUID(str(user_id))))
+    user = res.scalar_one_or_none()
+    if not user:
+        raise AuthServiceError("Account not found", 404)
+    if not user.email_verified:
+        user.email_verified = True
+        user.email_verified_at = datetime.now(timezone.utc)
+        await db.commit()
+    return user
+
+
+async def resend_verification_email(email: str, request: Request, db: AsyncSession) -> None:
+    """Resend the verify link. Rate-limited and silently no-op for unknown
+    emails so we don't leak account existence."""
+    await rate_limit_http(request, "resend-verify", 3, 600.0)
+    res = await db.execute(select(User).where(func.lower(User.email) == email.lower()))
+    user = res.scalar_one_or_none()
+    if not user:
+        return  # no-op (don't leak whether the email is registered)
+    if user.email_verified:
+        return  # already verified
+    _send_verify_email(user, request)
+
+
 async def _maybe_send_new_login_email(
     user: User,
     request: Request,
@@ -465,6 +542,11 @@ async def register_user(
         role="user",
         status="active",
         kyc_status="pending",
+        # New email-password sign-ups must verify before they can log in.
+        # Google / wallet sign-ups stay verified=True (third-party already
+        # confirmed ownership). Migration 0038 backfills True for existing
+        # users so this gate doesn't lock anyone out on deploy.
+        email_verified=False,
     )
     db.add(user)
     await db.flush()
@@ -475,9 +557,11 @@ async def register_user(
     response = await issue_auth_json_response(
         user, request, db, status_code=201, user_audit_action="REGISTER",
     )
-    # Fire-and-forget welcome email after the commit — never blocks the
-    # signup response and a delivery failure can't roll back the account.
+    # Fire-and-forget welcome + verify emails after the commit — neither
+    # blocks the signup response and a delivery failure can't roll back
+    # the account.
     _send_welcome_email(user, via_google=False)
+    _send_verify_email(user, request)
     return response
 
 
@@ -506,6 +590,20 @@ async def login_user(
 
     if not user or not verify_password(password, user.password_hash):
         raise AuthServiceError("Invalid credentials", 401)
+
+    # Gate sign-in until the user has confirmed ownership of the email.
+    # Existing users (registered before migration 0038) were backfilled
+    # with email_verified=True so this only blocks new sign-ups that
+    # haven't clicked the link yet. The 403 carries a structured detail
+    # so the frontend can render a "check your email + resend" UI.
+    if not bool(getattr(user, "email_verified", True)):
+        raise AuthServiceError(
+            {
+                "code": "email_unverified",
+                "message": "Please confirm your email before signing in. Check your inbox for the verification link.",
+            },
+            403,
+        )
 
     if user.status == "banned":
         raise AuthServiceError("Account has been banned", 403)
