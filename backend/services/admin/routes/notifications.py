@@ -86,9 +86,12 @@ async def notifications_summary(
     )
     new_users_24h = int(new_users_q.scalar() or 0)
 
+    # `link` values are admin-frontend route paths. Withdrawals share the
+    # /deposits page (tab=withdrawals); approvals get their own page; the
+    # rest map 1:1 to existing routes.
     items = [
         {"kind": "withdrawals", "count": pending_withdrawals,
-         "label": "Pending withdrawals", "link": "/withdrawals", "severity": "critical"},
+         "label": "Pending withdrawals", "link": "/deposits?tab=withdrawals", "severity": "critical"},
         {"kind": "approvals",   "count": pending_approvals,
          "label": "Approval requests", "link": "/approvals", "severity": "critical"},
         {"kind": "deposits",    "count": pending_deposits,

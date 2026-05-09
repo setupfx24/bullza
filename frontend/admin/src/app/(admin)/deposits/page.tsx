@@ -205,7 +205,15 @@ function withdrawalPayoutSummary(w: Withdrawal): string {
 const PAGE_SIZE = 20;
 
 export default function DepositsPage() {
-  const [activeTab, setActiveTab] = useState<TabId>('deposits');
+  // Allow deep-links from the notification bell (e.g. /deposits?tab=withdrawals)
+  // to land on the right tab. Reads `?tab=` once on mount; if the value
+  // matches a real TabId we honour it, otherwise we fall back to 'deposits'.
+  const initialTab: TabId = (() => {
+    if (typeof window === 'undefined') return 'deposits';
+    const t = new URLSearchParams(window.location.search).get('tab');
+    return t === 'withdrawals' || t === 'history' ? (t as TabId) : 'deposits';
+  })();
+  const [activeTab, setActiveTab] = useState<TabId>(initialTab);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('pending');
   const [page, setPage] = useState(1);
 
