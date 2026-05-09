@@ -437,14 +437,12 @@ export default function AccountsPage() {
   const newAccountCtaClass =
     'inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-lg border-2 border-[#55a630] text-[#55a630] text-sm font-bold hover:bg-[#55a630]/10 transition-colors shrink-0';
 
-  /** Open the live account picker only if KYC is approved; otherwise show the KYC gate modal. */
+  /** Open the account-type picker. Picker now hosts a Real/Demo toggle —
+   *  Demo accounts don't need KYC, so we open the picker regardless of KYC
+   *  status and let the modal show its own KYC banner when the user
+   *  actually selects Real. (Was: hard-blocked the picker if KYC wasn't
+   *  approved, which made demo accounts unreachable for new users.) */
   const handleOpenNewAccount = () => {
-    const kyc = (user?.kyc_status || '').toLowerCase();
-    const approved = kyc === 'approved' || kyc === 'verified';
-    if (!approved) {
-      setKycGateOpen(true);
-      return;
-    }
     setAccountPickerOpen(true);
   };
 

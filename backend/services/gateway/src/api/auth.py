@@ -55,7 +55,6 @@ async def register(req: RegisterRequest, request: Request, db: AsyncSession = De
             first_name=req.first_name, last_name=req.last_name,
             phone=req.phone, country=req.country,
             referral_code=req.referral_code,
-            create_demo=req.create_demo,
             request=request, db=db,
         )
     except AuthServiceError as e:

@@ -1,7 +1,7 @@
 """Trading Accounts API."""
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from packages.common.src.database import get_db
@@ -19,12 +19,20 @@ router = APIRouter()
 
 @router.get("/available-groups")
 async def list_openable_account_groups(
+    is_demo: bool = Query(default=False, description="True → return demo account groups (real users can open demos too)"),
     current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Account types the broker exposes (admin-managed AccountGroup rows). Filtered by user's demo/live status."""
+    """Account types the broker exposes (admin-managed AccountGroup rows).
+
+    Defaults to live groups for real users / demo groups for demo users.
+    A real user can pass ?is_demo=true to instead see demo account types
+    in the New Account picker — the picker's Real/Demo toggle hits this
+    endpoint twice with different flags so the trader can browse either
+    pool before committing.
+    """
     return await account_service.list_openable_account_groups(
-        db=db, user_id=current_user["user_id"],
+        db=db, user_id=current_user["user_id"], is_demo=is_demo,
     )
 
 

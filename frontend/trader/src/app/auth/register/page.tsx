@@ -98,9 +98,6 @@ function RegisterContent() {
   const [showConfirmPass, setShowConfirmPass] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
-  // Default ON — most new traders want a demo to explore the platform
-  // before funding a live account. Toggle is right above the submit button.
-  const [createDemo, setCreateDemo] = useState(true);
 
   useEffect(() => {
     const ref = searchParams.get('ref');
@@ -137,13 +134,8 @@ function RegisterContent() {
         last_name: form.last_name,
         phone: form.phone.trim(),
         referral_code: form.referral_code || undefined,
-        create_demo: createDemo,
       });
-      toast.success(
-        createDemo
-          ? 'Account created — demo account ready with $10,000 practice funds.'
-          : 'Account created successfully!'
-      );
+      toast.success('Account created successfully!');
       router.push('/accounts');
     } catch (err: any) {
       toast.error(err.message || 'Registration failed');
@@ -311,32 +303,6 @@ function RegisterContent() {
                       onIconClick={() => setShowConfirmPass(!showConfirmPass)}
                     />
                   </motion.div>
-
-                  <motion.label
-                    {...fadeUp(0.7)}
-                    className="auth-demo-toggle"
-                    style={{
-                      display: 'flex', alignItems: 'flex-start', gap: 10,
-                      padding: '10px 12px', marginTop: 4,
-                      borderRadius: 10,
-                      background: 'rgba(85, 166, 48, 0.08)',
-                      border: '1px solid rgba(85, 166, 48, 0.25)',
-                      cursor: 'pointer', userSelect: 'none',
-                    }}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={createDemo}
-                      onChange={(e) => setCreateDemo(e.target.checked)}
-                      style={{ marginTop: 3, accentColor: '#55a630', cursor: 'pointer' }}
-                    />
-                    <div style={{ fontSize: 13, lineHeight: 1.45 }}>
-                      <div style={{ fontWeight: 600 }}>Also create a demo account</div>
-                      <div style={{ opacity: 0.7, fontSize: 12 }}>
-                        Practice with $10,000 in virtual funds — same execution, no deposit required.
-                      </div>
-                    </div>
-                  </motion.label>
 
                   <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ delay: 0.72, duration: 0.4 }}>
                     <button type="submit" className="auth-btn" disabled={loading || isLoading}>

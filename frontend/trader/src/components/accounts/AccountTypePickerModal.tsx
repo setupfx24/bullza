@@ -47,13 +47,31 @@ type Props = {
 export default function AccountTypePickerModal({ open, onClose, onCreated }: Props) {
   const user = useAuthStore((s) => s.user);
   const userIsDemo = !!user?.is_demo;
+  const kycApproved = (() => {
+    const k = (user?.kyc_status || '').toLowerCase();
+    return k === 'approved' || k === 'verified';
+  })();
 
   const [groups, setGroups] = useState<AvailableAccountGroup[]>([]);
   const [loading, setLoading] = useState(false);
   const [creating, setCreating] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [leverage, setLeverage] = useState<number | null>(null);
+  // Real/Demo toggle. Demo users are forced to 'demo' (they can't open
+  // live accounts). Real users default to 'real' but can flip to 'demo'
+  // to provision a virtual-funds account from the same picker.
+  const [accountKind, setAccountKind] = useState<'real' | 'demo'>(
+    userIsDemo ? 'demo' : 'real',
+  );
 
+  // Re-sync kind when modal opens, in case the user's demo status changed.
+  useEffect(() => {
+    if (open) setAccountKind(userIsDemo ? 'demo' : 'real');
+  }, [open, userIsDemo]);
+
+  // Refetch groups whenever the modal opens OR the kind toggle flips —
+  // the backend returns a different pool of AccountGroup rows depending
+  // on ?is_demo so the cards/leverage need to refresh.
   useEffect(() => {
     if (!open) return;
     setSelectedId(null);
@@ -62,7 +80,8 @@ export default function AccountTypePickerModal({ open, onClose, onCreated }: Pro
     setLoading(true);
     (async () => {
       try {
-        const res = await api.get<{ items: AvailableAccountGroup[] }>('/accounts/available-groups');
+        const qs = accountKind === 'demo' ? '?is_demo=true' : '';
+        const res = await api.get<{ items: AvailableAccountGroup[] }>(`/accounts/available-groups${qs}`);
         if (cancelled) return;
         const list = Array.isArray(res.items) ? res.items : [];
         setGroups(list);
@@ -77,7 +96,7 @@ export default function AccountTypePickerModal({ open, onClose, onCreated }: Pro
       }
     })();
     return () => { cancelled = true; };
-  }, [open]);
+  }, [open, accountKind]);
 
   const selected = useMemo(
     () => groups.find((g) => g.id === selectedId) || null,
@@ -117,8 +136,13 @@ export default function AccountTypePickerModal({ open, onClose, onCreated }: Pro
       const res = await api.post<{ id: string; account_number: string }>('/accounts/open', {
         account_group_id: selected.id,
         leverage: leverage ?? selected.leverage_default,
+        is_demo: accountKind === 'demo',
       });
-      toast.success('Trading account created');
+      toast.success(
+        accountKind === 'demo'
+          ? 'Demo account created — $10,000 virtual funds added.'
+          : 'Trading account created',
+      );
       onClose();
       if (res?.id) {
         try { sessionStorage.setItem('ptd-accounts-expand', res.id); } catch {}
@@ -148,17 +172,37 @@ export default function AccountTypePickerModal({ open, onClose, onCreated }: Pro
       bodyClassName="bg-bg-card p-5 sm:p-6"
     >
       <div className="space-y-6">
-        {/* Account-type segmented toggle */}
+        {/* Account-type segmented toggle. Real users can flip between Real
+            and Demo; demo users are locked to Demo. */}
         <Section label="Account type">
           <div className="inline-flex p-1 rounded-lg" style={{ background: 'var(--bg-card-nested)', border: '1px solid var(--border-primary)' }}>
-            <TypePill active={!userIsDemo} disabled={userIsDemo} label="Real" />
-            <TypePill active={userIsDemo} disabled={!userIsDemo} label="Demo" />
+            <TypePill
+              active={accountKind === 'real'}
+              disabled={userIsDemo}
+              label="Real"
+              onClick={() => !userIsDemo && setAccountKind('real')}
+            />
+            <TypePill
+              active={accountKind === 'demo'}
+              disabled={false}
+              label="Demo"
+              onClick={() => setAccountKind('demo')}
+            />
           </div>
-          {userIsDemo && (
+          {userIsDemo ? (
             <p className="mt-2 text-xs text-text-tertiary">
               Demo users can only open demo accounts. Sign up for a real account to trade live.
             </p>
-          )}
+          ) : accountKind === 'demo' ? (
+            <p className="mt-2 text-xs text-text-tertiary">
+              Demo accounts start with $10,000 in virtual funds — same execution as live, no deposit or KYC needed.
+            </p>
+          ) : !kycApproved ? (
+            <div className="mt-3 rounded-lg border border-warning/40 bg-warning/10 px-3 py-2.5 text-xs text-warning">
+              Live accounts require KYC verification. Switch to <strong>Demo</strong> above to start practising
+              right away, or <a href="/kyc" className="underline font-semibold">complete your KYC</a> to open a live account.
+            </div>
+          ) : null}
         </Section>
 
         {/* Platform / account-group cards */}
@@ -266,12 +310,12 @@ export default function AccountTypePickerModal({ open, onClose, onCreated }: Pro
           <button
             type="button"
             onClick={handleCreate}
-            disabled={creating || !selected}
+            disabled={creating || !selected || (accountKind === 'real' && !userIsDemo && !kycApproved)}
             className="inline-flex items-center gap-2 px-6 py-3 rounded-lg text-sm font-bold disabled:opacity-50 transition-all"
             style={{ background: '#55a630', color: '#1a1408' }}
           >
             {creating && <Loader2 size={14} className="animate-spin" />}
-            Create account
+            {accountKind === 'demo' ? 'Create demo account' : 'Create account'}
           </button>
         </div>
       </div>
@@ -290,19 +334,29 @@ function Section({ label, children }: { label: string; children: React.ReactNode
   );
 }
 
-function TypePill({ active, disabled, label }: { active: boolean; disabled: boolean; label: string }) {
+function TypePill({
+  active, disabled, label, onClick,
+}: {
+  active: boolean;
+  disabled: boolean;
+  label: string;
+  onClick?: () => void;
+}) {
   return (
-    <span
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
       className="px-4 py-1.5 text-sm font-semibold rounded-md transition-colors select-none"
       style={{
         background: active ? '#55a630' : 'transparent',
         color: active ? '#1a1408' : 'var(--text-secondary)',
         opacity: disabled ? 0.55 : 1,
-        cursor: disabled ? 'not-allowed' : 'default',
+        cursor: disabled ? 'not-allowed' : 'pointer',
       }}
     >
       {label}
-    </span>
+    </button>
   );
 }
 

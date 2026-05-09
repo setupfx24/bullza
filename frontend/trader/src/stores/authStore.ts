@@ -58,7 +58,6 @@ interface AuthState {
     last_name: string;
     phone?: string;
     referral_code?: string;
-    create_demo?: boolean;
   }) => Promise<void>;
   logout: () => void;
   loadUser: () => Promise<void>;

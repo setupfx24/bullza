@@ -105,17 +105,23 @@ async def _user_effective_leverage_cap(
     }
 
 
-async def list_openable_account_groups(db: AsyncSession, user_id: UUID) -> dict:
+async def list_openable_account_groups(
+    db: AsyncSession, user_id: UUID, *, is_demo: bool = False,
+) -> dict:
     u = await db.execute(select(User).where(User.id == user_id))
     user = u.scalar_one_or_none()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-    # Demo users see only demo-type groups; live users see only live groups.
+    # Demo users always see demo-type groups regardless of the request flag
+    # (they can't open live accounts). Real users default to live but may
+    # request demo via ?is_demo=true so the New Account picker can show
+    # demo platforms alongside the Demo toggle.
+    want_demo = bool(user.is_demo) or bool(is_demo)
     result = await db.execute(
         select(AccountGroup)
         .where(
             AccountGroup.is_active == True,
-            AccountGroup.is_demo == bool(user.is_demo),
+            AccountGroup.is_demo == want_demo,
         )
         .order_by(AccountGroup.name)
     )
@@ -157,20 +163,26 @@ async def open_live_account(
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     user_is_demo = bool(user.is_demo)
+    # Effective demo flag: a real user may request a demo account from the
+    # New Account picker via req.is_demo=True; a demo user is always demo
+    # regardless of what they send (they can't open live accounts).
+    want_demo = user_is_demo or bool(getattr(req, "is_demo", False))
 
     gq = await db.execute(
         select(AccountGroup).where(
             AccountGroup.id == req.account_group_id,
             AccountGroup.is_active == True,
-            AccountGroup.is_demo == user_is_demo,
+            AccountGroup.is_demo == want_demo,
         )
     )
     group = gq.scalar_one_or_none()
     if not group:
         raise HTTPException(status_code=400, detail="Invalid or inactive account type")
 
-    # Live accounts require KYC approval. Demo users skip this gate.
-    if not user_is_demo:
+    # Live accounts require KYC approval. Demo accounts (whether the user is
+    # demo or a real user opening a demo) skip the gate — there's no real
+    # money involved so no compliance requirement.
+    if not want_demo:
         kyc = (user.kyc_status or "pending").lower()
         if kyc not in ("approved", "verified"):
             raise HTTPException(
@@ -181,8 +193,10 @@ async def open_live_account(
     min_d = Decimal(str(group.minimum_deposit or 0))
 
     new_balance = Decimal("0")
-    if user_is_demo:
-        # Demo users get a starter virtual balance; use min_deposit if set, else $10,000.
+    if want_demo:
+        # Demo accounts get a starter virtual balance; use min_deposit if set,
+        # else $10,000. Real-user demos follow the same rule — no live balance
+        # is touched, so the existing-live transfer block below doesn't run.
         new_balance = min_d if min_d > 0 else Decimal("10000")
     else:
         live_q = await db.execute(
@@ -248,7 +262,7 @@ async def open_live_account(
         margin_used=Decimal("0"),
         leverage=lev,
         currency="USD",
-        is_demo=user_is_demo,
+        is_demo=want_demo,
         is_active=True,
     )
     db.add(new_acc)
