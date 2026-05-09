@@ -8,6 +8,7 @@ import { useAuthStore } from '@/stores/authStore';
 import toast from 'react-hot-toast';
 import GoogleAuthButton from '@/components/auth/GoogleAuthButton';
 import ConnectWalletButton from '@/components/auth/ConnectWalletButton';
+import PhoneInput from '@/components/forms/PhoneInput';
 import '../auth.css';
 
 /* ── animation helpers ── */
@@ -247,14 +248,19 @@ function RegisterContent() {
                   </motion.div>
 
                   <motion.div {...fadeUp(0.5)}>
-                    <AuthInput
-                      label="Phone"
-                      type="tel"
-                      placeholder="+91 9876543210"
-                      value={form.phone}
-                      onChange={(e) => update('phone', e.target.value)}
-                      error={errors.phone}
-                    />
+                    <div className="auth-field">
+                      <label className="auth-field__label">Phone</label>
+                      <PhoneInput
+                        value={form.phone}
+                        onChange={(v) => update('phone', v)}
+                        defaultCountry="IN"
+                        placeholder="9876543210"
+                        hasError={!!errors.phone}
+                      />
+                      {errors.phone && (
+                        <span className="auth-field__error">{errors.phone}</span>
+                      )}
+                    </div>
                   </motion.div>
 
                   <motion.div {...fadeUp(0.56)}>

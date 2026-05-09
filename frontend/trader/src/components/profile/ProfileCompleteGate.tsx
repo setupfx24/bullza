@@ -17,10 +17,12 @@
  *    the modal unmounts itself.
  */
 import { useEffect, useMemo, useState } from 'react';
-import { Loader2, ShieldCheck, UserCircle2 } from 'lucide-react';
+import { Calendar, Loader2, ShieldCheck, UserCircle2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuthStore } from '@/stores/authStore';
 import api from '@/lib/api/client';
+import PhoneInput from '@/components/forms/PhoneInput';
+import { COUNTRIES as GEO_COUNTRIES, statesFor } from '@/lib/geo';
 
 type FormState = {
   first_name: string;
@@ -34,40 +36,10 @@ type FormState = {
   date_of_birth: string;
 };
 
-const COUNTRIES: { code: string; name: string }[] = [
-  { code: 'IN', name: 'India' },
-  { code: 'AE', name: 'United Arab Emirates' },
-  { code: 'SA', name: 'Saudi Arabia' },
-  { code: 'GB', name: 'United Kingdom' },
-  { code: 'US', name: 'United States' },
-  { code: 'CA', name: 'Canada' },
-  { code: 'AU', name: 'Australia' },
-  { code: 'SG', name: 'Singapore' },
-  { code: 'MY', name: 'Malaysia' },
-  { code: 'ID', name: 'Indonesia' },
-  { code: 'PH', name: 'Philippines' },
-  { code: 'TH', name: 'Thailand' },
-  { code: 'VN', name: 'Vietnam' },
-  { code: 'JP', name: 'Japan' },
-  { code: 'KR', name: 'South Korea' },
-  { code: 'DE', name: 'Germany' },
-  { code: 'FR', name: 'France' },
-  { code: 'IT', name: 'Italy' },
-  { code: 'ES', name: 'Spain' },
-  { code: 'NL', name: 'Netherlands' },
-  { code: 'BR', name: 'Brazil' },
-  { code: 'MX', name: 'Mexico' },
-  { code: 'ZA', name: 'South Africa' },
-  { code: 'NG', name: 'Nigeria' },
-  { code: 'KE', name: 'Kenya' },
-  { code: 'EG', name: 'Egypt' },
-  { code: 'TR', name: 'Turkey' },
-  { code: 'PK', name: 'Pakistan' },
-  { code: 'BD', name: 'Bangladesh' },
-  { code: 'LK', name: 'Sri Lanka' },
-  { code: 'NP', name: 'Nepal' },
-  { code: 'OTHER', name: 'Other' },
-];
+// COUNTRIES + dial codes + per-country states now live in lib/geo.ts so
+// the register page, PhoneInput, and this gate all share one source of
+// truth. Aliasing GEO_COUNTRIES keeps the JSX below reading the same.
+const COUNTRIES = GEO_COUNTRIES;
 
 function _toDateInput(s: string | null | undefined): string {
   if (!s) return '';
@@ -239,14 +211,11 @@ export default function ProfileCompleteGate() {
           </div>
 
           <Field label="Phone number" required>
-            <input
-              type="tel"
+            <PhoneInput
               value={form.phone}
-              onChange={handleChange('phone')}
-              placeholder="+91 98765 43210"
-              autoComplete="tel"
-              maxLength={20}
-              className="w-full px-3 py-2.5 rounded-lg border border-border-primary bg-bg-secondary text-text-primary placeholder:text-text-tertiary outline-none focus:border-[#55a630]/50 text-sm"
+              onChange={(v) => setForm((p) => ({ ...p, phone: v }))}
+              defaultCountry="IN"
+              placeholder="98765 43210"
             />
           </Field>
 
@@ -287,14 +256,37 @@ export default function ProfileCompleteGate() {
               />
             </Field>
             <Field label="State / province" required>
-              <input
-                type="text"
-                value={form.state}
-                onChange={handleChange('state')}
-                autoComplete="address-level1"
-                maxLength={100}
-                className="w-full px-3 py-2.5 rounded-lg border border-border-primary bg-bg-secondary text-text-primary placeholder:text-text-tertiary outline-none focus:border-[#55a630]/50 text-sm"
-              />
+              {(() => {
+                // Country-aware state list. If the picked country has a
+                // curated list (lib/geo:STATES), render a select; otherwise
+                // fall back to a plain text input so we don't lock out
+                // users from countries we haven't enumerated yet.
+                const stateList = statesFor(form.country);
+                if (stateList && stateList.length > 0) {
+                  return (
+                    <select
+                      value={form.state}
+                      onChange={handleChange('state')}
+                      className="w-full px-3 py-2.5 rounded-lg border border-border-primary bg-bg-secondary text-text-primary outline-none focus:border-[#55a630]/50 text-sm appearance-none"
+                    >
+                      <option value="">Select state…</option>
+                      {stateList.map((s) => (
+                        <option key={s} value={s}>{s}</option>
+                      ))}
+                    </select>
+                  );
+                }
+                return (
+                  <input
+                    type="text"
+                    value={form.state}
+                    onChange={handleChange('state')}
+                    autoComplete="address-level1"
+                    maxLength={100}
+                    className="w-full px-3 py-2.5 rounded-lg border border-border-primary bg-bg-secondary text-text-primary placeholder:text-text-tertiary outline-none focus:border-[#55a630]/50 text-sm"
+                  />
+                );
+              })()}
             </Field>
           </div>
 
@@ -309,14 +301,21 @@ export default function ProfileCompleteGate() {
                 className="w-full px-3 py-2.5 rounded-lg border border-border-primary bg-bg-secondary text-text-primary placeholder:text-text-tertiary outline-none focus:border-[#55a630]/50 text-sm"
               />
             </Field>
-            <Field label="Date of birth" required hint="18+ to trade.">
-              <input
-                type="date"
-                value={form.date_of_birth}
-                onChange={handleChange('date_of_birth')}
-                max={new Date().toISOString().slice(0, 10)}
-                className="w-full px-3 py-2.5 rounded-lg border border-border-primary bg-bg-secondary text-text-primary outline-none focus:border-[#55a630]/50 text-sm"
-              />
+            <Field label="Date of birth" required hint="18+ to trade. Click the field to open the calendar.">
+              <div className="relative">
+                <Calendar
+                  size={14}
+                  className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-text-tertiary"
+                  aria-hidden
+                />
+                <input
+                  type="date"
+                  value={form.date_of_birth}
+                  onChange={handleChange('date_of_birth')}
+                  max={new Date().toISOString().slice(0, 10)}
+                  className="w-full pl-9 pr-3 py-2.5 rounded-lg border border-border-primary bg-bg-secondary text-text-primary outline-none focus:border-[#55a630]/50 text-sm"
+                />
+              </div>
             </Field>
           </div>
 
