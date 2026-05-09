@@ -50,3 +50,24 @@ CONFIG_INSTRUMENTS_RELOAD_CHANNEL = "config:instruments:reload"
 async def publish_instrument_config_reload() -> None:
     """Notify services that instrument charge/spread config changed (optional cache bust)."""
     await redis_client.publish(CONFIG_INSTRUMENTS_RELOAD_CHANNEL, "1")
+
+
+# ─── Bar-update fan-out channel ──────────────────────────────────────────────
+# Market-data publishes the current in-progress OHLC bar for each (symbol,
+# timeframe) tuple to this single channel after every tick the aggregator
+# absorbs. The gateway's /ws/bars handler subscribes once and filters
+# per-client based on which (symbol, resolution) the chart is subscribed to.
+# Wire shape (JSON-encoded string):
+#   { "symbol": "XAUUSD", "timeframe": "5m",
+#     "time": 1731000000, "open": ..., "high": ...,
+#     "low": ..., "close": ..., "volume": ... }
+# `timeframe` matches the BarAggregator key set ("1m" / "5m" / "15m" /
+# "30m" / "1h" / "4h" / "1d"). The gateway maps these to TradingView
+# resolution strings ("1" / "5" / "15" / "30" / "60" / "240" / "1D").
+BAR_UPDATES_CHANNEL = "bars:updates"
+
+
+async def publish_bar_update(payload: dict) -> None:
+    """Fan out a current-bar snapshot. Caller serialises floats; we just dump."""
+    import json
+    await redis_client.publish(BAR_UPDATES_CHANNEL, json.dumps(payload))

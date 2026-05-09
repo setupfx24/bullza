@@ -12,6 +12,7 @@ from packages.common.src.redis_client import (
     PriceChannel,
     redis_client,
     publish_price,
+    publish_bar_update,
 )
 
 from .feed_handler import FeedSimulator, INSTRUMENTS
@@ -199,7 +200,44 @@ class MarketDataService:
             await self.store.insert_tick(symbol, bid, ask, ts)
 
             self.aggregator.update(symbol, bid, ask, ts)
+            # Fan out the just-updated current bar for every timeframe so the
+            # gateway's /ws/bars hub can push it to subscribed charts. This
+            # replaces the trader frontend's old client-side bar synthesis,
+            # which drifted from the server's authoritative aggregation. We
+            # publish AFTER aggregator.update so _bars[symbol] reflects this
+            # tick. bar_aggregator.py itself stays untouched — we just read
+            # its in-memory snapshot.
+            await self._publish_current_bars(symbol)
             self._tick_count += 1
+
+    async def _publish_current_bars(self, symbol: str) -> None:
+        """Publish current in-progress bar for every TF of `symbol` to
+        BAR_UPDATES_CHANNEL. Called once per tick from _process_ticks."""
+        sym_bars = self.aggregator._bars.get(symbol)
+        sym_starts = self.aggregator._bar_timestamps.get(symbol)
+        if not sym_bars or not sym_starts:
+            return
+        for tf_name, bar in sym_bars.items():
+            bar_start = sym_starts.get(tf_name)
+            if bar_start is None:
+                continue
+            try:
+                await publish_bar_update({
+                    "symbol": symbol,
+                    "timeframe": tf_name,
+                    "time": int(bar_start),
+                    "open": float(bar.open),
+                    "high": float(bar.high),
+                    "low": float(bar.low),
+                    "close": float(bar.close),
+                    "volume": float(bar.volume),
+                    "tick_count": int(bar.tick_count),
+                })
+            except Exception as exc:
+                # Pub/sub is best-effort — don't break the tick processor
+                # if Redis briefly hiccups. The gateway will catch up on
+                # the next tick anyway.
+                logger.debug("publish_bar_update %s %s failed: %s", symbol, tf_name, exc)
 
     async def _alltick_fallback_watchdog(self) -> None:
         """If AllTick never delivers ticks (bad token, expired plan, network,
