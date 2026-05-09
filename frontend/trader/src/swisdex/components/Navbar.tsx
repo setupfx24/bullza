@@ -66,6 +66,12 @@ export function Navbar() {
           </div>
 
           <div className="hidden md:flex items-center gap-2">
+            <Link
+              href="/auth/login"
+              className="text-sm font-medium text-foreground/85 hover:text-foreground transition-colors px-3 py-1.5 rounded-full"
+            >
+              Log in
+            </Link>
             <Button variant="heroSolid" className="rounded-full px-4 py-1.5 text-sm h-auto" asChild>
               <Link href={SIGNUP_HREF}>
                 Get Started
@@ -122,7 +128,14 @@ export function Navbar() {
                   </Link>
                 </motion.div>
               ))}
-              <Button variant="hero" asChild className="mt-6">
+              <Link
+                href="/auth/login"
+                onClick={() => setOpen(false)}
+                className="font-display uppercase text-2xl tracking-tight text-foreground/85 hover:text-foreground py-2 block mt-4"
+              >
+                Log in
+              </Link>
+              <Button variant="hero" asChild className="mt-2">
                 <Link href={SIGNUP_HREF} onClick={() => setOpen(false)}>
                   Get Started
                   <ArrowUpRight className="ml-1 size-4" />

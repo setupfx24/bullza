@@ -16,12 +16,14 @@ def render_welcome(
     )
     next_steps = """
     <p style="margin:0 0 12px;color:#f5f5f5;font-size:14px;line-height:1.6;">
-      Here's what to do next:
+      What you get with SwisDex:
     </p>
     <ul style="margin:0 0 8px;padding-left:20px;color:#f5f5f5;font-size:14px;line-height:1.7;">
+      <li><strong>Decentralised exchange</strong> &mdash; non-custodial. Your wallet, your keys, your funds stay where you control them.</li>
+      <li><strong>Insured trade</strong> &mdash; every position is policy-backed; tier coverage refunds part of any stop-out loss.</li>
       <li>Open your first trading account from the dashboard</li>
       <li>Complete KYC to unlock higher leverage tiers</li>
-      <li>Visit the Earn hub — daily streak, tasks, spin &amp; win, staking</li>
+      <li>Visit the Earn hub &mdash; daily streak, tasks, spin &amp; win, staking</li>
       <li>Try the demo account if you want to practise risk-free</li>
     </ul>
     """
@@ -46,7 +48,9 @@ def render_welcome(
     )
     text = (
         f"Welcome to SwisDex, {name}.\n\n"
-        "Your account is ready. Get started:\n"
+        "What you get:\n"
+        "  - Decentralised exchange — non-custodial; your wallet, your keys.\n"
+        "  - Insured trade — every position is policy-backed.\n"
         "  - Open your first trading account from the dashboard\n"
         "  - Complete KYC to unlock higher leverage tiers\n"
         "  - Visit the Earn hub for tasks, spin, and staking\n"
