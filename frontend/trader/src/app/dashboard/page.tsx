@@ -256,7 +256,7 @@ function AccountBalanceCard({
         </div>
       </div>
 
-      <div className="mt-6 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 md:gap-6">
+      <div className="mt-6 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-x-6 gap-y-4 md:gap-x-8">
         <Stat label="Balance" value={fmtUsd(a?.balance ?? 0)} highlight />
         <Stat label="Free margin" value={fmtUsd(a?.free_margin ?? 0)} />
         <Stat label="Equity" value={fmtUsd(a?.equity ?? 0)} />
@@ -269,12 +269,22 @@ function AccountBalanceCard({
 }
 
 function Stat({ label, value, highlight }: { label: string; value: string; highlight?: boolean }) {
+  // `min-w-0` lets the grid cell shrink below the value's intrinsic width
+  // so wide balances ($113,900.00 etc.) clip with ellipsis instead of
+  // overflowing into the next column. `truncate` adds the ellipsis. The
+  // highlight tier keeps the green colour but matches the size of the
+  // other stats — the previous text-2xl size was the root cause of the
+  // visible overlap on narrow widths.
   return (
-    <div>
-      <p className="text-[10px] uppercase tracking-[0.14em] font-medium text-text-tertiary">{label}</p>
+    <div className="min-w-0">
+      <p className="text-[10px] uppercase tracking-[0.14em] font-medium text-text-tertiary truncate">{label}</p>
       <p
-        className={clsx('mt-1 font-bold tabular-nums', highlight ? 'text-xl md:text-2xl' : 'text-base md:text-lg')}
+        className={clsx(
+          'mt-1 font-bold tabular-nums whitespace-nowrap overflow-hidden text-ellipsis',
+          'text-base md:text-lg',
+        )}
         style={{ color: highlight ? '#55a630' : 'var(--text-primary)' }}
+        title={value}
       >
         {value}
       </p>
