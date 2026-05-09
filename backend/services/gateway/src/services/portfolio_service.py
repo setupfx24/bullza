@@ -151,7 +151,9 @@ async def portfolio_summary(user_id: UUID, account_id: UUID | None, db: AsyncSes
 
 
 async def portfolio_performance(
-    user_id: UUID, account_id: UUID | None, period: str, db: AsyncSession
+    user_id: UUID, account_id: UUID | None, period: str, db: AsyncSession,
+    date_from: datetime | None = None,
+    date_to: datetime | None = None,
 ) -> dict:
     accounts = await _get_user_accounts(user_id, db)
     if not accounts:
@@ -173,7 +175,17 @@ async def portfolio_performance(
 
     now = datetime.now(timezone.utc)
     period_map = {"1m": timedelta(days=30), "3m": timedelta(days=90), "6m": timedelta(days=180), "1y": timedelta(days=365), "all": None}
-    since = (now - period_map[period]) if period_map[period] else None
+
+    # Custom-range mode: caller passed period='custom' with explicit dates.
+    # Falls back to preset behaviour when period is one of the preset codes
+    # (or anything unrecognised → 'all').
+    if period == "custom":
+        since = date_from
+        until = date_to
+    else:
+        delta = period_map.get(period)
+        since = (now - delta) if delta else None
+        until = None
 
     query = (
         select(TradeHistory)
@@ -182,6 +194,8 @@ async def portfolio_performance(
     )
     if since:
         query = query.where(TradeHistory.closed_at >= since)
+    if until:
+        query = query.where(TradeHistory.closed_at <= until)
     query = query.order_by(TradeHistory.closed_at.asc())
 
     result = await db.execute(query)
