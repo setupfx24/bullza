@@ -80,7 +80,20 @@ function AuthInput({
 }
 
 /* ═══════ PAGE ═══════ */
+// useSearchParams() forces this page to opt out of Next.js 15's static
+// prerender, which the build catches as "missing-suspense-with-csr-bailout"
+// unless the call lives inside a <Suspense> boundary. Splitting the page
+// into an outer Suspense wrapper + an inner content component is the
+// idiomatic fix (same pattern as the sibling /auth/register page).
 export default function LoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <LoginContent />
+    </Suspense>
+  );
+}
+
+function LoginContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const justVerified = searchParams.get('verified') === '1';
