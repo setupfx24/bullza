@@ -545,6 +545,24 @@ async def _ensure_shared_demo_user(db: AsyncSession) -> User:
     if existing:
         if not existing.is_demo:
             raise AuthServiceError("This email is reserved for the platform demo account", 403)
+        # Repair drift. profile_service.update_profile now blocks edits on
+        # is_demo users, but rows that were corrupted before this guard
+        # landed will keep showing whatever name the last visitor typed
+        # ("abhi", etc.) until reset. Reset to canonical "Demo Trader" on
+        # every demo-login so any leftover personalisation is wiped before
+        # the next visitor sees the profile.
+        canonical = {
+            "first_name": "Demo",
+            "last_name": "Trader",
+            "phone": None, "country": None,
+            "address": None, "city": None,
+            "state": None, "postal_code": None,
+            "date_of_birth": None,
+        }
+        for field, expected in canonical.items():
+            if getattr(existing, field, None) != expected:
+                setattr(existing, field, expected)
+        # commit happens via issue_auth_json_response in the caller
         return existing
 
     default_leverage = await get_int_setting("default_leverage", 100)

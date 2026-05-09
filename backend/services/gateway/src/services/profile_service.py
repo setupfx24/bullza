@@ -118,6 +118,20 @@ async def update_profile(
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
+    # The "Try with Demo Account" button signs everyone in as the SHARED
+    # demo@swisdex.com user (User.is_demo=True). Letting any visitor mutate
+    # that row corrupts identity for every subsequent visitor — exactly the
+    # bug where one user's "abhi" first_name leaked into a stranger's demo
+    # session. Reject profile edits on the shared demo identity.
+    if bool(getattr(user, "is_demo", False)):
+        raise HTTPException(
+            status_code=403,
+            detail=(
+                "Profile editing is disabled on the shared demo account. "
+                "Sign up for a real account to personalise your profile."
+            ),
+        )
+
     # date_of_birth arrives from the HTML <input type="date"> as a YYYY-MM-DD
     # string. The User column is a DateTime so we coerce here — asyncpg
     # otherwise raises DataError on commit.
@@ -166,6 +180,15 @@ async def change_password(
     user = result.scalar_one_or_none()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
+
+    # Shared demo identity — see update_profile for the rationale. Letting a
+    # visitor change the demo password would lock every subsequent visitor
+    # out of the shared account.
+    if bool(getattr(user, "is_demo", False)):
+        raise HTTPException(
+            status_code=403,
+            detail="Password changes are disabled on the shared demo account.",
+        )
 
     if not verify_password(current_password, user.password_hash):
         raise HTTPException(status_code=400, detail="Current password is incorrect")
