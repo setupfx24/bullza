@@ -31,9 +31,8 @@ def _from_address() -> str:
 
     Returns "<MAIL_FROM_NAME> <bare-email>" (RFC 5322 'name-addr'). The
     display name is what mail clients show in the inbox preview — wrapping
-    the address with "SwisDex" overrides any leftover branding (e.g.
-    FXArtha-era display name baked into the customer's SMTP_FROM env)
-    without forcing them to reconfigure their mail provider.
+    the address with "SwisDex" ensures the brand is consistent regardless
+    of what name the mail provider has baked into SMTP_FROM upstream.
 
     If SMTP_FROM is already in 'Name <addr>' form, we replace the name
     rather than nest two display names. If only an address is configured,

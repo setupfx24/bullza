@@ -233,7 +233,7 @@ function segmentToSymbolType(segment: string | undefined): string {
 
 /* ═══════════ DATAFEED ═══════════ */
 
-export const fxArthaDatafeed: IBasicDataFeed = {
+export const swisDexDatafeed: IBasicDataFeed = {
   onReady: (cb) => {
     setTimeout(() => cb(CONFIG), 0);
   },

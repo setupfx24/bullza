@@ -10,7 +10,7 @@ _INSECURE_DEFAULTS: dict[str, set[str]] = {
     "JWT_SECRET":         {"dev-secret-change-in-production", "", "changeme"},
     "USER_JWT_SECRET":    {"dev-secret-change-in-production", "", "changeme"},
     "ADMIN_JWT_SECRET":   {"admin-secret-change-in-production", "dev-secret-change-in-production", "", "changeme"},
-    "ADMIN_PASSWORD":     {"SwisDexAdmin2025!", "FXArthaAdmin2025!", "admin", "password", ""},
+    "ADMIN_PASSWORD":     {"SwisDexAdmin2025!", "admin", "password", ""},
 }
 
 
@@ -76,9 +76,9 @@ class Settings(BaseSettings):
     SMTP_PASSWORD: str = ""
     SMTP_FROM: str = ""
     # Display name shown in the user's inbox (e.g. "SwisDex <noreply@…>").
-    # Defaults to SwisDex; only override if the brand changes. Overrides
-    # any FXArtha-era display name still baked into the SMTP_FROM env
-    # value the customer's mail provider may have provisioned years ago.
+    # We wrap whatever address SMTP_FROM holds with this display name, so
+    # the inbox preview reads "SwisDex" even if the mail provider's
+    # underlying account is named differently.
     MAIL_FROM_NAME: str = "SwisDex"
     SMTP_USE_TLS: bool = True
 
