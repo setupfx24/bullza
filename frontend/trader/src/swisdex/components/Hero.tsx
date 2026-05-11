@@ -54,11 +54,14 @@ export function Hero() {
             transition={{ delay: 0.15, duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
             className="pointer-events-auto"
           >
-            <BubbleText
-              text={HERO.headline}
-              as="h1"
-              className="font-display uppercase text-[clamp(28px,4.2vw,68px)] leading-[1.05] tracking-[-0.02em] text-foreground whitespace-nowrap font-bold"
-            />
+            <h1 className="font-display uppercase text-[clamp(36px,8vw,68px)] leading-[1.05] tracking-[-0.02em] text-foreground font-bold break-words max-w-full px-2">
+              <span className="block">
+                <BubbleText text="Trade Smarter" as="span" />
+              </span>
+              <span className="block">
+                <BubbleText text="Grow Faster" as="span" />
+              </span>
+            </h1>
           </motion.div>
 
           <TypewriterText

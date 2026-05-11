@@ -32,7 +32,7 @@ function AnimatedValue({ value }: { value: string }) {
 
   if (num == null) {
     return (
-      <span ref={ref} className="font-display italic text-5xl md:text-6xl lg:text-7xl leading-none text-foreground">
+      <span ref={ref} className="font-display italic text-3xl sm:text-4xl md:text-6xl lg:text-7xl leading-none text-foreground">
         {value}
       </span>
     );
@@ -41,7 +41,7 @@ function AnimatedValue({ value }: { value: string }) {
   return (
     <motion.span
       ref={ref}
-      className="font-display italic text-5xl md:text-6xl lg:text-7xl leading-none text-foreground tabular-nums"
+      className="font-display italic text-3xl sm:text-4xl md:text-6xl lg:text-7xl leading-none text-foreground tabular-nums"
     >
       {display}
     </motion.span>
@@ -50,7 +50,7 @@ function AnimatedValue({ value }: { value: string }) {
 
 export function Stats() {
   return (
-    <section className="relative py-32 md:py-44 overflow-hidden">
+    <section className="relative py-16 sm:py-24 md:py-36 lg:py-44 overflow-hidden">
       <div className="absolute inset-0 bg-background" aria-hidden />
       <div className="absolute top-0 inset-x-0 h-[200px] gradient-fade-t pointer-events-none" />
       <div className="absolute bottom-0 inset-x-0 h-[200px] gradient-fade-b pointer-events-none" />
@@ -66,12 +66,12 @@ export function Stats() {
           <BlurText
             text="Performance That Speaks for Itself"
             as="h2"
-            className="font-display uppercase text-4xl md:text-6xl leading-[0.9] tracking-tight max-w-[18ch]"
+            className="font-display uppercase text-3xl sm:text-4xl md:text-6xl leading-[0.9] tracking-tight max-w-[18ch]"
           />
         </div>
 
-        <div className="liquid-glass rounded-3xl p-10 md:p-14 relative">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 md:gap-12">
+        <div className="liquid-glass rounded-3xl p-6 sm:p-10 md:p-14 relative">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 sm:gap-8 md:gap-12">
             {STATS.map((stat, i) => (
               <motion.div
                 key={stat.label}

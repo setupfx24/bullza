@@ -58,12 +58,12 @@ export default function AccountTypesPage() {
         style={{ background: 'radial-gradient(ellipse 60% 50% at 50% 0%, hsl(99 55% 42% / 0.18), transparent 70%)' }}
       />
 
-      <section className="mx-auto max-w-[1200px] px-[var(--gutter)] pt-40 pb-20 sm:pt-48 sm:pb-28 text-center">
+      <section className="mx-auto max-w-[1200px] px-[var(--gutter)] pt-32 pb-12 sm:pt-40 sm:pb-20 md:pt-48 md:pb-28 text-center">
         <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full liquid-glass text-xs uppercase tracking-[0.18em] text-foreground/70 font-body">
           <span className="size-1.5 rounded-full bg-primary" />
           Find Your Fit
         </div>
-        <h1 className="mt-6 font-display uppercase tracking-tight leading-[0.95] text-foreground text-5xl sm:text-6xl md:text-7xl">
+        <h1 className="mt-6 font-display uppercase tracking-tight leading-[0.95] text-foreground text-3xl sm:text-5xl md:text-6xl lg:text-7xl break-words">
           Accounts Designed
           <br />
           <span className="text-primary">Around You</span>

@@ -8,7 +8,7 @@ type T = (typeof TESTIMONIALS)[number];
 
 function Card({ t }: { t: T }) {
   return (
-    <div className="liquid-glass rounded-2xl p-7 w-[340px] md:w-[400px] shrink-0 flex flex-col gap-5 min-h-[220px]">
+    <div className="liquid-glass rounded-2xl p-5 sm:p-7 w-[280px] sm:w-[340px] md:w-[400px] shrink-0 flex flex-col gap-5 min-h-[200px] sm:min-h-[220px]">
       <Quote className="size-5 text-primary/70" aria-hidden />
       <p className="font-body text-foreground/85 italic leading-relaxed text-[15px]">
         &ldquo;{t.quote}&rdquo;
@@ -29,19 +29,19 @@ export function Testimonials() {
   const rowB = [...tail, ...tail];
 
   return (
-    <section id="testimonials" className="relative py-28 md:py-40 border-t border-border">
+    <section id="testimonials" className="relative py-16 sm:py-24 md:py-32 lg:py-40 border-t border-border">
       <div
         className="max-w-[var(--max)] mx-auto"
         style={{ paddingLeft: 'var(--gutter)', paddingRight: 'var(--gutter)' }}
       >
-        <div className="flex flex-col items-center gap-5 mb-14 md:mb-20 text-center">
+        <div className="flex flex-col items-center gap-5 mb-10 sm:mb-14 md:mb-20 text-center">
           <span className="liquid-glass rounded-full px-4 py-1.5 text-xs text-foreground/80">
             Investor Stories
           </span>
           <BlurText
             text="What Our Investors Say"
             as="h2"
-            className="font-display uppercase text-4xl md:text-6xl leading-[0.9] tracking-tight max-w-[20ch]"
+            className="font-display uppercase text-3xl sm:text-4xl md:text-6xl leading-[0.9] tracking-tight max-w-[20ch]"
           />
           <p className="font-body text-foreground/60 max-w-xl">
             Over 10,000 investors worldwide trust SwisDex with their portfolios. Here is what they say.

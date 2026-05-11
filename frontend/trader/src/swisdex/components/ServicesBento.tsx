@@ -67,19 +67,19 @@ function Card({
 
 export function ServicesBento() {
   return (
-    <section id="services" className="relative py-28 md:py-40">
+    <section id="services" className="relative py-16 sm:py-24 md:py-32 lg:py-40">
       <div
         className="max-w-[var(--max)] mx-auto"
         style={{ paddingLeft: 'var(--gutter)', paddingRight: 'var(--gutter)' }}
       >
-        <div className="flex flex-col items-start gap-5 mb-14 md:mb-20">
+        <div className="flex flex-col items-start gap-5 mb-10 sm:mb-14 md:mb-20">
           <span className="liquid-glass rounded-full px-4 py-1.5 text-xs text-foreground/80">
             What We Offer
           </span>
           <BlurText
             text="Comprehensive Investment Services Built for Growth"
             as="h2"
-            className="font-display uppercase text-4xl md:text-6xl lg:text-7xl leading-[0.9] tracking-tight max-w-[18ch]"
+            className="font-display uppercase text-3xl sm:text-4xl md:text-6xl lg:text-7xl leading-[0.9] tracking-tight max-w-[18ch]"
           />
           <p className="font-body text-foreground/60 max-w-xl text-base md:text-lg">
             From AI-driven automation to expert oversight — SwisDex delivers the full investment toolkit on one platform.

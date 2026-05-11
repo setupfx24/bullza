@@ -18,9 +18,9 @@ export function Faq() {
   useEffect(() => setMounted(true), []);
 
   return (
-    <section id="faq" className="relative py-28 md:py-40 border-t border-border">
+    <section id="faq" className="relative py-16 sm:py-24 md:py-32 lg:py-40 border-t border-border">
       <div
-        className="max-w-[var(--max)] mx-auto grid grid-cols-1 md:grid-cols-[0.9fr_1.1fr] gap-12 md:gap-16"
+        className="max-w-[var(--max)] mx-auto grid grid-cols-1 md:grid-cols-[0.9fr_1.1fr] gap-8 sm:gap-12 md:gap-16"
         style={{ paddingLeft: 'var(--gutter)', paddingRight: 'var(--gutter)' }}
       >
         <div className="md:sticky md:top-40 md:self-start flex flex-col gap-6">
@@ -30,7 +30,7 @@ export function Faq() {
           <BlurText
             text="Frequently Asked."
             as="h2"
-            className="font-display uppercase text-5xl md:text-6xl leading-[0.9] tracking-tight"
+            className="font-display uppercase text-3xl sm:text-4xl md:text-6xl leading-[0.9] tracking-tight"
           />
           <p className="font-body text-foreground/65 max-w-md">
             Everything you need to know before your first investment. Still have questions? Our team is live 24/7.
