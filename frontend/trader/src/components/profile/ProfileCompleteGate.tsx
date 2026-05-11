@@ -22,7 +22,11 @@ import toast from 'react-hot-toast';
 import { useAuthStore } from '@/stores/authStore';
 import api from '@/lib/api/client';
 import PhoneInput from '@/components/forms/PhoneInput';
-import { COUNTRIES as GEO_COUNTRIES, statesFor } from '@/lib/geo';
+import {
+  COUNTRIES as GEO_COUNTRIES,
+  getStatesOfCountry,
+  getCitiesOfState,
+} from '@/lib/geo';
 
 type FormState = {
   first_name: string;
@@ -75,6 +79,12 @@ export default function ProfileCompleteGate() {
   });
   const [submitting, setSubmitting] = useState(false);
 
+  // Snapshot at gate-render whether the user already supplied a phone at
+  // signup. If so we keep the value in `form.phone` (it still flows in the
+  // submit payload) but hide the input — asking the trader to retype the
+  // same number is a UX papercut they specifically called out.
+  const [phoneAlreadySaved, setPhoneAlreadySaved] = useState(false);
+
   // Pre-fill from whatever we already have so the user doesn't re-type
   // values that came from registration / Google sign-in.
   useEffect(() => {
@@ -90,13 +100,16 @@ export default function ProfileCompleteGate() {
       postal_code: user.postal_code || '',
       date_of_birth: _toDateInput(user.date_of_birth),
     });
+    setPhoneAlreadySaved(Boolean((user.phone || '').trim()));
   }, [shouldRender, user?.id]);
 
   const missingCount = useMemo(() => {
     let n = 0;
     if (!form.first_name.trim()) n++;
     if (!form.last_name.trim()) n++;
-    if (!form.phone.trim()) n++;
+    // Phone only counts as missing if we don't already have it from signup
+    // AND the user hasn't typed one in the gate.
+    if (!phoneAlreadySaved && !form.phone.trim()) n++;
     if (!form.country.trim()) n++;
     if (!form.address.trim()) n++;
     if (!form.city.trim()) n++;
@@ -104,7 +117,17 @@ export default function ProfileCompleteGate() {
     if (!form.postal_code.trim()) n++;
     if (!form.date_of_birth.trim()) n++;
     return n;
-  }, [form]);
+  }, [form, phoneAlreadySaved]);
+
+  // Cascading dropdowns — recompute lists as the country / state changes.
+  // Empty list means "the dataset doesn't have entries for this pair",
+  // in which case the JSX below falls back to a free-text input so the
+  // user isn't locked out of fringe regions.
+  const stateList = useMemo(() => getStatesOfCountry(form.country), [form.country]);
+  const cityList = useMemo(
+    () => getCitiesOfState(form.country, form.state),
+    [form.country, form.state],
+  );
 
   if (!shouldRender) return null;
 
@@ -210,24 +233,35 @@ export default function ProfileCompleteGate() {
             </Field>
           </div>
 
-          <Field label="Phone number" required>
-            <PhoneInput
-              value={form.phone}
-              onChange={(v) => setForm((p) => ({ ...p, phone: v }))}
-              defaultCountry="IN"
-              placeholder="98765 43210"
-            />
-          </Field>
+          {/* Phone is collected at signup. Hide the field here when we
+              already have one — trader explicitly asked not to be made to
+              re-type the same number. The value still flows through the
+              submit payload from the pre-fill in the useEffect above. */}
+          {!phoneAlreadySaved && (
+            <Field label="Phone number" required>
+              <PhoneInput
+                value={form.phone}
+                onChange={(v) => setForm((p) => ({ ...p, phone: v }))}
+                defaultCountry="IN"
+                placeholder="98765 43210"
+              />
+            </Field>
+          )}
 
           <Field label="Country of residence" required>
             <select
               value={form.country}
-              onChange={handleChange('country')}
+              onChange={(e) => {
+                // Changing country invalidates state + city since both
+                // are filtered by the country code in country-state-city.
+                const next = e.target.value;
+                setForm((f) => ({ ...f, country: next, state: '', city: '' }));
+              }}
               className="w-full px-3 py-2.5 rounded-lg border border-border-primary bg-bg-secondary text-text-primary outline-none focus:border-[#55a630]/50 text-sm appearance-none"
             >
               <option value="">Select your country…</option>
               {COUNTRIES.map((c) => (
-                <option key={c.code} value={c.name}>{c.name}</option>
+                <option key={c.code} value={c.name}>{c.flag} {c.name}</option>
               ))}
             </select>
           </Field>
@@ -244,49 +278,70 @@ export default function ProfileCompleteGate() {
             />
           </Field>
 
+          {/* Country → State → City cascade. The lib/geo helpers wrap
+              `country-state-city`, which covers every country in the world
+              (~5,000 states / ~150,000 cities). The user picks Country
+              first; State + City re-derive automatically. If the dataset
+              has no entries for a region (rare — typically tiny islands)
+              the corresponding field falls back to a free-text input so
+              we never trap the user. */}
           <div className="grid grid-cols-2 gap-3">
-            <Field label="City" required>
-              <input
-                type="text"
-                value={form.city}
-                onChange={handleChange('city')}
-                autoComplete="address-level2"
-                maxLength={100}
-                className="w-full px-3 py-2.5 rounded-lg border border-border-primary bg-bg-secondary text-text-primary placeholder:text-text-tertiary outline-none focus:border-[#55a630]/50 text-sm"
-              />
-            </Field>
             <Field label="State / province" required>
-              {(() => {
-                // Country-aware state list. If the picked country has a
-                // curated list (lib/geo:STATES), render a select; otherwise
-                // fall back to a plain text input so we don't lock out
-                // users from countries we haven't enumerated yet.
-                const stateList = statesFor(form.country);
-                if (stateList && stateList.length > 0) {
-                  return (
-                    <select
-                      value={form.state}
-                      onChange={handleChange('state')}
-                      className="w-full px-3 py-2.5 rounded-lg border border-border-primary bg-bg-secondary text-text-primary outline-none focus:border-[#55a630]/50 text-sm appearance-none"
-                    >
-                      <option value="">Select state…</option>
-                      {stateList.map((s) => (
-                        <option key={s} value={s}>{s}</option>
-                      ))}
-                    </select>
-                  );
-                }
-                return (
-                  <input
-                    type="text"
-                    value={form.state}
-                    onChange={handleChange('state')}
-                    autoComplete="address-level1"
-                    maxLength={100}
-                    className="w-full px-3 py-2.5 rounded-lg border border-border-primary bg-bg-secondary text-text-primary placeholder:text-text-tertiary outline-none focus:border-[#55a630]/50 text-sm"
-                  />
-                );
-              })()}
+              {stateList.length > 0 ? (
+                <select
+                  value={form.state}
+                  onChange={(e) => {
+                    const next = e.target.value;
+                    // Picking a new state invalidates the previous city,
+                    // because the city dropdown filters by (country, state).
+                    setForm((f) => ({ ...f, state: next, city: '' }));
+                  }}
+                  disabled={!form.country}
+                  className="w-full px-3 py-2.5 rounded-lg border border-border-primary bg-bg-secondary text-text-primary outline-none focus:border-[#55a630]/50 text-sm appearance-none disabled:opacity-50"
+                >
+                  <option value="">{form.country ? 'Select state…' : 'Pick a country first'}</option>
+                  {stateList.map((s) => (
+                    <option key={s.code} value={s.name}>{s.name}</option>
+                  ))}
+                </select>
+              ) : (
+                <input
+                  type="text"
+                  value={form.state}
+                  onChange={handleChange('state')}
+                  placeholder={form.country ? 'State / province' : 'Pick a country first'}
+                  disabled={!form.country}
+                  autoComplete="address-level1"
+                  maxLength={100}
+                  className="w-full px-3 py-2.5 rounded-lg border border-border-primary bg-bg-secondary text-text-primary placeholder:text-text-tertiary outline-none focus:border-[#55a630]/50 text-sm disabled:opacity-50"
+                />
+              )}
+            </Field>
+            <Field label="City" required>
+              {cityList.length > 0 ? (
+                <select
+                  value={form.city}
+                  onChange={handleChange('city')}
+                  disabled={!form.state}
+                  className="w-full px-3 py-2.5 rounded-lg border border-border-primary bg-bg-secondary text-text-primary outline-none focus:border-[#55a630]/50 text-sm appearance-none disabled:opacity-50"
+                >
+                  <option value="">{form.state ? 'Select city…' : 'Pick a state first'}</option>
+                  {cityList.map((c) => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
+                </select>
+              ) : (
+                <input
+                  type="text"
+                  value={form.city}
+                  onChange={handleChange('city')}
+                  placeholder={form.state ? 'City' : 'Pick a state first'}
+                  disabled={!form.state}
+                  autoComplete="address-level2"
+                  maxLength={100}
+                  className="w-full px-3 py-2.5 rounded-lg border border-border-primary bg-bg-secondary text-text-primary placeholder:text-text-tertiary outline-none focus:border-[#55a630]/50 text-sm disabled:opacity-50"
+                />
+              )}
             </Field>
           </div>
 
