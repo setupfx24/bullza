@@ -9,6 +9,7 @@ import toast from 'react-hot-toast';
 import GoogleAuthButton from '@/components/auth/GoogleAuthButton';
 import ConnectWalletButton from '@/components/auth/ConnectWalletButton';
 import PhoneInput from '@/components/forms/PhoneInput';
+import { scorePassword, PASSWORD_REQUIREMENTS } from '@/lib/passwordPolicy';
 import '../auth.css';
 
 /* ── animation helpers ── */
@@ -121,7 +122,18 @@ function RegisterContent() {
     } else if (!/^\+?[0-9 \-()]{6,20}$/.test(form.phone.trim())) {
       e.phone = 'Please enter a valid phone number.';
     }
-    if (form.password.length < 8) e.password = 'Password must be at least 8 characters.';
+    // Password is validated against the shared policy (passwordPolicy.ts) —
+    // length + character classes + not-in-common-list + not-like-email.
+    // The `disallow` list seeds substring checks so users can't reuse their
+    // email local-part or first name as the password.
+    const pwCheck = scorePassword(form.password, [
+      form.email.split('@')[0] || '',
+      form.first_name,
+      form.last_name,
+    ]);
+    if (!pwCheck.acceptable) {
+      e.password = pwCheck.issues[0] || 'Password is too weak — pick a stronger one.';
+    }
     if (form.password !== form.confirmPassword) e.confirmPassword = 'Passwords do not match.';
     setErrors(e);
     if (Object.keys(e).length > 0) return;
@@ -149,9 +161,14 @@ function RegisterContent() {
     }
   };
 
-  /* password strength */
-  const strength = form.password.length >= 12 ? 4 : form.password.length >= 10 ? 3 : form.password.length >= 8 ? 2 : form.password.length > 0 ? 1 : 0;
-  const strengthColors = ['#ef4444', '#f59e0b', '#22c55e', '#55a630'];
+  /* password strength — uses the shared policy module so the meter agrees
+     with the submit-time validation and with the server-side check.   */
+  const pwCheck = scorePassword(form.password, [
+    form.email.split('@')[0] || '',
+    form.first_name,
+    form.last_name,
+  ]);
+  const strength = pwCheck.score;
 
   /* ── Step change ── */
   const handleStepClick = (step: number) => {
@@ -284,20 +301,46 @@ function RegisterContent() {
                       value={form.password}
                       onChange={(e) => update('password', e.target.value)}
                       error={errors.password}
-                      helper="Must be at least 8 characters."
+                      helper="Use 8+ characters with a mix of upper, lower, number, and symbol."
                       rightIcon={showPass ? <Eye size={18} /> : <EyeOff size={18} />}
                       onIconClick={() => setShowPass(!showPass)}
                     />
                     {strength > 0 && (
-                      <div className="auth-strength" style={{ marginTop: 6 }}>
-                        {[1, 2, 3, 4].map((i) => (
-                          <div
-                            key={i}
-                            className="auth-strength__bar"
-                            style={{ background: i <= strength ? strengthColors[strength - 1] : undefined }}
-                          />
-                        ))}
-                      </div>
+                      <>
+                        <div className="auth-strength" style={{ marginTop: 6 }}>
+                          {[1, 2, 3, 4].map((i) => (
+                            <div
+                              key={i}
+                              className="auth-strength__bar"
+                              style={{ background: i <= strength ? pwCheck.color : undefined }}
+                            />
+                          ))}
+                        </div>
+                        <div
+                          style={{
+                            marginTop: 4, fontSize: 11, fontWeight: 600,
+                            color: pwCheck.color,
+                          }}
+                        >
+                          {pwCheck.label}
+                        </div>
+                        {/* Requirement checklist — only render until the
+                            password is acceptable so it disappears once the
+                            trader has picked a strong enough one. */}
+                        {!pwCheck.acceptable && (
+                          <ul style={{ marginTop: 6, padding: 0, listStyle: 'none', fontSize: 11, lineHeight: 1.6 }}>
+                            {PASSWORD_REQUIREMENTS.map((req) => {
+                              const ok = pwCheck.checks[req.id];
+                              return (
+                                <li key={req.id} style={{ color: ok ? '#22c55e' : '#9ca3af' }}>
+                                  <span style={{ marginRight: 6 }}>{ok ? '✓' : '○'}</span>
+                                  {req.label}
+                                </li>
+                              );
+                            })}
+                          </ul>
+                        )}
+                      </>
                     )}
                   </motion.div>
 

@@ -196,6 +196,18 @@ async def change_password(
     if current_password == new_password:
         raise HTTPException(status_code=400, detail="New password must be different")
 
+    # Same strength policy as signup + reset-password. Without this, a
+    # signed-in user could "change" their password to '12345678'.
+    from packages.common.src.password_policy import validate_password, PasswordTooWeak
+    try:
+        validate_password(new_password, disallow=[
+            (user.email or "").split("@", 1)[0],
+            user.first_name or "",
+            user.last_name or "",
+        ])
+    except PasswordTooWeak as e:
+        raise HTTPException(status_code=400, detail=e.reason)
+
     user.password_hash = hash_password(new_password)
     await db.commit()
 

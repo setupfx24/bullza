@@ -528,6 +528,19 @@ async def register_user(
     if not await get_bool_setting("allow_new_registrations", True):
         raise AuthServiceError("New registrations are currently disabled", 403)
 
+    # Reject weak passwords ("12345678", common-list, single-class, etc.)
+    # before we even hash + persist. Disallow list seeds substring checks
+    # so traders can't make their email/name the password.
+    from packages.common.src.password_policy import validate_password, PasswordTooWeak
+    try:
+        validate_password(password, disallow=[
+            (email or "").split("@", 1)[0],
+            first_name or "",
+            last_name or "",
+        ])
+    except PasswordTooWeak as e:
+        raise AuthServiceError(e.reason, 400)
+
     existing = await db.execute(select(User).where(User.email == email))
     if existing.scalar_one_or_none():
         raise AuthServiceError("Email already registered")
@@ -958,6 +971,17 @@ async def reset_password(token: str, new_password: str, request: Request, db: As
     user = await db.get(User, row.user_id)
     if not user:
         raise AuthServiceError("Invalid or expired reset link")
+    # Enforce the same policy here as at signup — otherwise "forgot password"
+    # is a back-door for users to set "12345678".
+    from packages.common.src.password_policy import validate_password, PasswordTooWeak
+    try:
+        validate_password(new_password, disallow=[
+            (user.email or "").split("@", 1)[0],
+            user.first_name or "",
+            user.last_name or "",
+        ])
+    except PasswordTooWeak as e:
+        raise AuthServiceError(e.reason, 400)
     user.password_hash = hash_password(new_password)
     row.used = True
     await db.commit()

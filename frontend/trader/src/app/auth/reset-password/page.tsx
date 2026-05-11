@@ -7,6 +7,7 @@ import api from '@/lib/api/client';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import toast from 'react-hot-toast';
+import { scorePassword, PASSWORD_REQUIREMENTS } from '@/lib/passwordPolicy';
 
 function ResetPasswordForm() {
   const router = useRouter();
@@ -22,8 +23,11 @@ function ResetPasswordForm() {
       toast.error('Invalid reset link');
       return;
     }
-    if (password.length < 8) {
-      toast.error('Password must be at least 8 characters');
+    // Same policy as register page — keeps the bar from sliding sideways
+    // (signup demands strong, but reset would have accepted '12345678').
+    const pwCheck = scorePassword(password);
+    if (!pwCheck.acceptable) {
+      toast.error(pwCheck.issues[0] || 'Password is too weak — pick a stronger one');
       return;
     }
     if (password !== confirm) {
@@ -61,8 +65,42 @@ function ResetPasswordForm() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               autoComplete="new-password"
-              placeholder="At least 8 characters"
+              placeholder="8+ chars · upper · lower · number · symbol"
             />
+            {password.length > 0 && (() => {
+              const pwCheck = scorePassword(password);
+              return (
+                <div>
+                  <div style={{ display: 'flex', gap: 4 }}>
+                    {[1, 2, 3, 4].map((i) => (
+                      <div
+                        key={i}
+                        style={{
+                          flex: 1, height: 4, borderRadius: 2,
+                          background: i <= pwCheck.score ? pwCheck.color : 'rgba(255,255,255,0.1)',
+                        }}
+                      />
+                    ))}
+                  </div>
+                  <div style={{ marginTop: 4, fontSize: 11, fontWeight: 600, color: pwCheck.color }}>
+                    {pwCheck.label}
+                  </div>
+                  {!pwCheck.acceptable && (
+                    <ul style={{ marginTop: 6, padding: 0, listStyle: 'none', fontSize: 11, lineHeight: 1.6 }}>
+                      {PASSWORD_REQUIREMENTS.map((req) => {
+                        const ok = pwCheck.checks[req.id];
+                        return (
+                          <li key={req.id} style={{ color: ok ? '#22c55e' : '#9ca3af' }}>
+                            <span style={{ marginRight: 6 }}>{ok ? '✓' : '○'}</span>
+                            {req.label}
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  )}
+                </div>
+              );
+            })()}
             <Input
               label="Confirm password"
               type="password"
