@@ -31,11 +31,11 @@ export function CtaFooter() {
       <div className="absolute top-0 inset-x-0 h-[200px] gradient-fade-t pointer-events-none" />
       <div className="absolute bottom-0 inset-x-0 h-[200px] gradient-fade-b pointer-events-none" />
 
-      <div className="relative z-10 flex-1 flex flex-col items-center justify-center text-center px-6 py-32">
+      <div className="relative z-10 flex-1 flex flex-col items-center justify-center text-center px-4 sm:px-6 py-16 sm:py-24 md:py-32">
         <BlurText
           text={CTA.headline}
           as="h2"
-          className="font-display italic text-[clamp(48px,8vw,140px)] leading-[0.92] tracking-[-0.02em] text-center max-w-[18ch] text-foreground"
+          className="font-display italic text-[clamp(36px,9vw,140px)] leading-[0.92] tracking-[-0.02em] text-center max-w-[18ch] text-foreground break-words"
         />
         <motion.p
           initial={{ filter: 'blur(10px)', opacity: 0, y: 16 }}

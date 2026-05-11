@@ -15,7 +15,7 @@ const iconMap: Record<string, LucideIcon> = { ShieldCheck, Zap, TrendingDown, He
 
 export function Pourquoi() {
   return (
-    <section id="why-choose" className="relative py-28 md:py-40 border-t border-border">
+    <section id="why-choose" className="relative py-16 sm:py-24 md:py-32 lg:py-40 border-t border-border">
       <div
         className="max-w-[var(--max)] mx-auto"
         style={{ paddingLeft: 'var(--gutter)', paddingRight: 'var(--gutter)' }}
@@ -27,7 +27,7 @@ export function Pourquoi() {
           <BlurText
             text="Why Thousands of Investors Trust SwisDex"
             as="h2"
-            className="font-display uppercase text-4xl md:text-6xl leading-[0.9] tracking-tight max-w-[18ch]"
+            className="font-display uppercase text-3xl sm:text-4xl md:text-6xl leading-[0.9] tracking-tight max-w-[18ch]"
           />
           <p className="font-body text-foreground/60 max-w-xl">
             AI-powered returns, institutional-grade security, and human expertise — all in one platform.

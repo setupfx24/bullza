@@ -15,28 +15,28 @@ const STEPS = [
 
 export function Process() {
   return (
-    <section id="process" className="relative py-28 md:py-40 border-t border-border">
+    <section id="process" className="relative py-16 sm:py-24 md:py-32 lg:py-40 border-t border-border">
       <div
         className="max-w-[var(--max)] mx-auto"
         style={{ paddingLeft: 'var(--gutter)', paddingRight: 'var(--gutter)' }}
       >
-        <div className="flex flex-col items-start gap-5 mb-14 md:mb-20">
+        <div className="flex flex-col items-start gap-5 mb-10 sm:mb-14 md:mb-20">
           <span className="liquid-glass rounded-full px-4 py-1.5 text-xs text-foreground/80">
             How It Works
           </span>
           <BlurText
             text="A New Era of Intelligent Trading"
             as="h2"
-            className="font-display uppercase text-4xl md:text-6xl leading-[0.9] tracking-tight max-w-[18ch]"
+            className="font-display uppercase text-3xl sm:text-4xl md:text-6xl leading-[0.9] tracking-tight max-w-[18ch]"
           />
-          <p className="font-body text-foreground/60 max-w-2xl">
+          <p className="font-body text-foreground/60 max-w-2xl text-sm sm:text-base">
             SwisDex is a leading AI-driven cryptocurrency and forex investment company. From sign-up to first profit in three simple steps — whether you are a first-time investor or a seasoned trader.
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-12 md:gap-20 items-start">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 sm:gap-12 md:gap-20 items-start">
           <div className="md:sticky md:top-32">
-            <h3 className="font-display uppercase text-3xl md:text-5xl leading-[0.95] tracking-tight">
+            <h3 className="font-display uppercase text-2xl sm:text-3xl md:text-5xl leading-[0.95] tracking-tight">
               Start Trading in
               <br />
               <span className="text-primary">3 Simple Steps</span>

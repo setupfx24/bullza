@@ -177,7 +177,7 @@ export default function Footer() {
           style={{ borderTop: '1px solid var(--fx-line)' }}
         >
           <p className="text-xs" style={{ color: 'var(--fx-text-3)' }}>
-            © 2010–{year} SwisDex Ltd. All rights reserved. · Founded in 2010
+            © {year} SwisDex Ltd. All rights reserved. · Founded in 2010
           </p>
           <div className="flex flex-wrap gap-x-5 gap-y-2 text-xs" style={{ color: 'var(--fx-text-3)' }}>
             <Link to="/privacy" className="hover:underline">Privacy Policy</Link>

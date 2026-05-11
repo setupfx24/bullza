@@ -166,7 +166,7 @@ export const FOOTER_LINKS = [
   { label: 'Risk Disclaimer',  href: '/risk' },
 ];
 
-export const COPYRIGHT = `© 2010–${new Date().getFullYear()} SwisDex. All Rights Reserved. · Founded in 2010`;
+export const COPYRIGHT = `© ${new Date().getFullYear()} SwisDex. All Rights Reserved. · Founded in 2010`;
 
 export const RISK_DISCLAIMER =
   'Trading cryptocurrencies and forex involves significant risk. Past performance is not indicative of future results. Invest only what you can afford to lose.';
