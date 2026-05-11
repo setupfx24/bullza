@@ -9,6 +9,7 @@ import toast from 'react-hot-toast';
 import GoogleAuthButton from '@/components/auth/GoogleAuthButton';
 import ConnectWalletButton from '@/components/auth/ConnectWalletButton';
 import PhoneInput from '@/components/forms/PhoneInput';
+import TurnstileWidget from '@/components/forms/TurnstileWidget';
 import { scorePassword, PASSWORD_REQUIREMENTS } from '@/lib/passwordPolicy';
 import '../auth.css';
 
@@ -100,6 +101,12 @@ function RegisterContent() {
   const [showConfirmPass, setShowConfirmPass] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
+  // Cloudflare Turnstile token, set when the widget solves the challenge.
+  // Backend rejects the register call with HTTP 400 if SECRET is
+  // configured AND this is empty/invalid; the widget short-circuits and
+  // emits '' when no NEXT_PUBLIC_CLOUDFLARE_TURNSTILE_SITE_KEY is set
+  // (dev mode) so the form keeps working without keys.
+  const [turnstileToken, setTurnstileToken] = useState('');
 
   useEffect(() => {
     const ref = searchParams.get('ref');
@@ -147,6 +154,10 @@ function RegisterContent() {
         last_name: form.last_name,
         phone: form.phone.trim(),
         referral_code: form.referral_code || undefined,
+        // Forwarded to Cloudflare siteverify on the backend. Empty
+        // string is fine when no site key is configured — server-side
+        // verifier short-circuits the same way (dev parity).
+        cf_turnstile_token: turnstileToken || undefined,
       });
       // Account created — backend has emailed a verify link. Send the
       // user to a "check your inbox" page rather than the dashboard;
@@ -355,6 +366,15 @@ function RegisterContent() {
                       rightIcon={showConfirmPass ? <Eye size={18} /> : <EyeOff size={18} />}
                       onIconClick={() => setShowConfirmPass(!showConfirmPass)}
                     />
+                  </motion.div>
+
+                  {/* Cloudflare Turnstile — quietly verifies that a real
+                      browser is filling the form. Mostly invisible to real
+                      users (Cloudflare's heuristic check passes most of the
+                      time without any UI). Renders nothing if no site key
+                      is configured in env. */}
+                  <motion.div {...fadeUp(0.7)} style={{ marginTop: 4 }}>
+                    <TurnstileWidget onToken={setTurnstileToken} />
                   </motion.div>
 
                   <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ delay: 0.72, duration: 0.4 }}>

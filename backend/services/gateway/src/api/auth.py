@@ -51,6 +51,17 @@ async def platform_status():
 
 @router.post("/register", status_code=status.HTTP_201_CREATED)
 async def register(req: RegisterRequest, request: Request, db: AsyncSession = Depends(get_db)):
+    # Cloudflare Turnstile gate — no-ops if SECRET isn't configured (dev /
+    # staging without a key), rejects with 400 otherwise. Runs BEFORE
+    # register_user so we don't hit the DB / send email for failed
+    # CAPTCHA submissions.
+    from packages.common.src.turnstile import verify_turnstile_token
+    remote_ip = request.client.host if request.client else None
+    if not await verify_turnstile_token(req.cf_turnstile_token, remote_ip=remote_ip):
+        raise HTTPException(
+            status_code=400,
+            detail="CAPTCHA verification failed — please reload and try again.",
+        )
     try:
         return await register_user(
             email=req.email, password=req.password,

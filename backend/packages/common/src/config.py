@@ -82,6 +82,14 @@ class Settings(BaseSettings):
     MAIL_FROM_NAME: str = "SwisDex"
     SMTP_USE_TLS: bool = True
 
+    # ─── Cloudflare Turnstile (bot protection on /auth/register) ─────────
+    # When both are set, the register endpoint requires a valid Turnstile
+    # token from the client; we POST it to challenges.cloudflare.com/turnstile
+    # /v0/siteverify with the SECRET to confirm it really came from a real
+    # browser. Leave SECRET empty in dev to skip verification entirely.
+    # Get a site/secret pair at https://dash.cloudflare.com → Turnstile.
+    CLOUDFLARE_TURNSTILE_SECRET_KEY: str = ""
+
     # ─── AllTick — primary market-data provider ─────────────────────────
     # Real-time forex / metals / crypto / indices CFD ticks via WebSocket.
     # Get a token at https://alltick.co (paid plan required for full
