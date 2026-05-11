@@ -60,6 +60,26 @@ function Card({
           {service.badge}
         </span>
       </div>
+
+      {/* "Coming Soon" teaser on the featured (first / largest) card */}
+      {index === 0 && (
+        <div className="mt-5 sm:mt-7 pt-5 border-t border-foreground/10">
+          <div className="inline-flex items-center gap-2 px-2.5 py-0.5 rounded-full bg-primary/25 text-primary text-[10px] uppercase tracking-[0.18em] font-semibold mb-2">
+            <span className="relative inline-flex items-center justify-center">
+              <span className="absolute size-1.5 rounded-full bg-primary opacity-75 animate-ping" />
+              <span className="relative size-1.5 rounded-full bg-primary" />
+            </span>
+            Coming Soon
+          </div>
+          <h4 className="font-display uppercase font-extrabold tracking-tight leading-none text-foreground text-2xl sm:text-3xl md:text-4xl">
+            EXX<span className="text-primary">9</span>
+          </h4>
+          <p className="mt-2 font-body text-[11px] sm:text-xs text-foreground/55 max-w-[28ch] leading-snug">
+            Next-generation execution layer. Launching Q3 2026.
+          </p>
+        </div>
+      )}
+
       <ArrowUpRight className="absolute top-6 right-6 size-5 text-foreground/30 group-hover:text-foreground/80 transition-colors" />
     </motion.div>
   );

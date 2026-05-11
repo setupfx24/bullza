@@ -77,6 +77,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         pathname === '/markets' ||
         pathname === '/account-types' ||
         pathname === '/how-it-works' ||
+        pathname?.startsWith('/academy') ||
+        pathname?.startsWith('/risk-management') ||
+        pathname?.startsWith('/products') ||
         pathname?.startsWith('/company') ||
         pathname?.startsWith('/education') ||
         ['/trading/forex', '/trading/commodities', '/trading/indices', '/trading/crypto'].includes(pathname || '') ||
@@ -103,6 +106,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       pathname === '/markets' ||
       pathname === '/account-types' ||
       pathname === '/how-it-works' ||
+      pathname?.startsWith('/academy') ||
+      pathname?.startsWith('/risk-management') ||
+      pathname?.startsWith('/products') ||
       pathname?.startsWith('/company') ||
       pathname?.startsWith('/education') ||
       ['/trading/forex', '/trading/commodities', '/trading/indices', '/trading/crypto'].includes(pathname || '') ||

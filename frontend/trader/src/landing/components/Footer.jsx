@@ -9,26 +9,26 @@ const columns = {
     { name: 'Commodities', path: '/trading/commodities' },
     { name: 'Crypto',      path: '/trading/crypto' },
   ],
-  Platforms: [
-    { name: 'Web Platform',  path: '/platforms/web' },
-    { name: 'Copy Trading',  path: '/platforms/copy-trading' },
-    { name: 'Prop Trading',  path: '/platforms/prop-trading' },
-    { name: 'IB Management', path: '/platforms/ib-management' },
-  ],
   Accounts: [
     { name: 'Standard', path: '/accounts/standard' },
     { name: 'Pro',      path: '/accounts/pro' },
     { name: 'Demo',     path: '/accounts/demo' },
   ],
+  Academy: [
+    { name: 'Videos', path: '/academy/videos' },
+    { name: 'PDFs',   path: '/academy/pdfs' },
+    { name: 'Blogs',  path: '/academy/blogs' },
+  ],
+  'Risk Management': [
+    { name: 'Lot Size & Profit Calculator', path: '/risk-management/calculator' },
+  ],
+  Products: [
+    { name: 'IB Referral',              path: '/products/ib-referral' },
+    { name: 'Fixed Return Insurance',   path: '/products/fixed-return-insurance' },
+  ],
   Company: [
     { name: 'About Us',       path: '/company/about' },
-    { name: 'Why SwisDex',    path: '/company/why-swisdex' },
     { name: 'Contact',        path: '/company/contact' },
-  ],
-  Education: [
-    { name: 'Tutorials',   path: '/education/tutorials' },
-    { name: 'Blog',        path: '/education/blog' },
-    { name: 'Market News', path: '/education/news' },
   ],
 }
 

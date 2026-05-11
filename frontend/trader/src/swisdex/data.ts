@@ -17,13 +17,42 @@ export const BRAND = {
 // Nav targets all resolve to public landing routes. /markets and
 // /account-types are explicit pages with their own content; AuthProvider
 // allow-lists them so unauthenticated visitors are not bounced to login.
-// (The trader-app /accounts route is auth-gated for account management,
-// hence the marketing tier overview lives at /account-types.)
-export const NAV_ITEMS: { label: string; href: string }[] = [
+// Items with `children` render as a dropdown.
+export type NavItem = {
+  label: string;
+  href: string;
+  children?: { label: string; href: string }[];
+};
+
+export const NAV_ITEMS: NavItem[] = [
   { label: 'Home',         href: '/' },
   { label: 'Markets',      href: '/markets' },
   { label: 'Accounts',     href: '/account-types' },
   { label: 'How it Works', href: '/how-it-works' },
+  {
+    label: 'Academy',
+    href: '/academy/videos',
+    children: [
+      { label: 'Videos', href: '/academy/videos' },
+      { label: 'PDFs',   href: '/academy/pdfs' },
+      { label: 'Blogs',  href: '/academy/blogs' },
+    ],
+  },
+  {
+    label: 'Risk Management',
+    href: '/risk-management/calculator',
+    children: [
+      { label: 'Lot Size & Profit Calculator', href: '/risk-management/calculator' },
+    ],
+  },
+  {
+    label: 'Products',
+    href: '/products/ib-referral',
+    children: [
+      { label: 'IB Referral',            href: '/products/ib-referral' },
+      { label: 'Fixed Return Insurance', href: '/products/fixed-return-insurance' },
+    ],
+  },
   { label: 'About',        href: '/company/about' },
   { label: 'Contact',      href: '/company/contact' },
 ];
@@ -33,9 +62,9 @@ export const HERO = {
   pillBadge: 'Live',
   headline: 'Trade Smarter Grow Faster',
   sub: 'SwisDex is a decentralised exchange with on-chain insured trades and licensed broker-grade execution — your funds stay in your wallet, your trades stay protected.',
-  ctaPrimary: 'Get Started',
+  ctaPrimary: 'Details',
   ctaSecondary: 'Learn How It Works',
-  ctaHref: SIGNUP_HREF,
+  ctaHref: '/how-it-works',
   ctaSecondaryHref: '/how-it-works',
 };
 
