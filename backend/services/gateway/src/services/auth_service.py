@@ -225,7 +225,9 @@ def clear_auth_cookies(response: JSONResponse, request: Request) -> None:
 def _send_welcome_email(user: User, *, via_google: bool) -> None:
     """Schedule a welcome email after a successful signup. Fire-and-forget:
     SMTP latency or failure must never delay the API response or roll back
-    the signup."""
+    the signup. Used today only for the Google-OAuth path — regular
+    signups receive verify_email.py which embeds the same welcome content
+    plus the Verify CTA."""
     try:
         from packages.common.src.smtp_mail import (
             send_email, smtp_configured, fire_and_forget,
@@ -234,10 +236,25 @@ def _send_welcome_email(user: User, *, via_google: bool) -> None:
             return
         from packages.common.src.email_templates import render_welcome
         st = get_settings()
+        # Same credentials block as verify_email — surface the first active
+        # trading account number if one already exists. (Google sign-up
+        # usually has none yet; the credentials row is then omitted.)
+        trading_id: str | None = None
+        try:
+            primary = next(
+                (a for a in (user.accounts or []) if a.is_active and not a.is_demo),
+                None,
+            ) or next((a for a in (user.accounts or []) if a.is_active), None)
+            if primary and primary.account_number:
+                trading_id = str(primary.account_number)
+        except Exception:
+            trading_id = None
         subject, html, text = render_welcome(
             first_name=user.first_name,
             trader_app_url=st.TRADER_APP_URL or "https://trade.swisdex.com",
             via_google=via_google,
+            username=user.email,
+            trading_id=trading_id,
         )
         fire_and_forget(send_email(user.email, subject, html, text=text))
     except Exception as e:
@@ -264,7 +281,13 @@ def _build_verify_url(user: User) -> str:
 
 
 def _send_verify_email(user: User, request: Request | None = None) -> None:
-    """Schedule the verify-your-email link. Fire-and-forget like welcome."""
+    """Schedule the rich welcome + verify-your-email message. Fire-and-forget.
+
+    The template embeds the full onboarding content (capability list,
+    account credentials, why-trade bullets) plus the Verify My Account
+    button, so signing up only generates ONE email — not the old
+    welcome + verify pair that landed together and confused users.
+    """
     try:
         from packages.common.src.smtp_mail import (
             send_email, smtp_configured, fire_and_forget,
@@ -273,9 +296,27 @@ def _send_verify_email(user: User, request: Request | None = None) -> None:
             return
         from packages.common.src.email_templates.verify_email import render_verify_email
         verify_url = _build_verify_url(user)
+        # Surface the user's first trading account number as the Trading ID
+        # in the credentials block — if there isn't one yet (the trader will
+        # provision one from /accounts), we just omit the row.
+        trading_id: str | None = None
+        try:
+            primary = next(
+                (a for a in (user.accounts or []) if a.is_active and not a.is_demo),
+                None,
+            ) or next((a for a in (user.accounts or []) if a.is_active), None)
+            if primary and primary.account_number:
+                trading_id = str(primary.account_number)
+        except Exception:
+            trading_id = None
+        st = get_settings()
+        trader_app_url = (getattr(st, "TRADER_APP_URL", None) or "https://trade.swisdex.com").rstrip("/")
         subject, html, text = render_verify_email(
             first_name=user.first_name,
             verify_url=verify_url,
+            trader_app_url=trader_app_url,
+            username=user.email,
+            trading_id=trading_id,
             expires_hours=EMAIL_VERIFY_EXPIRES_HOURS,
         )
         fire_and_forget(send_email(user.email, subject, html, text=text))
@@ -570,10 +611,11 @@ async def register_user(
     response = await issue_auth_json_response(
         user, request, db, status_code=201, user_audit_action="REGISTER",
     )
-    # Fire-and-forget welcome + verify emails after the commit — neither
-    # blocks the signup response and a delivery failure can't roll back
-    # the account.
-    _send_welcome_email(user, via_google=False)
+    # The verify-email template now contains the full welcome content
+    # (capability list, credentials block, why-trade bullets), so signup
+    # only sends ONE email instead of welcome + verify back-to-back.
+    # Google sign-up still sends the standalone welcome.py because its
+    # email_verified=True path skips the verify flow entirely.
     _send_verify_email(user, request)
     return response
 
