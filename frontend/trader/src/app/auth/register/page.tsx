@@ -286,7 +286,7 @@ function RegisterContent() {
                         value={form.phone}
                         onChange={(v) => update('phone', v)}
                         defaultCountry="IN"
-                        placeholder="9876543210"
+                        placeholder=""
                         hasError={!!errors.phone}
                       />
                       {errors.phone && (

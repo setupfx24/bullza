@@ -243,7 +243,7 @@ export default function ProfileCompleteGate() {
                 value={form.phone}
                 onChange={(v) => setForm((p) => ({ ...p, phone: v }))}
                 defaultCountry="IN"
-                placeholder="98765 43210"
+                placeholder=""
               />
             </Field>
           )}

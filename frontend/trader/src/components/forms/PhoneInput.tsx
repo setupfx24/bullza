@@ -59,7 +59,9 @@ export default function PhoneInput({
   defaultCountry = 'IN',
   className,
   inputClassName,
-  placeholder = '9876543210',
+  // Empty by default — client asked us not to show any sample number
+  // (looked like someone's actual private digits in the placeholder).
+  placeholder = '',
   disabled,
   hasError,
 }: Props) {
@@ -132,8 +134,17 @@ export default function PhoneInput({
         } ${inputClassName ?? ''}`}
       />
       {open && (
-        <div className="absolute top-full left-0 mt-1 w-72 rounded-lg border border-border-primary bg-bg-card shadow-2xl overflow-hidden z-30">
-          <div className="flex items-center gap-2 px-2.5 py-2 border-b border-border-primary bg-bg-secondary">
+        // Solid background (forced via inline style) so the password / form
+        // fields below don't bleed through. z-[60] sits above the auth
+        // card's stacking context.
+        <div
+          className="absolute top-full left-0 mt-1 w-72 rounded-lg border border-border-primary shadow-2xl overflow-hidden z-[60]"
+          style={{ background: '#0e0e0e' }}
+        >
+          <div
+            className="flex items-center gap-2 px-2.5 py-2 border-b border-border-primary"
+            style={{ background: '#171717' }}
+          >
             <Search size={12} className="text-text-tertiary shrink-0" />
             <input
               ref={searchRef}
