@@ -69,6 +69,21 @@ class Settings(BaseSettings):
     # Public trader app URL (password reset links). No trailing slash.
     TRADER_APP_URL: str = "http://localhost:3000"
 
+    # Email branding — used by the shared layout in email_templates/base.py.
+    # EMAIL_LOGO_URL must be an absolute https URL because email clients
+    # cannot resolve relative paths or render images from blob/data URIs.
+    # If empty, the layout falls back to the styled "SwisDex" wordmark text.
+    EMAIL_LOGO_URL: str = "https://swisdex.com/images/swisdex-logo.png"
+
+    # Mobile app store links — when set, the email footer renders the
+    # "Get the app" section with App Store + Google Play badges. Leave
+    # either empty to hide just that badge; leave both empty to hide the
+    # whole section. The badges themselves are served from EMAIL_*_BADGE_URL.
+    IOS_APP_URL: str = ""
+    ANDROID_APP_URL: str = ""
+    EMAIL_IOS_BADGE_URL: str = "https://swisdex.com/images/email/app-store-badge.png"
+    EMAIL_ANDROID_BADGE_URL: str = "https://swisdex.com/images/email/google-play-badge.png"
+
     # Optional SMTP — required for password-reset emails in non-dev. If SMTP_HOST is empty, reset links are only logged in development.
     SMTP_HOST: str = ""
     SMTP_PORT: int = 587

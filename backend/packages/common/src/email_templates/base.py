@@ -6,6 +6,8 @@ from __future__ import annotations
 
 from html import escape
 
+from ..config import get_settings
+
 
 # Brand palette — kept inline because Outlook/Gmail/iOS Mail strip <style>
 # blocks, so every colour has to live on a style="" attribute.
@@ -17,6 +19,92 @@ _CARD        = "#141414"
 _TEXT        = "#f5f5f5"
 _TEXT_DIM    = "#9a9a9a"
 _BORDER      = "#2a2a2a"
+
+
+def _header_brand_html() -> str:
+    """Logo image when EMAIL_LOGO_URL is set; styled wordmark text otherwise.
+
+    Most clients (Gmail, Outlook, iOS Mail) block remote images by default
+    until the user clicks "Display images". The alt text is the brand
+    wordmark so the header still reads "SwisDex" with images off.
+    """
+    logo = (getattr(get_settings(), "EMAIL_LOGO_URL", "") or "").strip()
+    if logo:
+        return (
+            f'<img src="{escape(logo, quote=True)}" alt="SwisDex" '
+            f'width="140" height="40" '
+            f'style="display:block;height:40px;width:auto;max-width:160px;'
+            f'border:0;outline:none;text-decoration:none;">'
+        )
+    return (
+        f'<span style="font-weight:700;font-size:22px;letter-spacing:0.2px;">'
+        f'<span style="color:{_TEXT};">Swis</span>'
+        f'<span style="color:{_BRAND};">Dex</span>'
+        f'</span>'
+    )
+
+
+def _app_badges_html() -> str:
+    """"Get the SwisDex app" footer section.
+
+    Renders only when at least one of IOS_APP_URL / ANDROID_APP_URL is set
+    so emails don't link to dead store pages before the apps ship.
+    """
+    s = get_settings()
+    ios_url = (getattr(s, "IOS_APP_URL", "") or "").strip()
+    and_url = (getattr(s, "ANDROID_APP_URL", "") or "").strip()
+    if not ios_url and not and_url:
+        return ""
+
+    ios_badge = (getattr(s, "EMAIL_IOS_BADGE_URL", "") or "").strip()
+    and_badge = (getattr(s, "EMAIL_ANDROID_BADGE_URL", "") or "").strip()
+
+    cells: list[str] = []
+    if ios_url and ios_badge:
+        cells.append(f"""
+        <td style="padding:0 6px;">
+          <a href="{escape(ios_url, quote=True)}" style="text-decoration:none;">
+            <img src="{escape(ios_badge, quote=True)}" alt="Download on the App Store"
+                 height="44" style="display:block;height:44px;width:auto;border:0;outline:none;">
+          </a>
+        </td>
+        """)
+    if and_url and and_badge:
+        cells.append(f"""
+        <td style="padding:0 6px;">
+          <a href="{escape(and_url, quote=True)}" style="text-decoration:none;">
+            <img src="{escape(and_badge, quote=True)}" alt="Get it on Google Play"
+                 height="44" style="display:block;height:44px;width:auto;border:0;outline:none;">
+          </a>
+        </td>
+        """)
+
+    if not cells:
+        return ""
+
+    return f"""
+    <tr>
+      <td style="padding:0 32px 28px;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
+               style="border-collapse:separate;background:{_BRAND};
+                      border-radius:10px;padding:20px 16px;">
+          <tr>
+            <td align="center" style="padding:0 0 10px;color:#0a0a0a;
+                                      font-size:15px;font-weight:700;letter-spacing:0.2px;">
+              Trade anywhere — get the SwisDex app
+            </td>
+          </tr>
+          <tr>
+            <td align="center" style="padding:6px 0 0;">
+              <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+                <tr>{''.join(cells)}</tr>
+              </table>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+    """
 
 
 def render_layout(
@@ -106,10 +194,9 @@ def render_layout(
                style="max-width:600px;width:100%;background:{_CARD};
                       border:1px solid {_BORDER};border-radius:12px;overflow:hidden;">
           <tr>
-            <td style="padding:28px 32px 12px;border-bottom:1px solid {_BORDER};">
-              <span style="font-weight:700;font-size:22px;letter-spacing:0.2px;">
-                <span style="color:{_TEXT};">Swis</span><span style="color:{_BRAND};">Dex</span>
-              </span>
+            <td style="padding:24px 32px;border-bottom:1px solid {_BORDER};
+                       background:linear-gradient(180deg,#181818 0%,{_CARD} 100%);">
+              {_header_brand_html()}
             </td>
           </tr>
           <tr>
@@ -126,6 +213,7 @@ def render_layout(
               {footer_block}
             </td>
           </tr>
+          {_app_badges_html()}
           <tr>
             <td style="padding:20px 32px;border-top:1px solid {_BORDER};
                        color:{_TEXT_DIM};font-size:12px;line-height:1.5;">
