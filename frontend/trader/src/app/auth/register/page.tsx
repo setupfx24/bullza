@@ -386,33 +386,31 @@ function RegisterContent() {
                     <TurnstileWidget onToken={setTurnstileToken} />
                   </motion.div>
 
-                  {/* Terms & Conditions / Privacy / Risk Disclaimer consent.
-                      Required — submit button stays disabled until checked,
-                      and submit-time validation surfaces an inline error if
-                      somehow bypassed. */}
-                  <motion.div {...fadeUp(0.71)} style={{ marginTop: 8 }}>
-                    <label
-                      style={{
-                        display: 'flex', alignItems: 'flex-start', gap: 8,
-                        fontSize: 12, lineHeight: 1.5, color: '#4b5563', cursor: 'pointer',
-                      }}
-                    >
+                  {/* Terms & Conditions / Privacy consent. Required —
+                      submit button stays disabled until checked, and
+                      submit-time validation surfaces an inline error if
+                      somehow bypassed. Styled via .auth-terms in auth.css
+                      so the colours match the rest of the form (green
+                      accent, dark themed border, no clashing blue links). */}
+                  <motion.div {...fadeUp(0.71)} style={{ marginTop: 4 }}>
+                    <label className="auth-terms">
                       <input
                         type="checkbox"
+                        className="auth-terms__checkbox"
                         checked={agreedToTerms}
                         onChange={(e) => {
                           setAgreedToTerms(e.target.checked);
                           if (e.target.checked) setErrors((prev) => ({ ...prev, terms: '' }));
                         }}
-                        style={{ marginTop: 2, accentColor: '#2563eb', cursor: 'pointer' }}
                       />
-                      <span>
+                      <span className="auth-terms__text">
                         I agree to the{' '}
                         <a
                           href="/terms"
                           target="_blank"
                           rel="noopener noreferrer"
-                          style={{ color: '#2563eb', textDecoration: 'underline' }}
+                          className="auth-terms__link"
+                          onClick={(e) => e.stopPropagation()}
                         >
                           Terms &amp; Conditions
                         </a>
@@ -421,7 +419,8 @@ function RegisterContent() {
                           href="/privacy"
                           target="_blank"
                           rel="noopener noreferrer"
-                          style={{ color: '#2563eb', textDecoration: 'underline' }}
+                          className="auth-terms__link"
+                          onClick={(e) => e.stopPropagation()}
                         >
                           Privacy Policy
                         </a>
@@ -429,9 +428,7 @@ function RegisterContent() {
                       </span>
                     </label>
                     {errors.terms && (
-                      <span className="auth-field__error" style={{ display: 'block', marginTop: 4 }}>
-                        {errors.terms}
-                      </span>
+                      <span className="auth-terms__error">{errors.terms}</span>
                     )}
                   </motion.div>
 
