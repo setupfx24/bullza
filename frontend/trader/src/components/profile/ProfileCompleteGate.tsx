@@ -17,7 +17,7 @@
  *    the modal unmounts itself.
  */
 import { useEffect, useMemo, useState } from 'react';
-import { Calendar, Loader2, ShieldCheck, UserCircle2 } from 'lucide-react';
+import { Calendar, Loader2, Mail, ShieldCheck, UserCircle2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuthStore } from '@/stores/authStore';
 import api from '@/lib/api/client';
@@ -78,6 +78,14 @@ export default function ProfileCompleteGate() {
     date_of_birth: '',
   });
   const [submitting, setSubmitting] = useState(false);
+  // Toggles the "Check your email" popup that replaces the form after a
+  // successful save. While this is true the gate stays mounted (so the
+  // dashboard underneath is still blurred) until the trader hits OK; only
+  // then do we refreshUser() and let `shouldRender` flip to false, which
+  // unmounts the gate and reveals the dashboard. This sequencing matches
+  // the spec: profile form → "check your email" popup → dashboard.
+  const [showVerifyPopup, setShowVerifyPopup] = useState(false);
+  const [resending, setResending] = useState(false);
 
   // Snapshot at gate-render whether the user already supplied a phone at
   // signup. If so we keep the value in `form.phone` (it still flows in the
@@ -167,8 +175,22 @@ export default function ProfileCompleteGate() {
         postal_code: form.postal_code.trim(),
         date_of_birth: form.date_of_birth,
       });
-      await refreshUser();
-      toast.success('Profile completed — welcome to SwisDex');
+      // Trigger the dashboard-access email (separate from the verify-email
+      // sent at signup). Fire-and-forget on the server side, so we don't
+      // block the popup on SMTP latency — if it ever fails the user can
+      // hit the Resend button or just use the in-app Continue button.
+      try {
+        await api.post('/profile/send-dashboard-link', {});
+      } catch (sendErr) {
+        // Non-fatal — log and continue. The Continue button still works.
+        // eslint-disable-next-line no-console
+        console.warn('dashboard-link email request failed', sendErr);
+      }
+      // Swap the form for the "Check your email" popup. We deliberately
+      // DO NOT call refreshUser() yet — once profile_complete flips true
+      // the gate unmounts and the popup would vanish with it. The popup's
+      // "Continue to dashboard" button does the refresh.
+      setShowVerifyPopup(true);
     } catch (err: any) {
       const msg = err?.response?.data?.detail || err?.message || 'Could not save profile';
       toast.error(typeof msg === 'string' ? msg : 'Could not save profile');
@@ -176,6 +198,85 @@ export default function ProfileCompleteGate() {
       setSubmitting(false);
     }
   };
+
+  // ── Post-save "Check your email" popup ──────────────────────────────
+  // Rendered in place of the profile form once the PUT succeeds. The user
+  // chooses between continuing to the dashboard now (verification email
+  // can be clicked later) or resending the verification mail if it didn't
+  // arrive.
+  const handleResendDashboardLink = async () => {
+    if (!user?.email || resending) return;
+    setResending(true);
+    try {
+      // Re-fires the dashboard-access email. Different endpoint from
+      // /auth/resend-verification (that one resends the signup-time
+      // verify link); this one resends the post-profile dashboard link.
+      await api.post('/profile/send-dashboard-link', {});
+      toast.success('Dashboard link sent — check your inbox.');
+    } catch (err: any) {
+      const msg = err?.response?.data?.detail || err?.message || 'Could not resend email';
+      toast.error(typeof msg === 'string' ? msg : 'Could not resend email');
+    } finally {
+      setResending(false);
+    }
+  };
+
+  const handleContinueToDashboard = async () => {
+    // Flips profile_complete true → unmounts the gate → dashboard visible.
+    await refreshUser();
+    toast.success('Welcome to SwisDex');
+  };
+
+  if (showVerifyPopup) {
+    return (
+      <div
+        className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="verify-popup-title"
+      >
+        <div className="w-full max-w-md rounded-2xl border border-border-primary bg-bg-elevated shadow-2xl px-6 py-7 text-center">
+          <div className="mx-auto w-14 h-14 rounded-full bg-[#55a630]/15 flex items-center justify-center mb-4">
+            <Mail size={26} className="text-[#55a630]" />
+          </div>
+          <h2 id="verify-popup-title" className="text-text-primary font-bold text-lg">
+            Check your email
+          </h2>
+          <p className="text-text-secondary text-sm mt-2 leading-relaxed">
+            We&apos;ve sent a dashboard access link to{' '}
+            <span className="text-text-primary font-medium break-all">
+              {user?.email}
+            </span>
+            . Click the button in the email to open your dashboard, or
+            continue here.
+          </p>
+          <div className="mt-6 flex flex-col gap-2">
+            <button
+              type="button"
+              onClick={handleContinueToDashboard}
+              className="w-full inline-flex items-center justify-center gap-2 py-3 rounded-xl bg-[#55a630] text-bg-base font-bold text-sm transition-all active:scale-[0.99]"
+            >
+              Continue to dashboard
+            </button>
+            <button
+              type="button"
+              onClick={handleResendDashboardLink}
+              disabled={resending}
+              className="w-full inline-flex items-center justify-center gap-2 py-2.5 rounded-xl border border-border-primary text-text-secondary font-medium text-sm transition-all hover:text-text-primary disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              {resending ? (
+                <>
+                  <Loader2 size={14} className="animate-spin" /> Sending…
+                </>
+              ) : (
+                'Resend email'
+              )}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div

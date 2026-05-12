@@ -107,6 +107,11 @@ function RegisterContent() {
   // emits '' when no NEXT_PUBLIC_CLOUDFLARE_TURNSTILE_SITE_KEY is set
   // (dev mode) so the form keeps working without keys.
   const [turnstileToken, setTurnstileToken] = useState('');
+  // Terms & Conditions / Privacy / Risk Disclaimer agreement. Required
+  // before the Sign Up button can submit — gives the user an explicit
+  // opt-in for the legal pages they're agreeing to. Unchecked by default
+  // so consent is affirmative, not pre-ticked.
+  const [agreedToTerms, setAgreedToTerms] = useState(false);
 
   useEffect(() => {
     const ref = searchParams.get('ref');
@@ -142,6 +147,7 @@ function RegisterContent() {
       e.password = pwCheck.issues[0] || 'Password is too weak — pick a stronger one.';
     }
     if (form.password !== form.confirmPassword) e.confirmPassword = 'Passwords do not match.';
+    if (!agreedToTerms) e.terms = 'You must agree to the Terms & Conditions and Privacy Policy.';
     setErrors(e);
     if (Object.keys(e).length > 0) return;
 
@@ -159,12 +165,15 @@ function RegisterContent() {
         // verifier short-circuits the same way (dev parity).
         cf_turnstile_token: turnstileToken || undefined,
       });
-      // Account created — backend has emailed a verify link. Send the
-      // user to a "check your inbox" page rather than the dashboard;
-      // they'll be blocked at /auth/me (or first protected fetch) until
-      // they click the link, so a hard redirect avoids confusing flicker.
-      toast.success('Account created — check your inbox to verify.');
-      router.push(`/auth/check-email?email=${encodeURIComponent(form.email)}`);
+      // Account created — backend signs the user in (HttpOnly cookies)
+      // AND emails a verify link in parallel. Send the user straight to
+      // the dashboard so the ProfileCompleteGate modal can take over and
+      // collect address / DOB / etc. The "check your email" reminder is
+      // surfaced inside the gate's success popup after Save & Continue,
+      // so the trader sees both the dashboard and the verification nudge
+      // in one flow (matches demoLogin / googleLogin landing behaviour).
+      toast.success('Account created — please complete your profile.');
+      router.push('/accounts');
     } catch (err: any) {
       toast.error(err.message || 'Registration failed');
     } finally {
@@ -377,8 +386,61 @@ function RegisterContent() {
                     <TurnstileWidget onToken={setTurnstileToken} />
                   </motion.div>
 
+                  {/* Terms & Conditions / Privacy / Risk Disclaimer consent.
+                      Required — submit button stays disabled until checked,
+                      and submit-time validation surfaces an inline error if
+                      somehow bypassed. */}
+                  <motion.div {...fadeUp(0.71)} style={{ marginTop: 8 }}>
+                    <label
+                      style={{
+                        display: 'flex', alignItems: 'flex-start', gap: 8,
+                        fontSize: 12, lineHeight: 1.5, color: '#4b5563', cursor: 'pointer',
+                      }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={agreedToTerms}
+                        onChange={(e) => {
+                          setAgreedToTerms(e.target.checked);
+                          if (e.target.checked) setErrors((prev) => ({ ...prev, terms: '' }));
+                        }}
+                        style={{ marginTop: 2, accentColor: '#2563eb', cursor: 'pointer' }}
+                      />
+                      <span>
+                        I agree to the{' '}
+                        <a
+                          href="/terms"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{ color: '#2563eb', textDecoration: 'underline' }}
+                        >
+                          Terms &amp; Conditions
+                        </a>
+                        {' '}and{' '}
+                        <a
+                          href="/privacy"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{ color: '#2563eb', textDecoration: 'underline' }}
+                        >
+                          Privacy Policy
+                        </a>
+                        .
+                      </span>
+                    </label>
+                    {errors.terms && (
+                      <span className="auth-field__error" style={{ display: 'block', marginTop: 4 }}>
+                        {errors.terms}
+                      </span>
+                    )}
+                  </motion.div>
+
                   <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ delay: 0.72, duration: 0.4 }}>
-                    <button type="submit" className="auth-btn" disabled={loading || isLoading}>
+                    <button
+                      type="submit"
+                      className="auth-btn"
+                      disabled={loading || isLoading || !agreedToTerms}
+                    >
                       {(loading || isLoading) ? <Loader2 size={18} className="auth-spinner" /> : 'Sign Up'}
                     </button>
                   </motion.div>

@@ -410,3 +410,64 @@ async def get_kyc_file(user_id: UUID, document_id: UUID, db: AsyncSession) -> Pa
         raise HTTPException(status_code=404, detail="File not found on server")
 
     return file_path
+
+
+# ─── Dashboard-access email ────────────────────────────────────────────────
+# Sent AFTER the trader hits Save & Continue on the profile-completion gate.
+# Distinct from the verify-email message that fires at signup — this one is
+# the welcome-to-your-dashboard hand-off and contains a deep link straight
+# into /accounts. The user is already authenticated via HttpOnly cookies
+# in the original browser, so clicking the link opens the dashboard with
+# no extra token exchange.
+
+async def send_dashboard_access_email(
+    user_id: UUID, db: AsyncSession,
+) -> dict:
+    """Send the 'Your dashboard is ready' email to the authenticated user.
+
+    Idempotent: callable as many times as the trader hits Save & Continue
+    or the resend button in the popup. Returns a small dict so the API
+    layer can echo a friendly message; never raises on SMTP failure (we
+    swallow + log so the trader can still proceed in-app).
+    """
+    result = await db.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    # Demo identity short-circuits — the shared demo@swisdex.com account
+    # must never be spammed via the dashboard email.
+    if bool(getattr(user, "is_demo", False)):
+        return {"message": "Skipped for demo account", "sent": False}
+
+    try:
+        from packages.common.src.smtp_mail import (
+            send_email, smtp_configured, fire_and_forget,
+        )
+        from packages.common.src.email_templates import render_dashboard_access
+
+        if not smtp_configured():
+            logger.info(
+                "SMTP not configured — dashboard-access email skipped for %s",
+                user.email,
+            )
+            return {"message": "Email not configured", "sent": False}
+
+        st = get_settings()
+        trader_app_url = (
+            getattr(st, "TRADER_APP_URL", None) or "https://trade.swisdex.com"
+        ).rstrip("/")
+        dashboard_url = f"{trader_app_url}/accounts"
+        subject, html, text = render_dashboard_access(
+            first_name=user.first_name,
+            dashboard_url=dashboard_url,
+        )
+        fire_and_forget(send_email(user.email, subject, html, text=text))
+    except Exception as e:
+        logger.warning(
+            "dashboard-access email scheduling failed for %s: %s",
+            user.email, e,
+        )
+        return {"message": "Could not send email — try again later", "sent": False}
+
+    return {"message": "Dashboard link sent — check your email.", "sent": True}

@@ -64,6 +64,26 @@ async def update_profile(
     )
 
 
+@router.post("/send-dashboard-link")
+async def send_dashboard_link(
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Send the 'your dashboard is ready' email to the authenticated user.
+
+    Triggered by the frontend's ProfileCompleteGate immediately after the
+    profile PUT succeeds — the trader sees a 'Check your email' popup and
+    can either click the link in the email OR press the in-app
+    'Continue to dashboard' button. Both paths land on /accounts.
+
+    Idempotent + safe to spam (SMTP latency is fire-and-forget). Demo
+    accounts are silently skipped server-side.
+    """
+    return await profile_service.send_dashboard_access_email(
+        user_id=current_user["user_id"], db=db,
+    )
+
+
 @router.put("/password")
 async def change_password(
     req: ChangePasswordRequest,
