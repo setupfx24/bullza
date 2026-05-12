@@ -5,7 +5,7 @@ import { ArrowUpRight, Repeat, BarChart3, Coins, Bitcoin, LineChart } from 'luci
 import { LiveChartSection } from '@/swisdex/components/LiveChartSection';
 
 const MARKETS = [
-  { title: 'Forex',       href: '/trading/forex',       Icon: Repeat,    blurb: 'Trade 60+ currency pairs — majors, minors, exotics. Tight spreads, deep liquidity, 24/5.' },
+  { title: 'Forex',       href: '/trading/forex',       Icon: Repeat,    blurb: 'Trade 60+ currency pairs — majors, minors, exotics. Tight spreads, deep liquidity, 24/7.' },
   { title: 'Indices',     href: '/trading/indices',     Icon: BarChart3, blurb: "Get exposure to the world's top economies through US, European, and Asian stock indices." },
   { title: 'Commodities', href: '/trading/commodities', Icon: Coins,     blurb: 'Trade Gold, Silver, Crude Oil, and Natural Gas with real-time pricing and institutional execution.' },
   { title: 'Crypto',      href: '/trading/crypto',      Icon: Bitcoin,   blurb: 'Trade Bitcoin, Ethereum, and top digital assets around the clock with fast, transparent pricing.' },
@@ -21,16 +21,21 @@ export default function MarketsPage() {
         style={{ background: 'radial-gradient(ellipse 60% 50% at 50% 0%, hsl(99 55% 42% / 0.18), transparent 70%)' }}
       />
 
-      <section className="mx-auto max-w-[1200px] px-[var(--gutter)] pt-32 pb-12 sm:pt-40 sm:pb-20 md:pt-48 md:pb-28 text-center">
+      {/* Live chart + instrument directory — moved to top of page */}
+      <div className="pt-24 sm:pt-28 md:pt-32">
+        <LiveChartSection />
+      </div>
+
+      <section className="mx-auto max-w-[1200px] px-[var(--gutter)] pt-4 pb-12 sm:pb-20 md:pb-24 text-center">
         <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full liquid-glass text-xs uppercase tracking-[0.18em] text-foreground/70 font-body">
           <span className="size-1.5 rounded-full bg-primary" />
           What You Can Trade
         </div>
-        <h1 className="mt-6 font-display uppercase tracking-tight leading-[0.95] text-foreground text-3xl sm:text-5xl md:text-6xl lg:text-7xl break-words">
+        <h2 className="mt-6 font-display uppercase tracking-tight leading-[0.95] text-foreground text-3xl sm:text-5xl md:text-6xl lg:text-7xl break-words">
           One Account.
           <br />
           <span className="text-primary">Every Market.</span>
-        </h1>
+        </h2>
         <p className="mt-7 mx-auto max-w-2xl text-foreground/70 text-base sm:text-lg leading-relaxed">
           SwisDex gives you direct access to the world's most traded financial instruments —
           all from a single, unified account.
@@ -66,8 +71,6 @@ export default function MarketsPage() {
           </Link>
         </div>
       </section>
-
-      <LiveChartSection />
     </main>
   );
 }

@@ -1,15 +1,68 @@
 import { Link } from 'react-router-dom'
-import { Users, Globe, Award, TrendingUp } from 'lucide-react'
+import { Users, Globe, Award, TrendingUp, Wallet, Zap, Handshake, FlaskConical } from 'lucide-react'
 import Button from '../components/Button'
 import Card from '../components/Card'
 import StatBox from '../components/StatBox'
 import ScrollReveal, { ScrollRevealGroup, ScrollRevealItem } from '../components/animations/ScrollReveal'
 
+const ACCOUNT_TYPES = [
+  {
+    icon: Wallet,
+    name: 'Standard',
+    min: '$50',
+    tagline: 'Designed for new traders',
+    points: ['Competitive spreads from 1.2 pips', 'Zero commission', 'Full platform access', '24/7 multilingual support'],
+  },
+  {
+    icon: Zap,
+    name: 'ECN',
+    min: '$100',
+    tagline: 'Raw spreads for serious traders',
+    popular: true,
+    points: ['Raw spreads from 0.0 pips', 'Direct liquidity access', 'Ultra-low commission per lot', 'Scalping and algo trading allowed'],
+  },
+  {
+    icon: Handshake,
+    name: 'IB',
+    min: '$500',
+    tagline: 'For partners and introducing brokers',
+    points: ['Lifetime per-lot commissions', 'Multi-tier earnings', 'Marketing kit and dashboard', 'Dedicated partner manager'],
+  },
+  {
+    icon: FlaskConical,
+    name: 'Demo',
+    min: '$100,000 virtual',
+    tagline: 'Practise risk-free, live conditions',
+    points: ['Identical execution to live', 'Real market spreads', 'No KYC required', 'Switch to live in one click'],
+  },
+]
+
 const AboutUs = () => {
   return (
     <div className="min-h-screen pt-20">
-      <section className="section-padding hero-banner">
-        <div className="container-custom text-center">
+      <section className="section-padding hero-banner relative overflow-hidden">
+        {/* Background banner image at 70% opacity */}
+        <div
+          aria-hidden
+          className="absolute inset-0"
+          style={{
+            backgroundImage: 'url(/images/banner1.png)',
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+            backgroundRepeat: 'no-repeat',
+            opacity: 0.7,
+          }}
+        />
+        {/* Subtle dark vignette to keep text readable on top of the image */}
+        <div
+          aria-hidden
+          className="absolute inset-0"
+          style={{
+            background:
+              'radial-gradient(ellipse 80% 60% at 50% 50%, transparent 0%, rgba(0,0,0,0.55) 100%)',
+          }}
+        />
+        <div className="container-custom text-center relative z-10">
           <ScrollReveal variant="fadeUp">
             <h1 className="text-5xl md:text-6xl font-bold text-white mb-6">Who We Are — SwisDex</h1>
             <p className="text-xl text-text-secondary max-w-3xl mx-auto">
@@ -106,6 +159,54 @@ const AboutUs = () => {
               </Card>
             </ScrollRevealItem>
           </ScrollRevealGroup>
+        </div>
+      </section>
+
+      {/* Account Types — added to About so visitors see the full ladder at a glance */}
+      <section className="section-padding bg-primary-secondary">
+        <div className="container-custom">
+          <ScrollReveal variant="fadeUp">
+            <h2 className="text-3xl md:text-4xl font-bold text-white text-center mb-4">
+              Account Types for Every Trader
+            </h2>
+            <p className="text-text-secondary text-center max-w-2xl mx-auto mb-12">
+              Start small with a Standard account, scale up to ECN raw spreads, partner with us through the IB program, or practise risk-free on Demo — same platform, same execution, different conditions.
+            </p>
+          </ScrollReveal>
+
+          <ScrollRevealGroup className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {ACCOUNT_TYPES.map((a) => (
+              <ScrollRevealItem key={a.name}>
+                <div className={`glass-card p-6 h-full flex flex-col ${a.popular ? 'border border-primary-accent/40' : ''}`}>
+                  {a.popular && (
+                    <span className="self-start mb-3 inline-block bg-primary-accent text-white text-[10px] font-bold px-2.5 py-0.5 rounded uppercase tracking-wider">
+                      Most Popular
+                    </span>
+                  )}
+                  <div className="feature-icon bg-primary-accent/10 text-primary-accent mb-4">
+                    <a.icon size={20} />
+                  </div>
+                  <h3 className="text-white font-semibold text-xl mb-1">{a.name}</h3>
+                  <div className="text-2xl font-bold gradient-text mb-1">{a.min}</div>
+                  <p className="text-text-secondary text-sm mb-4">{a.tagline}</p>
+                  <ul className="space-y-2 text-sm text-text-secondary flex-1">
+                    {a.points.map((p) => (
+                      <li key={p} className="flex items-start gap-2">
+                        <span className="mt-1.5 size-1.5 rounded-full bg-primary-accent shrink-0" />
+                        <span>{p}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </ScrollRevealItem>
+            ))}
+          </ScrollRevealGroup>
+
+          <div className="text-center mt-10">
+            <Link to="/account-types">
+              <Button variant="ghost">Compare All Accounts</Button>
+            </Link>
+          </div>
         </div>
       </section>
 

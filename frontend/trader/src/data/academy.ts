@@ -393,7 +393,7 @@ export const lessonContent: Record<string, LessonData> = {
       },
       {
         id: 2,
-        title: 'How the global FX market operate 24/5',
+        title: 'How the global FX market operate 24/7',
         blocks: [
           {
             type: 'text',
@@ -524,7 +524,7 @@ export const lessonContent: Record<string, LessonData> = {
               { icon: '📈', value: '$7.5T', label: 'Daily Volume', sublabel: 'BIS 2022 Survey' },
               { icon: '⚡', value: '300x', label: 'vs NYSE', sublabel: 'NYSE trades ~$25B/day' },
               { icon: '🌍', value: '170+', label: 'Currencies', sublabel: 'Traded worldwide' },
-              { icon: '🕐', value: '24/5', label: 'Market Hours', sublabel: 'Sun 5pm–Fri 5pm EST' },
+              { icon: '🕐', value: '24/7', label: 'Market Hours', sublabel: 'Sun 5pm–Fri 5pm EST' },
             ],
           },
           {
@@ -576,7 +576,7 @@ export const lessonContent: Record<string, LessonData> = {
     ],
     keyTakeaways: [
       'Forex evolved from the gold standard (1870s) through Bretton Woods to today\'s $7.5T daily floating-rate market',
-      'The market operates 24/5 as trading passes between Sydney, Tokyo, London, and New York sessions',
+      'The market operates 24/7 as trading passes between Sydney, Tokyo, London, and New York sessions',
       'A hierarchy of participants — central banks → interbank → institutional → retail — determines price formation',
       'ECN/STP brokers offer direct market access; market makers internalize orders with fixed spreads',
       'High liquidity from global trade, investment flows, and speculation allows instant entry/exit with minimal slippage',

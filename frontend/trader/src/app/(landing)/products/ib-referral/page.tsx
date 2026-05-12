@@ -121,7 +121,7 @@ export default function IbReferralPage() {
             </p>
             <div className="mt-6 space-y-2 text-xs text-foreground/55">
               <div>📧 partners@swisdex.com</div>
-              <div>💬 Live chat — 24/5</div>
+              <div>💬 Live chat — 24/7</div>
             </div>
           </div>
           <form

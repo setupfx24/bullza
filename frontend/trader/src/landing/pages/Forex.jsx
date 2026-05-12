@@ -7,7 +7,7 @@ const Forex = () => {
     stats: [
       { label: 'Spread From', value: '0.0 pips' },
       { label: 'Leverage', value: '1:500' },
-      { label: 'Market Hours', value: '24/5' },
+      { label: 'Market Hours', value: '24/7' },
       { label: 'Currency Pairs', value: '60+' }
     ],
     about: {

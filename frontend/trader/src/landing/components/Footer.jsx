@@ -9,6 +9,14 @@ const columns = {
     { name: 'Commodities', path: '/trading/commodities' },
     { name: 'Crypto',      path: '/trading/crypto' },
   ],
+  Services: [
+    { name: 'AI Auto Trading',       path: '/services/ai-auto-trading' },
+    { name: 'Portfolio Management',  path: '/services/portfolio-management' },
+    { name: 'Market Research',       path: '/services/market-research' },
+    { name: 'Education',             path: '/services/education' },
+    { name: 'Automated Profit',      path: '/services/automated-profit' },
+    { name: 'ICO (Coming Soon)',     path: '/services/ico-coming-soon' },
+  ],
   Accounts: [
     { name: 'Standard', path: '/accounts/standard' },
     { name: 'Pro',      path: '/accounts/pro' },

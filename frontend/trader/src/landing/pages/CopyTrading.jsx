@@ -97,8 +97,9 @@ const CopyTrading = () => {
               </ScrollReveal>
               <ScrollReveal variant="fadeRight" delay={0.2}>
                 <div className="text-center">
-                  <div className="text-5xl font-bold gradient-text mb-2">10,000+</div>
-                  <p className="text-text-secondary mb-6">Active signal providers to choose from</p>
+                  <p className="text-text-secondary mb-6">
+                    Browse verified signal providers, filter by strategy and risk, and start copying in a single click.
+                  </p>
                   <Link to="/accounts/standard">
                     <Button variant="primary" className="inline-flex items-center gap-2">Get Started <ArrowRight size={16} /></Button>
                   </Link>

@@ -7,6 +7,7 @@ import {
   ChevronDown, ArrowUpRight, Info,
 } from 'lucide-react';
 import { BannerPlaceholder } from '@/swisdex/components/BannerPlaceholder';
+import { FixedReturnRateTable } from '@/swisdex/components/FixedReturnRateTable';
 
 export default function FixedReturnInsurancePage() {
   return (
@@ -45,6 +46,9 @@ export default function FixedReturnInsurancePage() {
           ))}
         </div>
       </section>
+
+      {/* Fixed Return rate matrix */}
+      <FixedReturnRateTable />
 
       {/* Plan comparison */}
       <section id="plans" className="mx-auto max-w-[1200px] px-[var(--gutter)] py-12 sm:py-16">
@@ -139,47 +143,6 @@ export default function FixedReturnInsurancePage() {
         </div>
       </section>
 
-      {/* Application form */}
-      <section id="apply" className="mx-auto max-w-[1200px] px-[var(--gutter)] py-12 sm:py-16">
-        <div className="liquid-glass-strong rounded-3xl p-6 sm:p-10 grid lg:grid-cols-2 gap-10">
-          <div>
-            <h2 className="font-display uppercase text-2xl sm:text-3xl tracking-tight">Apply for a Plan</h2>
-            <p className="mt-3 text-foreground/65 text-sm sm:text-base max-w-md">
-              Provide a few details and our investment team will follow up within one business day with the full plan documents.
-            </p>
-            <div className="mt-6 space-y-2 text-xs text-foreground/55">
-              <div>📧 fixedreturn@swisdex.com</div>
-              <div>💬 Live chat — 24/5</div>
-            </div>
-          </div>
-          <form
-            onSubmit={(e) => { e.preventDefault(); alert('Application received. (Demo only.)'); }}
-            className="space-y-4"
-            aria-label="Plan application form"
-          >
-            <div className="grid sm:grid-cols-2 gap-3">
-              <FormField label="Full Name" name="name" type="text" required />
-              <FormField label="Country"   name="country" type="text" required />
-            </div>
-            <FormField label="Email"  name="email"  type="email" required />
-            <FormField label="Phone"  name="phone"  type="tel"   required />
-            <label className="block">
-              <span className="text-[11px] uppercase tracking-[0.16em] text-foreground/55 mb-1.5 block">Plan tenure *</span>
-              <select required name="tenure" className="w-full liquid-glass rounded-xl px-3.5 py-2.5 text-sm bg-transparent text-foreground focus:outline-none focus:ring-2 focus:ring-primary/60">
-                <option value="" className="bg-background">Select…</option>
-                <option value="6"  className="bg-background">6 months — 6.5% p.a.</option>
-                <option value="12" className="bg-background">12 months — 8.5% p.a.</option>
-                <option value="24" className="bg-background">24 months — 10.0% p.a.</option>
-              </select>
-            </label>
-            <FormField label="Investment amount (USD)" name="amount" type="number" required />
-            <button type="submit" className="inline-flex items-center gap-2 rounded-full bg-primary text-white px-6 py-3 text-sm font-semibold uppercase tracking-wider hover:opacity-90">
-              Submit Application <ArrowUpRight className="size-4" />
-            </button>
-          </form>
-        </div>
-      </section>
-
       {/* FAQ */}
       <section id="faq" className="mx-auto max-w-[800px] px-[var(--gutter)] py-12 sm:py-16">
         <h2 className="text-center font-display uppercase text-2xl sm:text-3xl tracking-tight mb-8">FAQ</h2>
@@ -213,26 +176,12 @@ export default function FixedReturnInsurancePage() {
           <p className="mt-4 text-foreground/70 max-w-xl mx-auto text-sm sm:text-base">
             Capital-protected, fixed-yield, regulated. Apply in minutes, fund in days.
           </p>
-          <Link href="#apply" className="mt-7 inline-flex items-center gap-2 rounded-full bg-primary text-white px-6 py-3 text-sm font-semibold uppercase tracking-wider hover:opacity-90">
-            Apply Now <ArrowUpRight className="size-4" />
+          <Link href="/auth/register" className="mt-7 inline-flex items-center gap-2 rounded-full bg-primary text-white px-6 py-3 text-sm font-semibold uppercase tracking-wider hover:opacity-90">
+            Open Account <ArrowUpRight className="size-4" />
           </Link>
         </div>
       </section>
     </main>
-  );
-}
-
-function FormField({ label, name, type, required }: { label: string; name: string; type: string; required?: boolean }) {
-  return (
-    <label className="block">
-      <span className="text-[11px] uppercase tracking-[0.16em] text-foreground/55 mb-1.5 block">{label}{required && ' *'}</span>
-      <input
-        name={name}
-        type={type}
-        required={required}
-        className="w-full liquid-glass rounded-xl px-3.5 py-2.5 text-sm bg-transparent text-foreground placeholder:text-foreground/40 outline-none focus:ring-2 focus:ring-primary/60"
-      />
-    </label>
   );
 }
 
