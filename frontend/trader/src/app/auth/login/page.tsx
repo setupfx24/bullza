@@ -10,7 +10,7 @@ import { useAuthStore } from '@/stores/authStore';
 import { usePlatformStatusStore } from '@/stores/platformStatusStore';
 import toast from 'react-hot-toast';
 import GoogleAuthButton from '@/components/auth/GoogleAuthButton';
-import ConnectWalletButton from '@/components/auth/ConnectWalletButton';
+// import ConnectWalletButton from '@/components/auth/ConnectWalletButton'; // Re-enable when wallet login goes live
 import '../auth.css';
 
 /* ── animation helpers ── */
@@ -290,9 +290,6 @@ function LoginContent() {
                 {/* ── SIGN IN ── */}
                 {activeStep === 1 && (
                   <form className="auth-form" onSubmit={handleSignIn} noValidate>
-                    <motion.div {...fadeUp(0.2)} className="flex justify-center mb-2">
-                      <img src="/images/swisdex-logo.png" alt="SwisDex" className="w-16 h-16 object-contain" />
-                    </motion.div>
                     <motion.div {...fadeUp(0.3)}>
                       <h2 className="auth-form__title">Sign In</h2>
                       <p className="auth-form__subtitle">Enter your credentials to access your account.</p>
@@ -378,12 +375,13 @@ function LoginContent() {
                       </Suspense>
                     </motion.div>
 
-                    <motion.div {...fadeUp(0.595)}>
-                      <ConnectWalletButton
-                        variant="login"
-                        disabled={loading || isLoading || demoLoading || maintenance}
-                      />
-                    </motion.div>
+                    {/* Connect wallet — hidden for now, will re-enable when wallet login is ready.
+                       <motion.div {...fadeUp(0.595)}>
+                         <ConnectWalletButton
+                           variant="login"
+                           disabled={loading || isLoading || demoLoading || maintenance}
+                         />
+                       </motion.div> */}
 
                     <motion.div {...fadeUp(0.6)}>
                       <button

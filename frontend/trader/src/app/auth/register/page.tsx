@@ -7,7 +7,7 @@ import { Eye, EyeOff, Loader2 } from 'lucide-react';
 import { useAuthStore } from '@/stores/authStore';
 import toast from 'react-hot-toast';
 import GoogleAuthButton from '@/components/auth/GoogleAuthButton';
-import ConnectWalletButton from '@/components/auth/ConnectWalletButton';
+// import ConnectWalletButton from '@/components/auth/ConnectWalletButton'; // Re-enable when wallet login goes live
 import PhoneInput from '@/components/forms/PhoneInput';
 import TurnstileWidget from '@/components/forms/TurnstileWidget';
 import { scorePassword, PASSWORD_REQUIREMENTS } from '@/lib/passwordPolicy';
@@ -252,9 +252,6 @@ function RegisterContent() {
                 style={{ width: '100%', maxWidth: 380 }}
               >
                 <form className="auth-form" onSubmit={handleSubmit} noValidate>
-                  <motion.div {...fadeUp(0.2)} className="flex justify-center mb-2">
-                    <img src="/images/swisdex-logo.png" alt="SwisDex" className="w-16 h-16 object-contain" />
-                  </motion.div>
                   <motion.div {...fadeUp(0.3)}>
                     <h2 className="auth-form__title">Sign Up Account</h2>
                     <p className="auth-form__subtitle">Enter your personal data to create your account.</p>
@@ -452,12 +449,13 @@ function RegisterContent() {
                     <GoogleAuthButton disabled={loading || isLoading || demoLoading} />
                   </motion.div>
 
-                  <motion.div {...fadeUp(0.755)}>
-                    <ConnectWalletButton
-                      variant="login"
-                      disabled={loading || isLoading || demoLoading}
-                    />
-                  </motion.div>
+                  {/* Connect wallet — hidden for now, will re-enable when wallet login is ready.
+                     <motion.div {...fadeUp(0.755)}>
+                       <ConnectWalletButton
+                         variant="login"
+                         disabled={loading || isLoading || demoLoading}
+                       />
+                     </motion.div> */}
 
                   <motion.div {...fadeUp(0.76)}>
                     <button
