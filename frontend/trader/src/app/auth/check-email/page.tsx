@@ -10,7 +10,7 @@
  */
 import { Suspense, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Loader2, Mail } from 'lucide-react';
+import { CheckCircle2, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '@/lib/api/client';
 import '../auth.css';
@@ -43,22 +43,29 @@ function CheckEmailContent() {
       <div className="auth-card-wrapper">
         <div className="auth-card" style={{ minHeight: 'auto' }}>
           <div className="auth-right" style={{ width: '100%' }}>
-            <div style={{ width: '100%', maxWidth: 420, textAlign: 'center', padding: '40px 20px' }}>
+            <div style={{ width: '100%', maxWidth: 460, textAlign: 'center', padding: '48px 24px' }}>
               <div style={{
-                width: 72, height: 72, borderRadius: '50%',
-                background: 'rgba(85,166,48,0.12)', border: '1px solid rgba(85,166,48,0.3)',
-                margin: '0 auto 20px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                width: 84, height: 84, borderRadius: '50%',
+                background: 'rgba(85,166,48,0.14)', border: '2px solid rgba(85,166,48,0.4)',
+                margin: '0 auto 24px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                boxShadow: '0 0 0 6px rgba(85,166,48,0.05)',
               }}>
-                <Mail size={32} style={{ color: '#55a630' }} />
+                <CheckCircle2 size={44} strokeWidth={2.25} style={{ color: '#55a630' }} />
               </div>
-              <h2 className="auth-form__title">Check your inbox</h2>
-              <p className="auth-form__subtitle" style={{ marginBottom: 16 }}>
-                We&apos;ve sent a verification link to{' '}
-                <strong style={{ color: 'var(--text-primary, #fff)' }}>{email || 'your email'}</strong>.
-                Click it to activate your account.
+              <h2 className="auth-form__title" style={{ fontSize: 28, marginBottom: 16 }}>
+                Please check your email.
+              </h2>
+              <p className="auth-form__subtitle" style={{ marginBottom: 18, fontSize: 15, lineHeight: 1.55 }}>
+                An email has been sent to{' '}
+                <strong style={{ color: 'var(--text-primary, #fff)' }}>{email || 'your inbox'}</strong>.
+                Please verify your email address to complete your SwisDex registration
+                and start trading.
               </p>
-              <p className="auth-form__subtitle" style={{ fontSize: 12, marginBottom: 24, opacity: 0.7 }}>
-                The link is valid for 24 hours. Didn&apos;t see it? Check your spam folder.
+              <p className="auth-form__subtitle" style={{ fontSize: 13, marginBottom: 28, opacity: 0.72, lineHeight: 1.55 }}>
+                If you do not see the email in a few minutes, check your{' '}
+                <em>&ldquo;junk&rdquo;</em> or <em>&ldquo;spam&rdquo;</em> folder.
+                We make every effort to ensure these emails are delivered.
+                The verification link is valid for 24 hours.
               </p>
               <button
                 type="button"
