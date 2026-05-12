@@ -324,13 +324,21 @@ def _send_verify_email(user: User, request: Request | None = None) -> None:
         logger.warning("verify-email scheduling failed for %s: %s", user.email, e)
 
 
-async def confirm_email_verification(token: str, db: AsyncSession) -> User:
-    """Validate a verify token and flip user.email_verified=True.
+async def confirm_email_verification(
+    token: str, request: Request, db: AsyncSession,
+) -> JSONResponse:
+    """Validate a verify token, flip user.email_verified=True, and auto-login.
 
-    Idempotent: if the user is already verified we still resolve OK so the
-    user clicking the link twice (e.g. once in their preview pane, once in
-    the inbox) doesn't see an error. Raises AuthServiceError on bad/expired
-    tokens or unknown users."""
+    Issuing the session cookies here makes the verify-email click the single
+    entry point into the app — register_user no longer sets cookies, so this
+    is the only path that grants a session to a freshly-signed-up user. That
+    closes the email-verification bypass that the cookies-on-register flow
+    had.
+
+    Idempotent: clicking the link twice (e.g. once in inbox preview, once
+    in the inbox itself) still returns a fresh session. Raises
+    AuthServiceError on bad/expired tokens or unknown users.
+    """
     from packages.common.src.auth import decode_email_verify_token
     payload = decode_email_verify_token(token)
     if not payload or payload.get("type") != EMAIL_VERIFY_TOKEN_TYPE:
@@ -346,7 +354,9 @@ async def confirm_email_verification(token: str, db: AsyncSession) -> User:
         user.email_verified = True
         user.email_verified_at = datetime.now(timezone.utc)
         await db.commit()
-    return user
+    return await issue_auth_json_response(
+        user, request, db, status_code=200, user_audit_action="EMAIL_VERIFY",
+    )
 
 
 async def resend_verification_email(email: str, request: Request, db: AsyncSession) -> None:
@@ -558,7 +568,7 @@ async def register_user(
     referral_code: str | None,
     request: Request,
     db: AsyncSession,
-) -> JSONResponse:
+) -> dict:
     from packages.common.src.settings_store import get_bool_setting
 
     await rate_limit_http(request, "register", 15, 3600.0)
@@ -608,16 +618,19 @@ async def register_user(
     if referral_code:
         await _consume_referral(db, user.id, referral_code)
 
-    response = await issue_auth_json_response(
-        user, request, db, status_code=201, user_audit_action="REGISTER",
-    )
-    # The verify-email template now contains the full welcome content
-    # (capability list, credentials block, why-trade bullets), so signup
-    # only sends ONE email instead of welcome + verify back-to-back.
-    # Google sign-up still sends the standalone welcome.py because its
-    # email_verified=True path skips the verify flow entirely.
+    await db.commit()
+
+    # Email/password signups do NOT receive a session cookie here — the user
+    # must click the verify link in their inbox, which is the ONLY path that
+    # issues cookies + lets them into the app. This is the email-verification
+    # gate the platform relies on; previously the cookies-on-register flow
+    # let traders skip verification entirely (regression closed 2026-05-12).
     _send_verify_email(user, request)
-    return response
+    return {
+        "email": user.email,
+        "verification_sent": True,
+        "message": "Account created. Check your email to verify and sign in.",
+    }
 
 
 # ─── Login ────────────────────────────────────────────────────────────────

@@ -3,24 +3,24 @@
 /**
  * /auth/verify-email — landing page the email-verify link points at.
  *
- * Reads ?token= from the URL, calls GET /auth/verify-email?token=…,
- * shows success / error, and offers a button to continue to /auth/login.
- *
- * Flow:
- *   1. User signs up → backend sends email with link to this page.
- *   2. User clicks link → this page POSTs the token to /auth/verify-email.
- *   3. On success, redirect to /auth/login?verified=1 (the login page
- *      detects the flag and shows a green "Email verified — sign in" banner).
+ * Reads ?token= from the URL, calls GET /auth/verify-email?token=…, and on
+ * success lands the user on /accounts. The verify endpoint now AUTO-LOGS-IN
+ * (sets the same HttpOnly session cookies a login would), so this page is
+ * the single entry point that grants a session to a freshly-signed-up
+ * trader. /auth/register no longer issues cookies — bypassing this page is
+ * not possible.
  */
 import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { CheckCircle2, Loader2, XCircle } from 'lucide-react';
 import api from '@/lib/api/client';
+import { useAuthStore } from '@/stores/authStore';
 import '../auth.css';
 
 function VerifyEmailContent() {
   const router = useRouter();
   const params = useSearchParams();
+  const loadUser = useAuthStore((s) => s.loadUser);
   const token = params.get('token');
   const [state, setState] = useState<'loading' | 'ok' | 'fail'>('loading');
   const [message, setMessage] = useState('');
@@ -34,13 +34,16 @@ function VerifyEmailContent() {
     let cancelled = false;
     (async () => {
       try {
-        await api.get<{ message: string; verified: boolean }>(
-          `/auth/verify-email?token=${encodeURIComponent(token)}`,
-        );
+        // Backend sets session cookies on this response (auto-login).
+        await api.get(`/auth/verify-email?token=${encodeURIComponent(token)}`);
+        if (cancelled) return;
+        // Pull the user into the store now that cookies are set so the
+        // dashboard / ProfileCompleteGate render with the correct identity.
+        await loadUser();
         if (cancelled) return;
         setState('ok');
-        setMessage('Email verified. Redirecting you to sign in…');
-        setTimeout(() => router.push('/auth/login?verified=1'), 1200);
+        setMessage('Email verified. Taking you to your account…');
+        setTimeout(() => router.push('/accounts'), 900);
       } catch (e: unknown) {
         if (cancelled) return;
         const err = e as { message?: string };
@@ -49,7 +52,7 @@ function VerifyEmailContent() {
       }
     })();
     return () => { cancelled = true; };
-  }, [token, router]);
+  }, [token, router, loadUser]);
 
   return (
     <div className="auth-wrapper">
