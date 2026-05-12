@@ -86,7 +86,7 @@ function DesktopNavLink({ item, pathname }: { item: NavItem; pathname: string })
     return (
       <Link
         href={item.href}
-        className={`relative px-3.5 py-2 text-[15px] font-semibold transition-colors font-body focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded-full ${
+        className={`relative px-2.5 py-1.5 text-[13px] font-semibold whitespace-nowrap transition-colors font-body focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded-full ${
           active ? 'text-foreground' : 'text-foreground/75 hover:text-foreground'
         }`}
       >
@@ -112,7 +112,7 @@ function DesktopNavLink({ item, pathname }: { item: NavItem; pathname: string })
         onMouseLeave={scheduleClose}
         onFocus={() => { cancelClose(); setOpen(true); }}
         onClick={() => setOpen((v) => !v)}
-        className={`relative inline-flex items-center gap-1 px-3.5 py-2 text-[15px] font-semibold transition-colors font-body rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+        className={`relative inline-flex items-center gap-1 px-2.5 py-1.5 text-[13px] font-semibold whitespace-nowrap transition-colors font-body rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
           active ? 'text-foreground' : 'text-foreground/75 hover:text-foreground'
         }`}
       >
