@@ -1,8 +1,69 @@
 @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+@import 'react-day-picker/style.css';
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* react-day-picker — themed to match SwisDex green + the dark inline-CSS
+   used in ProfileCompleteGate. Only the DOBPicker mounts this widget so
+   any visual regression here is scoped to that one input. Client request
+   "show only current month days" is satisfied by showOutsideDays={false}
+   in the component; these rules just style what's visible. */
+.dob-popover .rdp-root {
+  --rdp-accent-color: #55a630;
+  --rdp-accent-background-color: rgba(85, 166, 48, 0.18);
+  --rdp-day-height: 36px;
+  --rdp-day-width: 36px;
+  --rdp-day_button-height: 36px;
+  --rdp-day_button-width: 36px;
+  --rdp-day_button-border-radius: 6px;
+  color: var(--text-primary, #f5f5f5);
+  font-family: inherit;
+  font-size: 13px;
+  --rdp-nav_button-height: 32px;
+  --rdp-nav_button-width: 32px;
+  --rdp-weekday-padding: 6px;
+}
+.dob-popover .rdp-month_caption,
+.dob-popover .rdp-caption_label {
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--text-primary, #f5f5f5);
+}
+.dob-popover .rdp-dropdowns select {
+  background: var(--bg-secondary, #1a1a1a);
+  color: var(--text-primary, #f5f5f5);
+  border: 1px solid var(--border-primary, #2a2a2a);
+  border-radius: 6px;
+  font-size: 12px;
+  padding: 4px 6px;
+}
+.dob-popover .rdp-day_button {
+  color: var(--text-primary, #f5f5f5);
+}
+.dob-popover .rdp-day_button:hover:not(.rdp-day_disabled .rdp-day_button) {
+  background: rgba(85, 166, 48, 0.12);
+}
+.dob-popover .rdp-day_disabled {
+  opacity: 0.32;
+  pointer-events: none;
+}
+.dob-popover .rdp-today:not(.rdp-selected) .rdp-day_button {
+  color: #55a630;
+  font-weight: 700;
+}
+.dob-popover .rdp-selected .rdp-day_button {
+  background: #55a630 !important;
+  color: #0a0a0a !important;
+  font-weight: 700;
+}
+.dob-popover .rdp-weekday {
+  color: var(--text-tertiary, #9a9a9a);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
 
 /* Fallback: before JS runs, use dark. Script in <head> overrides immediately. */
 :root {

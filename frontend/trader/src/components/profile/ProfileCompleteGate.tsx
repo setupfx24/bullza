@@ -17,11 +17,12 @@
  *    the modal unmounts itself.
  */
 import { useEffect, useMemo, useState } from 'react';
-import { Calendar, Loader2, ShieldCheck, UserCircle2 } from 'lucide-react';
+import { Loader2, ShieldCheck, UserCircle2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuthStore } from '@/stores/authStore';
 import api from '@/lib/api/client';
 import PhoneInput from '@/components/forms/PhoneInput';
+import DOBPicker from '@/components/forms/DOBPicker';
 import {
   COUNTRIES as GEO_COUNTRIES,
   getStatesOfCountry,
@@ -361,20 +362,10 @@ export default function ProfileCompleteGate() {
               />
             </Field>
             <Field label="Date of birth" required hint="18+ to trade. Click the field to open the calendar.">
-              <div className="relative">
-                <Calendar
-                  size={14}
-                  className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-text-tertiary"
-                  aria-hidden
-                />
-                <input
-                  type="date"
-                  value={form.date_of_birth}
-                  onChange={handleChange('date_of_birth')}
-                  max={new Date().toISOString().slice(0, 10)}
-                  className="w-full pl-9 pr-3 py-2.5 rounded-lg border border-border-primary bg-bg-secondary text-text-primary outline-none focus:border-[#55a630]/50 text-sm"
-                />
-              </div>
+              <DOBPicker
+                value={form.date_of_birth}
+                onChange={(iso) => setForm((f) => ({ ...f, date_of_birth: iso }))}
+              />
             </Field>
           </div>
 
