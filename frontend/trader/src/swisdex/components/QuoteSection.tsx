@@ -15,7 +15,7 @@ export function QuoteSection() {
   const initials = 'WB';
 
   return (
-    <section className="relative px-4 sm:px-6 py-12 sm:py-16 md:py-20">
+    <section className="relative px-3 sm:px-6 py-10 sm:py-16 md:py-20">
       <div
         className="max-w-[1200px] mx-auto rounded-3xl overflow-hidden relative"
         style={{
@@ -41,7 +41,7 @@ export function QuoteSection() {
           style={{ border: '1px solid hsl(99 55% 42% / 0.18)' }}
         />
 
-        <div className="relative grid md:grid-cols-[2fr_1fr] gap-6 sm:gap-10 p-7 sm:p-10 md:p-14 items-center">
+        <div className="relative grid md:grid-cols-[2fr_1fr] gap-6 sm:gap-10 p-5 sm:p-10 md:p-14 items-center">
           {/* Left — quote */}
           <div>
             <div className="flex items-center gap-2 mb-6">
@@ -57,7 +57,7 @@ export function QuoteSection() {
 
             <Quote className="size-7 text-primary/70 mb-4" aria-hidden />
 
-            <blockquote className="font-display text-2xl sm:text-3xl md:text-[40px] lg:text-5xl leading-[1.12] text-foreground tracking-tight max-w-none">
+            <blockquote className="font-display text-xl sm:text-3xl md:text-[40px] lg:text-5xl leading-[1.15] sm:leading-[1.12] text-foreground tracking-tight max-w-none break-words">
               &ldquo;Rule No. 1 is <span className="text-primary font-bold">never lose money.</span>{' '}
               Rule No. 2 is <span className="text-primary font-bold">never forget</span> Rule No. 1.&rdquo;
             </blockquote>

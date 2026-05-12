@@ -1,4 +1,5 @@
 @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+@import 'flag-icons/css/flag-icons.min.css';
 
 @tailwind base;
 @tailwind components;
@@ -217,6 +218,9 @@ html, body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   transition: background-color 0.3s ease, color 0.3s ease;
+  /* Prevent any rogue element from triggering horizontal scroll on mobile —
+     keeps the page width clamped to the viewport even if a child overflows. */
+  overflow-x: hidden;
 }
 
 .tabular-nums { font-variant-numeric: tabular-nums; }
