@@ -10,6 +10,7 @@ import { Process } from './components/Process';
 import { Stats } from './components/Stats';
 import { Testimonials } from './components/Testimonials';
 import { Faq } from './components/Faq';
+import { QuoteSection } from './components/QuoteSection';
 import { CtaFooter } from './components/CtaFooter';
 
 /**
@@ -33,6 +34,7 @@ export default function SwisDexHomePage() {
         <Stats />
         <Testimonials />
         <Faq />
+        <QuoteSection />
         <CtaFooter />
       </main>
     </div>

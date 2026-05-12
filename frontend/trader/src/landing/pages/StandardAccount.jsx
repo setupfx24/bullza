@@ -7,7 +7,7 @@ import ScrollReveal, { ScrollRevealGroup, ScrollRevealItem } from '../components
 const StandardAccount = () => {
   const features = [
     'Free educational content',
-    '24/5 customer support',
+    '24/7 customer support',
     'Negative balance protection',
     'Access to all trading platforms',
     'No hidden fees',
@@ -22,7 +22,7 @@ const StandardAccount = () => {
     { feature: 'Leverage', standard: 'Up to 1:500', pro: 'Up to 1:200', demo: 'Up to 1:500' },
     { feature: 'Commission', standard: 'None', pro: '$3.5/lot', demo: 'None' },
     { feature: 'Platforms', standard: 'Web, Copy Trading', pro: 'Web, Copy Trading', demo: 'Web, Copy Trading' },
-    { feature: 'Support', standard: '24/5', pro: 'Priority 24/7', demo: '24/5' }
+    { feature: 'Support', standard: '24/7', pro: 'Priority 24/7', demo: '24/7' }
   ]
 
   return (

@@ -16,8 +16,11 @@ export function BubbleText({ text, className = '', as: Tag = 'h2' }: Props) {
   return (
     <Component
       onMouseLeave={() => setHoveredIndex(null)}
-      className={className}
-      style={{ display: 'inline-block', color: '#ffffff' }}
+      // Google Translate would otherwise butcher the per-char spans into
+      // garbage like "TRADAND SMARTANDR" — opt out for this element.
+      translate="no"
+      className={`notranslate ${className}`}
+      style={{ color: '#ffffff' }}
     >
       {text.split('').map((char, idx) => {
         const distance = hoveredIndex !== null ? Math.abs(hoveredIndex - idx) : null;

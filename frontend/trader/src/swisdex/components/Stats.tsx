@@ -32,7 +32,7 @@ function AnimatedValue({ value }: { value: string }) {
 
   if (num == null) {
     return (
-      <span ref={ref} className="font-display italic text-3xl sm:text-4xl md:text-6xl lg:text-7xl leading-none text-foreground">
+      <span ref={ref} className="font-display italic text-2xl sm:text-3xl md:text-4xl lg:text-5xl leading-none whitespace-nowrap text-foreground">
         {value}
       </span>
     );
@@ -41,7 +41,7 @@ function AnimatedValue({ value }: { value: string }) {
   return (
     <motion.span
       ref={ref}
-      className="font-display italic text-3xl sm:text-4xl md:text-6xl lg:text-7xl leading-none text-foreground tabular-nums"
+      className="font-display italic text-2xl sm:text-3xl md:text-4xl lg:text-5xl leading-none whitespace-nowrap text-foreground tabular-nums"
     >
       {display}
     </motion.span>

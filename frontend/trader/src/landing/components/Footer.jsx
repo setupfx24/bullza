@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom'
+import Link from 'next/link'
 import { Twitter, Linkedin, Instagram, Youtube, Mail } from 'lucide-react'
 import ScrollReveal from './animations/ScrollReveal'
 
@@ -9,26 +9,34 @@ const columns = {
     { name: 'Commodities', path: '/trading/commodities' },
     { name: 'Crypto',      path: '/trading/crypto' },
   ],
-  Platforms: [
-    { name: 'Web Platform',  path: '/platforms/web' },
-    { name: 'Copy Trading',  path: '/platforms/copy-trading' },
-    { name: 'Prop Trading',  path: '/platforms/prop-trading' },
-    { name: 'IB Management', path: '/platforms/ib-management' },
+  Services: [
+    { name: 'AI Auto Trading',       path: '/services/ai-auto-trading' },
+    { name: 'Portfolio Management',  path: '/services/portfolio-management' },
+    { name: 'Market Research',       path: '/services/market-research' },
+    { name: 'Education',             path: '/services/education' },
+    { name: 'Automated Profit',      path: '/services/automated-profit' },
+    { name: 'ICO (Coming Soon)',     path: '/services/ico-coming-soon' },
   ],
   Accounts: [
     { name: 'Standard', path: '/accounts/standard' },
     { name: 'Pro',      path: '/accounts/pro' },
     { name: 'Demo',     path: '/accounts/demo' },
   ],
+  Academy: [
+    { name: 'Videos', path: '/academy/videos' },
+    { name: 'PDFs',   path: '/academy/pdfs' },
+    { name: 'Blogs',  path: '/academy/blogs' },
+  ],
+  'Risk Management': [
+    { name: 'Lot Size & Profit Calculator', path: '/risk-management/calculator' },
+  ],
+  Products: [
+    { name: 'IB Referral',              path: '/products/ib-referral' },
+    { name: 'Fixed Return Insurance',   path: '/products/fixed-return-insurance' },
+  ],
   Company: [
     { name: 'About Us',       path: '/company/about' },
-    { name: 'Why SwisDex',    path: '/company/why-swisdex' },
     { name: 'Contact',        path: '/company/contact' },
-  ],
-  Education: [
-    { name: 'Tutorials',   path: '/education/tutorials' },
-    { name: 'Blog',        path: '/education/blog' },
-    { name: 'Market News', path: '/education/news' },
   ],
 }
 
@@ -58,13 +66,18 @@ export default function Footer() {
           {/* Brand block — spans more on mobile */}
           <div className="col-span-2 lg:col-span-2">
             <ScrollReveal variant="fadeLeft">
-              <Link to="/" className="inline-block mb-5" aria-label="SwisDex home">
+              <Link href="/" className="inline-block mb-5" aria-label="SwisDex home">
                 <img src="/images/swisdex-logo.png" alt="SwisDex" className="h-10 w-auto" />
               </Link>
               <p className="text-sm leading-relaxed max-w-sm mb-6" style={{ color: 'var(--fx-text-2)' }}>
-                SwisDex is an institutional-grade forex and CFD broker. Built for serious
-                traders who demand fast execution, transparent pricing, and a platform that
-                works as hard as they do.
+                SwisDex is an institutional-grade forex, CFD broker, and decentralized exchange
+                built for serious traders. It offers fast execution, low spreads, transparent
+                pricing, insured trades, and fully automated trading with no human intervention.
+              </p>
+              <p className="text-sm leading-relaxed max-w-sm mb-6" style={{ color: 'var(--fx-text-2)' }}>
+                SwisDex also provides staking with fixed monthly income, anytime withdrawals,
+                and a rewarding IB (Introducing Broker) program with profit-sharing opportunities
+                for partners and affiliates.
               </p>
 
               <div className="flex items-center gap-2 text-sm mb-5" style={{ color: 'var(--fx-text-3)' }}>
@@ -115,7 +128,7 @@ export default function Footer() {
                 {links.map((link) => (
                   <li key={link.path}>
                     <Link
-                      to={link.path}
+                      href={link.path}
                       className="text-sm transition-colors"
                       style={{ color: 'var(--fx-text-2)' }}
                       onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--fx-text)' }}
@@ -180,9 +193,9 @@ export default function Footer() {
             © {year} SwisDex Ltd. All rights reserved. · Founded in 2010
           </p>
           <div className="flex flex-wrap gap-x-5 gap-y-2 text-xs" style={{ color: 'var(--fx-text-3)' }}>
-            <Link to="/privacy" className="hover:underline">Privacy Policy</Link>
-            <Link to="/terms" className="hover:underline">Terms of Service</Link>
-            <Link to="/risk" className="hover:underline">Risk Disclosure</Link>
+            <Link href="/privacy" className="hover:underline">Privacy Policy</Link>
+            <Link href="/terms" className="hover:underline">Terms of Service</Link>
+            <Link href="/risk" className="hover:underline">Risk Disclosure</Link>
           </div>
         </div>
       </div>

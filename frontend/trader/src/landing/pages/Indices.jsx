@@ -8,7 +8,7 @@ const Indices = () => {
       { label: 'Spread From', value: '0.4 pips' },
       { label: 'Leverage', value: '1:200' },
       { label: 'Indices', value: '20+' },
-      { label: 'Market Hours', value: '24/5' }
+      { label: 'Market Hours', value: '24/7' }
     ],
     about: {
       title: 'What are Index CFDs?',
@@ -36,7 +36,7 @@ const Indices = () => {
       {
         icon: '⏰',
         title: 'Extended Trading Hours',
-        description: 'Trade indices nearly 24/5 with access to both cash and futures contracts.'
+        description: 'Trade indices nearly 24/7 with access to both cash and futures contracts.'
       }
     ]
   }

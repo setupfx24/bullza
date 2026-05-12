@@ -221,6 +221,33 @@ html, body {
 
 .tabular-nums { font-variant-numeric: tabular-nums; }
 
+/* Google Translate Element — hide all default UI (we drive it via our
+   own LanguageSwitcher component). */
+.goog-te-banner-frame.skiptranslate { display: none !important; }
+body { top: 0 !important; }
+.goog-tooltip,
+.goog-tooltip:hover,
+#goog-gt-tt,
+.goog-te-balloon-frame { display: none !important; }
+.goog-text-highlight { background: transparent !important; box-shadow: none !important; }
+.skiptranslate iframe { display: none !important; visibility: hidden !important; }
+
+/* Google injects <font> wrappers around translated text — neutralise them
+   so they don't break inline-block layouts, gradients, or responsive
+   word-break behaviour. */
+font {
+  font: inherit !important;
+  color: inherit !important;
+  background: inherit !important;
+  display: inline !important;
+  white-space: inherit !important;
+  text-shadow: inherit !important;
+  letter-spacing: inherit !important;
+  word-spacing: inherit !important;
+  text-transform: inherit !important;
+  vertical-align: baseline !important;
+}
+
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: var(--scrollbar-track); }
 ::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); border-radius: 4px; }

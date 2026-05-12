@@ -29,7 +29,7 @@ const WhySwisDex = () => {
     {
       icon: Award,
       title: 'Award-Winning Support',
-      description: '24/5 multilingual support team ready to assist you via live chat, email, and phone in your language.'
+      description: '24/7 multilingual support team ready to assist you via live chat, email, and phone in your language.'
     },
     {
       icon: Users,

@@ -9,6 +9,7 @@ import GoogleAuthProvider from '@/components/providers/GoogleAuthProvider';
 import NotificationListener from '@/components/NotificationListener';
 import ProfileCompleteGate from '@/components/profile/ProfileCompleteGate';
 import TopLoader from '@/components/TopLoader';
+import GoogleTranslate from '@/components/GoogleTranslate';
 
 export const metadata: Metadata = {
   title: 'SwisDex',
@@ -37,8 +38,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             __html: `(function(){try{var L='swisdex-ui',N='swisdex-ui';var o=localStorage.getItem(L),n=localStorage.getItem(N);if(o&&!n){localStorage.setItem(N,o);localStorage.removeItem(L);}var s=localStorage.getItem(N);var t='dark';if(s){var j=JSON.parse(s);t=(j&&j.state&&j.state.theme)||(j&&j.theme)||'dark';}var d=document.documentElement;d.setAttribute('data-theme',t);d.classList.add(t==='light'?'theme-light':'theme-dark');if(t==='light'){d.style.backgroundColor='#ffffff';d.style.color='#111827';}else{d.style.backgroundColor='#0a0a0a';d.style.color='#ffffff';}}catch(e){document.documentElement.setAttribute('data-theme','light');document.documentElement.style.backgroundColor='#ffffff';document.documentElement.style.color='#111827';}})();`,
           }}
         />
+
       </head>
       <body className="min-h-full" suppressHydrationWarning>
+        {/* Google Translate — loaded client-side after hydration to avoid DOM mismatch */}
+        <GoogleTranslate />
         <Suspense fallback={null}>
           <TopLoader />
         </Suspense>

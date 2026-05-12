@@ -56,10 +56,21 @@ function Card({
         {service.body}
       </p>
       <div className="mt-5">
-        <span className="liquid-glass rounded-full px-3 py-1 text-xs font-body text-foreground/85 inline-block">
-          {service.badge}
-        </span>
+        {(service as { comingSoon?: boolean }).comingSoon ? (
+          <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/25 text-primary text-[10px] uppercase tracking-[0.18em] font-semibold">
+            <span className="relative inline-flex items-center justify-center">
+              <span className="absolute size-1.5 rounded-full bg-primary opacity-75 animate-ping" />
+              <span className="relative size-1.5 rounded-full bg-primary" />
+            </span>
+            {service.badge}
+          </span>
+        ) : (
+          <span className="liquid-glass rounded-full px-3 py-1 text-xs font-body text-foreground/85 inline-block">
+            {service.badge}
+          </span>
+        )}
       </div>
+
       <ArrowUpRight className="absolute top-6 right-6 size-5 text-foreground/30 group-hover:text-foreground/80 transition-colors" />
     </motion.div>
   );
@@ -86,7 +97,7 @@ export function ServicesBento() {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-5 md:auto-rows-[260px]">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-5 md:auto-rows-[minmax(260px,auto)]">
           <div className="md:row-span-2 md:col-span-1 min-h-[480px] md:min-h-0">
             <Card service={INSTRUMENTS[0]} className="p-8 h-full" index={0} />
           </div>

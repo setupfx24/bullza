@@ -24,7 +24,7 @@ const TIERS: Tier[] = [
     spread: 'From 1.5 pips',
     commission: 'None',
     desc: 'The perfect starting point. Simple pricing, full platform access, and everything you need to learn and grow as a trader.',
-    features: ['No commission', 'Full platform access', '24/5 support', 'Demo available'],
+    features: ['No commission', 'Full platform access', '24/7 support', 'Demo available'],
   },
   {
     name: 'Pro',

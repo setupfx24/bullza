@@ -210,7 +210,7 @@ const Contact = () => {
               Need Immediate Assistance?
             </h2>
             <p className="text-xl text-text-secondary mb-8 max-w-2xl mx-auto">
-              Our live chat support is available 24/5 to answer your questions instantly.
+              Our live chat support is available 24/7 to answer your questions instantly.
             </p>
             <Button variant="primary" onClick={() => setIsChatOpen(true)}>
               <MessageCircle className="w-5 h-5" />

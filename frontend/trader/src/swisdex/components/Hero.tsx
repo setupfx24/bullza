@@ -54,15 +54,23 @@ export function Hero() {
             transition={{ delay: 0.15, duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
             className="pointer-events-auto"
           >
-            <h1 className="font-display uppercase text-[clamp(36px,8vw,68px)] leading-[1.05] tracking-[-0.02em] text-foreground font-bold break-words max-w-full px-2">
-              <span className="block">
-                <BubbleText text="Trade Smarter" as="span" />
-              </span>
-              <span className="block">
-                <BubbleText text="Grow Faster" as="span" />
-              </span>
+            <h1 className="font-display uppercase text-[clamp(24px,5vw,56px)] leading-[1.05] tracking-[-0.02em] text-foreground font-bold whitespace-nowrap px-2">
+              <BubbleText text="Trade Smarter Grow Faster" as="span" />
             </h1>
           </motion.div>
+
+          <motion.h3
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.55, duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+            className="mt-4 font-display uppercase tracking-[0.18em] text-xs sm:text-base md:text-lg text-foreground/85 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 pointer-events-auto"
+          >
+            <span>Decentralized Exchange</span>
+            <span aria-hidden className="text-primary">:</span>
+            <span>Insured Trades</span>
+            <span aria-hidden className="text-primary">:</span>
+            <span>Fixed Return Program</span>
+          </motion.h3>
 
           <TypewriterText
             text={HERO.sub}

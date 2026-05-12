@@ -1,15 +1,71 @@
 'use client';
 
+import { useState } from 'react';
 import { Quote, Star } from 'lucide-react';
 import { BlurText } from './BlurText';
 import { TESTIMONIALS } from '../data';
 
 type T = (typeof TESTIMONIALS)[number];
 
+/** Two-letter initials from a full name, used as the avatar fallback. */
+function initials(name: string): string {
+  return name
+    .split(' ')
+    .map((p) => p[0])
+    .filter(Boolean)
+    .slice(0, 2)
+    .join('')
+    .toUpperCase();
+}
+
+function Avatar({ name, src }: { name: string; src?: string }) {
+  // If the real image fails to load (e.g. file not dropped yet),
+  // fall back to a brand-styled initials circle.
+  const [errored, setErrored] = useState(false);
+  const showImg = src && !errored;
+  return (
+    <div
+      className="size-12 rounded-full overflow-hidden shrink-0 flex items-center justify-center font-display font-semibold text-sm"
+      style={{
+        background: showImg ? 'transparent' : 'hsl(99 55% 42% / 0.22)',
+        color: 'hsl(99 60% 78%)',
+        border: '1px solid hsl(99 55% 42% / 0.35)',
+      }}
+      aria-hidden
+    >
+      {showImg ? (
+        // TODO: drop avatar at /images/testimonials/<slug>.webp
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={src}
+          alt=""
+          className="w-full h-full object-cover"
+          onError={() => setErrored(true)}
+        />
+      ) : (
+        <span>{initials(name)}</span>
+      )}
+    </div>
+  );
+}
+
 function Card({ t }: { t: T }) {
   return (
-    <div className="liquid-glass rounded-2xl p-5 sm:p-7 w-[280px] sm:w-[340px] md:w-[400px] shrink-0 flex flex-col gap-5 min-h-[200px] sm:min-h-[220px]">
-      <Quote className="size-5 text-primary/70" aria-hidden />
+    <div className="liquid-glass rounded-2xl p-5 sm:p-7 w-[280px] sm:w-[340px] md:w-[400px] shrink-0 flex flex-col gap-4 min-h-[220px] sm:min-h-[240px]">
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3 min-w-0">
+          <Avatar name={t.name} src={t.avatar} />
+          <div className="min-w-0">
+            <div className="font-display text-sm uppercase tracking-tight text-foreground truncate">
+              {t.name}
+            </div>
+            <div className="text-[11px] uppercase tracking-[0.16em] text-foreground/55 truncate">
+              {t.role}
+            </div>
+          </div>
+        </div>
+        <Quote className="size-5 text-primary/70 shrink-0" aria-hidden />
+      </div>
       <p className="font-body text-foreground/85 italic leading-relaxed text-[15px]">
         &ldquo;{t.quote}&rdquo;
       </p>

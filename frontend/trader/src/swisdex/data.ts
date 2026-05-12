@@ -17,13 +17,42 @@ export const BRAND = {
 // Nav targets all resolve to public landing routes. /markets and
 // /account-types are explicit pages with their own content; AuthProvider
 // allow-lists them so unauthenticated visitors are not bounced to login.
-// (The trader-app /accounts route is auth-gated for account management,
-// hence the marketing tier overview lives at /account-types.)
-export const NAV_ITEMS: { label: string; href: string }[] = [
+// Items with `children` render as a dropdown.
+export type NavItem = {
+  label: string;
+  href: string;
+  children?: { label: string; href: string }[];
+};
+
+export const NAV_ITEMS: NavItem[] = [
   { label: 'Home',         href: '/' },
   { label: 'Markets',      href: '/markets' },
   { label: 'Accounts',     href: '/account-types' },
   { label: 'How it Works', href: '/how-it-works' },
+  {
+    label: 'Academy',
+    href: '/academy/videos',
+    children: [
+      { label: 'Videos', href: '/academy/videos' },
+      { label: 'PDFs',   href: '/academy/pdfs' },
+      { label: 'Blogs',  href: '/academy/blogs' },
+    ],
+  },
+  {
+    label: 'Risk Management',
+    href: '/risk-management/calculator',
+    children: [
+      { label: 'Lot Size & Profit Calculator', href: '/risk-management/calculator' },
+    ],
+  },
+  {
+    label: 'Products',
+    href: '/products/ib-referral',
+    children: [
+      { label: 'IB Referral',            href: '/products/ib-referral' },
+      { label: 'Fixed Return Insurance', href: '/products/fixed-return-insurance' },
+    ],
+  },
   { label: 'About',        href: '/company/about' },
   { label: 'Contact',      href: '/company/contact' },
 ];
@@ -33,9 +62,9 @@ export const HERO = {
   pillBadge: 'Live',
   headline: 'Trade Smarter Grow Faster',
   sub: 'SwisDex is a decentralised exchange with on-chain insured trades and licensed broker-grade execution — your funds stay in your wallet, your trades stay protected.',
-  ctaPrimary: 'Get Started',
+  ctaPrimary: 'Details',
   ctaSecondary: 'Learn How It Works',
-  ctaHref: SIGNUP_HREF,
+  ctaHref: '/bonus',
   ctaSecondaryHref: '/how-it-works',
 };
 
@@ -69,19 +98,23 @@ export const LIVE_TICKER = [
 ];
 
 export const INSTRUMENTS = [
-  { icon: 'Cpu',        title: 'AI-Driven Auto Trading',         badge: '24/7 Active',       body: 'Our intelligent algorithms monitor markets 24/7 and execute high-frequency trades to maximise your returns with minimal risk.', href: SIGNUP_HREF },
-  { icon: 'BarChart2',  title: 'Portfolio Management',           badge: 'Expert Managed',    body: 'Expert asset allocation and continuous rebalancing to build a diversified, resilient portfolio aligned with your goals.',      href: SIGNUP_HREF },
-  { icon: 'TrendingUp', title: 'Market Research & Analysis',     badge: 'Daily Reports',     body: 'In-depth technical and fundamental analysis reports, updated daily to keep your investment decisions sharp.',                  href: SIGNUP_HREF },
-  { icon: 'Layers',     title: 'Educational Resources',          badge: 'Beginner Friendly', body: 'Learn trading strategies, crypto fundamentals, and market dynamics through curated workshops, guides, and webinars.',          href: SIGNUP_HREF },
-  { icon: 'Gem',        title: 'ICO & Early-Stage Investments',  badge: 'Exclusive Access',  body: 'Early access to promising new blockchain projects, vetted by SwisDex before they hit the wider market.',                       href: SIGNUP_HREF },
-  { icon: 'Building',   title: 'Automated Profit Generation',    badge: 'Algo Powered',      body: 'Beyond standard trading, SwisDex deploys advanced algorithmic bots designed to generate consistent returns even in volatile markets.', href: SIGNUP_HREF },
+  { icon: 'Cpu',        title: 'AI-Driven Auto Trading',         badge: '24/7 Active',       body: 'Our intelligent algorithms monitor markets 24/7 and execute high-frequency trades to maximise your returns with minimal risk.', href: '/services/ai-auto-trading' },
+  { icon: 'BarChart2',  title: 'Portfolio Management',           badge: 'MAM / PAM',         body: 'Expert asset allocation and continuous rebalancing — choose MAM for managed-account models or PAM for percentage-based allocations.', href: '/services/portfolio-management' },
+  { icon: 'TrendingUp', title: 'Market Research & Analysis',     badge: 'Daily Reports',     body: 'In-depth technical and fundamental analysis reports, updated daily to keep your investment decisions sharp.',                  href: '/services/market-research' },
+  { icon: 'Layers',     title: 'Educational Resources',          badge: 'Beginner Friendly', body: 'Learn trading strategies, crypto fundamentals, and market dynamics through curated workshops, guides, and webinars.',          href: '/services/education' },
+  { icon: 'Gem',        title: 'ICO & Early-Stage Investments',  badge: 'Coming Soon',       body: 'Early access to promising new blockchain projects, vetted by SwisDex before they hit the wider market. Launching soon.',     href: '/services/ico-coming-soon', comingSoon: true },
+  { icon: 'Building',   title: 'Automated Profit Generation',    badge: 'Algo Powered',      body: 'Beyond standard trading, SwisDex deploys advanced algorithmic bots designed to generate consistent returns even in volatile markets.', href: '/services/automated-profit' },
 ] as const;
 
 export const WHY_US = [
-  { icon: 'Zap',          title: 'AI-Powered Returns',                body: 'Sophisticated algorithms generate consistent profits across crypto and forex markets — analysing thousands of market signals per second.' },
-  { icon: 'ShieldCheck',  title: 'Secure Wallet Infrastructure',      body: 'All assets stored in offline cold storage. Multi-layer encryption keeps every holding safe from breaches and threats.' },
-  { icon: 'Headphones',   title: 'Expert Human Oversight',            body: 'Our team of experienced analysts monitors all trades for optimal performance — technology paired with seasoned market judgment.' },
-  { icon: 'TrendingDown', title: 'Flexible Plans for Every Investor', body: 'From starter to premium plans, the right option for your budget. Start with $500 and scale as confidence grows.' },
+  { icon: 'Network',      title: 'Decentralized Exchange',            body: 'Trade directly from your own wallet with non-custodial, on-chain execution — no intermediaries, no counterparty risk. Your keys, your funds.' },
+  { icon: 'ShieldCheck',  title: 'Insurance for Traders',             body: 'Every trade is policy-backed with on-chain insurance. If the market moves against you beyond defined thresholds, your insured amount is protected.' },
+  { icon: 'Gift',         title: 'Bonus & Rewards',                   body: 'Earn up to $200 welcome bonus on your first deposit plus ongoing loyalty rewards, referral commissions, and trading cashback on every lot.' },
+  { icon: 'Lock',         title: 'Fixed Rate Return',                 body: 'Lock in guaranteed fixed returns with our structured investment plans — predictable income with transparent terms and no hidden fees.' },
+  { icon: 'Brain',        title: 'AI Trading Software — 90% Accuracy', body: 'Our proprietary AI engine analyses thousands of market signals per second, achieving a verified 90% accuracy rate across forex and crypto pairs.' },
+  { icon: 'ShieldPlus',   title: 'Insured Trading',                   body: 'All positions carry built-in trade insurance. Your capital is safeguarded with multi-layer protection — cold storage, encryption, and smart-contract coverage.' },
+  { icon: 'Gauge',        title: 'Risk Management',                   body: 'Advanced risk controls including adjustable leverage (up to 1:500), stop-loss automation, margin-call alerts, and real-time exposure monitoring.' },
+  { icon: 'TrendingDown', title: 'Loss Protection',                   body: 'Smart stop-out mechanisms, hedging tools, and AI-driven drawdown limits ensure your losses are minimised even in the most volatile market conditions.' },
 ] as const;
 
 export const HOW_IT_WORKS = [
@@ -92,30 +125,39 @@ export const HOW_IT_WORKS = [
 ] as const;
 
 export const STATS = [
-  { value: '96%',  label: 'Profitable Trades' },
-  { value: '10K+', label: 'Active Investors Worldwide' },
-  { value: '$200', label: 'Welcome Bonus for New Members' },
-  { value: '24/7', label: 'Automated Trading, Always On' },
+  { value: '99%',     label: 'Profitable Trades' },
+  { value: '55K+',    label: 'Active Investors Worldwide' },
+  { value: 'Upto 7%', label: 'Monthly Return' },
+  { value: '24/7',    label: 'Automated Trading, Always On' },
 ] as const;
 
+/**
+ * Drop avatar images at: public/images/testimonials/<slug>.webp
+ * Recommended size: 200 × 200 px, WebP < 20 KB. Circular crop in the UI.
+ * If the file is missing, a tasteful initials-circle placeholder is shown.
+ */
 export const TESTIMONIALS = [
-  { quote: 'The interface is clean and easy to navigate.' },
-  { quote: 'Account setup was straightforward and quick.' },
-  { quote: 'I like how simple the trading dashboard feels.' },
-  { quote: 'The platform performance has been smooth so far.' },
-  { quote: 'Good mobile experience and responsive layout.' },
-  { quote: 'Transactions appeared quickly in the dashboard.' },
-  { quote: 'Customer support replied within a reasonable time.' },
-  { quote: 'The verification process was simple to complete.' },
-  { quote: 'Professional interface with a strong focus on usability.' },
-  { quote: 'Efficient execution and a polished trading environment.' },
-  { quote: 'A modern platform built with simplicity in mind.' },
+  { name: 'Aarav Sharma',  role: 'India',          avatar: '/images/testimonials/aarav-sharma.webp',  quote: 'The interface is clean and easy to navigate.' },
+  { name: 'Maria Lopez',   role: 'Spain',          avatar: '/images/testimonials/maria-lopez.webp',   quote: 'Account setup was straightforward and quick.' },
+  { name: 'Hiroshi Tanaka', role: 'Japan',         avatar: '/images/testimonials/hiroshi-tanaka.webp', quote: 'I like how simple the trading dashboard feels.' },
+  { name: 'Sofia Müller',  role: 'Germany',        avatar: '/images/testimonials/sofia-mueller.webp', quote: 'The platform performance has been smooth so far.' },
+  { name: 'Liam O\'Connor', role: 'Ireland',       avatar: '/images/testimonials/liam-oconnor.webp',  quote: 'Good mobile experience and responsive layout.' },
+  { name: 'Priya Iyer',    role: 'India',          avatar: '/images/testimonials/priya-iyer.webp',    quote: 'Transactions appeared quickly in the dashboard.' },
+  { name: 'Tunde Okafor',  role: 'Nigeria',        avatar: '/images/testimonials/tunde-okafor.webp',  quote: 'Customer support replied within a reasonable time.' },
+  { name: 'Emma Wilson',   role: 'United Kingdom', avatar: '/images/testimonials/emma-wilson.webp',   quote: 'The verification process was simple to complete.' },
+  { name: 'Daniel Roberts', role: 'Canada',        avatar: '/images/testimonials/daniel-roberts.webp', quote: 'Professional interface with a strong focus on usability.' },
+  { name: 'Aisha Khan',    role: 'United Arab Emirates', avatar: '/images/testimonials/aisha-khan.webp', quote: 'Efficient execution and a polished trading environment.' },
+  { name: 'Marco Rossi',   role: 'Italy',          avatar: '/images/testimonials/marco-rossi.webp',   quote: 'A modern platform built with simplicity in mind.' },
 ] as const;
 
 export const FAQ = [
   {
     q: 'What is the minimum deposit required to start trading?',
-    a: 'The minimum deposit depends on your account type. Standard accounts start from $100, while Pro and ECN accounts require a minimum of $5,000. A free Demo account with $10,000 in virtual funds is also available — no commitment, identical execution conditions to a live account.',
+    a: 'The minimum deposit depends on the account type: Standard $50, ECN $100, and IB partner account $500. A free Demo account with $100,000 in virtual funds is also available — no commitment, identical execution conditions to a live account. Every new trader also receives a 100% Welcome Bonus on the first deposit.',
+  },
+  {
+    q: 'How do I get the 100% Welcome Bonus?',
+    a: 'The 100% Welcome Bonus is applied automatically to your first qualifying deposit — no promo code required. Deposit $100 → trade with $200 of equity; deposit $1,000 → trade with $2,000. The bonus is fully tradeable from the moment it lands in your account, and unlocks for withdrawal after a small lot-volume requirement is met. See the /bonus page for the full tier breakdown.',
   },
   {
     q: 'Which deposit and withdrawal methods are available, and how long do they take?',
@@ -126,18 +168,26 @@ export const FAQ = [
     a: 'SwisDex offers a fast web platform accessible from any modern browser, plus dedicated iOS and Android mobile apps. All platforms sync to a single account, so your positions, alerts, and watchlists stay in sync across every device.',
   },
   {
-    q: 'What leverage options are available, and how does margin work?',
-    a: 'Maximum leverage is up to 1:500 across forex, metals, energies, and indices. Hedged positions carry 0% margin requirement. Margin call kicks in at 30% and stop-out at 0% (with stock-specific rules — see contract specifications). Use leverage responsibly.',
+    q: 'What is Fixed Return?',
+    a: 'Fixed Return is a capital-protected investment product where you lock your principal for a defined tenure (Month, Quarter, Half-Year, Year, or 2 Year) and earn a known, fixed return paid at maturity. Returns scale with deposit size and tenure — from 1% per month on a $1K Monthly plan to 7% on a $50K+ 2-Year plan. Your principal is held in a segregated trust account and returned in full at maturity. See the Products → Fixed Return Insurance page for the full rate matrix.',
   },
   {
-    q: 'What lot sizes can I trade?',
-    a: 'Minimum lot size is 0.01 across all instruments. Maximum is 200 lots between 7:00–20:59 GMT and 60 lots between 21:00–6:59 GMT. There are no limits on the number of open positions per account.',
+    q: 'How does the Decentralized Exchange work?',
+    a: 'SwisDex DEX lets you trade directly from your own wallet with non-custodial, on-chain execution. You keep your private keys, your funds never leave your wallet, and every order is settled through smart contracts — no counterparty risk, no withdrawal queues. Connect MetaMask, WalletConnect, or any EVM-compatible wallet, sign the trade, and the swap clears on-chain in seconds.',
+  },
+  {
+    q: 'How do I insure my trades?',
+    a: 'Trade Insurance is built into every position on SwisDex — you do not need to opt in. Each open trade is policy-backed by on-chain insurance up to the policy limit. If the market moves against you beyond the defined threshold, the insured amount is paid out automatically by the smart-contract underwriter. The insurance does not cover market loss within the policy threshold, so always size positions to your own risk tolerance.',
+  },
+  {
+    q: 'How do I apply for the IB program?',
+    a: 'Visit Products → IB Referral and fill out the short partner application (name, country, email, phone, and a brief note about your audience). Our partner team reviews and activates accounts within 24 hours. Once approved you receive a unique referral link plus a marketing kit, and you start earning weekly per-lot commissions (up to $7 / lot at Platinum tier) on every trade your referrals place — for life.',
   },
 ] as const;
 
 export const CTA = {
   headline: 'Ready to Start Your Investment Journey?',
-  sub: 'Join SwisDex today and receive a $200 Welcome Bonus on your first deposit.',
+  sub: 'Join SwisDex today and receive a 100% Welcome Bonus on your first deposit.',
   primary: 'Create Free Account',
   secondary: 'How It Works',
   href: SIGNUP_HREF,
@@ -154,10 +204,12 @@ export const FOOTER_QUICK_LINKS = [
 ];
 
 export const FOOTER_SERVICES = [
-  { label: 'AI Auto Trading',       href: SIGNUP_HREF },
-  { label: 'Portfolio Management',  href: SIGNUP_HREF },
-  { label: 'Educational Resources', href: SIGNUP_HREF },
-  { label: 'ICO Investments',       href: SIGNUP_HREF },
+  { label: 'AI Auto Trading',       href: '/services/ai-auto-trading' },
+  { label: 'Portfolio Management',  href: '/services/portfolio-management' },
+  { label: 'Market Research',       href: '/services/market-research' },
+  { label: 'Educational Resources', href: '/services/education' },
+  { label: 'Automated Profit',      href: '/services/automated-profit' },
+  { label: 'ICO Investments',       href: '/services/ico-coming-soon' },
 ];
 
 export const FOOTER_LINKS = [
