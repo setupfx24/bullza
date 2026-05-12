@@ -3,15 +3,21 @@
 import { motion } from 'motion/react';
 import {
   ShieldCheck,
+  ShieldPlus,
   Zap,
   TrendingDown,
   Headphones,
+  Network,
+  Gift,
+  Lock,
+  Brain,
+  Gauge,
   type LucideIcon,
 } from 'lucide-react';
 import { BlurText } from './BlurText';
 import { WHY_US } from '../data';
 
-const iconMap: Record<string, LucideIcon> = { ShieldCheck, Zap, TrendingDown, Headphones };
+const iconMap: Record<string, LucideIcon> = { ShieldCheck, ShieldPlus, Zap, TrendingDown, Headphones, Network, Gift, Lock, Brain, Gauge };
 
 export function Pourquoi() {
   return (

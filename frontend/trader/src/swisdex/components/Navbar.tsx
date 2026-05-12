@@ -154,7 +154,7 @@ function DesktopNavLink({ item, pathname }: { item: NavItem; pathname: string })
                       href={c.href}
                       role="menuitem"
                       onClick={() => setOpen(false)}
-                      className={`block px-3.5 py-2.5 text-sm rounded-xl font-body transition-colors ${
+                      className={`block px-3.5 py-2.5 text-sm font-semibold rounded-xl font-body transition-colors ${
                         isActive
                           ? 'bg-primary/25 text-primary'
                           : 'text-foreground/80 hover:bg-foreground/5 hover:text-foreground'

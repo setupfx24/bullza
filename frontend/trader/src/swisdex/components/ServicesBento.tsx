@@ -56,29 +56,20 @@ function Card({
         {service.body}
       </p>
       <div className="mt-5">
-        <span className="liquid-glass rounded-full px-3 py-1 text-xs font-body text-foreground/85 inline-block">
-          {service.badge}
-        </span>
-      </div>
-
-      {/* "Coming Soon" teaser on the featured (first / largest) card */}
-      {index === 0 && (
-        <div className="mt-5 sm:mt-7 pt-5 border-t border-foreground/10">
-          <div className="inline-flex items-center gap-2 px-2.5 py-0.5 rounded-full bg-primary/25 text-primary text-[10px] uppercase tracking-[0.18em] font-semibold mb-2">
+        {(service as { comingSoon?: boolean }).comingSoon ? (
+          <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/25 text-primary text-[10px] uppercase tracking-[0.18em] font-semibold">
             <span className="relative inline-flex items-center justify-center">
               <span className="absolute size-1.5 rounded-full bg-primary opacity-75 animate-ping" />
               <span className="relative size-1.5 rounded-full bg-primary" />
             </span>
-            Coming Soon
-          </div>
-          <h4 className="font-display uppercase font-extrabold tracking-tight leading-none text-foreground text-2xl sm:text-3xl md:text-4xl">
-            EXX<span className="text-primary">9</span>
-          </h4>
-          <p className="mt-2 font-body text-[11px] sm:text-xs text-foreground/55 max-w-[28ch] leading-snug">
-            Next-generation execution layer. Launching Q3 2026.
-          </p>
-        </div>
-      )}
+            {service.badge}
+          </span>
+        ) : (
+          <span className="liquid-glass rounded-full px-3 py-1 text-xs font-body text-foreground/85 inline-block">
+            {service.badge}
+          </span>
+        )}
+      </div>
 
       <ArrowUpRight className="absolute top-6 right-6 size-5 text-foreground/30 group-hover:text-foreground/80 transition-colors" />
     </motion.div>
@@ -106,7 +97,7 @@ export function ServicesBento() {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-5 md:auto-rows-[260px]">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-5 md:auto-rows-[minmax(260px,auto)]">
           <div className="md:row-span-2 md:col-span-1 min-h-[480px] md:min-h-0">
             <Card service={INSTRUMENTS[0]} className="p-8 h-full" index={0} />
           </div>

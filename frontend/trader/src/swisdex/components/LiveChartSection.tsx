@@ -2,7 +2,7 @@
 
 import { useRef, useState } from 'react';
 import Link from 'next/link';
-import { ArrowUpRight, Repeat, Coins, Bitcoin, BarChart3 } from 'lucide-react';
+import { ArrowUpRight, Repeat, Coins, BarChart3, LineChart } from 'lucide-react';
 import { TradingViewChart } from './TradingViewChart';
 
 interface QuickTab {
@@ -15,10 +15,10 @@ interface QuickTab {
 }
 
 const QUICK_TABS: QuickTab[] = [
-  { key: 'forex',   label: 'Forex',   Icon: Repeat,    symbol: 'EUR/USD', tvSymbol: 'FX:EURUSD',       spread: '0.1 pips' },
-  { key: 'gold',    label: 'Gold',    Icon: Coins,     symbol: 'XAU/USD', tvSymbol: 'OANDA:XAUUSD',    spread: '0.15 pips' },
-  { key: 'crypto',  label: 'Crypto',  Icon: Bitcoin,   symbol: 'BTC/USD', tvSymbol: 'BINANCE:BTCUSDT', spread: '$2.50' },
-  { key: 'indices', label: 'Indices', Icon: BarChart3, symbol: 'US30',    tvSymbol: 'OANDA:US30USD',   spread: '1.0 pts' },
+  { key: 'indices',     label: 'Indices',     Icon: BarChart3, symbol: 'US30',    tvSymbol: 'OANDA:US30USD',   spread: '1.0 pts' },
+  { key: 'commodities', label: 'Commodities', Icon: Coins,     symbol: 'XAU/USD', tvSymbol: 'OANDA:XAUUSD',    spread: '0.15 pips' },
+  { key: 'stocks',      label: 'Stocks',      Icon: LineChart, symbol: 'AAPL',    tvSymbol: 'NASDAQ:AAPL',     spread: 'Market' },
+  { key: 'forex',       label: 'Forex Pairs', Icon: Repeat,    symbol: 'EUR/USD', tvSymbol: 'FX:EURUSD',       spread: '0.1 pips' },
 ];
 
 /* TradingView symbol mapping for every directory item below. */

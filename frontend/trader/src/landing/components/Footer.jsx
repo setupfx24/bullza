@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom'
+import Link from 'next/link'
 import { Twitter, Linkedin, Instagram, Youtube, Mail } from 'lucide-react'
 import ScrollReveal from './animations/ScrollReveal'
 
@@ -58,13 +58,18 @@ export default function Footer() {
           {/* Brand block — spans more on mobile */}
           <div className="col-span-2 lg:col-span-2">
             <ScrollReveal variant="fadeLeft">
-              <Link to="/" className="inline-block mb-5" aria-label="SwisDex home">
+              <Link href="/" className="inline-block mb-5" aria-label="SwisDex home">
                 <img src="/images/swisdex-logo.png" alt="SwisDex" className="h-10 w-auto" />
               </Link>
               <p className="text-sm leading-relaxed max-w-sm mb-6" style={{ color: 'var(--fx-text-2)' }}>
-                SwisDex is an institutional-grade forex and CFD broker. Built for serious
-                traders who demand fast execution, transparent pricing, and a platform that
-                works as hard as they do.
+                SwisDex is an institutional-grade forex, CFD broker, and decentralized exchange
+                built for serious traders. It offers fast execution, low spreads, transparent
+                pricing, insured trades, and fully automated trading with no human intervention.
+              </p>
+              <p className="text-sm leading-relaxed max-w-sm mb-6" style={{ color: 'var(--fx-text-2)' }}>
+                SwisDex also provides staking with fixed monthly income, anytime withdrawals,
+                and a rewarding IB (Introducing Broker) program with profit-sharing opportunities
+                for partners and affiliates.
               </p>
 
               <div className="flex items-center gap-2 text-sm mb-5" style={{ color: 'var(--fx-text-3)' }}>
@@ -115,7 +120,7 @@ export default function Footer() {
                 {links.map((link) => (
                   <li key={link.path}>
                     <Link
-                      to={link.path}
+                      href={link.path}
                       className="text-sm transition-colors"
                       style={{ color: 'var(--fx-text-2)' }}
                       onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--fx-text)' }}
@@ -180,9 +185,9 @@ export default function Footer() {
             © {year} SwisDex Ltd. All rights reserved. · Founded in 2010
           </p>
           <div className="flex flex-wrap gap-x-5 gap-y-2 text-xs" style={{ color: 'var(--fx-text-3)' }}>
-            <Link to="/privacy" className="hover:underline">Privacy Policy</Link>
-            <Link to="/terms" className="hover:underline">Terms of Service</Link>
-            <Link to="/risk" className="hover:underline">Risk Disclosure</Link>
+            <Link href="/privacy" className="hover:underline">Privacy Policy</Link>
+            <Link href="/terms" className="hover:underline">Terms of Service</Link>
+            <Link href="/risk" className="hover:underline">Risk Disclosure</Link>
           </div>
         </div>
       </div>

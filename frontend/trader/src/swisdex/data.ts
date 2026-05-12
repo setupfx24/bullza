@@ -98,19 +98,23 @@ export const LIVE_TICKER = [
 ];
 
 export const INSTRUMENTS = [
-  { icon: 'Cpu',        title: 'AI-Driven Auto Trading',         badge: '24/7 Active',       body: 'Our intelligent algorithms monitor markets 24/7 and execute high-frequency trades to maximise your returns with minimal risk.', href: SIGNUP_HREF },
-  { icon: 'BarChart2',  title: 'Portfolio Management',           badge: 'Expert Managed',    body: 'Expert asset allocation and continuous rebalancing to build a diversified, resilient portfolio aligned with your goals.',      href: SIGNUP_HREF },
-  { icon: 'TrendingUp', title: 'Market Research & Analysis',     badge: 'Daily Reports',     body: 'In-depth technical and fundamental analysis reports, updated daily to keep your investment decisions sharp.',                  href: SIGNUP_HREF },
-  { icon: 'Layers',     title: 'Educational Resources',          badge: 'Beginner Friendly', body: 'Learn trading strategies, crypto fundamentals, and market dynamics through curated workshops, guides, and webinars.',          href: SIGNUP_HREF },
-  { icon: 'Gem',        title: 'ICO & Early-Stage Investments',  badge: 'Exclusive Access',  body: 'Early access to promising new blockchain projects, vetted by SwisDex before they hit the wider market.',                       href: SIGNUP_HREF },
-  { icon: 'Building',   title: 'Automated Profit Generation',    badge: 'Algo Powered',      body: 'Beyond standard trading, SwisDex deploys advanced algorithmic bots designed to generate consistent returns even in volatile markets.', href: SIGNUP_HREF },
+  { icon: 'Cpu',        title: 'AI-Driven Auto Trading',         badge: '24/7 Active',       body: 'Our intelligent algorithms monitor markets 24/7 and execute high-frequency trades to maximise your returns with minimal risk.', href: '/services/ai-auto-trading' },
+  { icon: 'BarChart2',  title: 'Portfolio Management',           badge: 'MAM / PAM',         body: 'Expert asset allocation and continuous rebalancing — choose MAM for managed-account models or PAM for percentage-based allocations.', href: '/services/portfolio-management' },
+  { icon: 'TrendingUp', title: 'Market Research & Analysis',     badge: 'Daily Reports',     body: 'In-depth technical and fundamental analysis reports, updated daily to keep your investment decisions sharp.',                  href: '/services/market-research' },
+  { icon: 'Layers',     title: 'Educational Resources',          badge: 'Beginner Friendly', body: 'Learn trading strategies, crypto fundamentals, and market dynamics through curated workshops, guides, and webinars.',          href: '/services/education' },
+  { icon: 'Gem',        title: 'ICO & Early-Stage Investments',  badge: 'Coming Soon',       body: 'Early access to promising new blockchain projects, vetted by SwisDex before they hit the wider market. Launching soon.',     href: '/services/ico-coming-soon', comingSoon: true },
+  { icon: 'Building',   title: 'Automated Profit Generation',    badge: 'Algo Powered',      body: 'Beyond standard trading, SwisDex deploys advanced algorithmic bots designed to generate consistent returns even in volatile markets.', href: '/services/automated-profit' },
 ] as const;
 
 export const WHY_US = [
-  { icon: 'Zap',          title: 'AI-Powered Returns',                body: 'Sophisticated algorithms generate consistent profits across crypto and forex markets — analysing thousands of market signals per second.' },
-  { icon: 'ShieldCheck',  title: 'Secure Wallet Infrastructure',      body: 'All assets stored in offline cold storage. Multi-layer encryption keeps every holding safe from breaches and threats.' },
-  { icon: 'Headphones',   title: 'Expert Human Oversight',            body: 'Our team of experienced analysts monitors all trades for optimal performance — technology paired with seasoned market judgment.' },
-  { icon: 'TrendingDown', title: 'Flexible Plans for Every Investor', body: 'From starter to premium plans, the right option for your budget. Start with $500 and scale as confidence grows.' },
+  { icon: 'Network',      title: 'Decentralized Exchange',            body: 'Trade directly from your own wallet with non-custodial, on-chain execution — no intermediaries, no counterparty risk. Your keys, your funds.' },
+  { icon: 'ShieldCheck',  title: 'Insurance for Traders',             body: 'Every trade is policy-backed with on-chain insurance. If the market moves against you beyond defined thresholds, your insured amount is protected.' },
+  { icon: 'Gift',         title: 'Bonus & Rewards',                   body: 'Earn up to $200 welcome bonus on your first deposit plus ongoing loyalty rewards, referral commissions, and trading cashback on every lot.' },
+  { icon: 'Lock',         title: 'Fixed Rate Return',                 body: 'Lock in guaranteed fixed returns with our structured investment plans — predictable income with transparent terms and no hidden fees.' },
+  { icon: 'Brain',        title: 'AI Trading Software — 90% Accuracy', body: 'Our proprietary AI engine analyses thousands of market signals per second, achieving a verified 90% accuracy rate across forex and crypto pairs.' },
+  { icon: 'ShieldPlus',   title: 'Insured Trading',                   body: 'All positions carry built-in trade insurance. Your capital is safeguarded with multi-layer protection — cold storage, encryption, and smart-contract coverage.' },
+  { icon: 'Gauge',        title: 'Risk Management',                   body: 'Advanced risk controls including adjustable leverage (up to 1:500), stop-loss automation, margin-call alerts, and real-time exposure monitoring.' },
+  { icon: 'TrendingDown', title: 'Loss Protection',                   body: 'Smart stop-out mechanisms, hedging tools, and AI-driven drawdown limits ensure your losses are minimised even in the most volatile market conditions.' },
 ] as const;
 
 export const HOW_IT_WORKS = [
