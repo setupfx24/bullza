@@ -14,7 +14,7 @@ from sqlalchemy.orm import selectinload
 
 from packages.common.src.models import (
     TradingAccount, Position, PositionStatus, OrderSide,
-    TradeHistory, Instrument, CopyTrade,
+    TradeHistory, Instrument, CopyTrade, Transaction,
 )
 from packages.common.src.redis_client import redis_client, PriceChannel
 
@@ -405,3 +405,101 @@ async def export_trades(
         media_type="text/csv",
         headers={"Content-Disposition": f"attachment; filename={filename}"},
     )
+
+
+# Period → (window seconds, bucket seconds). Bucket sizes mirror what the
+# accounts-page trend chart renders so the X-axis labels line up.
+_BALANCE_HISTORY_PERIODS: dict[str, tuple[int, int]] = {
+    "24h": (86_400, 3_600),          # 1 day, hourly
+    "7d":  (604_800, 86_400),        # 1 week, daily
+    "30d": (2_592_000, 86_400),      # 30 days, daily
+    "90d": (7_776_000, 604_800),     # 90 days, weekly
+    "1y":  (31_536_000, 2_592_000),  # 1 year, ~monthly (30d buckets)
+}
+
+
+async def balance_history(
+    user_id: UUID, account_id: UUID, period: str, db: AsyncSession,
+) -> dict:
+    """Time-bucketed balance series for an account, sourced from the
+    transactions ledger.
+
+    For each bucket we emit the LAST observed `balance_after` in that
+    bucket. Empty buckets carry forward the previous bucket's value, so
+    the line is continuous. The first bucket seeds from the most recent
+    transaction strictly before the window (or, if none, the account's
+    current balance — a fresh account stays flat at zero).
+    """
+    if period not in _BALANCE_HISTORY_PERIODS:
+        raise HTTPException(status_code=400, detail="Invalid period")
+
+    accounts = await _get_user_accounts(user_id, db)
+    if not any(a.id == account_id for a in accounts):
+        raise HTTPException(status_code=404, detail="Account not found")
+    account = next(a for a in accounts if a.id == account_id)
+
+    window_s, bucket_s = _BALANCE_HISTORY_PERIODS[period]
+    now = datetime.now(timezone.utc)
+    start = now - timedelta(seconds=window_s)
+
+    # All in-window transactions, oldest first.
+    in_window = (await db.execute(
+        select(Transaction.created_at, Transaction.balance_after)
+        .where(
+            Transaction.account_id == account_id,
+            Transaction.created_at >= start,
+            Transaction.balance_after.is_not(None),
+        )
+        .order_by(Transaction.created_at.asc())
+    )).all()
+
+    # Seed balance — most recent transaction strictly before the window.
+    seed_row = (await db.execute(
+        select(Transaction.balance_after)
+        .where(
+            Transaction.account_id == account_id,
+            Transaction.created_at < start,
+            Transaction.balance_after.is_not(None),
+        )
+        .order_by(Transaction.created_at.desc()).limit(1)
+    )).first()
+    if seed_row and seed_row[0] is not None:
+        seed = float(seed_row[0])
+    elif in_window:
+        # No history before the window — back-fill from the first observed
+        # balance so the curve doesn't artificially start at zero.
+        seed = float(in_window[0].balance_after)
+    else:
+        seed = float(account.balance or 0)
+
+    # Build bucket boundaries: align to the bucket grid so the X axis is stable.
+    bucket_start_ms = int(start.timestamp() // bucket_s * bucket_s)
+    end_ms = int(now.timestamp())
+    boundaries: list[int] = []
+    t = bucket_start_ms
+    while t <= end_ms:
+        boundaries.append(t)
+        t += bucket_s
+    if boundaries[-1] < end_ms:
+        boundaries.append(end_ms)
+
+    # Walk transactions once, bucket the LAST balance_after per bucket.
+    tx_idx = 0
+    last_balance = seed
+    items: list[dict] = []
+    for b in boundaries:
+        b_end = b + bucket_s
+        bucket_balance = last_balance
+        while tx_idx < len(in_window) and int(in_window[tx_idx].created_at.timestamp()) < b_end:
+            bucket_balance = float(in_window[tx_idx].balance_after)
+            tx_idx += 1
+        last_balance = bucket_balance
+        items.append({"time": b, "balance": bucket_balance})
+
+    return {
+        "account_id": str(account_id),
+        "period": period,
+        "bucket_seconds": bucket_s,
+        "current_balance": float(account.balance or 0),
+        "items": items,
+    }

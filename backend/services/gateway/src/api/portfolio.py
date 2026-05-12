@@ -65,6 +65,21 @@ async def trade_history(
     )
 
 
+@router.get("/balance-history")
+async def balance_history(
+    account_id: UUID = Query(...),
+    period: str = Query("7d", pattern="^(24h|7d|30d|90d|1y)$"),
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Time-bucketed balance series sourced from the transactions ledger.
+    Powers the Balance Trend chart on the Trading Accounts page."""
+    return await portfolio_service.balance_history(
+        user_id=current_user["user_id"], account_id=account_id,
+        period=period, db=db,
+    )
+
+
 @router.get("/export")
 async def export_trades(
     account_id: UUID = Query(None),

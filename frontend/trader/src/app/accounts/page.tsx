@@ -878,11 +878,17 @@ function formatCreated(d?: string) {
   return new Intl.DateTimeFormat('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(t);
 }
 
-interface ClosedTradeRow {
-  id: string;
-  pnl: number;
-  close_time: string;
+interface BalanceHistoryResponse {
+  account_id: string;
+  period: string;
+  bucket_seconds: number;
+  current_balance: number;
+  items: Array<{ time: number; balance: number }>; // time is unix seconds
 }
+
+const TAB_TO_PERIOD: Record<(typeof TREND_TABS)[number], string> = {
+  '24H': '24h', '7D': '7d', '30D': '30d', '90D': '90d', '1Y': '1y',
+};
 
 const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const MONTH_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -893,83 +899,49 @@ function fmtYLabel(v: number): string {
   return `$${v.toFixed(0)}`;
 }
 
-function BalanceTrendBlock({ accountId, balance }: { accountId: string; balance: number }) {
+function BalanceTrendBlock({ accountId }: { accountId: string }) {
   const [tab, setTab] = useState<(typeof TREND_TABS)[number]>('7D');
-  const [trades, setTrades] = useState<ClosedTradeRow[]>([]);
+  const [items, setItems] = useState<Array<{ time: number; balance: number }>>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
     api
-      .get<{ items?: ClosedTradeRow[] } | ClosedTradeRow[]>('/portfolio/trades', {
-        page: '1',
-        per_page: '1000',
+      .get<BalanceHistoryResponse>('/portfolio/balance-history', {
         account_id: accountId,
+        period: TAB_TO_PERIOD[tab],
       })
       .then((res) => {
         if (cancelled) return;
-        const items = (res && typeof res === 'object' && 'items' in res ? res.items : Array.isArray(res) ? res : []) || [];
-        setTrades(items);
+        setItems(Array.isArray(res?.items) ? res.items : []);
       })
-      .catch(() => { if (!cancelled) setTrades([]); })
+      .catch(() => { if (!cancelled) setItems([]); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [accountId]);
+  }, [accountId, tab]);
 
-  /* Build daily balance snapshots: work backwards from current balance */
+  /* Project backend buckets onto the chart space. */
   const { dailyPoints, xLabels } = useMemo(() => {
-    const msMap: Record<string, number> = { '24H': 864e5, '7D': 6048e5, '30D': 2592e6, '90D': 7776e6, '1Y': 31536e6 };
-    const periodMs = msMap[tab] || 6048e5;
-    const now = new Date();
-    const startMs = now.getTime() - periodMs;
-
-    /* Determine interval: 24H → hourly, 7D → daily, 30D → daily, 90D → weekly, 1Y → monthly */
-    let intervalMs: number;
     let labelFn: (d: Date) => string;
     if (tab === '24H') {
-      intervalMs = 36e5; // 1 hour
       labelFn = (d) => `${d.getHours().toString().padStart(2, '0')}:00`;
     } else if (tab === '7D' || tab === '30D') {
-      intervalMs = 864e5; // 1 day
       labelFn = (d) => DAY_NAMES[d.getDay()];
     } else if (tab === '90D') {
-      intervalMs = 864e5 * 7; // 1 week
       labelFn = (d) => `${MONTH_SHORT[d.getMonth()]} ${d.getDate()}`;
     } else {
-      intervalMs = 864e5 * 30; // ~1 month
       labelFn = (d) => MONTH_SHORT[d.getMonth()];
     }
 
-    /* Build time slots from start to now */
-    const slots: number[] = [];
-    let t = startMs;
-    while (t <= now.getTime()) {
-      slots.push(t);
-      t += intervalMs;
-    }
-    if (slots[slots.length - 1] < now.getTime()) slots.push(now.getTime());
-
-    /* Sort trades by close_time ascending */
-    const sorted = [...trades]
-      .filter((tr) => tr.close_time)
-      .sort((a, b) => new Date(a.close_time).getTime() - new Date(b.close_time).getTime());
-
-    /* Sum P&L per slot: for each slot, accumulate P&L of trades closed after that slot */
-    /* Current balance = balance. Balance at slot[i] = balance - sum(pnl of trades closed after slot[i]) */
-    const pts: { x: number; y: number }[] = [];
-    const labels: string[] = [];
-
-    for (const slotMs of slots) {
-      const pnlAfter = sorted
-        .filter((tr) => new Date(tr.close_time).getTime() > slotMs)
-        .reduce((s, tr) => s + (Number(tr.pnl) || 0), 0);
-      pts.push({ x: slotMs, y: balance - pnlAfter });
-      labels.push(labelFn(new Date(slotMs)));
-    }
+    const pts: { x: number; y: number }[] = items.map((it) => ({
+      x: it.time * 1000,
+      y: it.balance,
+    }));
+    const labels: string[] = items.map((it) => labelFn(new Date(it.time * 1000)));
 
     return { dailyPoints: pts, xLabels: labels };
-  }, [trades, tab, balance]);
+  }, [items, tab]);
 
   /* Chart dimensions with margins for labels */
   const W = 480;
@@ -1267,7 +1239,7 @@ function AccountCard({
         <div className="px-3 sm:px-5 md:px-6 pb-4 sm:pb-5 pt-0" style={{ borderTop: '1px solid var(--border-primary)' }}>
           <div className="grid grid-cols-1 lg:grid-cols-[1.2fr_1fr] gap-4 sm:gap-6 pt-4 sm:pt-5">
             {/* Left — Balance Trend chart */}
-            <BalanceTrendBlock accountId={row.id} balance={row.balance} />
+            <BalanceTrendBlock accountId={row.id} />
 
             {/* Right — Account Details */}
             <div>
