@@ -14,6 +14,13 @@ class RegisterRequest(BaseModel):
     phone: Optional[str] = None
     country: Optional[str] = None
     referral_code: Optional[str] = None
+    # Cloudflare Turnstile token from the signup widget. Verified
+    # server-side via turnstile.verify_turnstile_token before the
+    # User row is inserted. Optional in the schema so existing
+    # admin / scripted callers still work; backend rejects only
+    # when CLOUDFLARE_TURNSTILE_SECRET_KEY is configured AND the
+    # token is invalid.
+    cf_turnstile_token: Optional[str] = None
 
 
 class LoginRequest(BaseModel):
@@ -81,6 +88,13 @@ class WalletVerifyRequest(BaseModel):
 class OpenLiveAccountRequest(BaseModel):
     account_group_id: UUID
     leverage: Optional[int] = Field(default=None, ge=1, le=2000)
+    # When True the user is asking to provision a DEMO trading account
+    # under a demo AccountGroup, not a live one. Real users may flip the
+    # toggle in the New Account picker; demo users are forced to True
+    # regardless of what they send. KYC gate is bypassed for demos and
+    # the account starts with a virtual balance from the group's
+    # minimum_deposit (or $10,000 default).
+    is_demo: bool = False
 
 
 class TokenResponse(BaseModel):

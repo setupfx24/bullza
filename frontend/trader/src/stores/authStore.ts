@@ -58,6 +58,8 @@ interface AuthState {
     last_name: string;
     phone?: string;
     referral_code?: string;
+    /** Cloudflare Turnstile token — verified server-side. */
+    cf_turnstile_token?: string;
   }) => Promise<void>;
   logout: () => void;
   loadUser: () => Promise<void>;

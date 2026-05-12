@@ -27,7 +27,11 @@ def _start_of_month():
     return today.replace(day=1)
 
 
-async def _revenue_stats(db: AsyncSession, since=None):
+async def _revenue_stats(db: AsyncSession, since=None, until=None):
+    """Aggregate revenue between [since, until). Either bound may be None.
+    `since=None` ⇒ all time. `until=None` ⇒ now (open-ended). The `today /
+    this_week / this_month / all_time` cards pass only `since`; the
+    custom-range filter on the analytics page passes both."""
     commission_filter = [Position.commission != 0]
     swap_filter = [Position.swap != 0]
     pnl_filter = []
@@ -36,6 +40,10 @@ async def _revenue_stats(db: AsyncSession, since=None):
         commission_filter.append(Position.created_at >= since)
         swap_filter.append(Position.created_at >= since)
         pnl_filter.append(TradeHistory.closed_at >= since)
+    if until:
+        commission_filter.append(Position.created_at < until)
+        swap_filter.append(Position.created_at < until)
+        pnl_filter.append(TradeHistory.closed_at < until)
 
     comm_q = await db.execute(
         select(func.coalesce(func.sum(Position.commission), 0)).where(*commission_filter)
@@ -47,11 +55,8 @@ async def _revenue_stats(db: AsyncSession, since=None):
     )
     total_swap = abs(float(swap_q.scalar() or 0))
 
-    pnl_q_filters = []
-    if since:
-        pnl_q_filters.append(TradeHistory.closed_at >= since)
     pnl_q = await db.execute(
-        select(func.coalesce(func.sum(TradeHistory.profit), 0)).where(*pnl_q_filters) if pnl_q_filters
+        select(func.coalesce(func.sum(TradeHistory.profit), 0)).where(*pnl_filter) if pnl_filter
         else select(func.coalesce(func.sum(TradeHistory.profit), 0))
     )
     user_pnl = float(pnl_q.scalar() or 0)
@@ -65,11 +70,24 @@ async def _revenue_stats(db: AsyncSession, since=None):
     }
 
 
-async def analytics_dashboard(db: AsyncSession) -> dict:
+async def analytics_dashboard(
+    db: AsyncSession,
+    start_date: datetime | None = None,
+    end_date: datetime | None = None,
+) -> dict:
+    """Return the full revenue/exposure dashboard payload.
+
+    `start_date` / `end_date` are optional and, when supplied, populate a
+    `custom_range` bucket alongside the always-on today / this_week /
+    this_month / all_time buckets. The frontend's date-range filter sends
+    both bounds for ranges like 'yesterday' or 'last 7 days'."""
     today = await _revenue_stats(db, _start_of_today())
     week = await _revenue_stats(db, _start_of_week())
     month = await _revenue_stats(db, _start_of_month())
     all_time = await _revenue_stats(db)
+    custom_range = None
+    if start_date is not None:
+        custom_range = await _revenue_stats(db, start_date, end_date)
 
     dep_q = await db.execute(
         select(func.coalesce(func.sum(Deposit.amount), 0)).where(
@@ -184,6 +202,9 @@ async def analytics_dashboard(db: AsyncSession) -> dict:
         "this_week": week,
         "this_month": month,
         "all_time": all_time,
+        "custom_range": custom_range,
+        "custom_range_start": start_date.isoformat() if start_date else None,
+        "custom_range_end": end_date.isoformat() if end_date else None,
         "total_deposits": total_deposits,
         "total_withdrawals": total_withdrawals,
         "net_deposits": total_deposits - total_withdrawals,

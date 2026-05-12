@@ -7,7 +7,10 @@ import { Eye, EyeOff, Loader2 } from 'lucide-react';
 import { useAuthStore } from '@/stores/authStore';
 import toast from 'react-hot-toast';
 import GoogleAuthButton from '@/components/auth/GoogleAuthButton';
-import ConnectWalletButton from '@/components/auth/ConnectWalletButton';
+// import ConnectWalletButton from '@/components/auth/ConnectWalletButton'; // Re-enable when wallet login goes live
+import PhoneInput from '@/components/forms/PhoneInput';
+import TurnstileWidget from '@/components/forms/TurnstileWidget';
+import { scorePassword, PASSWORD_REQUIREMENTS } from '@/lib/passwordPolicy';
 import '../auth.css';
 
 /* ── animation helpers ── */
@@ -98,6 +101,17 @@ function RegisterContent() {
   const [showConfirmPass, setShowConfirmPass] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
+  // Cloudflare Turnstile token, set when the widget solves the challenge.
+  // Backend rejects the register call with HTTP 400 if SECRET is
+  // configured AND this is empty/invalid; the widget short-circuits and
+  // emits '' when no NEXT_PUBLIC_CLOUDFLARE_TURNSTILE_SITE_KEY is set
+  // (dev mode) so the form keeps working without keys.
+  const [turnstileToken, setTurnstileToken] = useState('');
+  // Terms & Conditions / Privacy / Risk Disclaimer agreement. Required
+  // before the Sign Up button can submit — gives the user an explicit
+  // opt-in for the legal pages they're agreeing to. Unchecked by default
+  // so consent is affirmative, not pre-ticked.
+  const [agreedToTerms, setAgreedToTerms] = useState(false);
 
   useEffect(() => {
     const ref = searchParams.get('ref');
@@ -120,8 +134,20 @@ function RegisterContent() {
     } else if (!/^\+?[0-9 \-()]{6,20}$/.test(form.phone.trim())) {
       e.phone = 'Please enter a valid phone number.';
     }
-    if (form.password.length < 8) e.password = 'Password must be at least 8 characters.';
+    // Password is validated against the shared policy (passwordPolicy.ts) —
+    // length + character classes + not-in-common-list + not-like-email.
+    // The `disallow` list seeds substring checks so users can't reuse their
+    // email local-part or first name as the password.
+    const pwCheck = scorePassword(form.password, [
+      form.email.split('@')[0] || '',
+      form.first_name,
+      form.last_name,
+    ]);
+    if (!pwCheck.acceptable) {
+      e.password = pwCheck.issues[0] || 'Password is too weak — pick a stronger one.';
+    }
     if (form.password !== form.confirmPassword) e.confirmPassword = 'Passwords do not match.';
+    if (!agreedToTerms) e.terms = 'You must agree to the Terms & Conditions and Privacy Policy.';
     setErrors(e);
     if (Object.keys(e).length > 0) return;
 
@@ -134,8 +160,19 @@ function RegisterContent() {
         last_name: form.last_name,
         phone: form.phone.trim(),
         referral_code: form.referral_code || undefined,
+        // Forwarded to Cloudflare siteverify on the backend. Empty
+        // string is fine when no site key is configured — server-side
+        // verifier short-circuits the same way (dev parity).
+        cf_turnstile_token: turnstileToken || undefined,
       });
-      toast.success('Account created successfully!');
+      // Account created — backend signs the user in (HttpOnly cookies)
+      // AND emails a verify link in parallel. Send the user straight to
+      // the dashboard so the ProfileCompleteGate modal can take over and
+      // collect address / DOB / etc. The "check your email" reminder is
+      // surfaced inside the gate's success popup after Save & Continue,
+      // so the trader sees both the dashboard and the verification nudge
+      // in one flow (matches demoLogin / googleLogin landing behaviour).
+      toast.success('Account created — please complete your profile.');
       router.push('/accounts');
     } catch (err: any) {
       toast.error(err.message || 'Registration failed');
@@ -144,9 +181,14 @@ function RegisterContent() {
     }
   };
 
-  /* password strength */
-  const strength = form.password.length >= 12 ? 4 : form.password.length >= 10 ? 3 : form.password.length >= 8 ? 2 : form.password.length > 0 ? 1 : 0;
-  const strengthColors = ['#ef4444', '#f59e0b', '#22c55e', '#55a630'];
+  /* password strength — uses the shared policy module so the meter agrees
+     with the submit-time validation and with the server-side check.   */
+  const pwCheck = scorePassword(form.password, [
+    form.email.split('@')[0] || '',
+    form.first_name,
+    form.last_name,
+  ]);
+  const strength = pwCheck.score;
 
   /* ── Step change ── */
   const handleStepClick = (step: number) => {
@@ -210,9 +252,6 @@ function RegisterContent() {
                 style={{ width: '100%', maxWidth: 380 }}
               >
                 <form className="auth-form" onSubmit={handleSubmit} noValidate>
-                  <motion.div {...fadeUp(0.2)} className="flex justify-center mb-2">
-                    <img src="/images/swisdex-logo.png" alt="SwisDex" className="w-16 h-16 object-contain" />
-                  </motion.div>
                   <motion.div {...fadeUp(0.3)}>
                     <h2 className="auth-form__title">Sign Up Account</h2>
                     <p className="auth-form__subtitle">Enter your personal data to create your account.</p>
@@ -247,14 +286,19 @@ function RegisterContent() {
                   </motion.div>
 
                   <motion.div {...fadeUp(0.5)}>
-                    <AuthInput
-                      label="Phone"
-                      type="tel"
-                      placeholder="+91 9876543210"
-                      value={form.phone}
-                      onChange={(e) => update('phone', e.target.value)}
-                      error={errors.phone}
-                    />
+                    <div className="auth-field">
+                      <label className="auth-field__label">Phone</label>
+                      <PhoneInput
+                        value={form.phone}
+                        onChange={(v) => update('phone', v)}
+                        defaultCountry="IN"
+                        placeholder=""
+                        hasError={!!errors.phone}
+                      />
+                      {errors.phone && (
+                        <span className="auth-field__error">{errors.phone}</span>
+                      )}
+                    </div>
                   </motion.div>
 
                   <motion.div {...fadeUp(0.56)}>
@@ -274,20 +318,46 @@ function RegisterContent() {
                       value={form.password}
                       onChange={(e) => update('password', e.target.value)}
                       error={errors.password}
-                      helper="Must be at least 8 characters."
+                      helper="Use 8+ characters with a mix of upper, lower, number, and symbol."
                       rightIcon={showPass ? <Eye size={18} /> : <EyeOff size={18} />}
                       onIconClick={() => setShowPass(!showPass)}
                     />
                     {strength > 0 && (
-                      <div className="auth-strength" style={{ marginTop: 6 }}>
-                        {[1, 2, 3, 4].map((i) => (
-                          <div
-                            key={i}
-                            className="auth-strength__bar"
-                            style={{ background: i <= strength ? strengthColors[strength - 1] : undefined }}
-                          />
-                        ))}
-                      </div>
+                      <>
+                        <div className="auth-strength" style={{ marginTop: 6 }}>
+                          {[1, 2, 3, 4].map((i) => (
+                            <div
+                              key={i}
+                              className="auth-strength__bar"
+                              style={{ background: i <= strength ? pwCheck.color : undefined }}
+                            />
+                          ))}
+                        </div>
+                        <div
+                          style={{
+                            marginTop: 4, fontSize: 11, fontWeight: 600,
+                            color: pwCheck.color,
+                          }}
+                        >
+                          {pwCheck.label}
+                        </div>
+                        {/* Requirement checklist — only render until the
+                            password is acceptable so it disappears once the
+                            trader has picked a strong enough one. */}
+                        {!pwCheck.acceptable && (
+                          <ul style={{ marginTop: 6, padding: 0, listStyle: 'none', fontSize: 11, lineHeight: 1.6 }}>
+                            {PASSWORD_REQUIREMENTS.map((req) => {
+                              const ok = pwCheck.checks[req.id];
+                              return (
+                                <li key={req.id} style={{ color: ok ? '#22c55e' : '#9ca3af' }}>
+                                  <span style={{ marginRight: 6 }}>{ok ? '✓' : '○'}</span>
+                                  {req.label}
+                                </li>
+                              );
+                            })}
+                          </ul>
+                        )}
+                      </>
                     )}
                   </motion.div>
 
@@ -304,8 +374,67 @@ function RegisterContent() {
                     />
                   </motion.div>
 
+                  {/* Cloudflare Turnstile — quietly verifies that a real
+                      browser is filling the form. Mostly invisible to real
+                      users (Cloudflare's heuristic check passes most of the
+                      time without any UI). Renders nothing if no site key
+                      is configured in env. */}
+                  <motion.div {...fadeUp(0.7)} style={{ marginTop: 4 }}>
+                    <TurnstileWidget onToken={setTurnstileToken} />
+                  </motion.div>
+
+                  {/* Terms & Conditions / Privacy consent. Required —
+                      submit button stays disabled until checked, and
+                      submit-time validation surfaces an inline error if
+                      somehow bypassed. Styled via .auth-terms in auth.css
+                      so the colours match the rest of the form (green
+                      accent, dark themed border, no clashing blue links). */}
+                  <motion.div {...fadeUp(0.71)} style={{ marginTop: 4 }}>
+                    <label className="auth-terms">
+                      <input
+                        type="checkbox"
+                        className="auth-terms__checkbox"
+                        checked={agreedToTerms}
+                        onChange={(e) => {
+                          setAgreedToTerms(e.target.checked);
+                          if (e.target.checked) setErrors((prev) => ({ ...prev, terms: '' }));
+                        }}
+                      />
+                      <span className="auth-terms__text">
+                        I agree to the{' '}
+                        <a
+                          href="/terms"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="auth-terms__link"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          Terms &amp; Conditions
+                        </a>
+                        {' '}and{' '}
+                        <a
+                          href="/privacy"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="auth-terms__link"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          Privacy Policy
+                        </a>
+                        .
+                      </span>
+                    </label>
+                    {errors.terms && (
+                      <span className="auth-terms__error">{errors.terms}</span>
+                    )}
+                  </motion.div>
+
                   <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ delay: 0.72, duration: 0.4 }}>
-                    <button type="submit" className="auth-btn" disabled={loading || isLoading}>
+                    <button
+                      type="submit"
+                      className="auth-btn"
+                      disabled={loading || isLoading || !agreedToTerms}
+                    >
                       {(loading || isLoading) ? <Loader2 size={18} className="auth-spinner" /> : 'Sign Up'}
                     </button>
                   </motion.div>
@@ -320,12 +449,13 @@ function RegisterContent() {
                     <GoogleAuthButton disabled={loading || isLoading || demoLoading} />
                   </motion.div>
 
-                  <motion.div {...fadeUp(0.755)}>
-                    <ConnectWalletButton
-                      variant="login"
-                      disabled={loading || isLoading || demoLoading}
-                    />
-                  </motion.div>
+                  {/* Connect wallet — hidden for now, will re-enable when wallet login is ready.
+                     <motion.div {...fadeUp(0.755)}>
+                       <ConnectWalletButton
+                         variant="login"
+                         disabled={loading || isLoading || demoLoading}
+                       />
+                     </motion.div> */}
 
                   <motion.div {...fadeUp(0.76)}>
                     <button

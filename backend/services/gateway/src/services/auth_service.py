@@ -225,7 +225,9 @@ def clear_auth_cookies(response: JSONResponse, request: Request) -> None:
 def _send_welcome_email(user: User, *, via_google: bool) -> None:
     """Schedule a welcome email after a successful signup. Fire-and-forget:
     SMTP latency or failure must never delay the API response or roll back
-    the signup."""
+    the signup. Used today only for the Google-OAuth path — regular
+    signups receive verify_email.py which embeds the same welcome content
+    plus the Verify CTA."""
     try:
         from packages.common.src.smtp_mail import (
             send_email, smtp_configured, fire_and_forget,
@@ -234,14 +236,130 @@ def _send_welcome_email(user: User, *, via_google: bool) -> None:
             return
         from packages.common.src.email_templates import render_welcome
         st = get_settings()
+        # Same credentials block as verify_email — surface the first active
+        # trading account number if one already exists. (Google sign-up
+        # usually has none yet; the credentials row is then omitted.)
+        trading_id: str | None = None
+        try:
+            primary = next(
+                (a for a in (user.accounts or []) if a.is_active and not a.is_demo),
+                None,
+            ) or next((a for a in (user.accounts or []) if a.is_active), None)
+            if primary and primary.account_number:
+                trading_id = str(primary.account_number)
+        except Exception:
+            trading_id = None
         subject, html, text = render_welcome(
             first_name=user.first_name,
             trader_app_url=st.TRADER_APP_URL or "https://trade.swisdex.com",
             via_google=via_google,
+            username=user.email,
+            trading_id=trading_id,
         )
         fire_and_forget(send_email(user.email, subject, html, text=text))
     except Exception as e:
         logger.warning("welcome email scheduling failed for %s: %s", user.email, e)
+
+
+# ─── Email verification ───────────────────────────────────────────────────
+
+EMAIL_VERIFY_EXPIRES_HOURS = 24
+EMAIL_VERIFY_TOKEN_TYPE = "email_verify"
+
+
+def _build_verify_url(user: User) -> str:
+    """Sign a 24h JWT for email verification and return the click-through URL.
+    The token has type=email_verify so it can't be reused as a session token
+    even if a server-side bug accepted it on the wrong route."""
+    from packages.common.src.auth import create_email_verify_token
+    st = get_settings()
+    base = (st.TRADER_APP_URL or "https://trade.swisdex.com").rstrip("/")
+    token, _exp = create_email_verify_token(
+        str(user.id), expires_hours=EMAIL_VERIFY_EXPIRES_HOURS,
+    )
+    return f"{base}/auth/verify-email?token={token}"
+
+
+def _send_verify_email(user: User, request: Request | None = None) -> None:
+    """Schedule the rich welcome + verify-your-email message. Fire-and-forget.
+
+    The template embeds the full onboarding content (capability list,
+    account credentials, why-trade bullets) plus the Verify My Account
+    button, so signing up only generates ONE email — not the old
+    welcome + verify pair that landed together and confused users.
+    """
+    try:
+        from packages.common.src.smtp_mail import (
+            send_email, smtp_configured, fire_and_forget,
+        )
+        if not smtp_configured():
+            return
+        from packages.common.src.email_templates.verify_email import render_verify_email
+        verify_url = _build_verify_url(user)
+        # Surface the user's first trading account number as the Trading ID
+        # in the credentials block — if there isn't one yet (the trader will
+        # provision one from /accounts), we just omit the row.
+        trading_id: str | None = None
+        try:
+            primary = next(
+                (a for a in (user.accounts or []) if a.is_active and not a.is_demo),
+                None,
+            ) or next((a for a in (user.accounts or []) if a.is_active), None)
+            if primary and primary.account_number:
+                trading_id = str(primary.account_number)
+        except Exception:
+            trading_id = None
+        st = get_settings()
+        trader_app_url = (getattr(st, "TRADER_APP_URL", None) or "https://trade.swisdex.com").rstrip("/")
+        subject, html, text = render_verify_email(
+            first_name=user.first_name,
+            verify_url=verify_url,
+            trader_app_url=trader_app_url,
+            username=user.email,
+            trading_id=trading_id,
+            expires_hours=EMAIL_VERIFY_EXPIRES_HOURS,
+        )
+        fire_and_forget(send_email(user.email, subject, html, text=text))
+    except Exception as e:
+        logger.warning("verify-email scheduling failed for %s: %s", user.email, e)
+
+
+async def confirm_email_verification(token: str, db: AsyncSession) -> User:
+    """Validate a verify token and flip user.email_verified=True.
+
+    Idempotent: if the user is already verified we still resolve OK so the
+    user clicking the link twice (e.g. once in their preview pane, once in
+    the inbox) doesn't see an error. Raises AuthServiceError on bad/expired
+    tokens or unknown users."""
+    from packages.common.src.auth import decode_email_verify_token
+    payload = decode_email_verify_token(token)
+    if not payload or payload.get("type") != EMAIL_VERIFY_TOKEN_TYPE:
+        raise AuthServiceError("Verification link is invalid or expired", 400)
+    user_id = payload.get("sub")
+    if not user_id:
+        raise AuthServiceError("Verification link is invalid", 400)
+    res = await db.execute(select(User).where(User.id == UUID(str(user_id))))
+    user = res.scalar_one_or_none()
+    if not user:
+        raise AuthServiceError("Account not found", 404)
+    if not user.email_verified:
+        user.email_verified = True
+        user.email_verified_at = datetime.now(timezone.utc)
+        await db.commit()
+    return user
+
+
+async def resend_verification_email(email: str, request: Request, db: AsyncSession) -> None:
+    """Resend the verify link. Rate-limited and silently no-op for unknown
+    emails so we don't leak account existence."""
+    await rate_limit_http(request, "resend-verify", 3, 600.0)
+    res = await db.execute(select(User).where(func.lower(User.email) == email.lower()))
+    user = res.scalar_one_or_none()
+    if not user:
+        return  # no-op (don't leak whether the email is registered)
+    if user.email_verified:
+        return  # already verified
+    _send_verify_email(user, request)
 
 
 async def _maybe_send_new_login_email(
@@ -451,6 +569,19 @@ async def register_user(
     if not await get_bool_setting("allow_new_registrations", True):
         raise AuthServiceError("New registrations are currently disabled", 403)
 
+    # Reject weak passwords ("12345678", common-list, single-class, etc.)
+    # before we even hash + persist. Disallow list seeds substring checks
+    # so traders can't make their email/name the password.
+    from packages.common.src.password_policy import validate_password, PasswordTooWeak
+    try:
+        validate_password(password, disallow=[
+            (email or "").split("@", 1)[0],
+            first_name or "",
+            last_name or "",
+        ])
+    except PasswordTooWeak as e:
+        raise AuthServiceError(e.reason, 400)
+
     existing = await db.execute(select(User).where(User.email == email))
     if existing.scalar_one_or_none():
         raise AuthServiceError("Email already registered")
@@ -465,6 +596,11 @@ async def register_user(
         role="user",
         status="active",
         kyc_status="pending",
+        # New email-password sign-ups must verify before they can log in.
+        # Google / wallet sign-ups stay verified=True (third-party already
+        # confirmed ownership). Migration 0038 backfills True for existing
+        # users so this gate doesn't lock anyone out on deploy.
+        email_verified=False,
     )
     db.add(user)
     await db.flush()
@@ -475,9 +611,12 @@ async def register_user(
     response = await issue_auth_json_response(
         user, request, db, status_code=201, user_audit_action="REGISTER",
     )
-    # Fire-and-forget welcome email after the commit — never blocks the
-    # signup response and a delivery failure can't roll back the account.
-    _send_welcome_email(user, via_google=False)
+    # The verify-email template now contains the full welcome content
+    # (capability list, credentials block, why-trade bullets), so signup
+    # only sends ONE email instead of welcome + verify back-to-back.
+    # Google sign-up still sends the standalone welcome.py because its
+    # email_verified=True path skips the verify flow entirely.
+    _send_verify_email(user, request)
     return response
 
 
@@ -506,6 +645,20 @@ async def login_user(
 
     if not user or not verify_password(password, user.password_hash):
         raise AuthServiceError("Invalid credentials", 401)
+
+    # Gate sign-in until the user has confirmed ownership of the email.
+    # Existing users (registered before migration 0038) were backfilled
+    # with email_verified=True so this only blocks new sign-ups that
+    # haven't clicked the link yet. The 403 carries a structured detail
+    # so the frontend can render a "check your email + resend" UI.
+    if not bool(getattr(user, "email_verified", True)):
+        raise AuthServiceError(
+            {
+                "code": "email_unverified",
+                "message": "Please confirm your email before signing in. Check your inbox for the verification link.",
+            },
+            403,
+        )
 
     if user.status == "banned":
         raise AuthServiceError("Account has been banned", 403)
@@ -545,6 +698,24 @@ async def _ensure_shared_demo_user(db: AsyncSession) -> User:
     if existing:
         if not existing.is_demo:
             raise AuthServiceError("This email is reserved for the platform demo account", 403)
+        # Repair drift. profile_service.update_profile now blocks edits on
+        # is_demo users, but rows that were corrupted before this guard
+        # landed will keep showing whatever name the last visitor typed
+        # ("abhi", etc.) until reset. Reset to canonical "Demo Trader" on
+        # every demo-login so any leftover personalisation is wiped before
+        # the next visitor sees the profile.
+        canonical = {
+            "first_name": "Demo",
+            "last_name": "Trader",
+            "phone": None, "country": None,
+            "address": None, "city": None,
+            "state": None, "postal_code": None,
+            "date_of_birth": None,
+        }
+        for field, expected in canonical.items():
+            if getattr(existing, field, None) != expected:
+                setattr(existing, field, expected)
+        # commit happens via issue_auth_json_response in the caller
         return existing
 
     default_leverage = await get_int_setting("default_leverage", 100)
@@ -842,6 +1013,17 @@ async def reset_password(token: str, new_password: str, request: Request, db: As
     user = await db.get(User, row.user_id)
     if not user:
         raise AuthServiceError("Invalid or expired reset link")
+    # Enforce the same policy here as at signup — otherwise "forgot password"
+    # is a back-door for users to set "12345678".
+    from packages.common.src.password_policy import validate_password, PasswordTooWeak
+    try:
+        validate_password(new_password, disallow=[
+            (user.email or "").split("@", 1)[0],
+            user.first_name or "",
+            user.last_name or "",
+        ])
+    except PasswordTooWeak as e:
+        raise AuthServiceError(e.reason, 400)
     user.password_hash = hash_password(new_password)
     row.used = True
     await db.commit()

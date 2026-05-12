@@ -12,6 +12,7 @@ import {
   ArrowUp,
   ArrowUpDown,
   Ban,
+  Calendar,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
@@ -31,6 +32,39 @@ import {
   UserRound,
   X,
 } from 'lucide-react';
+
+/** YYYY-MM-DD in local time (avoids the UTC-shift `toISOString()` pitfall). */
+function ymd(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+type DatePresetKey = 'today' | 'yesterday' | 'day_before' | 'last_7' | 'last_30';
+
+function datePresetRange(key: DatePresetKey): [string, string] {
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const yesterday = new Date(today); yesterday.setDate(yesterday.getDate() - 1);
+  const dayBefore = new Date(today); dayBefore.setDate(dayBefore.getDate() - 2);
+  const last7Start = new Date(today); last7Start.setDate(last7Start.getDate() - 6);
+  const last30Start = new Date(today); last30Start.setDate(last30Start.getDate() - 29);
+  switch (key) {
+    case 'today':       return [ymd(today), ymd(today)];
+    case 'yesterday':   return [ymd(yesterday), ymd(yesterday)];
+    case 'day_before':  return [ymd(dayBefore), ymd(dayBefore)];
+    case 'last_7':      return [ymd(last7Start), ymd(today)];
+    case 'last_30':     return [ymd(last30Start), ymd(today)];
+  }
+}
+
+const DATE_PRESETS: { key: DatePresetKey; label: string }[] = [
+  { key: 'today',      label: 'Today' },
+  { key: 'yesterday',  label: 'Yesterday' },
+  { key: 'day_before', label: 'Day Before' },
+  { key: 'last_7',     label: 'Last 7 days' },
+  { key: 'last_30',    label: 'Last 30 days' },
+];
 
 interface User {
   id: string;
@@ -151,6 +185,11 @@ export default function UsersPage() {
   const [statusFilter, setStatusFilter] = useState('');
   const [kycFilter, setKycFilter] = useState('');
   const [groupFilter, setGroupFilter] = useState('');
+  // Created-at date range. Empty strings = no filter (default — show all).
+  // Backend: created_at between [date_from 00:00 UTC, date_to 23:59:59 UTC].
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const [activeDatePreset, setActiveDatePreset] = useState<DatePresetKey | 'custom' | null>(null);
   const [page, setPage] = useState(1);
   const [users, setUsers] = useState<User[]>([]);
   const [total, setTotal] = useState(0);
@@ -183,6 +222,8 @@ export default function UsersPage() {
       if (debouncedSearch) params.search = debouncedSearch;
       if (statusFilter) params.status = statusFilter;
       if (kycFilter) params.kyc_status = kycFilter;
+      if (dateFrom) params.date_from = dateFrom;
+      if (dateTo) params.date_to = dateTo;
       const data = await adminApi.get<UsersResponse>('/users', params);
       setUsers(data.users || []);
       setTotal(data.total || 0);
@@ -192,7 +233,15 @@ export default function UsersPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, debouncedSearch, statusFilter, kycFilter]);
+  }, [page, debouncedSearch, statusFilter, kycFilter, dateFrom, dateTo]);
+
+  const applyDatePreset = (key: DatePresetKey) => {
+    const [s, e] = datePresetRange(key);
+    setDateFrom(s); setDateTo(e); setActiveDatePreset(key); setPage(1);
+  };
+  const clearDateRange = () => {
+    setDateFrom(''); setDateTo(''); setActiveDatePreset(null); setPage(1);
+  };
 
   useEffect(() => { fetchUsers(); }, [fetchUsers]);
 
@@ -324,8 +373,25 @@ export default function UsersPage() {
       } else if (modalType !== 'add-fund' && modalAccountId) {
         payload.account_id = modalAccountId;
       }
-      await adminApi.post(`/users/${modalUser.id}/${modalType}`, payload);
-      toast.success(`${FUND_LABELS[modalType as FundAction]} successful`);
+      // Backend returns HTTP 202 with detail.code='approval_required' when the
+      // amount is >= ADMIN_DUAL_APPROVAL_THRESHOLD (default $1000). The fund is
+      // NOT applied yet — a second admin must approve via /admin/approvals.
+      // The API client treats 202 as success and returns the body, so without
+      // this branch we'd show "successful" while the user's wallet stays the
+      // same. Surface the pending state explicitly instead.
+      const resp = await adminApi.post<{ detail?: { code?: string; request_id?: string; threshold_usd?: number; message?: string } }>(
+        `/users/${modalUser.id}/${modalType}`,
+        payload,
+      );
+      if (resp?.detail?.code === 'approval_required') {
+        toast(
+          `Pending — amount ≥ $${resp.detail.threshold_usd?.toLocaleString() ?? '1,000'}. ` +
+          `A second admin must approve this in /approvals.`,
+          { icon: '⏳', duration: 6000 },
+        );
+      } else {
+        toast.success(`${FUND_LABELS[modalType as FundAction]} successful`);
+      }
       closeModal();
       fetchUsers();
     } catch (e) {
@@ -475,6 +541,63 @@ export default function UsersPage() {
                 </div>
               </div>
             ))}
+          </div>
+
+          {/* Created-at date range — quick presets + custom inputs */}
+          <div className="pt-4 border-t border-border-primary/60">
+            <div className="flex items-center gap-2 mb-2">
+              <Calendar size={13} className="text-text-tertiary" />
+              <span className="text-xxs uppercase tracking-wide text-text-tertiary font-medium">
+                Registered (date range)
+              </span>
+              {activeDatePreset && (
+                <span className="text-xxs text-text-secondary ml-1">
+                  · {activeDatePreset === 'custom'
+                      ? (dateFrom === dateTo ? dateFrom : `${dateFrom} → ${dateTo}`)
+                      : DATE_PRESETS.find(p => p.key === activeDatePreset)?.label}
+                </span>
+              )}
+              {(dateFrom || dateTo) && (
+                <button
+                  onClick={clearDateRange}
+                  className="ml-auto text-xxs text-text-tertiary hover:text-text-primary inline-flex items-center gap-1"
+                >
+                  <X size={11} /> Clear
+                </button>
+              )}
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              {DATE_PRESETS.map((p) => (
+                <button
+                  key={p.key}
+                  onClick={() => applyDatePreset(p.key)}
+                  className={cn(
+                    'px-2.5 py-1 rounded-md text-xs font-medium border transition-fast',
+                    activeDatePreset === p.key
+                      ? 'bg-buy/15 border-buy/40 text-buy'
+                      : 'border-border-primary text-text-secondary hover:bg-bg-hover',
+                  )}
+                >
+                  {p.label}
+                </button>
+              ))}
+              <span className="mx-1 text-text-tertiary text-xxs">|</span>
+              <input
+                type="date"
+                value={dateFrom}
+                max={dateTo || undefined}
+                onChange={(e) => { setDateFrom(e.target.value); setActiveDatePreset('custom'); setPage(1); }}
+                className="px-2 py-1 rounded-md text-xs bg-bg-input border border-border-primary text-text-primary"
+              />
+              <span className="text-xxs text-text-tertiary">to</span>
+              <input
+                type="date"
+                value={dateTo}
+                min={dateFrom || undefined}
+                onChange={(e) => { setDateTo(e.target.value); setActiveDatePreset('custom'); setPage(1); }}
+                className="px-2 py-1 rounded-md text-xs bg-bg-input border border-border-primary text-text-primary"
+              />
+            </div>
           </div>
         </div>
 
@@ -649,6 +772,9 @@ export default function UsersPage() {
                 <p className="text-sm font-semibold text-buy">Funds go to Main Wallet</p>
                 <p className="text-xs text-text-secondary mt-0.5 leading-relaxed">
                   The amount will be credited to the user&apos;s <strong>main wallet</strong>. The user must then transfer funds to their trading account from the Wallet page.
+                </p>
+                <p className="text-[11px] text-text-tertiary mt-1.5 leading-snug">
+                  Amounts of <strong>$1,000 or more</strong> require a second admin to approve in <strong>/approvals</strong> before the wallet is credited.
                 </p>
               </div>
             </div>

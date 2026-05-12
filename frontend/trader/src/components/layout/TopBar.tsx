@@ -52,13 +52,18 @@ export default function TopBar() {
     router.push('/auth/login');
   };
 
-  const initials = user
-    ? (
-        user.first_name?.[0] && user.last_name?.[0]
-          ? `${user.first_name[0]}${user.last_name[0]}`
-          : user.first_name?.[0] || user.email?.[0] || 'U'
-      ).toUpperCase()
-    : 'U';
+  // See AppHeader — anonymise display when active account is a demo so
+  // demo sessions don't leak the user's real name in headers / menus.
+  const isDemo = !!activeAccount?.is_demo;
+  const initials = isDemo
+    ? 'DA'
+    : (user
+        ? (
+            user.first_name?.[0] && user.last_name?.[0]
+              ? `${user.first_name[0]}${user.last_name[0]}`
+              : user.first_name?.[0] || user.email?.[0] || 'U'
+          ).toUpperCase()
+        : 'U');
 
   const statusColor =
     wsStatus === 'connected' ? 'bg-success' : wsStatus === 'connecting' ? 'bg-warning' : 'bg-sell';
@@ -145,9 +150,13 @@ export default function TopBar() {
                 {user && (
                   <div className="px-3 py-2 border-b border-border-glass">
                     <p className="text-xs font-medium text-text-primary truncate">
-                      {[user.first_name, user.last_name].filter(Boolean).join(' ') || user.email?.split('@')[0]}
+                      {isDemo
+                        ? 'Demo Account'
+                        : ([user.first_name, user.last_name].filter(Boolean).join(' ') || user.email?.split('@')[0])}
                     </p>
-                    <p className="text-[10px] text-text-tertiary truncate">{user.email}</p>
+                    <p className="text-[10px] text-text-tertiary truncate">
+                      {isDemo ? 'Practice mode — virtual funds' : user.email}
+                    </p>
                   </div>
                 )}
                 <Link

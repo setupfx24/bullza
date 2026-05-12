@@ -27,11 +27,31 @@ def smtp_configured() -> bool:
 
 
 def _from_address() -> str:
+    """Build the From header with the canonical display name.
+
+    Returns "<MAIL_FROM_NAME> <bare-email>" (RFC 5322 'name-addr'). The
+    display name is what mail clients show in the inbox preview — wrapping
+    the address with "SwisDex" ensures the brand is consistent regardless
+    of what name the mail provider has baked into SMTP_FROM upstream.
+
+    If SMTP_FROM is already in 'Name <addr>' form, we replace the name
+    rather than nest two display names. If only an address is configured,
+    we wrap it once.
+    """
     s = get_settings()
-    addr = (s.SMTP_FROM or s.SMTP_USER or "").strip()
-    if not addr:
+    raw = (s.SMTP_FROM or s.SMTP_USER or "").strip()
+    if not raw:
         raise ValueError("SMTP_FROM or SMTP_USER must be set when SMTP_HOST is set")
-    return addr
+    name = (getattr(s, "MAIL_FROM_NAME", None) or "SwisDex").strip()
+    # Strip any pre-existing 'Name <addr>' wrapping — keep just the address.
+    if "<" in raw and raw.endswith(">"):
+        try:
+            addr = raw[raw.rindex("<") + 1: -1].strip()
+        except ValueError:
+            addr = raw
+    else:
+        addr = raw
+    return f"{name} <{addr}>"
 
 
 def _send_sync(to_email: str, subject: str, html: str, text: Optional[str]) -> None:

@@ -178,6 +178,25 @@ input:disabled, select:disabled { opacity: 0.5; cursor: not-allowed; }
   animation: shimmer 2s infinite;
 }
 
+/* ── Notification bell — attention-grabber when there are pending items ── */
+/* Tailwind's animate-pulse is just opacity 1↔0.5; on a small red badge it's
+   hardly visible. Replace with a real scale-pulse + a swinging icon so the
+   bell actually catches the eye when admins have work in their queue.    */
+@keyframes notifBadgePulse {
+  0%, 100% { transform: scale(1);   box-shadow: 0 0 0 0   rgba(239, 68, 68, 0.7); }
+  50%      { transform: scale(1.18); box-shadow: 0 0 0 6px rgba(239, 68, 68, 0); }
+}
+@keyframes notifBellSwing {
+  0%, 60%, 100% { transform: rotate(0deg); }
+  10%           { transform: rotate(-14deg); }
+  20%           { transform: rotate(12deg); }
+  30%           { transform: rotate(-9deg); }
+  40%           { transform: rotate(6deg); }
+  50%           { transform: rotate(-3deg); }
+}
+.notif-badge-blink { animation: notifBadgePulse 1.2s ease-out infinite; transform-origin: center; }
+.notif-bell-ring   { animation: notifBellSwing  2.4s ease-in-out infinite; transform-origin: top center; }
+
 /* ═══════════════════════════════════════════════════════════
    Sidebar nav glow for active item
    ═══════════════════════════════════════════════════════════ */

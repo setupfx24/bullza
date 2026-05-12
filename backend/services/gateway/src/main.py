@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from packages.common.src.config import get_settings
 from packages.common.src.database import get_db, AsyncSessionLocal
-from packages.common.src.redis_client import redis_client, PriceChannel
+from packages.common.src.redis_client import redis_client, PriceChannel, BAR_UPDATES_CHANNEL
 from packages.common.src.auth import decode_token
 from packages.common.src.models import TradingAccount
 from packages.common.src.instrumentation import init_sentry, add_middleware_stack
@@ -212,6 +212,164 @@ async def price_stream(websocket: WebSocket, token: str | None = Query(default=N
     finally:
         await pubsub.unsubscribe(PriceChannel.PRICE_CHANNEL)
         await pubsub.close()
+
+
+# ─── Live OHLC bar updates for the trader chart ──────────────────────────────
+# Replaces the trader frontend's old client-side bar synthesis (which built
+# the in-progress candle from raw ticks and drifted from the server's
+# authoritative aggregation). market-data publishes per-tick snapshots of
+# every (symbol, timeframe) bar to BAR_UPDATES_CHANNEL; this hub fans them
+# out to subscribed charts only — clients send a {type:"subscribe",
+# symbol, resolution} message after connecting and we filter accordingly.
+#
+# Wire protocol:
+#   client → server: {"type":"subscribe","symbol":"XAUUSD","resolution":"5"}
+#                    {"type":"unsubscribe","symbol":"XAUUSD","resolution":"5"}
+#                    {"type":"ping"}
+#   server → client: {"type":"bar_update","symbol":"XAUUSD","resolution":"5",
+#                     "bar":{"time":1731000000,"open":...,"high":...,
+#                            "low":...,"close":...,"volume":...}}
+#                    {"type":"pong"}
+#                    {"type":"subscribed","symbol":...,"resolution":...}
+#
+# `bar.time` is BAR-START in epoch SECONDS to match the rest of the bar
+# pipeline (Redis lists, REST get_bars). Frontend converts to ms for TV.
+
+# Map BarAggregator timeframe key → TradingView resolution string. Server
+# accepts EITHER form on the wire (frontend usually sends TV resolutions);
+# we normalise to the TF key for filtering.
+_TV_RESOLUTION_TO_TF: dict[str, str] = {
+    "1": "1m", "5": "5m", "15": "15m", "30": "30m",
+    "60": "1h", "240": "4h", "D": "1d", "1D": "1d",
+}
+_TF_TO_TV_RESOLUTION: dict[str, str] = {
+    "1m": "1", "5m": "5", "15m": "15", "30m": "30",
+    "1h": "60", "4h": "240", "1d": "1D",
+}
+
+
+def _normalise_resolution(value: str | None) -> str | None:
+    """Accept either a TV resolution ('5') or a TF key ('5m'); return TF key."""
+    if not value:
+        return None
+    v = str(value).strip()
+    if v in _TV_RESOLUTION_TO_TF:
+        return _TV_RESOLUTION_TO_TF[v]
+    if v in _TF_TO_TV_RESOLUTION:
+        return v
+    return None
+
+
+@app.websocket("/ws/bars")
+async def bar_stream(websocket: WebSocket, token: str | None = Query(default=None)):
+    """One-stop chart bar feed. Clients subscribe to (symbol, resolution)
+    pairs they care about; the server forwards only matching bar updates."""
+    token = _ws_token(websocket, token)
+    if token:
+        user = _verify_ws_token(token)
+        if not user:
+            await websocket.close(code=4001, reason="Invalid token")
+            return
+
+    await websocket.accept()
+    # Per-connection subscription set: {(SYMBOL_UPPER, "5m"), ...}
+    subs: set[tuple[str, str]] = set()
+    pubsub = redis_client.pubsub()
+    await pubsub.subscribe(BAR_UPDATES_CHANNEL)
+
+    async def reader_loop():
+        """Forward Redis bar updates to this client filtered by `subs`."""
+        try:
+            ping_interval = 30
+            last_ping = asyncio.get_event_loop().time()
+            while True:
+                msg = await pubsub.get_message(ignore_subscribe_messages=True, timeout=0.1)
+                if msg and msg["type"] == "message":
+                    try:
+                        payload = json.loads(msg["data"])
+                    except (TypeError, ValueError):
+                        continue
+                    sym = str(payload.get("symbol") or "").upper()
+                    tf = str(payload.get("timeframe") or "")
+                    if not sym or not tf:
+                        continue
+                    if (sym, tf) not in subs:
+                        continue
+                    bar = {
+                        "time":   int(payload.get("time", 0)),
+                        "open":   float(payload.get("open", 0)),
+                        "high":   float(payload.get("high", 0)),
+                        "low":    float(payload.get("low", 0)),
+                        "close":  float(payload.get("close", 0)),
+                        "volume": float(payload.get("volume", 0)),
+                    }
+                    await websocket.send_json({
+                        "type": "bar_update",
+                        "symbol": sym,
+                        "resolution": _TF_TO_TV_RESOLUTION.get(tf, tf),
+                        "bar": bar,
+                    })
+
+                now = asyncio.get_event_loop().time()
+                if now - last_ping >= ping_interval:
+                    await websocket.send_json({"type": "ping"})
+                    last_ping = now
+
+                await asyncio.sleep(0.01)
+        except (WebSocketDisconnect, asyncio.CancelledError):
+            return
+        except Exception as exc:
+            logger.debug("ws/bars reader loop ended: %s", exc)
+
+    async def control_loop():
+        """Handle client subscribe / unsubscribe / ping messages."""
+        try:
+            while True:
+                raw = await websocket.receive_text()
+                try:
+                    data = json.loads(raw)
+                except (TypeError, ValueError):
+                    continue
+                t = data.get("type")
+                if t == "ping":
+                    await websocket.send_json({"type": "pong"})
+                    continue
+                if t in ("subscribe", "unsubscribe"):
+                    sym = str(data.get("symbol") or "").upper()
+                    tf = _normalise_resolution(data.get("resolution"))
+                    if not sym or not tf:
+                        continue
+                    if t == "subscribe":
+                        subs.add((sym, tf))
+                        await websocket.send_json({
+                            "type": "subscribed",
+                            "symbol": sym,
+                            "resolution": _TF_TO_TV_RESOLUTION.get(tf, tf),
+                        })
+                    else:
+                        subs.discard((sym, tf))
+        except (WebSocketDisconnect, asyncio.CancelledError):
+            return
+        except Exception as exc:
+            logger.debug("ws/bars control loop ended: %s", exc)
+
+    reader = asyncio.create_task(reader_loop())
+    control = asyncio.create_task(control_loop())
+    try:
+        await asyncio.wait({reader, control}, return_when=asyncio.FIRST_COMPLETED)
+    finally:
+        for t in (reader, control):
+            if not t.done():
+                t.cancel()
+        try:
+            await pubsub.unsubscribe(BAR_UPDATES_CHANNEL)
+            await pubsub.close()
+        except Exception:
+            pass
+        try:
+            await websocket.close()
+        except Exception:
+            pass
 
 
 @app.websocket("/ws/trades/{account_id}")

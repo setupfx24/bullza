@@ -461,6 +461,65 @@
   color: var(--auth-accent);
 }
 
+/* ── TERMS & PRIVACY CONSENT ──
+   Sits between the Turnstile widget and the Sign Up button on /auth/register.
+   Tightly themed against the dark form: subtle border, green accent
+   checkbox, link colour matches the footer "Log in" anchor so the page
+   has a single accent throughout. */
+.auth-terms {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--auth-border);
+  border-radius: var(--auth-radius-md);
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s;
+}
+
+.auth-terms:hover {
+  border-color: #3a3a3a;
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.auth-terms__checkbox {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  margin: 2px 0 0 0;
+  accent-color: var(--auth-accent);
+  cursor: pointer;
+}
+
+.auth-terms__text {
+  flex: 1;
+  font-size: 0.78rem;
+  line-height: 1.55;
+  color: #9ca3af;
+  user-select: none;
+}
+
+.auth-terms__link {
+  color: var(--auth-accent-light);
+  font-weight: 600;
+  text-decoration: none;
+  border-bottom: 1px solid rgba(125, 194, 79, 0.35);
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.auth-terms__link:hover {
+  color: var(--auth-accent);
+  border-bottom-color: var(--auth-accent);
+}
+
+.auth-terms__error {
+  color: #f87171;
+  font-size: 0.72rem;
+  margin-top: 6px;
+  display: block;
+}
+
 /* ── DIVIDER ── */
 .auth-divider {
   display: flex;

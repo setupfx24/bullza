@@ -10,7 +10,7 @@ _INSECURE_DEFAULTS: dict[str, set[str]] = {
     "JWT_SECRET":         {"dev-secret-change-in-production", "", "changeme"},
     "USER_JWT_SECRET":    {"dev-secret-change-in-production", "", "changeme"},
     "ADMIN_JWT_SECRET":   {"admin-secret-change-in-production", "dev-secret-change-in-production", "", "changeme"},
-    "ADMIN_PASSWORD":     {"SwisDexAdmin2025!", "FXArthaAdmin2025!", "admin", "password", ""},
+    "ADMIN_PASSWORD":     {"SwisDexAdmin2025!", "admin", "password", ""},
 }
 
 
@@ -75,7 +75,20 @@ class Settings(BaseSettings):
     SMTP_USER: str = ""
     SMTP_PASSWORD: str = ""
     SMTP_FROM: str = ""
+    # Display name shown in the user's inbox (e.g. "SwisDex <noreply@…>").
+    # We wrap whatever address SMTP_FROM holds with this display name, so
+    # the inbox preview reads "SwisDex" even if the mail provider's
+    # underlying account is named differently.
+    MAIL_FROM_NAME: str = "SwisDex"
     SMTP_USE_TLS: bool = True
+
+    # ─── Cloudflare Turnstile (bot protection on /auth/register) ─────────
+    # When both are set, the register endpoint requires a valid Turnstile
+    # token from the client; we POST it to challenges.cloudflare.com/turnstile
+    # /v0/siteverify with the SECRET to confirm it really came from a real
+    # browser. Leave SECRET empty in dev to skip verification entirely.
+    # Get a site/secret pair at https://dash.cloudflare.com → Turnstile.
+    CLOUDFLARE_TURNSTILE_SECRET_KEY: str = ""
 
     # ─── AllTick — primary market-data provider ─────────────────────────
     # Real-time forex / metals / crypto / indices CFD ticks via WebSocket.

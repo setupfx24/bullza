@@ -21,6 +21,7 @@ import type {
   SubscribeBarsCallback,
 } from '@/types/charting_library';
 import { useTradingStore } from '@/stores/tradingStore';
+import { barSocket, type ServerBar } from '@/lib/ws/barSocket';
 
 /* ─── Resolution maps ─── */
 
@@ -199,12 +200,19 @@ const CONFIG: DatafeedConfiguration = {
 };
 
 /* ─── Subscription state ─── */
-
+//
+// subscribeBars now uses the gateway's /ws/bars channel — see
+// `lib/ws/barSocket.ts` and `gateway/src/main.py:bar_stream`. The server
+// pushes pre-aggregated OHLC for the in-progress candle on every tick;
+// the frontend just relays them to TradingView. The previous tick-based
+// client-side synthesis has been removed because it drifted from the
+// server's authoritative aggregation in market-data/bar_aggregator.py
+// (different clocks, different filtering, floating-point accumulation),
+// which is what produced the "candles don't match TradingView" symptom.
 interface Subscription {
   symbol: string;
   resolution: string;
   onTick: SubscribeBarsCallback;
-  lastBar?: Bar;
   unsubscribe: () => void;
 }
 
@@ -225,7 +233,7 @@ function segmentToSymbolType(segment: string | undefined): string {
 
 /* ═══════════ DATAFEED ═══════════ */
 
-export const fxArthaDatafeed: IBasicDataFeed = {
+export const swisDexDatafeed: IBasicDataFeed = {
   onReady: (cb) => {
     setTimeout(() => cb(CONFIG), 0);
   },
@@ -279,7 +287,7 @@ export const fxArthaDatafeed: IBasicDataFeed = {
       const sym = (symbolInfo.ticker || symbolInfo.name).toUpperCase();
       const { from, to } = periodParams;
 
-      // 1. Crypto → Binance (real data, fast)
+      // 1. Crypto → Binance (real OHLCV, fastest path).
       if (BINANCE_PAIRS[sym]) {
         const bars = await fetchBinanceKlines(sym, String(resolution), from, to);
         if (bars.length > 0) {
@@ -288,20 +296,11 @@ export const fxArthaDatafeed: IBasicDataFeed = {
         }
       }
 
-      // 2. Non-crypto → synthetic candles from live price
-      //    Wait for a price tick if it hasn't arrived yet (WebSocket may still be connecting)
-      const tick = await waitForPrice(sym);
-      if (tick && tick.bid > 0) {
-        const mid = (tick.bid + tick.ask) / 2;
-        const spread = Math.abs(tick.ask - tick.bid);
-        const bars = generateSyntheticBars(sym, mid, spread, String(resolution), from, to);
-        if (bars.length > 0) {
-          onResult(bars, { noData: false });
-          return;
-        }
-      }
-
-      // 3. Fallback: try backend
+      // 2. Non-crypto → REAL aggregated bars from our backend
+      //    (TimescaleDB hypertable populated by market-data's BarAggregator
+      //    from live AllTick ticks). Bars across timeframes agree by
+      //    construction (5m == aggregation of five 1m, 1h == twelve 5m,
+      //    etc.) so switching TF no longer shuffles the historical pattern.
       try {
         const params = new URLSearchParams({
           resolution: String(resolution), from: String(from), to: String(to),
@@ -319,7 +318,22 @@ export const fxArthaDatafeed: IBasicDataFeed = {
             return;
           }
         }
-      } catch { /* backend unavailable */ }
+      } catch { /* backend unavailable — fall through to synthetic */ }
+
+      // 3. Last resort — synthetic walk anchored to the current live mid.
+      //    Used only if both backend and Binance failed (fresh deploy with
+      //    no aggregated bars in TimescaleDB yet). Synthetic bars do NOT
+      //    aggregate across TFs, so this is intentionally the final fallback.
+      const tick = await waitForPrice(sym);
+      if (tick && tick.bid > 0) {
+        const mid = (tick.bid + tick.ask) / 2;
+        const spread = Math.abs(tick.ask - tick.bid);
+        const bars = generateSyntheticBars(sym, mid, spread, String(resolution), from, to);
+        if (bars.length > 0) {
+          onResult(bars, { noData: false });
+          return;
+        }
+      }
 
       onResult([], { noData: true });
     } catch (err) {
@@ -332,41 +346,28 @@ export const fxArthaDatafeed: IBasicDataFeed = {
     onTick: SubscribeBarsCallback, listenerGuid: string,
   ) => {
     const sym = (symbolInfo.ticker || symbolInfo.name).toUpperCase();
-    const barSec = RESOLUTION_TO_SECONDS[String(resolution)] ?? 300;
+    const res = String(resolution);
 
-    const unsub = useTradingStore.subscribe((state, prev) => {
-      const tick = state.prices[sym];
-      if (!tick) return;
-      if (prev?.prices[sym] === tick) return;
-
+    // Subscribe to the gateway's bar-update channel. The server pushes a
+    // pre-aggregated OHLC snapshot on every tick (the same data the
+    // BarAggregator wrote to bar:current:<SYM>:<TF> in Redis), so the
+    // current candle on the chart matches the candle on TradingView /
+    // OANDA / Binance / etc. by construction.
+    const unsub = barSocket.subscribe(sym, res, (bar: ServerBar) => {
       const sub = subscriptions.get(listenerGuid);
       if (!sub) return;
-
-      const mid = (Number(tick.bid) + Number(tick.ask)) / 2;
-      if (!Number.isFinite(mid)) return;
-
-      const nowSec = Math.floor(Date.now() / 1000);
-      const barStartMs = Math.floor(nowSec / barSec) * barSec * 1000;
-
-      const last = sub.lastBar;
-      let next: Bar;
-      if (last && last.time === barStartMs) {
-        next = {
-          time: last.time, open: last.open,
-          high: Math.max(last.high, mid), low: Math.min(last.low, mid),
-          close: mid, volume: (last.volume ?? 0) + 1,
-        };
-      } else {
-        next = {
-          time: barStartMs, open: last?.close ?? mid,
-          high: mid, low: mid, close: mid, volume: 1,
-        };
-      }
-      sub.lastBar = next;
-      sub.onTick(next);
+      // Server emits seconds — TradingView expects milliseconds.
+      sub.onTick({
+        time: bar.time * 1000,
+        open: bar.open,
+        high: bar.high,
+        low: bar.low,
+        close: bar.close,
+        volume: bar.volume,
+      });
     });
 
-    subscriptions.set(listenerGuid, { symbol: sym, resolution: String(resolution), onTick, unsubscribe: unsub });
+    subscriptions.set(listenerGuid, { symbol: sym, resolution: res, onTick, unsubscribe: unsub });
   },
 
   unsubscribeBars: (listenerGuid: string) => {

@@ -17,10 +17,16 @@
  *    the modal unmounts itself.
  */
 import { useEffect, useMemo, useState } from 'react';
-import { Loader2, ShieldCheck, UserCircle2 } from 'lucide-react';
+import { Calendar, Loader2, Mail, ShieldCheck, UserCircle2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuthStore } from '@/stores/authStore';
 import api from '@/lib/api/client';
+import PhoneInput from '@/components/forms/PhoneInput';
+import {
+  COUNTRIES as GEO_COUNTRIES,
+  getStatesOfCountry,
+  getCitiesOfState,
+} from '@/lib/geo';
 
 type FormState = {
   first_name: string;
@@ -34,40 +40,10 @@ type FormState = {
   date_of_birth: string;
 };
 
-const COUNTRIES: { code: string; name: string }[] = [
-  { code: 'IN', name: 'India' },
-  { code: 'AE', name: 'United Arab Emirates' },
-  { code: 'SA', name: 'Saudi Arabia' },
-  { code: 'GB', name: 'United Kingdom' },
-  { code: 'US', name: 'United States' },
-  { code: 'CA', name: 'Canada' },
-  { code: 'AU', name: 'Australia' },
-  { code: 'SG', name: 'Singapore' },
-  { code: 'MY', name: 'Malaysia' },
-  { code: 'ID', name: 'Indonesia' },
-  { code: 'PH', name: 'Philippines' },
-  { code: 'TH', name: 'Thailand' },
-  { code: 'VN', name: 'Vietnam' },
-  { code: 'JP', name: 'Japan' },
-  { code: 'KR', name: 'South Korea' },
-  { code: 'DE', name: 'Germany' },
-  { code: 'FR', name: 'France' },
-  { code: 'IT', name: 'Italy' },
-  { code: 'ES', name: 'Spain' },
-  { code: 'NL', name: 'Netherlands' },
-  { code: 'BR', name: 'Brazil' },
-  { code: 'MX', name: 'Mexico' },
-  { code: 'ZA', name: 'South Africa' },
-  { code: 'NG', name: 'Nigeria' },
-  { code: 'KE', name: 'Kenya' },
-  { code: 'EG', name: 'Egypt' },
-  { code: 'TR', name: 'Turkey' },
-  { code: 'PK', name: 'Pakistan' },
-  { code: 'BD', name: 'Bangladesh' },
-  { code: 'LK', name: 'Sri Lanka' },
-  { code: 'NP', name: 'Nepal' },
-  { code: 'OTHER', name: 'Other' },
-];
+// COUNTRIES + dial codes + per-country states now live in lib/geo.ts so
+// the register page, PhoneInput, and this gate all share one source of
+// truth. Aliasing GEO_COUNTRIES keeps the JSX below reading the same.
+const COUNTRIES = GEO_COUNTRIES;
 
 function _toDateInput(s: string | null | undefined): string {
   if (!s) return '';
@@ -102,6 +78,20 @@ export default function ProfileCompleteGate() {
     date_of_birth: '',
   });
   const [submitting, setSubmitting] = useState(false);
+  // Toggles the "Check your email" popup that replaces the form after a
+  // successful save. While this is true the gate stays mounted (so the
+  // dashboard underneath is still blurred) until the trader hits OK; only
+  // then do we refreshUser() and let `shouldRender` flip to false, which
+  // unmounts the gate and reveals the dashboard. This sequencing matches
+  // the spec: profile form → "check your email" popup → dashboard.
+  const [showVerifyPopup, setShowVerifyPopup] = useState(false);
+  const [resending, setResending] = useState(false);
+
+  // Snapshot at gate-render whether the user already supplied a phone at
+  // signup. If so we keep the value in `form.phone` (it still flows in the
+  // submit payload) but hide the input — asking the trader to retype the
+  // same number is a UX papercut they specifically called out.
+  const [phoneAlreadySaved, setPhoneAlreadySaved] = useState(false);
 
   // Pre-fill from whatever we already have so the user doesn't re-type
   // values that came from registration / Google sign-in.
@@ -118,13 +108,16 @@ export default function ProfileCompleteGate() {
       postal_code: user.postal_code || '',
       date_of_birth: _toDateInput(user.date_of_birth),
     });
+    setPhoneAlreadySaved(Boolean((user.phone || '').trim()));
   }, [shouldRender, user?.id]);
 
   const missingCount = useMemo(() => {
     let n = 0;
     if (!form.first_name.trim()) n++;
     if (!form.last_name.trim()) n++;
-    if (!form.phone.trim()) n++;
+    // Phone only counts as missing if we don't already have it from signup
+    // AND the user hasn't typed one in the gate.
+    if (!phoneAlreadySaved && !form.phone.trim()) n++;
     if (!form.country.trim()) n++;
     if (!form.address.trim()) n++;
     if (!form.city.trim()) n++;
@@ -132,7 +125,17 @@ export default function ProfileCompleteGate() {
     if (!form.postal_code.trim()) n++;
     if (!form.date_of_birth.trim()) n++;
     return n;
-  }, [form]);
+  }, [form, phoneAlreadySaved]);
+
+  // Cascading dropdowns — recompute lists as the country / state changes.
+  // Empty list means "the dataset doesn't have entries for this pair",
+  // in which case the JSX below falls back to a free-text input so the
+  // user isn't locked out of fringe regions.
+  const stateList = useMemo(() => getStatesOfCountry(form.country), [form.country]);
+  const cityList = useMemo(
+    () => getCitiesOfState(form.country, form.state),
+    [form.country, form.state],
+  );
 
   if (!shouldRender) return null;
 
@@ -172,8 +175,22 @@ export default function ProfileCompleteGate() {
         postal_code: form.postal_code.trim(),
         date_of_birth: form.date_of_birth,
       });
-      await refreshUser();
-      toast.success('Profile completed — welcome to SwisDex');
+      // Trigger the dashboard-access email (separate from the verify-email
+      // sent at signup). Fire-and-forget on the server side, so we don't
+      // block the popup on SMTP latency — if it ever fails the user can
+      // hit the Resend button or just use the in-app Continue button.
+      try {
+        await api.post('/profile/send-dashboard-link', {});
+      } catch (sendErr) {
+        // Non-fatal — log and continue. The Continue button still works.
+        // eslint-disable-next-line no-console
+        console.warn('dashboard-link email request failed', sendErr);
+      }
+      // Swap the form for the "Check your email" popup. We deliberately
+      // DO NOT call refreshUser() yet — once profile_complete flips true
+      // the gate unmounts and the popup would vanish with it. The popup's
+      // "Continue to dashboard" button does the refresh.
+      setShowVerifyPopup(true);
     } catch (err: any) {
       const msg = err?.response?.data?.detail || err?.message || 'Could not save profile';
       toast.error(typeof msg === 'string' ? msg : 'Could not save profile');
@@ -181,6 +198,85 @@ export default function ProfileCompleteGate() {
       setSubmitting(false);
     }
   };
+
+  // ── Post-save "Check your email" popup ──────────────────────────────
+  // Rendered in place of the profile form once the PUT succeeds. The user
+  // chooses between continuing to the dashboard now (verification email
+  // can be clicked later) or resending the verification mail if it didn't
+  // arrive.
+  const handleResendDashboardLink = async () => {
+    if (!user?.email || resending) return;
+    setResending(true);
+    try {
+      // Re-fires the dashboard-access email. Different endpoint from
+      // /auth/resend-verification (that one resends the signup-time
+      // verify link); this one resends the post-profile dashboard link.
+      await api.post('/profile/send-dashboard-link', {});
+      toast.success('Dashboard link sent — check your inbox.');
+    } catch (err: any) {
+      const msg = err?.response?.data?.detail || err?.message || 'Could not resend email';
+      toast.error(typeof msg === 'string' ? msg : 'Could not resend email');
+    } finally {
+      setResending(false);
+    }
+  };
+
+  const handleContinueToDashboard = async () => {
+    // Flips profile_complete true → unmounts the gate → dashboard visible.
+    await refreshUser();
+    toast.success('Welcome to SwisDex');
+  };
+
+  if (showVerifyPopup) {
+    return (
+      <div
+        className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="verify-popup-title"
+      >
+        <div className="w-full max-w-md rounded-2xl border border-border-primary bg-bg-elevated shadow-2xl px-6 py-7 text-center">
+          <div className="mx-auto w-14 h-14 rounded-full bg-[#55a630]/15 flex items-center justify-center mb-4">
+            <Mail size={26} className="text-[#55a630]" />
+          </div>
+          <h2 id="verify-popup-title" className="text-text-primary font-bold text-lg">
+            Check your email
+          </h2>
+          <p className="text-text-secondary text-sm mt-2 leading-relaxed">
+            We&apos;ve sent a dashboard access link to{' '}
+            <span className="text-text-primary font-medium break-all">
+              {user?.email}
+            </span>
+            . Click the button in the email to open your dashboard, or
+            continue here.
+          </p>
+          <div className="mt-6 flex flex-col gap-2">
+            <button
+              type="button"
+              onClick={handleContinueToDashboard}
+              className="w-full inline-flex items-center justify-center gap-2 py-3 rounded-xl bg-[#55a630] text-bg-base font-bold text-sm transition-all active:scale-[0.99]"
+            >
+              Continue to dashboard
+            </button>
+            <button
+              type="button"
+              onClick={handleResendDashboardLink}
+              disabled={resending}
+              className="w-full inline-flex items-center justify-center gap-2 py-2.5 rounded-xl border border-border-primary text-text-secondary font-medium text-sm transition-all hover:text-text-primary disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              {resending ? (
+                <>
+                  <Loader2 size={14} className="animate-spin" /> Sending…
+                </>
+              ) : (
+                'Resend email'
+              )}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div
@@ -238,27 +334,35 @@ export default function ProfileCompleteGate() {
             </Field>
           </div>
 
-          <Field label="Phone number" required>
-            <input
-              type="tel"
-              value={form.phone}
-              onChange={handleChange('phone')}
-              placeholder="+91 98765 43210"
-              autoComplete="tel"
-              maxLength={20}
-              className="w-full px-3 py-2.5 rounded-lg border border-border-primary bg-bg-secondary text-text-primary placeholder:text-text-tertiary outline-none focus:border-[#55a630]/50 text-sm"
-            />
-          </Field>
+          {/* Phone is collected at signup. Hide the field here when we
+              already have one — trader explicitly asked not to be made to
+              re-type the same number. The value still flows through the
+              submit payload from the pre-fill in the useEffect above. */}
+          {!phoneAlreadySaved && (
+            <Field label="Phone number" required>
+              <PhoneInput
+                value={form.phone}
+                onChange={(v) => setForm((p) => ({ ...p, phone: v }))}
+                defaultCountry="IN"
+                placeholder=""
+              />
+            </Field>
+          )}
 
           <Field label="Country of residence" required>
             <select
               value={form.country}
-              onChange={handleChange('country')}
+              onChange={(e) => {
+                // Changing country invalidates state + city since both
+                // are filtered by the country code in country-state-city.
+                const next = e.target.value;
+                setForm((f) => ({ ...f, country: next, state: '', city: '' }));
+              }}
               className="w-full px-3 py-2.5 rounded-lg border border-border-primary bg-bg-secondary text-text-primary outline-none focus:border-[#55a630]/50 text-sm appearance-none"
             >
               <option value="">Select your country…</option>
               {COUNTRIES.map((c) => (
-                <option key={c.code} value={c.name}>{c.name}</option>
+                <option key={c.code} value={c.name}>{c.flag} {c.name}</option>
               ))}
             </select>
           </Field>
@@ -275,26 +379,70 @@ export default function ProfileCompleteGate() {
             />
           </Field>
 
+          {/* Country → State → City cascade. The lib/geo helpers wrap
+              `country-state-city`, which covers every country in the world
+              (~5,000 states / ~150,000 cities). The user picks Country
+              first; State + City re-derive automatically. If the dataset
+              has no entries for a region (rare — typically tiny islands)
+              the corresponding field falls back to a free-text input so
+              we never trap the user. */}
           <div className="grid grid-cols-2 gap-3">
-            <Field label="City" required>
-              <input
-                type="text"
-                value={form.city}
-                onChange={handleChange('city')}
-                autoComplete="address-level2"
-                maxLength={100}
-                className="w-full px-3 py-2.5 rounded-lg border border-border-primary bg-bg-secondary text-text-primary placeholder:text-text-tertiary outline-none focus:border-[#55a630]/50 text-sm"
-              />
-            </Field>
             <Field label="State / province" required>
-              <input
-                type="text"
-                value={form.state}
-                onChange={handleChange('state')}
-                autoComplete="address-level1"
-                maxLength={100}
-                className="w-full px-3 py-2.5 rounded-lg border border-border-primary bg-bg-secondary text-text-primary placeholder:text-text-tertiary outline-none focus:border-[#55a630]/50 text-sm"
-              />
+              {stateList.length > 0 ? (
+                <select
+                  value={form.state}
+                  onChange={(e) => {
+                    const next = e.target.value;
+                    // Picking a new state invalidates the previous city,
+                    // because the city dropdown filters by (country, state).
+                    setForm((f) => ({ ...f, state: next, city: '' }));
+                  }}
+                  disabled={!form.country}
+                  className="w-full px-3 py-2.5 rounded-lg border border-border-primary bg-bg-secondary text-text-primary outline-none focus:border-[#55a630]/50 text-sm appearance-none disabled:opacity-50"
+                >
+                  <option value="">{form.country ? 'Select state…' : 'Pick a country first'}</option>
+                  {stateList.map((s) => (
+                    <option key={s.code} value={s.name}>{s.name}</option>
+                  ))}
+                </select>
+              ) : (
+                <input
+                  type="text"
+                  value={form.state}
+                  onChange={handleChange('state')}
+                  placeholder={form.country ? 'State / province' : 'Pick a country first'}
+                  disabled={!form.country}
+                  autoComplete="address-level1"
+                  maxLength={100}
+                  className="w-full px-3 py-2.5 rounded-lg border border-border-primary bg-bg-secondary text-text-primary placeholder:text-text-tertiary outline-none focus:border-[#55a630]/50 text-sm disabled:opacity-50"
+                />
+              )}
+            </Field>
+            <Field label="City" required>
+              {cityList.length > 0 ? (
+                <select
+                  value={form.city}
+                  onChange={handleChange('city')}
+                  disabled={!form.state}
+                  className="w-full px-3 py-2.5 rounded-lg border border-border-primary bg-bg-secondary text-text-primary outline-none focus:border-[#55a630]/50 text-sm appearance-none disabled:opacity-50"
+                >
+                  <option value="">{form.state ? 'Select city…' : 'Pick a state first'}</option>
+                  {cityList.map((c) => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
+                </select>
+              ) : (
+                <input
+                  type="text"
+                  value={form.city}
+                  onChange={handleChange('city')}
+                  placeholder={form.state ? 'City' : 'Pick a state first'}
+                  disabled={!form.state}
+                  autoComplete="address-level2"
+                  maxLength={100}
+                  className="w-full px-3 py-2.5 rounded-lg border border-border-primary bg-bg-secondary text-text-primary placeholder:text-text-tertiary outline-none focus:border-[#55a630]/50 text-sm disabled:opacity-50"
+                />
+              )}
             </Field>
           </div>
 
@@ -309,14 +457,21 @@ export default function ProfileCompleteGate() {
                 className="w-full px-3 py-2.5 rounded-lg border border-border-primary bg-bg-secondary text-text-primary placeholder:text-text-tertiary outline-none focus:border-[#55a630]/50 text-sm"
               />
             </Field>
-            <Field label="Date of birth" required hint="18+ to trade.">
-              <input
-                type="date"
-                value={form.date_of_birth}
-                onChange={handleChange('date_of_birth')}
-                max={new Date().toISOString().slice(0, 10)}
-                className="w-full px-3 py-2.5 rounded-lg border border-border-primary bg-bg-secondary text-text-primary outline-none focus:border-[#55a630]/50 text-sm"
-              />
+            <Field label="Date of birth" required hint="18+ to trade. Click the field to open the calendar.">
+              <div className="relative">
+                <Calendar
+                  size={14}
+                  className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-text-tertiary"
+                  aria-hidden
+                />
+                <input
+                  type="date"
+                  value={form.date_of_birth}
+                  onChange={handleChange('date_of_birth')}
+                  max={new Date().toISOString().slice(0, 10)}
+                  className="w-full pl-9 pr-3 py-2.5 rounded-lg border border-border-primary bg-bg-secondary text-text-primary outline-none focus:border-[#55a630]/50 text-sm"
+                />
+              </div>
             </Field>
           </div>
 

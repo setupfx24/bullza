@@ -118,6 +118,20 @@ async def update_profile(
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
+    # The "Try with Demo Account" button signs everyone in as the SHARED
+    # demo@swisdex.com user (User.is_demo=True). Letting any visitor mutate
+    # that row corrupts identity for every subsequent visitor — exactly the
+    # bug where one user's "abhi" first_name leaked into a stranger's demo
+    # session. Reject profile edits on the shared demo identity.
+    if bool(getattr(user, "is_demo", False)):
+        raise HTTPException(
+            status_code=403,
+            detail=(
+                "Profile editing is disabled on the shared demo account. "
+                "Sign up for a real account to personalise your profile."
+            ),
+        )
+
     # date_of_birth arrives from the HTML <input type="date"> as a YYYY-MM-DD
     # string. The User column is a DateTime so we coerce here — asyncpg
     # otherwise raises DataError on commit.
@@ -167,11 +181,32 @@ async def change_password(
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
+    # Shared demo identity — see update_profile for the rationale. Letting a
+    # visitor change the demo password would lock every subsequent visitor
+    # out of the shared account.
+    if bool(getattr(user, "is_demo", False)):
+        raise HTTPException(
+            status_code=403,
+            detail="Password changes are disabled on the shared demo account.",
+        )
+
     if not verify_password(current_password, user.password_hash):
         raise HTTPException(status_code=400, detail="Current password is incorrect")
 
     if current_password == new_password:
         raise HTTPException(status_code=400, detail="New password must be different")
+
+    # Same strength policy as signup + reset-password. Without this, a
+    # signed-in user could "change" their password to '12345678'.
+    from packages.common.src.password_policy import validate_password, PasswordTooWeak
+    try:
+        validate_password(new_password, disallow=[
+            (user.email or "").split("@", 1)[0],
+            user.first_name or "",
+            user.last_name or "",
+        ])
+    except PasswordTooWeak as e:
+        raise HTTPException(status_code=400, detail=e.reason)
 
     user.password_hash = hash_password(new_password)
     await db.commit()
@@ -375,3 +410,64 @@ async def get_kyc_file(user_id: UUID, document_id: UUID, db: AsyncSession) -> Pa
         raise HTTPException(status_code=404, detail="File not found on server")
 
     return file_path
+
+
+# ─── Dashboard-access email ────────────────────────────────────────────────
+# Sent AFTER the trader hits Save & Continue on the profile-completion gate.
+# Distinct from the verify-email message that fires at signup — this one is
+# the welcome-to-your-dashboard hand-off and contains a deep link straight
+# into /accounts. The user is already authenticated via HttpOnly cookies
+# in the original browser, so clicking the link opens the dashboard with
+# no extra token exchange.
+
+async def send_dashboard_access_email(
+    user_id: UUID, db: AsyncSession,
+) -> dict:
+    """Send the 'Your dashboard is ready' email to the authenticated user.
+
+    Idempotent: callable as many times as the trader hits Save & Continue
+    or the resend button in the popup. Returns a small dict so the API
+    layer can echo a friendly message; never raises on SMTP failure (we
+    swallow + log so the trader can still proceed in-app).
+    """
+    result = await db.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    # Demo identity short-circuits — the shared demo@swisdex.com account
+    # must never be spammed via the dashboard email.
+    if bool(getattr(user, "is_demo", False)):
+        return {"message": "Skipped for demo account", "sent": False}
+
+    try:
+        from packages.common.src.smtp_mail import (
+            send_email, smtp_configured, fire_and_forget,
+        )
+        from packages.common.src.email_templates import render_dashboard_access
+
+        if not smtp_configured():
+            logger.info(
+                "SMTP not configured — dashboard-access email skipped for %s",
+                user.email,
+            )
+            return {"message": "Email not configured", "sent": False}
+
+        st = get_settings()
+        trader_app_url = (
+            getattr(st, "TRADER_APP_URL", None) or "https://trade.swisdex.com"
+        ).rstrip("/")
+        dashboard_url = f"{trader_app_url}/accounts"
+        subject, html, text = render_dashboard_access(
+            first_name=user.first_name,
+            dashboard_url=dashboard_url,
+        )
+        fire_and_forget(send_email(user.email, subject, html, text=text))
+    except Exception as e:
+        logger.warning(
+            "dashboard-access email scheduling failed for %s: %s",
+            user.email, e,
+        )
+        return {"message": "Could not send email — try again later", "sent": False}
+
+    return {"message": "Dashboard link sent — check your email.", "sent": True}

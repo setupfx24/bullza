@@ -20,12 +20,16 @@ async def list_users(
     status_filter: str = Query(None, alias="status"),
     kyc_filter: str = Query(None, alias="kyc_status"),
     group_id: str = Query(None),
+    date_from: str | None = Query(None, description="YYYY-MM-DD; inclusive lower bound on User.created_at"),
+    date_to:   str | None = Query(None, description="YYYY-MM-DD; inclusive upper bound on User.created_at"),
     admin: User = Depends(require_permission("users.view")),
     db: AsyncSession = Depends(get_db),
 ):
     return await user_service.list_users(
         page=page, per_page=per_page, search=search,
-        status_filter=status_filter, kyc_filter=kyc_filter, group_id=group_id, db=db,
+        status_filter=status_filter, kyc_filter=kyc_filter, group_id=group_id,
+        date_from=date_from, date_to=date_to,
+        db=db,
     )
 
 

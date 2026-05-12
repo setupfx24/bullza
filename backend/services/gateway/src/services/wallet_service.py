@@ -1444,30 +1444,45 @@ async def charge_insurance_fee(
     *,
     db: AsyncSession,
     user_id: UUID,
+    account_id: UUID,
     amount: Decimal,
     policy_id: UUID,
     description: str,
 ) -> Decimal:
-    """Debit `amount` from the user's main wallet for an insurance fee.
+    """Debit `amount` from the trading account that holds the insured position.
     Caller is responsible for `db.commit()`. Raises 402 if balance is short.
 
-    Returns the user's new main_wallet_balance.
-    """
-    user = (await db.execute(select(User).where(User.id == user_id).with_for_update())).scalar_one_or_none()
-    if user is None:
-        raise HTTPException(status_code=404, detail="User not found")
+    The fee comes off `TradingAccount.balance` — the same pool that pays for
+    margin, commission, and swap on the position itself. Equity is updated
+    so the trader UI's free-margin / margin-level reflect the new balance
+    immediately. Insurance claim payouts (see insurance/claims.py) credit
+    the same field, keeping the loop closed on a single balance.
 
-    bal = Decimal(str(user.main_wallet_balance or 0))
+    Returns the trading account's new balance.
+    """
+    account = (await db.execute(
+        select(TradingAccount).where(TradingAccount.id == account_id).with_for_update()
+    )).scalar_one_or_none()
+    if account is None:
+        raise HTTPException(status_code=404, detail="trading_account_not_found")
+    if account.user_id != user_id:
+        raise HTTPException(status_code=403, detail="account_user_mismatch")
+
+    bal = Decimal(str(account.balance or 0))
     if bal < amount:
         raise HTTPException(status_code=402, detail="insufficient_balance")
 
     new_balance = bal - amount
-    user.main_wallet_balance = new_balance
+    account.balance = new_balance
+    # Equity drops by the fee amount alongside balance (unrealized PnL is
+    # carried by other code paths; keep them in sync without recomputing).
+    if account.equity is not None:
+        account.equity = Decimal(str(account.equity)) - amount
 
     db.add(Transaction(
         id=uuid_lib.uuid4(),
         user_id=user_id,
-        account_id=None,
+        account_id=account_id,
         type="insurance_fee",
         amount=-amount,
         balance_after=new_balance,

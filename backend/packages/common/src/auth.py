@@ -59,6 +59,37 @@ def hash_token(token: str) -> str:
     return hashlib.sha256(token.encode()).hexdigest()
 
 
+# ─── Email-verify token (separate JWT type, can't be used as a session) ──
+
+def create_email_verify_token(user_id: str, *, expires_hours: int = 24) -> tuple[str, datetime]:
+    """Mint a short-lived JWT for the verify-email click link. Includes an
+    explicit `type=email_verify` claim so a leaked token can't be replayed
+    on /auth/me or any session-cookie path."""
+    now = datetime.now(timezone.utc)
+    expires = now + timedelta(hours=expires_hours)
+    payload = {
+        "sub": user_id,
+        "type": "email_verify",
+        "exp": expires,
+        "iat": now,
+    }
+    token = jwt.encode(payload, settings.JWT_SECRET, algorithm=settings.JWT_ALGORITHM)
+    return token, expires
+
+
+def decode_email_verify_token(token: str) -> Optional[dict]:
+    """Decode + validate an email-verify token. Returns None on any failure
+    (expired, bad signature, malformed, wrong type). Caller decides the
+    user-facing error message."""
+    try:
+        payload = jwt.decode(token, settings.JWT_SECRET, algorithms=[settings.JWT_ALGORITHM])
+    except (jwt.ExpiredSignatureError, jwt.InvalidTokenError):
+        return None
+    if payload.get("type") != "email_verify":
+        return None
+    return payload
+
+
 def _extract_bearer_token(
     request: Request,
     credentials: Optional[HTTPAuthorizationCredentials],

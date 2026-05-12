@@ -12,6 +12,7 @@ from packages.common.src.redis_client import (
     PriceChannel,
     redis_client,
     publish_price,
+    publish_bar_update,
 )
 
 from .feed_handler import FeedSimulator, INSTRUMENTS
@@ -19,7 +20,7 @@ from .alltick_config import usable_alltick_token
 from .alltick_feed import AllTickFeed
 from .corecen_lp_feed import CorecenLPFeed
 from .bar_aggregator import BarAggregator
-from .seed_bars import seed as seed_bars
+from .seed_bars import seed as seed_bars, flush_non_crypto_keys
 from .spread_cache import StreamSpreadCache, RELOAD_INTERVAL_SEC
 from .store import TickStore
 
@@ -199,7 +200,44 @@ class MarketDataService:
             await self.store.insert_tick(symbol, bid, ask, ts)
 
             self.aggregator.update(symbol, bid, ask, ts)
+            # Fan out the just-updated current bar for every timeframe so the
+            # gateway's /ws/bars hub can push it to subscribed charts. This
+            # replaces the trader frontend's old client-side bar synthesis,
+            # which drifted from the server's authoritative aggregation. We
+            # publish AFTER aggregator.update so _bars[symbol] reflects this
+            # tick. bar_aggregator.py itself stays untouched — we just read
+            # its in-memory snapshot.
+            await self._publish_current_bars(symbol)
             self._tick_count += 1
+
+    async def _publish_current_bars(self, symbol: str) -> None:
+        """Publish current in-progress bar for every TF of `symbol` to
+        BAR_UPDATES_CHANNEL. Called once per tick from _process_ticks."""
+        sym_bars = self.aggregator._bars.get(symbol)
+        sym_starts = self.aggregator._bar_timestamps.get(symbol)
+        if not sym_bars or not sym_starts:
+            return
+        for tf_name, bar in sym_bars.items():
+            bar_start = sym_starts.get(tf_name)
+            if bar_start is None:
+                continue
+            try:
+                await publish_bar_update({
+                    "symbol": symbol,
+                    "timeframe": tf_name,
+                    "time": int(bar_start),
+                    "open": float(bar.open),
+                    "high": float(bar.high),
+                    "low": float(bar.low),
+                    "close": float(bar.close),
+                    "volume": float(bar.volume),
+                    "tick_count": int(bar.tick_count),
+                })
+            except Exception as exc:
+                # Pub/sub is best-effort — don't break the tick processor
+                # if Redis briefly hiccups. The gateway will catch up on
+                # the next tick anyway.
+                logger.debug("publish_bar_update %s %s failed: %s", symbol, tf_name, exc)
 
     async def _alltick_fallback_watchdog(self) -> None:
         """If AllTick never delivers ticks (bad token, expired plan, network,
@@ -225,19 +263,46 @@ class MarketDataService:
         asyncio.create_task(self.feed.start())
 
     async def _auto_seed_bars(self) -> None:
-        """Wait for first ticks to arrive, then seed historical bars if Redis is empty."""
+        """Wait for first ticks to arrive, then seed historical bars.
+
+        On every startup we drop any non-crypto `bars:*:*` keys first.
+        Those used to be filled with simulated random-walk data when
+        AllTick wasn't yet integrated; the keys have no TTL so they
+        survive across deploys until explicitly deleted. After the
+        flush, `seed_bars()` repopulates from real AllTick history
+        (and Binance for crypto). Crypto bars are left untouched —
+        they were always real.
+
+        The crypto-presence check is kept as a fast-path: if BTCUSD
+        already has 50+ bars in Redis we short-circuit so a normal
+        restart doesn't re-fetch all crypto bars unnecessarily.
+        """
         try:
             await asyncio.sleep(30.0)  # give feed time to start delivering ticks
         except asyncio.CancelledError:
             raise
         if not self.running:
             return
-        # Check if bars already exist for a common symbol
+
+        # Drop simulated non-crypto bars from any earlier deploy so the seed
+        # below replaces them with real AllTick data. No-op on a fresh deploy
+        # (nothing to delete) so this is safe to run unconditionally.
+        try:
+            flushed = await flush_non_crypto_keys()
+            if flushed:
+                logger.info("Auto-seed: flushed %d stale non-crypto bar keys", flushed)
+        except Exception as exc:
+            logger.warning("Auto-seed flush failed (continuing): %s", exc)
+
         sample_count = await redis_client.llen("bars:BTCUSD:5m")
         if sample_count >= 50:
-            logger.info("Bars already seeded (%d bars for BTCUSD:5m), skipping auto-seed", sample_count)
-            return
-        logger.info("Auto-seeding historical bars (first run or bars missing)...")
+            logger.info(
+                "Bars already seeded for crypto (%d bars for BTCUSD:5m); "
+                "running seed for non-crypto only",
+                sample_count,
+            )
+        else:
+            logger.info("Auto-seeding historical bars (first run or bars missing)...")
         try:
             await seed_bars()
         except Exception as exc:

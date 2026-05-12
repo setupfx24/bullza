@@ -171,13 +171,21 @@ function tradeExitLabel(
 
 
 
-const TIMEFRAMES = ['1M', '3M', '6M', '1Y', 'All'] as const;
+const TIMEFRAMES = ['1M', '3M', '6M', '1Y', 'All', 'Custom'] as const;
 
 const TF_TO_PERIOD: Record<string, string> = {
 
-  '1M': '1m', '3M': '3m', '6M': '6m', '1Y': '1y', 'All': 'all',
+  '1M': '1m', '3M': '3m', '6M': '6m', '1Y': '1y', 'All': 'all', 'Custom': 'custom',
 
 };
+
+/** YYYY-MM-DD in local time (avoids the UTC-shift `toISOString()` pitfall). */
+function ymd(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -201,6 +209,14 @@ function PortfolioPageContent() {
   }, [queryKey]);
 
   const [tf, setTf] = useState('1M');
+  // Custom date-range state (only used when tf === 'Custom').
+  // Backend endpoint accepts ISO datetimes; we send the date in YYYY-MM-DD
+  // form and let server-side defaults treat them as 00:00 UTC / 23:59 UTC.
+  const [customFrom, setCustomFrom] = useState<string>(() => {
+    const d = new Date(); d.setMonth(d.getMonth() - 1);
+    return ymd(d);
+  });
+  const [customTo, setCustomTo] = useState<string>(() => ymd(new Date()));
 
   const [tab, setTab] = useState('overview');
 
@@ -250,6 +266,22 @@ function PortfolioPageContent() {
 
       if (validAccountId) tradeParams.account_id = validAccountId;
 
+      // Custom-range mode: forward date_from / date_to to both performance
+      // (so the equity curve + breakdowns are scoped) and trades (so the
+      // table only shows trades within the picked window). The backend's
+      // /portfolio/trades endpoint already accepted these; we now also
+      // pass them to /portfolio/performance (period='custom').
+      if (period === 'custom') {
+        if (customFrom) {
+          perfParams.date_from = `${customFrom}T00:00:00`;
+          tradeParams.date_from = `${customFrom}T00:00:00`;
+        }
+        if (customTo) {
+          perfParams.date_to = `${customTo}T23:59:59`;
+          tradeParams.date_to = `${customTo}T23:59:59`;
+        }
+      }
+
       const [sumRes, perfRes, tradesRes] = await Promise.all([
 
         api.get<PortfolioSummary>('/portfolio/summary', summaryParams),
@@ -280,7 +312,7 @@ function PortfolioPageContent() {
 
     }
 
-  }, [tf, validAccountId]);
+  }, [tf, validAccountId, customFrom, customTo]);
 
 
 
@@ -339,6 +371,14 @@ function PortfolioPageContent() {
         };
 
         if (validAccountId) params.account_id = validAccountId;
+
+        // PDF export honours the same custom date range the user picked
+        // for performance — otherwise the statement would include trades
+        // outside the visible chart, which is confusing.
+        if (TF_TO_PERIOD[tf] === 'custom') {
+          if (customFrom) params.date_from = `${customFrom}T00:00:00`;
+          if (customTo) params.date_to = `${customTo}T23:59:59`;
+        }
 
         const res = await api.get<{ items: Trade[]; pages: number }>(
 
@@ -571,19 +611,46 @@ function PortfolioPageContent() {
         ) : null}
 
         {dashboardData ? (
-          <div className="flex items-center justify-end gap-0.5 -mb-2">
-            {TIMEFRAMES.map((t) => (
-              <button
-                key={t}
-                onClick={() => setTf(t)}
-                className={clsx(
-                  'px-2 py-1 text-[10px] rounded-md transition-all',
-                  tf === t ? 'skeu-btn-buy text-text-inverse' : 'text-text-tertiary hover:bg-bg-hover',
-                )}
-              >
-                {t}
-              </button>
-            ))}
+          <div className="flex items-center justify-end gap-2 flex-wrap -mb-2">
+            {/* Custom date inputs — only render when 'Custom' is the active
+                timeframe so the existing preset row stays compact. The
+                inputs auto-flip the active tf to 'Custom' if the user
+                edits one without first clicking the preset, but here
+                they're hidden until selected to avoid clutter. */}
+            {tf === 'Custom' && (
+              <div className="flex items-center gap-1.5 mr-1">
+                <input
+                  type="date"
+                  value={customFrom}
+                  max={customTo || undefined}
+                  onChange={(e) => setCustomFrom(e.target.value)}
+                  className="px-2 py-1 text-[11px] rounded-md bg-bg-secondary border border-border-primary text-text-primary"
+                />
+                <span className="text-[10px] text-text-tertiary">to</span>
+                <input
+                  type="date"
+                  value={customTo}
+                  min={customFrom || undefined}
+                  max={ymd(new Date())}
+                  onChange={(e) => setCustomTo(e.target.value)}
+                  className="px-2 py-1 text-[11px] rounded-md bg-bg-secondary border border-border-primary text-text-primary"
+                />
+              </div>
+            )}
+            <div className="flex items-center gap-0.5">
+              {TIMEFRAMES.map((t) => (
+                <button
+                  key={t}
+                  onClick={() => setTf(t)}
+                  className={clsx(
+                    'px-2 py-1 text-[10px] rounded-md transition-all',
+                    tf === t ? 'skeu-btn-buy text-text-inverse' : 'text-text-tertiary hover:bg-bg-hover',
+                  )}
+                >
+                  {t}
+                </button>
+              ))}
+            </div>
           </div>
         ) : null}
 

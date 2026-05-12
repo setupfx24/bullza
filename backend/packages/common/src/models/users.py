@@ -52,6 +52,13 @@ class User(Base):
     book_type = Column(String(1), default="B", server_default="B")  # 'A' (LP routed) or 'B' (internal)
     trading_blocked_until = Column(DateTime(timezone=True))
     main_wallet_balance = Column(Numeric(18, 8), nullable=False, default=0)
+    # Email verification — gate sign-in until the user clicks the verify
+    # link once. Migration 0038 backfills TRUE for existing users so the
+    # deploy doesn't lock anyone out; register_user explicitly sets FALSE
+    # for new email-password sign-ups. Google / wallet sign-ups stay TRUE
+    # because the third-party provider already verified ownership.
+    email_verified = Column(Boolean, nullable=False, default=True, server_default="true")
+    email_verified_at = Column(DateTime(timezone=True))
     # Lowercased EVM address (0x + 40 hex). Unique via the partial index
     # ix_users_wallet_address_lower (migration 0034). Set on first SIWE
     # sign-in or after a manual link from /profile/wallet/link.
