@@ -119,7 +119,11 @@ export default function PhoneInput({
           hasError ? 'border-red-500/50' : 'border-border-primary'
         }`}
       >
-        <span aria-hidden className="text-base leading-none">{country.flag ?? '🌐'}</span>
+        <span
+          aria-hidden
+          className={`fi fi-${country.code.toLowerCase()} rounded-sm shadow-sm shrink-0`}
+          style={{ width: 18, height: 13, backgroundSize: 'cover', backgroundPosition: 'center', display: 'inline-block' }}
+        />
         <span className="font-mono tabular-nums text-xs">+{country.dial}</span>
         <ChevronDown size={12} className={`text-text-tertiary transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
@@ -166,7 +170,11 @@ export default function PhoneInput({
                     c.code === country.code ? 'bg-[#55a630]/10 text-[#55a630]' : 'text-text-secondary hover:bg-bg-hover'
                   }`}
                 >
-                  <span aria-hidden className="text-base leading-none">{c.flag ?? '🌐'}</span>
+                  <span
+                    aria-hidden
+                    className={`fi fi-${c.code.toLowerCase()} rounded-sm shadow-sm shrink-0`}
+                    style={{ width: 18, height: 13, backgroundSize: 'cover', backgroundPosition: 'center', display: 'inline-block' }}
+                  />
                   <span className="flex-1 truncate">{c.name}</span>
                   <span className="font-mono tabular-nums text-[11px] text-text-tertiary">+{c.dial}</span>
                 </button>

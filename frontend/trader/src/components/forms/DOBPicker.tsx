@@ -4,8 +4,14 @@
  * DOBPicker — calendar input for date-of-birth on the profile completion
  * gate. Uses react-day-picker so we can hide adjacent-month days (the
  * native <input type="date"> shows greyed leading/trailing days and the
- * browser owns that, so client-asked "only this month's days" is only
- * possible with a custom picker).
+ * browser owns that, so the client-asked "only this month's days" is
+ * only possible with a custom picker).
+ *
+ * The calendar popover is rendered through a portal into document.body
+ * so it escapes the ProfileCompleteGate modal's overflow container —
+ * otherwise it gets clipped when the DOB field sits near the bottom of
+ * the form card. Position is computed from the trigger's rect, and
+ * flipped above the field when there isn't enough room below.
  *
  * Constraints baked into the picker:
  *   • max = today − 18 years (matches the 18+ submit-time guard)
@@ -13,7 +19,8 @@
  *   • default month opens at ~25 years ago if no value set
  *   • year + month dropdowns so the user doesn't click prev-month 30×
  */
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { DayPicker } from 'react-day-picker';
 import { Calendar } from 'lucide-react';
 
@@ -23,6 +30,9 @@ interface DOBPickerProps {
   minAgeYears?: number;
   disabled?: boolean;
 }
+
+const POPOVER_WIDTH = 320;
+const POPOVER_HEIGHT_ESTIMATE = 380;  // rough — used for flip decision; real height re-checked once mounted
 
 function toIso(d: Date): string {
   const y = d.getFullYear();
@@ -38,6 +48,11 @@ function parseIso(s: string): Date | undefined {
   return new Date(y, m - 1, d);
 }
 
+interface PopoverPos {
+  top: number;
+  left: number;
+}
+
 export default function DOBPicker({
   value,
   onChange,
@@ -45,7 +60,10 @@ export default function DOBPicker({
   disabled = false,
 }: DOBPickerProps) {
   const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState<PopoverPos | null>(null);
+  const [mounted, setMounted] = useState(false);
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
+  const popoverRef = useRef<HTMLDivElement | null>(null);
 
   const selected = parseIso(value);
 
@@ -57,19 +75,54 @@ export default function DOBPicker({
     return { minDate: min, maxDate: max, fallbackMonth: fallback };
   }, [minAgeYears]);
 
+  // Defer portal mount until after first client render to avoid SSR mismatch.
+  useEffect(() => { setMounted(true); }, []);
+
+  // Compute popover position from the trigger button's viewport rect every
+  // time we open. Done with useLayoutEffect so the popover appears in its
+  // final spot on the same paint (no visible flicker).
+  useLayoutEffect(() => {
+    if (!open || !triggerRef.current) return;
+    const rect = triggerRef.current.getBoundingClientRect();
+    const viewportH = window.innerHeight;
+    const viewportW = window.innerWidth;
+    const spaceBelow = viewportH - rect.bottom;
+    const spaceAbove = rect.top;
+    const openAbove = spaceBelow < POPOVER_HEIGHT_ESTIMATE + 8 && spaceAbove > spaceBelow;
+    const top = openAbove
+      ? Math.max(8, rect.top - POPOVER_HEIGHT_ESTIMATE - 4)
+      : rect.bottom + 4;
+    // Clamp horizontally so the popover never escapes the viewport on
+    // narrow screens (modal is centred so this is mostly defensive).
+    const left = Math.min(
+      Math.max(8, rect.left),
+      viewportW - POPOVER_WIDTH - 8,
+    );
+    setPos({ top, left });
+  }, [open]);
+
+  // Outside-click + Esc to close. Scroll/resize close because re-positioning
+  // mid-scroll on a portal-mounted popover is visually janky and rarely
+  // what the user wants.
   useEffect(() => {
     if (!open) return;
     const onDocClick = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+      const t = e.target as Node;
+      if (popoverRef.current?.contains(t)) return;
+      if (triggerRef.current?.contains(t)) return;
+      setOpen(false);
     };
-    const onEsc = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setOpen(false);
-    };
+    const onEsc = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); };
+    const onScrollOrResize = () => setOpen(false);
     document.addEventListener('mousedown', onDocClick);
     document.addEventListener('keydown', onEsc);
+    window.addEventListener('resize', onScrollOrResize);
+    window.addEventListener('scroll', onScrollOrResize, true);
     return () => {
       document.removeEventListener('mousedown', onDocClick);
       document.removeEventListener('keydown', onEsc);
+      window.removeEventListener('resize', onScrollOrResize);
+      window.removeEventListener('scroll', onScrollOrResize, true);
     };
   }, [open]);
 
@@ -77,14 +130,42 @@ export default function DOBPicker({
     ? selected.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
     : '';
 
+  const popover = open && !disabled && pos && mounted ? (
+    <div
+      ref={popoverRef}
+      className="dob-popover fixed z-[300] rounded-xl border border-border-primary bg-bg-secondary shadow-2xl p-2"
+      style={{ top: pos.top, left: pos.left, width: POPOVER_WIDTH }}
+      role="dialog"
+      aria-label="Select date of birth"
+    >
+      <DayPicker
+        mode="single"
+        selected={selected}
+        onSelect={(d) => {
+          if (d) {
+            onChange(toIso(d));
+            setOpen(false);
+          }
+        }}
+        showOutsideDays={false}
+        captionLayout="dropdown"
+        startMonth={minDate}
+        endMonth={maxDate}
+        defaultMonth={selected || fallbackMonth}
+        disabled={{ after: maxDate, before: minDate }}
+      />
+    </div>
+  ) : null;
+
   return (
-    <div ref={ref} className="relative">
+    <div className="relative">
       <Calendar
         size={14}
         className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-text-tertiary"
         aria-hidden
       />
       <button
+        ref={triggerRef}
         type="button"
         onClick={() => !disabled && setOpen((o) => !o)}
         disabled={disabled}
@@ -94,29 +175,7 @@ export default function DOBPicker({
       >
         {display || <span className="text-text-tertiary">Select date</span>}
       </button>
-      {open && !disabled && (
-        <div
-          className="dob-popover absolute z-50 mt-1 left-0 rounded-xl border border-border-primary bg-bg-secondary shadow-2xl p-2"
-          role="dialog"
-        >
-          <DayPicker
-            mode="single"
-            selected={selected}
-            onSelect={(d) => {
-              if (d) {
-                onChange(toIso(d));
-                setOpen(false);
-              }
-            }}
-            showOutsideDays={false}
-            captionLayout="dropdown"
-            startMonth={minDate}
-            endMonth={maxDate}
-            defaultMonth={selected || fallbackMonth}
-            disabled={{ after: maxDate, before: minDate }}
-          />
-        </div>
-      )}
+      {popover && createPortal(popover, document.body)}
     </div>
   );
 }
