@@ -2,7 +2,7 @@
 
 import { useRef, useState } from 'react';
 import Link from 'next/link';
-import { ArrowUpRight, Repeat, Coins, BarChart3, LineChart } from 'lucide-react';
+import { ArrowUpRight, Repeat, Coins, BarChart3, LineChart, ChevronLeft, ChevronRight } from 'lucide-react';
 import { TradingViewChart } from './TradingViewChart';
 
 interface QuickTab {
@@ -219,11 +219,54 @@ function InstrumentDirectory({
   activeLabel: string;
   onSelect: (label: string) => void;
 }) {
+  const scrollerRef = useRef<HTMLDivElement>(null);
+
+  /** Scrolls the directory horizontally by one snap-column. */
+  const nudge = (dir: 1 | -1) => {
+    const el = scrollerRef.current;
+    if (!el) return;
+    const firstChild = el.firstElementChild as HTMLElement | null;
+    const step = firstChild ? firstChild.getBoundingClientRect().width + 24 : 280;
+    el.scrollBy({ left: step * dir, behavior: 'smooth' });
+  };
+
   return (
-    <div className="mt-12 sm:mt-16 text-left">
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-x-6 gap-y-10">
+    <div className="mt-12 sm:mt-16 text-left relative">
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="font-display uppercase text-base sm:text-lg tracking-[0.18em] text-foreground/55">
+          Browse Instruments
+        </h3>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            aria-label="Scroll instruments left"
+            onClick={() => nudge(-1)}
+            className="size-9 rounded-full liquid-glass-strong flex items-center justify-center text-foreground/80 hover:text-foreground hover:bg-foreground/10 transition-colors"
+          >
+            <ChevronLeft className="size-4" />
+          </button>
+          <button
+            type="button"
+            aria-label="Scroll instruments right"
+            onClick={() => nudge(1)}
+            className="size-9 rounded-full liquid-glass-strong flex items-center justify-center text-foreground/80 hover:text-foreground hover:bg-foreground/10 transition-colors"
+          >
+            <ChevronRight className="size-4" />
+          </button>
+        </div>
+      </div>
+
+      {/* Horizontal snap-scroll carousel — arrows scroll one column at a time */}
+      <div
+        ref={scrollerRef}
+        className="flex gap-6 overflow-x-auto snap-x snap-mandatory pb-3 -mx-[var(--gutter)] px-[var(--gutter)]"
+        style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.15) transparent' }}
+      >
         {COLUMNS.map((col) => (
-          <div key={col.heading}>
+          <div
+            key={col.heading}
+            className="snap-start shrink-0 w-[calc(50%-12px)] sm:w-[calc(33.333%-16px)] lg:w-[calc(20%-19.2px)]"
+          >
             <h3 className="font-display uppercase text-lg sm:text-xl tracking-tight text-foreground mb-4">
               {col.heading}
             </h3>

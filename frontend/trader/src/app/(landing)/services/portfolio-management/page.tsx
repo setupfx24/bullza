@@ -7,6 +7,7 @@ import {
   Headphones, FileText, Target, ChevronDown,
 } from 'lucide-react';
 import { BannerPlaceholder } from '@/swisdex/components/BannerPlaceholder';
+import { QuoteSection } from '@/swisdex/components/QuoteSection';
 
 const SIGNUP_HREF = '/auth/register';
 
@@ -16,6 +17,18 @@ export default function PortfolioManagementPage() {
       <BannerPlaceholder
         title="Portfolio Management"
         tagline="Professional asset allocation managed by verified strategists. Choose MAM for a fully managed account, or PAM for proportional exposure to a master strategy."
+      />
+
+      {/* Investor quote — Warren Buffett "make money while you sleep" */}
+      <QuoteSection
+        eyebrow="Why Managed Accounts"
+        quote={
+          <>
+            &ldquo;If you don&rsquo;t find a way to{' '}
+            <span className="text-primary font-bold">make money while you sleep</span>,
+            you will <span className="text-primary font-bold">work until you die</span>.&rdquo;
+          </>
+        }
       />
 
       {/* MAM vs PAM comparison */}

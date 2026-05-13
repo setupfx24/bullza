@@ -8,6 +8,7 @@ import {
   ChevronDown, CheckCircle2,
 } from 'lucide-react';
 import { BannerPlaceholder } from '@/swisdex/components/BannerPlaceholder';
+import { QuoteSection } from '@/swisdex/components/QuoteSection';
 
 const SIGNUP_HREF = '/auth/register';
 
@@ -18,6 +19,18 @@ export default function AutomatedProfitPage() {
       <BannerPlaceholder
         title="Automated Profit Generation"
         tagline="Pre-built algorithmic investment plans designed to generate consistent monthly returns — even in volatile markets. Pick your tier, fund your account, the bots do the rest."
+      />
+
+      {/* Investor quote — Warren Buffett "make money while you sleep" */}
+      <QuoteSection
+        eyebrow="Why Automate"
+        quote={
+          <>
+            &ldquo;If you don&rsquo;t find a way to{' '}
+            <span className="text-primary font-bold">make money while you sleep</span>,
+            you will <span className="text-primary font-bold">work until you die</span>.&rdquo;
+          </>
+        }
       />
 
       <section className="mx-auto max-w-[1200px] px-[var(--gutter)] py-10 sm:py-14">

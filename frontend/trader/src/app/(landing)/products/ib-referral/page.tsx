@@ -13,7 +13,7 @@ export default function IbReferralPage() {
     <main className="min-h-screen bg-background">
       <BannerPlaceholder
         title="Become an Introducing Broker"
-        tagline="Refer traders to SwisDex and earn lifetime commissions on every lot they trade. No cap, paid weekly."
+        tagline="Refer traders to SwisDex and earn lifetime per-lot commissions — up to $15 per standard lot, paid instantly."
       />
 
       {/* How it works */}
@@ -58,20 +58,17 @@ export default function IbReferralPage() {
             <table className="w-full" style={{ borderCollapse: 'collapse' }}>
               <thead>
                 <tr>
-                  <th className="bg-foreground/[0.04] border-r border-foreground/15 px-5 py-4 text-left text-xs uppercase tracking-[0.16em] text-foreground/55">Tier</th>
-                  <th className="px-5 py-4 text-center font-display uppercase tracking-[0.16em] text-sm text-white border-r border-white/10" style={{ background: 'linear-gradient(180deg, #1f2937 0%, #0a0a0a 100%)' }}>Silver</th>
-                  <th className="px-5 py-4 text-center font-display uppercase tracking-[0.16em] text-sm text-white border-r border-white/10" style={{ background: 'linear-gradient(180deg, #55a630 0%, #1a3210 100%)' }}>Gold</th>
-                  <th className="px-5 py-4 text-center font-display uppercase tracking-[0.16em] text-sm text-white" style={{ background: 'linear-gradient(180deg, #d00000 0%, #3d0000 100%)' }}>Platinum</th>
+                  <th className="bg-foreground/[0.04] border-r border-foreground/15 px-5 py-4 text-left text-xs uppercase tracking-[0.16em] text-foreground/55">Active Referrals</th>
+                  <th className="px-5 py-4 text-center font-display uppercase tracking-[0.16em] text-sm text-white border-r border-white/10" style={{ background: 'linear-gradient(180deg, #1f2937 0%, #0a0a0a 100%)' }}>5 – 20</th>
+                  <th className="px-5 py-4 text-center font-display uppercase tracking-[0.16em] text-sm text-white border-r border-white/10" style={{ background: 'linear-gradient(180deg, #55a630 0%, #1a3210 100%)' }}>21 – 100</th>
+                  <th className="px-5 py-4 text-center font-display uppercase tracking-[0.16em] text-sm text-white" style={{ background: 'linear-gradient(180deg, #d00000 0%, #3d0000 100%)' }}>100+</th>
                 </tr>
               </thead>
               <tbody>
                 {[
-                  { label: 'Active referrals required', a: '5–20',  b: '21–100', c: '100+' },
-                  { label: 'Per-lot rebate',            a: '$3.00', b: '$5.00',  c: '$7.00' },
-                  { label: 'Payout cycle',              a: 'Weekly', b: 'Weekly', c: 'Weekly' },
-                  { label: 'Dedicated manager',         a: '—',      b: '✓',      c: '✓' },
-                  { label: 'Custom marketing kit',      a: 'Standard', b: 'Co-branded', c: 'White-label' },
-                  { label: 'Sub-IB support',            a: '—',      b: '1 level', c: 'Multi-level' },
+                  { label: 'Per-lot commission', a: '$5 – $7',  b: '$7 – $10', c: '$12 – $15' },
+                  { label: 'Payout',             a: 'Instant',  b: 'Instant',  c: 'Instant' },
+                  { label: 'Dedicated manager',  a: '—',        b: '✓',        c: '✓' },
                 ].map((row) => (
                   <tr key={row.label} className="border-t border-foreground/10">
                     <td className="px-5 py-4 text-sm text-foreground/75 bg-foreground/[0.04] border-r border-foreground/15">{row.label}</td>
@@ -93,9 +90,9 @@ export default function IbReferralPage() {
         </div>
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
           {[
-            { icon: Wallet,      title: 'High Per-Lot Payouts',     body: 'Up to $7 per standard lot — among the highest in the industry. No volume claw-back.' },
+            { icon: Wallet,      title: 'High Per-Lot Payouts',     body: 'Up to $15 per standard lot — among the highest in the industry. No volume claw-back.' },
             { icon: Layers,      title: 'Multi-Tier Earnings',      body: 'Earn from your direct referrals AND from IBs you bring in. Build a network, not a sales job.' },
-            { icon: Zap,         title: 'Fast Weekly Payouts',      body: 'Paid every Monday for the prior week. Crypto, bank transfer, or local options — your choice.' },
+            { icon: Zap,         title: 'Instant Payouts',          body: 'Commissions hit your wallet the moment your referral closes a lot — no Monday queue, no holding period.' },
             { icon: BarChart3,   title: 'Real-Time Dashboard',      body: 'Live earnings, trader activity, conversion funnel, lot volume — all in one panel.' },
             { icon: Headphones,  title: 'Dedicated Manager',        body: 'Gold + Platinum partners get a named account manager and direct WhatsApp support.' },
             { icon: Award,       title: 'Marketing Kit',            body: 'Banners, landing pages, video assets, and email copy in 12 languages — ready to deploy.' },
@@ -184,7 +181,7 @@ export default function IbReferralPage() {
             No. You can sign up as a partner directly without ever placing a trade. We do recommend opening a free demo so you understand the product you are recommending.
           </FaqItem>
           <FaqItem q="When are commissions paid?">
-            Every Monday, for trades closed in the prior calendar week. Payouts go to your preferred method — crypto, bank wire, or local rails.
+            Commissions are paid instantly — the moment your referral closes a lot, the rebate hits your wallet. Payouts go to your preferred method — crypto, bank wire, or local rails.
           </FaqItem>
           <FaqItem q="Can my referrals trade any product?">
             Yes. You earn rebates on every lot your referrals trade across forex, metals, energies, indices, and crypto.
