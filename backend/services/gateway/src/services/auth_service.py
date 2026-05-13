@@ -281,12 +281,12 @@ def _build_verify_url(user: User) -> str:
 
 
 def _send_verify_email(user: User, request: Request | None = None) -> None:
-    """Schedule the rich welcome + verify-your-email message. Fire-and-forget.
+    """Schedule the focused verify-your-email message. Fire-and-forget.
 
-    The template embeds the full onboarding content (capability list,
-    account credentials, why-trade bullets) plus the Verify My Account
-    button, so signing up only generates ONE email — not the old
-    welcome + verify pair that landed together and confused users.
+    Template is intentionally minimal: greeting + verify CTA + expiry +
+    "ignore if you didn't sign up" reassurance. Onboarding / welcome
+    content lives elsewhere (or not at all) — the client flagged that
+    bundling it here buried the verification action.
     """
     try:
         from packages.common.src.smtp_mail import (
@@ -296,27 +296,9 @@ def _send_verify_email(user: User, request: Request | None = None) -> None:
             return
         from packages.common.src.email_templates.verify_email import render_verify_email
         verify_url = _build_verify_url(user)
-        # Surface the user's first trading account number as the Trading ID
-        # in the credentials block — if there isn't one yet (the trader will
-        # provision one from /accounts), we just omit the row.
-        trading_id: str | None = None
-        try:
-            primary = next(
-                (a for a in (user.accounts or []) if a.is_active and not a.is_demo),
-                None,
-            ) or next((a for a in (user.accounts or []) if a.is_active), None)
-            if primary and primary.account_number:
-                trading_id = str(primary.account_number)
-        except Exception:
-            trading_id = None
-        st = get_settings()
-        trader_app_url = (getattr(st, "TRADER_APP_URL", None) or "https://trade.swisdex.com").rstrip("/")
         subject, html, text = render_verify_email(
             first_name=user.first_name,
             verify_url=verify_url,
-            trader_app_url=trader_app_url,
-            username=user.email,
-            trading_id=trading_id,
             expires_hours=EMAIL_VERIFY_EXPIRES_HOURS,
         )
         fire_and_forget(send_email(user.email, subject, html, text=text))
