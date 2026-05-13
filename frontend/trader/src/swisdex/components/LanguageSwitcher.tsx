@@ -23,40 +23,57 @@ import { Globe, Check, X } from 'lucide-react';
 interface Language {
   code: string;       // Google Translate code
   label: string;
-  flag: string;       // emoji flag (display-only)
+  /** ISO 3166-1 alpha-2 country code — feeds the `flag-icons` SVG class (e.g. "gb" → fi-gb). */
+  country: string;
 }
 
 const LANGUAGES: Language[] = [
-  { code: 'en',    label: 'English',     flag: '🇬🇧' },
-  { code: 'ms',    label: 'Malay',       flag: '🇲🇾' },
-  { code: 'zh-CN', label: '简体中文',     flag: '🇨🇳' },
-  { code: 'zh-TW', label: '繁體中文',     flag: '🇭🇰' },
-  { code: 'el',    label: 'Ελληνικά',    flag: '🇬🇷' },
-  { code: 'hu',    label: 'Magyar',      flag: '🇭🇺' },
-  { code: 'ru',    label: 'Русский',     flag: '🇷🇺' },
-  { code: 'id',    label: 'Indonesia',   flag: '🇮🇩' },
-  { code: 'fr',    label: 'Français',    flag: '🇫🇷' },
-  { code: 'it',    label: 'Italiano',    flag: '🇮🇹' },
-  { code: 'sv',    label: 'Svenska',     flag: '🇸🇪' },
-  { code: 'de',    label: 'Deutsch',     flag: '🇩🇪' },
-  { code: 'pl',    label: 'Polski',      flag: '🇵🇱' },
-  { code: 'ar',    label: 'العربية',     flag: '🇸🇦' },
-  { code: 'es',    label: 'Español',     flag: '🇪🇸' },
-  { code: 'ko',    label: '한국어',       flag: '🇰🇷' },
-  { code: 'pt',    label: 'Português',   flag: '🇵🇹' },
-  { code: 'vi',    label: 'Tiếng Việt',  flag: '🇻🇳' },
-  { code: 'th',    label: 'ภาษาไทย',     flag: '🇹🇭' },
-  { code: 'fil',   label: 'Filipino',    flag: '🇵🇭' },
-  { code: 'nl',    label: 'Dutch',       flag: '🇳🇱' },
-  { code: 'cs',    label: 'Česky',       flag: '🇨🇿' },
-  { code: 'bn',    label: 'বাংলা',        flag: '🇧🇩' },
-  { code: 'ur',    label: 'اردو',         flag: '🇵🇰' },
-  { code: 'tr',    label: 'Türkçe',      flag: '🇹🇷' },
-  { code: 'hi',    label: 'हिंदी',         flag: '🇮🇳' },
-  { code: 'si',    label: 'සිංහල',       flag: '🇱🇰' },
-  { code: 'uz',    label: "O'zbekcha",   flag: '🇺🇿' },
-  { code: 'mn',    label: 'Монгол',      flag: '🇲🇳' },
+  { code: 'en',    label: 'English',     country: 'gb' },
+  { code: 'ms',    label: 'Malay',       country: 'my' },
+  { code: 'zh-CN', label: '简体中文',     country: 'cn' },
+  { code: 'zh-TW', label: '繁體中文',     country: 'hk' },
+  { code: 'el',    label: 'Ελληνικά',    country: 'gr' },
+  { code: 'hu',    label: 'Magyar',      country: 'hu' },
+  { code: 'ru',    label: 'Русский',     country: 'ru' },
+  { code: 'id',    label: 'Indonesia',   country: 'id' },
+  { code: 'fr',    label: 'Français',    country: 'fr' },
+  { code: 'it',    label: 'Italiano',    country: 'it' },
+  { code: 'sv',    label: 'Svenska',     country: 'se' },
+  { code: 'de',    label: 'Deutsch',     country: 'de' },
+  { code: 'pl',    label: 'Polski',      country: 'pl' },
+  { code: 'ar',    label: 'العربية',     country: 'sa' },
+  { code: 'es',    label: 'Español',     country: 'es' },
+  { code: 'ko',    label: '한국어',       country: 'kr' },
+  { code: 'pt',    label: 'Português',   country: 'pt' },
+  { code: 'vi',    label: 'Tiếng Việt',  country: 'vn' },
+  { code: 'th',    label: 'ภาษาไทย',     country: 'th' },
+  { code: 'fil',   label: 'Filipino',    country: 'ph' },
+  { code: 'nl',    label: 'Dutch',       country: 'nl' },
+  { code: 'cs',    label: 'Česky',       country: 'cz' },
+  { code: 'bn',    label: 'বাংলা',        country: 'bd' },
+  { code: 'ur',    label: 'اردو',         country: 'pk' },
+  { code: 'tr',    label: 'Türkçe',      country: 'tr' },
+  { code: 'hi',    label: 'हिंदी',         country: 'in' },
+  { code: 'si',    label: 'සිංහල',       country: 'lk' },
+  { code: 'uz',    label: "O'zbekcha",   country: 'uz' },
+  { code: 'mn',    label: 'Монгол',      country: 'mn' },
 ];
+
+/**
+ * Renders a real SVG flag via the `flag-icons` library — looks identical on
+ * every OS (no Windows emoji-flag fallback to two-letter codes). The default
+ * 4:3 aspect ratio matches the visual rhythm of the language picker rows.
+ */
+function Flag({ country, className = '' }: { country: string; className?: string }) {
+  return (
+    <span
+      role="img"
+      aria-hidden
+      className={`fi fi-${country} rounded-sm shadow-sm shrink-0 ${className}`}
+      style={{ width: 20, height: 15, backgroundSize: 'cover', backgroundPosition: 'center', display: 'inline-block' }}
+    />
+  );
+}
 
 const COOKIE_NAME = 'googtrans';
 
@@ -114,8 +131,9 @@ export function LanguageSwitcher() {
     setOpen(false);
   }, []);
 
-  const activeLabel = LANGUAGES.find((l) => l.code === active)?.label ?? 'English';
-  const activeFlag  = LANGUAGES.find((l) => l.code === active)?.flag  ?? '🇬🇧';
+  const activeLang  = LANGUAGES.find((l) => l.code === active);
+  const activeLabel = activeLang?.label ?? 'English';
+  const activeCountry = activeLang?.country ?? 'gb';
 
   return (
     <>
@@ -129,7 +147,7 @@ export function LanguageSwitcher() {
         translate="no"
       >
         <Globe className="size-4" />
-        <span className="hidden sm:inline">{activeFlag}</span>
+        <Flag country={activeCountry} className="hidden sm:inline-block" />
         <span className="hidden md:inline uppercase tracking-wider">{active}</span>
       </button>
 
@@ -189,7 +207,7 @@ export function LanguageSwitcher() {
                           }`}
                           aria-pressed={isActive}
                         >
-                          <span className="text-base shrink-0" aria-hidden>{lang.flag}</span>
+                          <Flag country={lang.country} />
                           <span className="flex-1 truncate">{lang.label}</span>
                           {isActive && <Check className="size-4 shrink-0" />}
                         </button>

@@ -12,6 +12,9 @@
 @import "@fontsource/montserrat/800.css";
 
 .swisdex-home {
+  /* Belt-and-braces: never let any descendant cause horizontal page scroll on mobile. */
+  overflow-x: hidden;
+
   /* ── Raw palette (HSL triplets, no hsl() so Tailwind alpha works) ── */
   --ink:           0 0% 6%;
   --cream:         0 0% 96%;

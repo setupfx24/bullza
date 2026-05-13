@@ -191,7 +191,7 @@ The legacy landing pages (`Forex.jsx`, `Indices.jsx`, `Crypto.jsx`,
 existing brand assets. Logos / favicon already live at:
 
 - `public/images/swisdex-logo.png`
-- `public/images/swisdex_logo_fevicon.png`
+- `public/images/swisdex_fevicon.png`
 
 To brand-refresh those: drop replacement files at the same paths (same names).
 
