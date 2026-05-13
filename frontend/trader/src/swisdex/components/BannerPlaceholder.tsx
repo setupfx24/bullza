@@ -33,24 +33,10 @@ export function BannerPlaceholder({
           aria-hidden
         />
       ) : (
-        // Fallback gradient until an image is dropped.
-        // TODO: Banner image / video yahan aayegi — see README-CONTENT-PLACEHOLDERS.md
-        <div
-          className="image-placeholder absolute inset-0 bg-foreground/[0.06]"
-          style={{
-            backgroundImage:
-              'linear-gradient(135deg, hsl(99 55% 42% / 0.10) 0%, hsl(0 0% 6%) 60%, hsl(0 100% 41% / 0.10) 100%)',
-          }}
-        />
+        // Plain black box until a real banner is dropped — per client
+        // direction "use only real images, plain black box as placeholder".
+        <div className="image-placeholder absolute inset-0" style={{ background: '#000' }} />
       )}
-      <div
-        aria-hidden
-        className="absolute inset-0"
-        style={{
-          background:
-            'radial-gradient(ellipse 70% 55% at 50% 50%, transparent 0%, hsl(0 0% 6%) 90%)',
-        }}
-      />
 
       <div className="relative z-10 mx-auto max-w-[1200px] px-[var(--gutter)] pt-32 pb-12 sm:pt-40 sm:pb-20 md:pt-48 md:pb-24 text-center">
         <h1 className="font-display uppercase tracking-tight leading-[0.95] text-foreground text-3xl sm:text-5xl md:text-6xl break-words">

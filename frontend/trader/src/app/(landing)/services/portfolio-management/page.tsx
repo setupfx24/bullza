@@ -7,6 +7,7 @@ import {
   Headphones, FileText, Target, ChevronDown,
 } from 'lucide-react';
 import { BannerPlaceholder } from '@/swisdex/components/BannerPlaceholder';
+import { QuoteSection } from '@/swisdex/components/QuoteSection';
 
 const SIGNUP_HREF = '/auth/register';
 
@@ -127,6 +128,20 @@ export default function PortfolioManagementPage() {
           ))}
         </div>
       </section>
+
+      {/* Investor quote — Warren Buffett "make money while you sleep"
+          Sits between Manager profiles and the Fee table per client request
+          ("move this section 2 sections down"). */}
+      <QuoteSection
+        eyebrow="Why Managed Accounts"
+        quote={
+          <>
+            &ldquo;If you don&rsquo;t find a way to{' '}
+            <span className="text-primary font-bold">make money while you sleep</span>,
+            you will <span className="text-primary font-bold">work until you die</span>.&rdquo;
+          </>
+        }
+      />
 
       {/* Fee table */}
       <section className="mx-auto max-w-[1200px] px-[var(--gutter)] py-12 sm:py-16">

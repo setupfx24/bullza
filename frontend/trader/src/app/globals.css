@@ -284,6 +284,22 @@ html, body {
   overflow-x: hidden;
 }
 
+/* ──────────────────────────────────────────────────────────────────────
+   Image placeholders — client direction: until a real image is dropped,
+   render every `image-placeholder` div as a plain black box. Hides any
+   decorative icon / illustration the markup currently nests inside the
+   placeholder. As soon as the real image is added (typically by
+   replacing the placeholder div with an <img>), this rule no longer
+   matches and the picture renders normally.
+   ────────────────────────────────────────────────────────────────────── */
+.image-placeholder {
+  background: #000 !important;
+  background-image: none !important;
+}
+.image-placeholder > * {
+  display: none !important;
+}
+
 .tabular-nums { font-variant-numeric: tabular-nums; }
 
 /* Google Translate Element — hide all default UI (we drive it via our

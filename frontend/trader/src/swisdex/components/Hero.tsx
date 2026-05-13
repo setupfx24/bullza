@@ -48,6 +48,34 @@ export function Hero() {
         <div className="absolute bottom-0 inset-x-0 h-[40vh] z-[4] gradient-fade-b pointer-events-none" />
 
         <div className="absolute inset-0 z-10 flex flex-col items-center justify-center text-center px-6 pointer-events-none">
+          {/* Bonus offer pill — primary CTA above the headline */}
+          <motion.div
+            initial={{ opacity: 0, y: -6 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.05, duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+            className="mb-5 inline-flex items-center gap-2.5 rounded-full px-3 py-1.5 pointer-events-auto"
+            style={{
+              background: 'rgba(85,166,48,0.18)',
+              border: '1px solid rgba(85,166,48,0.45)',
+              backdropFilter: 'blur(8px)',
+            }}
+          >
+            <span className="relative inline-flex items-center justify-center" aria-hidden>
+              <span className="absolute size-2 rounded-full bg-primary opacity-75 animate-ping" />
+              <span className="relative size-2 rounded-full bg-primary" />
+            </span>
+            <span className="text-[12px] sm:text-sm font-semibold text-foreground uppercase tracking-[0.14em]">
+              100% Bonus on Your First Deposit
+            </span>
+            <Link
+              href="/bonus"
+              className="inline-flex items-center gap-1 text-[12px] sm:text-sm font-bold text-primary hover:text-foreground transition-colors uppercase tracking-[0.14em] pl-2 border-l border-primary/40"
+            >
+              Details
+              <ArrowUpRight className="size-3.5" />
+            </Link>
+          </motion.div>
+
           <motion.div
             initial={{ filter: 'blur(10px)', opacity: 0, y: 16 }}
             animate={{ filter: 'blur(0px)', opacity: 1, y: 0 }}
@@ -65,7 +93,7 @@ export function Hero() {
             transition={{ delay: 0.55, duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
             className="mt-4 font-display uppercase tracking-[0.18em] text-xs sm:text-base md:text-lg text-foreground/85 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 pointer-events-auto"
           >
-            <span>Decentralized Exchange</span>
+            <span>Decentralised Exchange</span>
             <span aria-hidden className="text-primary">:</span>
             <span>Insured Trades</span>
             <span aria-hidden className="text-primary">:</span>

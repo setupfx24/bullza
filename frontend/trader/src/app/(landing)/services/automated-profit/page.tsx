@@ -8,6 +8,7 @@ import {
   ChevronDown, CheckCircle2,
 } from 'lucide-react';
 import { BannerPlaceholder } from '@/swisdex/components/BannerPlaceholder';
+import { QuoteSection } from '@/swisdex/components/QuoteSection';
 
 const SIGNUP_HREF = '/auth/register';
 
@@ -19,6 +20,7 @@ export default function AutomatedProfitPage() {
         title="Automated Profit Generation"
         tagline="Pre-built algorithmic investment plans designed to generate consistent monthly returns — even in volatile markets. Pick your tier, fund your account, the bots do the rest."
       />
+
 
       <section className="mx-auto max-w-[1200px] px-[var(--gutter)] py-10 sm:py-14">
         <div className="liquid-glass-strong rounded-3xl p-6 sm:p-10 grid lg:grid-cols-[1.2fr_1fr] gap-8 items-center">
@@ -76,6 +78,20 @@ export default function AutomatedProfitPage() {
           ))}
         </ol>
       </section>
+
+      {/* Investor quote — Warren Buffett "make money while you sleep"
+          Sits between How It Works and Plans per client request
+          ("move this section 2 sections down"). */}
+      <QuoteSection
+        eyebrow="Why Automate"
+        quote={
+          <>
+            &ldquo;If you don&rsquo;t find a way to{' '}
+            <span className="text-primary font-bold">make money while you sleep</span>,
+            you will <span className="text-primary font-bold">work until you die</span>.&rdquo;
+          </>
+        }
+      />
 
       {/* 3. Plans */}
       <section id="plans" className="mx-auto max-w-[1200px] px-[var(--gutter)] py-12 sm:py-16">

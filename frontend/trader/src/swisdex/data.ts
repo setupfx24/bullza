@@ -28,7 +28,6 @@ export const NAV_ITEMS: NavItem[] = [
   { label: 'Home',         href: '/' },
   { label: 'Markets',      href: '/markets' },
   { label: 'Accounts',     href: '/account-types' },
-  { label: 'How it Works', href: '/how-it-works' },
   {
     label: 'Academy',
     href: '/academy/videos',
@@ -49,8 +48,10 @@ export const NAV_ITEMS: NavItem[] = [
     label: 'Products',
     href: '/products/ib-referral',
     children: [
-      { label: 'IB Referral',            href: '/products/ib-referral' },
-      { label: 'Fixed Return Insurance', href: '/products/fixed-return-insurance' },
+      { label: 'IB',           href: '/products/ib-referral' },
+      { label: 'Referral',     href: '/products/referral' },
+      { label: 'Fixed Return', href: '/products/fixed-return-insurance' },
+      { label: 'Insurance',    href: '/products/insurance' },
     ],
   },
   { label: 'About',        href: '/company/about' },

@@ -40,32 +40,66 @@ const ACCOUNT_TYPES = [
 const AboutUs = () => {
   return (
     <div className="min-h-screen pt-20">
-      <section className="section-padding hero-banner relative overflow-hidden">
-        {/* Background banner image at 70% opacity */}
+      <section className="section-padding hero-banner relative overflow-hidden" style={{ background: '#050707' }}>
+        {/* Clean dark base — no photo background. Makes the heading sit
+            cleanly on solid colour for maximum contrast. */}
+        <div aria-hidden className="absolute inset-0" style={{ background: '#050707' }} />
+
+        {/* Subtle dot grid pattern — pure SVG, no AI/photo content */}
         <div
           aria-hidden
           className="absolute inset-0"
           style={{
-            backgroundImage: 'url(/images/banner1.png)',
-            backgroundSize: 'cover',
-            backgroundPosition: 'center',
-            backgroundRepeat: 'no-repeat',
-            opacity: 0.7,
+            backgroundImage:
+              "radial-gradient(circle at 1px 1px, rgba(255,255,255,0.06) 1px, transparent 0)",
+            backgroundSize: '28px 28px',
+            opacity: 0.85,
           }}
         />
-        {/* Subtle dark vignette to keep text readable on top of the image */}
+
+        {/* Brand-green glow at top + brand-red glow at bottom */}
         <div
           aria-hidden
           className="absolute inset-0"
           style={{
             background:
-              'radial-gradient(ellipse 80% 60% at 50% 50%, transparent 0%, rgba(0,0,0,0.55) 100%)',
+              'radial-gradient(60% 50% at 50% 0%, rgba(85,166,48,0.18) 0%, transparent 60%), ' +
+              'radial-gradient(45% 35% at 50% 100%, rgba(208,0,0,0.10) 0%, transparent 70%)',
           }}
         />
+
+        {/* Vignette to anchor the heading in the centre */}
+        <div
+          aria-hidden
+          className="absolute inset-0"
+          style={{
+            background:
+              'radial-gradient(ellipse 70% 50% at 50% 50%, transparent 0%, rgba(0,0,0,0.55) 100%)',
+          }}
+        />
+
         <div className="container-custom text-center relative z-10">
           <ScrollReveal variant="fadeUp">
-            <h1 className="text-5xl md:text-6xl font-bold text-white mb-6">Who We Are — SwisDex</h1>
-            <p className="text-xl text-text-secondary max-w-3xl mx-auto">
+            <span
+              className="inline-flex items-center gap-2 px-3 py-1 rounded-full mb-6"
+              style={{
+                background: 'rgba(85,166,48,0.18)',
+                border: '1px solid rgba(85,166,48,0.4)',
+              }}
+            >
+              <span className="size-1.5 rounded-full" style={{ background: '#55a630' }} />
+              <span className="text-[11px] uppercase tracking-[0.22em] font-semibold text-white">About SwisDex</span>
+            </span>
+            <h1
+              className="text-5xl md:text-6xl font-bold mb-6"
+              style={{
+                color: '#ffffff',
+                textShadow: '0 4px 24px rgba(0,0,0,0.6), 0 1px 2px rgba(0,0,0,0.9)',
+              }}
+            >
+              Who We Are — SwisDex
+            </h1>
+            <p className="text-xl max-w-3xl mx-auto" style={{ color: 'rgba(255,255,255,0.78)' }}>
               A globally regulated forex and CFD broker committed to transparency, innovation, and excellence.
             </p>
           </ScrollReveal>
