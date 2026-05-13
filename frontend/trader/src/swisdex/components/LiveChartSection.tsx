@@ -2,24 +2,13 @@
 
 import { useRef, useState } from 'react';
 import Link from 'next/link';
-import { ArrowUpRight, Repeat, Coins, BarChart3, LineChart, ChevronDown } from 'lucide-react';
+import { ArrowUpRight, ChevronDown } from 'lucide-react';
 import { TradingViewChart } from './TradingViewChart';
 
-interface QuickTab {
-  key: string;
-  label: string;
-  Icon: React.ComponentType<{ className?: string }>;
-  symbol: string;
-  tvSymbol: string;
-  spread: string;
-}
-
-const QUICK_TABS: QuickTab[] = [
-  { key: 'indices',     label: 'Indices',     Icon: BarChart3, symbol: 'US30',    tvSymbol: 'OANDA:US30USD',   spread: '1.0 pts' },
-  { key: 'commodities', label: 'Commodities', Icon: Coins,     symbol: 'XAU/USD', tvSymbol: 'OANDA:XAUUSD',    spread: '0.15 pips' },
-  { key: 'stocks',      label: 'Stocks',      Icon: LineChart, symbol: 'AAPL',    tvSymbol: 'NASDAQ:AAPL',     spread: 'Market' },
-  { key: 'forex',       label: 'Forex Pairs', Icon: Repeat,    symbol: 'EUR/USD', tvSymbol: 'FX:EURUSD',       spread: '0.1 pips' },
-];
+/** Initial chart state — first instrument loaded into the live chart on mount. */
+const DEFAULT_SYMBOL   = 'US30';
+const DEFAULT_TV       = 'OANDA:US30USD';
+const DEFAULT_SPREAD   = '1.0 pts';
 
 /* TradingView symbol mapping for every directory item below. */
 const INSTRUMENT_MAP: Record<string, string> = {
@@ -104,18 +93,13 @@ const COLUMNS: Column[] = [
     viewAllHref: '/trading/forex',
     items: ['EUR/USD', 'GBP/USD', 'USD/JPY', 'AUD/USD', 'EUR/GBP', 'USD/CAD', 'USD/CHF', 'GBP/JPY', 'EUR/CAD', 'EUR/AUD', 'AUD/CHF'],
   },
-  {
-    heading: 'Options',
-    viewAllHref: '/markets',
-    items: ['AUD/CAD Options', 'AUD/CHF Options', 'AUD/JPY Options', 'AUD/NZD Options', 'AUD/USD Options', 'CAD/CHF Options', 'CAD/JPY Options', 'CHF/JPY Options'],
-  },
 ];
 
 export function LiveChartSection() {
-  // Active chart state — populated from quick-tabs or instrument directory.
-  const [activeSymbol, setActiveSymbol] = useState<string>(QUICK_TABS[0].symbol);
-  const [activeTv,     setActiveTv]     = useState<string>(QUICK_TABS[0].tvSymbol);
-  const [activeSpread, setActiveSpread] = useState<string>(QUICK_TABS[0].spread);
+  // Active chart state — populated by clicking an item in the instrument directory.
+  const [activeSymbol, setActiveSymbol] = useState<string>(DEFAULT_SYMBOL);
+  const [activeTv,     setActiveTv]     = useState<string>(DEFAULT_TV);
+  const [activeSpread, setActiveSpread] = useState<string>(DEFAULT_SPREAD);
   const chartRef = useRef<HTMLDivElement>(null);
 
   const selectInstrument = (label: string) => {
@@ -128,12 +112,6 @@ export function LiveChartSection() {
     requestAnimationFrame(() => {
       chartRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     });
-  };
-
-  const selectQuickTab = (t: QuickTab) => {
-    setActiveSymbol(t.symbol);
-    setActiveTv(t.tvSymbol);
-    setActiveSpread(t.spread);
   };
 
   return (
@@ -155,23 +133,6 @@ export function LiveChartSection() {
           activeLabel={activeSymbol}
           onSelect={selectInstrument}
         />
-
-        {/* Quick-tabs for popular asset classes */}
-        <div className="mt-12 inline-flex flex-wrap justify-center gap-2 p-1.5 rounded-full liquid-glass">
-          {QUICK_TABS.map((t) => (
-            <button
-              key={t.key}
-              type="button"
-              onClick={() => selectQuickTab(t)}
-              className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-body transition-colors ${
-                activeSymbol === t.symbol ? 'bg-primary text-white' : 'text-foreground/70 hover:text-foreground'
-              }`}
-            >
-              <t.Icon className="size-4" />
-              {t.label}
-            </button>
-          ))}
-        </div>
 
         {/* Live chart card */}
         <div ref={chartRef} className="mt-10 scroll-mt-32">
@@ -249,7 +210,7 @@ function InstrumentDirectory({
         </span>
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4 items-start">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 items-start">
         {COLUMNS.map((col, i) => {
           const isOpen = openIdx === i;
           return (

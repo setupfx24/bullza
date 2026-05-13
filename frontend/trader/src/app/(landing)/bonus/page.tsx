@@ -7,7 +7,6 @@ import {
   Zap, ShieldCheck, Clock, ChevronDown,
 } from 'lucide-react';
 import { BannerPlaceholder } from '@/swisdex/components/BannerPlaceholder';
-import { FixedReturnRateTable } from '@/swisdex/components/FixedReturnRateTable';
 
 const SIGNUP_HREF = '/auth/register';
 
@@ -179,9 +178,6 @@ export default function BonusPage() {
           Bonus is credited as tradeable equity on your first qualifying deposit only. Lot-volume unlock requirements apply before bonus is withdrawable.
         </p>
       </section>
-
-      {/* Fixed Return Funds rate matrix */}
-      <FixedReturnRateTable />
 
       {/* Comparison table */}
       <section className="mx-auto max-w-[1200px] px-[var(--gutter)] py-12 sm:py-16">
