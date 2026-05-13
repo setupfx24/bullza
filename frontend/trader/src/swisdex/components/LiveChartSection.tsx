@@ -2,7 +2,7 @@
 
 import { useRef, useState } from 'react';
 import Link from 'next/link';
-import { ArrowUpRight, Repeat, Coins, BarChart3, LineChart, ChevronLeft, ChevronRight } from 'lucide-react';
+import { ArrowUpRight, Repeat, Coins, BarChart3, LineChart, ChevronDown } from 'lucide-react';
 import { TradingViewChart } from './TradingViewChart';
 
 interface QuickTab {
@@ -219,81 +219,112 @@ function InstrumentDirectory({
   activeLabel: string;
   onSelect: (label: string) => void;
 }) {
-  const scrollerRef = useRef<HTMLDivElement>(null);
+  // Track which category dropdown is open. -1 means all collapsed.
+  const [openIdx, setOpenIdx] = useState<number>(-1);
+  const closeTimer = useRef<number | null>(null);
 
-  /** Scrolls the directory horizontally by one snap-column. */
-  const nudge = (dir: 1 | -1) => {
-    const el = scrollerRef.current;
-    if (!el) return;
-    const firstChild = el.firstElementChild as HTMLElement | null;
-    const step = firstChild ? firstChild.getBoundingClientRect().width + 24 : 280;
-    el.scrollBy({ left: step * dir, behavior: 'smooth' });
+  /** Cancel any pending close (called when re-entering the dropdown area). */
+  const cancelClose = () => {
+    if (closeTimer.current) {
+      window.clearTimeout(closeTimer.current);
+      closeTimer.current = null;
+    }
+  };
+
+  /** Schedule a close — small delay so the user can move from the button to
+   *  the floating panel without it disappearing. */
+  const scheduleClose = () => {
+    cancelClose();
+    closeTimer.current = window.setTimeout(() => setOpenIdx(-1), 180);
   };
 
   return (
-    <div className="mt-12 sm:mt-16 text-left relative">
-      <div className="flex items-center justify-between mb-4">
+    <div className="mt-12 sm:mt-16 text-left">
+      <div className="flex items-center justify-between mb-5">
         <h3 className="font-display uppercase text-base sm:text-lg tracking-[0.18em] text-foreground/55">
           Browse Instruments
         </h3>
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            aria-label="Scroll instruments left"
-            onClick={() => nudge(-1)}
-            className="size-9 rounded-full liquid-glass-strong flex items-center justify-center text-foreground/80 hover:text-foreground hover:bg-foreground/10 transition-colors"
-          >
-            <ChevronLeft className="size-4" />
-          </button>
-          <button
-            type="button"
-            aria-label="Scroll instruments right"
-            onClick={() => nudge(1)}
-            className="size-9 rounded-full liquid-glass-strong flex items-center justify-center text-foreground/80 hover:text-foreground hover:bg-foreground/10 transition-colors"
-          >
-            <ChevronRight className="size-4" />
-          </button>
-        </div>
+        <span className="hidden sm:inline-flex items-center text-[11px] uppercase tracking-[0.16em] text-foreground/40 gap-1">
+          Hover or tap to expand
+        </span>
       </div>
 
-      {/* Horizontal snap-scroll carousel — arrows scroll one column at a time */}
-      <div
-        ref={scrollerRef}
-        className="flex gap-6 overflow-x-auto snap-x snap-mandatory pb-3 -mx-[var(--gutter)] px-[var(--gutter)]"
-        style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.15) transparent' }}
-      >
-        {COLUMNS.map((col) => (
-          <div
-            key={col.heading}
-            className="snap-start shrink-0 w-[calc(50%-12px)] sm:w-[calc(33.333%-16px)] lg:w-[calc(20%-19.2px)]"
-          >
-            <h3 className="font-display uppercase text-lg sm:text-xl tracking-tight text-foreground mb-4">
-              {col.heading}
-            </h3>
-            <ul className="flex flex-col gap-2.5">
-              {col.items.map((item) => {
-                const isActive = activeLabel === item;
-                return (
-                  <li key={item}>
-                    <button
-                      type="button"
-                      onClick={() => onSelect(item)}
-                      className={`text-left text-base transition-colors ${
-                        isActive
-                          ? 'text-primary font-semibold'
-                          : 'text-foreground/75 hover:text-primary'
-                      }`}
-                      aria-pressed={isActive}
-                      aria-label={`Load ${item} live chart`}
-                    >
-                      {item}
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
-        ))}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4 items-start">
+        {COLUMNS.map((col, i) => {
+          const isOpen = openIdx === i;
+          return (
+            <div
+              key={col.heading}
+              className="flex flex-col"
+              onMouseEnter={() => { cancelClose(); setOpenIdx(i); }}
+              onMouseLeave={scheduleClose}
+            >
+              {/* Category trigger */}
+              <button
+                type="button"
+                onClick={() => setOpenIdx((cur) => (cur === i ? -1 : i))}
+                aria-expanded={isOpen}
+                aria-haspopup="true"
+                aria-label={`Show ${col.heading} instruments`}
+                className={`w-full liquid-glass rounded-2xl px-4 py-4 flex items-center justify-between gap-2 transition-colors ${
+                  isOpen ? 'bg-primary/10 ring-1 ring-primary/40' : 'hover:bg-foreground/[0.05]'
+                }`}
+              >
+                <span
+                  className="font-display uppercase text-sm sm:text-base tracking-tight"
+                  style={{ color: '#ffffff' }}
+                >
+                  {col.heading}
+                </span>
+                <ChevronDown
+                  className={`size-4 shrink-0 transition-transform ${isOpen ? 'rotate-180' : ''}`}
+                  style={{ color: isOpen ? '#55a630' : 'rgba(255,255,255,0.85)' }}
+                  aria-hidden
+                />
+              </button>
+
+              {/* Inline dropdown — appears directly below the button in the
+                  normal document flow. Pushes the chart down rather than
+                  overlaying it. Per client request: items render right
+                  underneath the category card, no floating panel. */}
+              {isOpen && (
+                <div
+                  className="mt-2 liquid-glass-strong rounded-2xl p-3 [backdrop-filter:blur(28px)]"
+                  style={{ border: '1px solid hsl(99 55% 42% / 0.35)' }}
+                  role="menu"
+                >
+                  <ul className="flex flex-col gap-1 max-h-[320px] overflow-y-auto">
+                    {col.items.map((item) => {
+                      const isActive = activeLabel === item;
+                      return (
+                        <li key={item} role="none">
+                          <button
+                            type="button"
+                            role="menuitem"
+                            onClick={() => {
+                              onSelect(item);
+                              setOpenIdx(-1);
+                            }}
+                            className={`w-full text-left text-sm px-3 py-2 rounded-lg transition-colors ${
+                              isActive
+                                ? 'bg-primary/25 font-semibold'
+                                : 'hover:bg-foreground/[0.08]'
+                            }`}
+                            style={{ color: isActive ? '#55a630' : '#ffffff' }}
+                            aria-pressed={isActive}
+                            aria-label={`Load ${item} live chart`}
+                          >
+                            {item}
+                          </button>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
     </div>
   );

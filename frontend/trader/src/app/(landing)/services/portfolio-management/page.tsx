@@ -19,18 +19,6 @@ export default function PortfolioManagementPage() {
         tagline="Professional asset allocation managed by verified strategists. Choose MAM for a fully managed account, or PAM for proportional exposure to a master strategy."
       />
 
-      {/* Investor quote — Warren Buffett "make money while you sleep" */}
-      <QuoteSection
-        eyebrow="Why Managed Accounts"
-        quote={
-          <>
-            &ldquo;If you don&rsquo;t find a way to{' '}
-            <span className="text-primary font-bold">make money while you sleep</span>,
-            you will <span className="text-primary font-bold">work until you die</span>.&rdquo;
-          </>
-        }
-      />
-
       {/* MAM vs PAM comparison */}
       <section id="mam-pam" className="mx-auto max-w-[1200px] px-[var(--gutter)] py-12 sm:py-16">
         <div className="text-center mb-10">
@@ -140,6 +128,20 @@ export default function PortfolioManagementPage() {
           ))}
         </div>
       </section>
+
+      {/* Investor quote — Warren Buffett "make money while you sleep"
+          Sits between Manager profiles and the Fee table per client request
+          ("move this section 2 sections down"). */}
+      <QuoteSection
+        eyebrow="Why Managed Accounts"
+        quote={
+          <>
+            &ldquo;If you don&rsquo;t find a way to{' '}
+            <span className="text-primary font-bold">make money while you sleep</span>,
+            you will <span className="text-primary font-bold">work until you die</span>.&rdquo;
+          </>
+        }
+      />
 
       {/* Fee table */}
       <section className="mx-auto max-w-[1200px] px-[var(--gutter)] py-12 sm:py-16">
