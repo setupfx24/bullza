@@ -23,8 +23,8 @@ import { useAuthStore } from '@/stores/authStore';
 import api from '@/lib/api/client';
 import PhoneInput from '@/components/forms/PhoneInput';
 import DOBPicker from '@/components/forms/DOBPicker';
+import CountrySelect from '@/components/forms/CountrySelect';
 import {
-  COUNTRIES as GEO_COUNTRIES,
   getStatesOfCountry,
   getCitiesOfState,
 } from '@/lib/geo';
@@ -40,11 +40,6 @@ type FormState = {
   postal_code: string;
   date_of_birth: string;
 };
-
-// COUNTRIES + dial codes + per-country states now live in lib/geo.ts so
-// the register page, PhoneInput, and this gate all share one source of
-// truth. Aliasing GEO_COUNTRIES keeps the JSX below reading the same.
-const COUNTRIES = GEO_COUNTRIES;
 
 function _toDateInput(s: string | null | undefined): string {
   if (!s) return '';
@@ -254,21 +249,14 @@ export default function ProfileCompleteGate() {
           )}
 
           <Field label="Country of residence" required>
-            <select
+            <CountrySelect
               value={form.country}
-              onChange={(e) => {
+              onChange={(next) => {
                 // Changing country invalidates state + city since both
                 // are filtered by the country code in country-state-city.
-                const next = e.target.value;
                 setForm((f) => ({ ...f, country: next, state: '', city: '' }));
               }}
-              className="w-full px-3 py-2.5 rounded-lg border border-border-primary bg-bg-secondary text-text-primary outline-none focus:border-[#55a630]/50 text-sm appearance-none"
-            >
-              <option value="">Select your country…</option>
-              {COUNTRIES.map((c) => (
-                <option key={c.code} value={c.name}>{c.flag} {c.name}</option>
-              ))}
-            </select>
+            />
           </Field>
 
           <Field label="Street address" required>
