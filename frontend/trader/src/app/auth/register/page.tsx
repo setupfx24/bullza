@@ -165,15 +165,12 @@ function RegisterContent() {
         // verifier short-circuits the same way (dev parity).
         cf_turnstile_token: turnstileToken || undefined,
       });
-      // Account created — backend signs the user in (HttpOnly cookies)
-      // AND emails a verify link in parallel. Send the user straight to
-      // the dashboard so the ProfileCompleteGate modal can take over and
-      // collect address / DOB / etc. The "check your email" reminder is
-      // surfaced inside the gate's success popup after Save & Continue,
-      // so the trader sees both the dashboard and the verification nudge
-      // in one flow (matches demoLogin / googleLogin landing behaviour).
-      toast.success('Account created — please complete your profile.');
-      router.push('/accounts');
+      // Account created. The backend does NOT issue session cookies here
+      // — the user has to click the verify link in their inbox, which is
+      // the only path that grants a session. Bounce to /auth/check-email
+      // so the user knows to check their inbox.
+      toast.success('Account created — check your email to verify and sign in.');
+      router.push(`/auth/check-email?email=${encodeURIComponent(form.email)}`);
     } catch (err: any) {
       toast.error(err.message || 'Registration failed');
     } finally {

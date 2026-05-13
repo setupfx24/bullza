@@ -131,9 +131,12 @@ export const useAuthStore = create<AuthState>()((set) => ({
   register: async (data) => {
     set({ isLoading: true });
     try {
-      await api.post<{ access_token: string }>('/auth/register', data);
-      const user = await api.get<User>('/auth/me');
-      set({ user, isAuthenticated: true, isLoading: false, token: null });
+      // Register no longer issues session cookies — the user must click the
+      // verify link in their inbox to log in. Don't fetch /auth/me here
+      // (would 401) and leave the store unauthenticated; the page handler
+      // redirects to /auth/check-email after this resolves.
+      await api.post<{ email: string; verification_sent: boolean }>('/auth/register', data);
+      set({ isLoading: false });
     } catch (e) {
       set({ isLoading: false });
       throw e;

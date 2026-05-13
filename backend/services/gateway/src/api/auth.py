@@ -75,14 +75,20 @@ async def register(req: RegisterRequest, request: Request, db: AsyncSession = De
 
 
 @router.get("/verify-email")
-async def verify_email(token: str, db: AsyncSession = Depends(get_db)):
+async def verify_email(token: str, request: Request, db: AsyncSession = Depends(get_db)):
     """Verify the email address using the signed token from the click-link.
-    Idempotent — clicking the link twice still returns 200."""
+
+    On success the response carries the session cookies (auto-login) so the
+    frontend can redirect the user straight into `/accounts` — this is the
+    single entry point that grants a session for new signups, since
+    /auth/register no longer issues cookies.
+
+    Idempotent: clicking the link twice still returns 200 + fresh cookies.
+    """
     try:
-        await _confirm_email_verification(token, db=db)
+        return await _confirm_email_verification(token, request=request, db=db)
     except AuthServiceError as e:
         raise HTTPException(status_code=e.status_code, detail=e.detail)
-    return {"message": "Email verified — you can now sign in.", "verified": True}
 
 
 class _ResendVerifyBody(__import__("pydantic").BaseModel):
