@@ -57,6 +57,20 @@ const LANGUAGES: Language[] = [
   { code: 'si',    label: 'සිංහල',       country: 'lk' },
   { code: 'uz',    label: "O'zbekcha",   country: 'uz' },
   { code: 'mn',    label: 'Монгол',      country: 'mn' },
+  { code: 'ja',    label: '日本語',        country: 'jp' },
+  { code: 'ta',    label: 'தமிழ்',         country: 'in' },
+  { code: 'te',    label: 'తెలుగు',         country: 'in' },
+  { code: 'mr',    label: 'मराठी',         country: 'in' },
+  { code: 'gu',    label: 'ગુજરાતી',        country: 'in' },
+  { code: 'pa',    label: 'ਪੰਜਾਬੀ',          country: 'in' },
+  { code: 'fa',    label: 'فارسی',         country: 'ir' },
+  { code: 'iw',    label: 'עברית',         country: 'il' },
+  { code: 'uk',    label: 'Українська',   country: 'ua' },
+  { code: 'ro',    label: 'Română',       country: 'ro' },
+  { code: 'no',    label: 'Norsk',        country: 'no' },
+  { code: 'da',    label: 'Dansk',        country: 'dk' },
+  { code: 'fi',    label: 'Suomi',        country: 'fi' },
+  { code: 'sw',    label: 'Kiswahili',    country: 'ke' },
 ];
 
 /**

@@ -48,12 +48,59 @@ export function Hero() {
         <div className="absolute bottom-0 inset-x-0 h-[40vh] z-[4] gradient-fade-b pointer-events-none" />
 
         <div className="absolute inset-0 z-10 flex flex-col items-center justify-center text-center px-6 pointer-events-none">
-          {/* Bonus offer pill — primary CTA above the headline */}
           <motion.div
-            initial={{ opacity: 0, y: -6 }}
+            initial={{ filter: 'blur(10px)', opacity: 0, y: 16 }}
+            animate={{ filter: 'blur(0px)', opacity: 1, y: 0 }}
+            transition={{ delay: 0.15, duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
+            className="pointer-events-auto"
+          >
+            <h1 className="font-display uppercase text-[clamp(28px,6.2vw,52px)] leading-[1.05] tracking-[-0.02em] text-foreground font-bold px-2 max-w-[18ch] sm:max-w-none mx-auto sm:whitespace-nowrap">
+              <BubbleText text="Trade Smarter Grow Faster" as="span" />
+            </h1>
+          </motion.div>
+
+          <motion.h3
+            initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.05, duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-            className="mb-5 inline-flex items-center gap-2.5 rounded-full px-3 py-1.5 pointer-events-auto"
+            transition={{ delay: 0.55, duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+            className="mt-4 font-display uppercase tracking-[0.18em] text-xs sm:text-base md:text-lg text-foreground/85 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 pointer-events-auto"
+          >
+            <span>Decentralized Exchange</span>
+            <span aria-hidden className="text-primary">:</span>
+            <span>Insured Trades</span>
+            <span aria-hidden className="text-primary">:</span>
+            <span>Fixed Return Program</span>
+          </motion.h3>
+
+          <TypewriterText
+            text={HERO.sub}
+            duration={6}
+            holdDuration={5}
+            eraseDuration={2.5}
+            pauseDuration={1.5}
+            startDelay={0.9}
+            className="mt-6 font-body text-base md:text-lg text-foreground/70 max-w-2xl leading-relaxed min-h-[3em]"
+          />
+
+          {/* Secondary CTA — primary "Details" button removed per client
+              request (the Details link now lives inside the bonus pill below). */}
+          <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 1.4, duration: 0.6 }}
+            className="mt-8 flex items-center gap-3 flex-wrap justify-center pointer-events-auto"
+          >
+            <Button variant="heroGlass" asChild>
+              <Link href={HERO.ctaSecondaryHref}>{HERO.ctaSecondary}</Link>
+            </Button>
+          </motion.div>
+
+          {/* Bonus offer pill — moved BELOW the CTAs per client request */}
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 1.6, duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+            className="mt-8 inline-flex items-center gap-2.5 rounded-full px-3 py-1.5 pointer-events-auto"
             style={{
               background: 'rgba(85,166,48,0.18)',
               border: '1px solid rgba(85,166,48,0.45)',
@@ -74,57 +121,6 @@ export function Hero() {
               Details
               <ArrowUpRight className="size-3.5" />
             </Link>
-          </motion.div>
-
-          <motion.div
-            initial={{ filter: 'blur(10px)', opacity: 0, y: 16 }}
-            animate={{ filter: 'blur(0px)', opacity: 1, y: 0 }}
-            transition={{ delay: 0.15, duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
-            className="pointer-events-auto"
-          >
-            <h1 className="font-display uppercase text-[clamp(28px,7.5vw,56px)] leading-[1.05] tracking-[-0.02em] text-foreground font-bold px-2 max-w-[18ch] mx-auto">
-              <BubbleText text="Trade Smarter Grow Faster" as="span" />
-            </h1>
-          </motion.div>
-
-          <motion.h3
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.55, duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
-            className="mt-4 font-display uppercase tracking-[0.18em] text-xs sm:text-base md:text-lg text-foreground/85 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 pointer-events-auto"
-          >
-            <span>Decentralised Exchange</span>
-            <span aria-hidden className="text-primary">:</span>
-            <span>Insured Trades</span>
-            <span aria-hidden className="text-primary">:</span>
-            <span>Fixed Return Program</span>
-          </motion.h3>
-
-          <TypewriterText
-            text={HERO.sub}
-            duration={6}
-            holdDuration={5}
-            eraseDuration={2.5}
-            pauseDuration={1.5}
-            startDelay={0.9}
-            className="mt-6 font-body text-base md:text-lg text-foreground/70 max-w-2xl leading-relaxed min-h-[3em]"
-          />
-
-          <motion.div
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 1.4, duration: 0.6 }}
-            className="mt-8 flex items-center gap-3 flex-wrap justify-center pointer-events-auto"
-          >
-            <Button variant="hero" asChild>
-              <Link href={HERO.ctaHref}>
-                {HERO.ctaPrimary}
-                <ArrowUpRight className="ml-1 size-4" />
-              </Link>
-            </Button>
-            <Button variant="heroGlass" asChild>
-              <Link href={HERO.ctaSecondaryHref}>{HERO.ctaSecondary}</Link>
-            </Button>
           </motion.div>
         </div>
 
