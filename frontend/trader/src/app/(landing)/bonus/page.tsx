@@ -18,7 +18,6 @@ const TIERS = [
     features: [
       'Auto-credited within minutes',
       'Tradeable on all instruments',
-      'Unlock after 2 lots traded',
       'Email + chat support',
     ],
     cta: 'Deposit $100',
@@ -27,24 +26,22 @@ const TIERS = [
     range: '$500 – $999',
     bonus: '$300',
     multiplier: 'Up to 60%',
-    popular: true,
     features: [
       'Auto-credited within minutes',
       'Tradeable on all instruments',
-      'Unlock after 5 lots traded',
       'Priority chat support',
       'Free risk-management webinar',
     ],
-    cta: 'Most Picked Tier',
+    cta: 'Deposit $500',
   },
   {
     range: '$1,000+',
     bonus: '$1,000',
     multiplier: '100% Match',
+    popular: true,
     features: [
       'Auto-credited within minutes',
       'Tradeable on all instruments',
-      'Unlock after 10 lots traded',
       'Dedicated account manager',
       'Free 1-on-1 strategy session',
       'Cashback on every trade',
@@ -175,7 +172,7 @@ export default function BonusPage() {
         </div>
 
         <p className="mt-6 text-center text-xs text-foreground/45 max-w-2xl mx-auto leading-relaxed">
-          Bonus is credited as tradeable equity on your first qualifying deposit only. Lot-volume unlock requirements apply before bonus is withdrawable.
+          Bonus is credited as tradeable equity on your first qualifying deposit only. Standard programme terms apply.
         </p>
       </section>
 
@@ -197,12 +194,12 @@ export default function BonusPage() {
                     $100 – $499
                   </th>
                   <th className="px-5 py-4 text-center font-display uppercase tracking-[0.16em] text-sm text-white border-r border-white/10"
-                    style={{ background: 'linear-gradient(180deg, #55a630 0%, #1a3210 100%)' }}>
+                    style={{ background: 'linear-gradient(180deg, #2c3e50 0%, #0e1418 100%)' }}>
                     $500 – $999
                   </th>
                   <th className="px-5 py-4 text-center font-display uppercase tracking-[0.16em] text-sm text-white"
-                    style={{ background: 'linear-gradient(180deg, #d00000 0%, #3d0000 100%)' }}>
-                    $1,000+
+                    style={{ background: 'linear-gradient(180deg, #55a630 0%, #1a3210 100%)' }}>
+                    $1,000+ ★
                   </th>
                 </tr>
               </thead>
@@ -210,7 +207,6 @@ export default function BonusPage() {
                 {[
                   { label: 'Bonus credited',     a: '$100',          b: '$300',          c: '$1,000' },
                   { label: 'Match rate',         a: 'Up to 100%',    b: 'Up to 60%',     c: '100%' },
-                  { label: 'Lot-volume unlock',  a: '2 lots',        b: '5 lots',        c: '10 lots' },
                   { label: 'Dedicated manager',  a: '—',             b: '—',             c: '✓' },
                   { label: 'Strategy session',   a: '—',             b: '—',             c: '✓' },
                   { label: 'Trade cashback',     a: '—',             b: '—',             c: '✓' },
@@ -219,8 +215,8 @@ export default function BonusPage() {
                   <tr key={row.label} className="border-t border-foreground/10">
                     <td className="px-5 py-4 text-sm text-foreground/75 bg-foreground/[0.04] border-r border-foreground/15">{row.label}</td>
                     <td className="px-5 py-4 text-center text-sm text-foreground/90 bg-foreground/[0.02] border-r border-foreground/10">{row.a}</td>
-                    <td className="px-5 py-4 text-center text-sm text-foreground bg-primary/[0.08] border-r border-foreground/10">{row.b}</td>
-                    <td className="px-5 py-4 text-center text-sm text-foreground/90 bg-foreground/[0.02]">{row.c}</td>
+                    <td className="px-5 py-4 text-center text-sm text-foreground/90 bg-foreground/[0.02] border-r border-foreground/10">{row.b}</td>
+                    <td className="px-5 py-4 text-center text-sm text-foreground bg-primary/[0.08]">{row.c}</td>
                   </tr>
                 ))}
               </tbody>
@@ -242,7 +238,7 @@ export default function BonusPage() {
             { n: '01', icon: Wallet,      title: 'Open Account',    body: 'Sign up in under 3 minutes. KYC verification is automated and usually completes within 24 hours.' },
             { n: '02', icon: Gift,        title: 'Make First Deposit', body: 'Deposit at least $100 via crypto, wire, or card. Tier is set automatically based on amount.' },
             { n: '03', icon: Zap,         title: 'Bonus Credited',   body: 'Matching bonus lands in your bonus-equity balance within minutes — no manual claim needed.' },
-            { n: '04', icon: CheckCircle2, title: 'Trade & Unlock',   body: 'Trade the required lot volume for your tier to unlock the bonus for withdrawal.' },
+            { n: '04', icon: CheckCircle2, title: 'Trade & Withdraw', body: 'Use the bonus equity to open positions. Withdraw your profits at any time — no holding period.' },
           ].map(({ n, icon: Icon, title, body }) => (
             <li key={n} className="liquid-glass rounded-2xl p-6">
               <div className="flex items-center justify-between">
@@ -265,7 +261,7 @@ export default function BonusPage() {
           {[
             { icon: Zap,         title: 'Instant Credit',          body: 'No 5-day approval. Bonus lands in your account within minutes of your deposit clearing.' },
             { icon: CheckCircle2, title: 'Fully Tradeable',         body: 'Use the bonus equity on any instrument — forex, crypto, indices, metals. No restrictions.' },
-            { icon: ShieldCheck, title: 'Transparent Unlock',      body: 'Simple lot-volume requirement. The unlock progress bar is visible in your dashboard from day one.' },
+            { icon: ShieldCheck, title: 'Transparent Terms',       body: 'Plain-English programme terms. Bonus status and equity are visible in your dashboard from day one.' },
             { icon: Clock,       title: 'No Time Pressure',         body: 'No 30-day deadline games. Take the time you need to trade the unlock volume responsibly.' },
             { icon: Sparkles,    title: 'No Promo Codes',          body: 'Tier is set automatically by deposit size. No emails to chase, no codes to remember.' },
             { icon: Gift,        title: 'Stacks With Loyalty',      body: 'Welcome bonus stacks on top of ongoing loyalty rewards, referral commissions, and trade cashback.' },
@@ -288,9 +284,8 @@ export default function BonusPage() {
             $100 → $100 bonus; $500 → $300; $1,000 or more → full $1,000 match.
           </FaqItem>
           <FaqItem q="Can I withdraw the bonus immediately?">
-            The bonus becomes withdrawable after you complete the lot-volume requirement for your tier
-            (2 lots for the $100 tier, 5 lots for $500, 10 lots for $1,000). Your profits from trading the
-            bonus are withdrawable at any time.
+            Your profits from trading the bonus are withdrawable at any time. The bonus equity itself
+            is subject to the standard programme terms shown in your dashboard.
           </FaqItem>
           <FaqItem q="What happens if I deposit more than once?">
             The welcome bonus applies only to your first qualifying deposit. Subsequent deposits are eligible

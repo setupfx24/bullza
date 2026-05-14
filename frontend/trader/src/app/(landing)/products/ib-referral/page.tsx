@@ -161,8 +161,15 @@ export default function IbReferralPage() {
             { name: 'Tunde O.', region: 'Nigeria',        quote: 'Multi-tier is what changed it for me. I bring in IBs, they bring in traders, and I earn from the whole tree.' },
           ].map((t) => (
             <article key={t.name} className="liquid-glass rounded-2xl p-6">
-              {/* TODO: Partner avatar yahan aayega */}
-              <div className="image-placeholder size-12 rounded-full bg-foreground/[0.08] mb-4" aria-hidden />
+              {/* Real partner-style photo via pravatar.cc. */}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={`https://i.pravatar.cc/120?u=partner-${t.name.toLowerCase().replace(/\W+/g, '-')}`}
+                alt=""
+                className="size-12 rounded-full mb-4 object-cover"
+                aria-hidden
+                style={{ border: '1px solid rgba(85,166,48,0.35)' }}
+              />
               <p className="text-sm text-foreground/85 leading-relaxed italic">"{t.quote}"</p>
               <div className="mt-4 pt-4 border-t border-border">
                 <div className="font-display text-sm">{t.name}</div>

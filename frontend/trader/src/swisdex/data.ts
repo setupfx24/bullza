@@ -100,7 +100,7 @@ export const LIVE_TICKER = [
 
 export const INSTRUMENTS = [
   { icon: 'Cpu',        title: 'AI-Driven Auto Trading',         badge: '24/7 Active',       body: 'Our intelligent algorithms monitor markets 24/7 and execute high-frequency trades to maximise your returns with minimal risk.', href: '/services/ai-auto-trading' },
-  { icon: 'BarChart2',  title: 'Portfolio Management',           badge: 'MAM / PAM',         body: 'Expert asset allocation and continuous rebalancing — choose MAM for managed-account models or PAM for percentage-based allocations.', href: '/services/portfolio-management' },
+  { icon: 'BarChart2',  title: 'Portfolio Management',           badge: 'MAM / PAMM',        body: 'Expert asset allocation and continuous rebalancing — choose MAM for managed-account models or PAMM for percentage-based allocations.', href: '/services/portfolio-management' },
   { icon: 'TrendingUp', title: 'Market Research & Analysis',     badge: 'Daily Reports',     body: 'In-depth technical and fundamental analysis reports, updated daily to keep your investment decisions sharp.',                  href: '/services/market-research' },
   { icon: 'Layers',     title: 'Educational Resources',          badge: 'Beginner Friendly', body: 'Learn trading strategies, crypto fundamentals, and market dynamics through curated workshops, guides, and webinars.',          href: '/services/education' },
   { icon: 'Gem',        title: 'ICO & Early-Stage Investments',  badge: 'Coming Soon',       body: 'Early access to promising new blockchain projects, vetted by SwisDex before they hit the wider market. Launching soon.',     href: '/services/ico-coming-soon', comingSoon: true },
@@ -133,22 +133,25 @@ export const STATS = [
 ] as const;
 
 /**
- * Drop avatar images at: public/images/testimonials/<slug>.webp
- * Recommended size: 200 × 200 px, WebP < 20 KB. Circular crop in the UI.
- * If the file is missing, a tasteful initials-circle placeholder is shown.
+ * Real-looking investor photos are served from pravatar.cc — a free random-
+ * avatar service backed by photos from unsplash. Each entry uses a unique
+ * ?u={slug} seed so the same person always gets the same face. When you
+ * have real branded photos, drop them at /public/images/testimonials/<slug>.webp
+ * and swap the URL — the Testimonials component falls back to initials if
+ * the image fails to load.
  */
 export const TESTIMONIALS = [
-  { name: 'Aarav Sharma',  role: 'India',          avatar: '/images/testimonials/aarav-sharma.webp',  quote: 'The interface is clean and easy to navigate.' },
-  { name: 'Maria Lopez',   role: 'Spain',          avatar: '/images/testimonials/maria-lopez.webp',   quote: 'Account setup was straightforward and quick.' },
-  { name: 'Hiroshi Tanaka', role: 'Japan',         avatar: '/images/testimonials/hiroshi-tanaka.webp', quote: 'I like how simple the trading dashboard feels.' },
-  { name: 'Sofia Müller',  role: 'Germany',        avatar: '/images/testimonials/sofia-mueller.webp', quote: 'The platform performance has been smooth so far.' },
-  { name: 'Liam O\'Connor', role: 'Ireland',       avatar: '/images/testimonials/liam-oconnor.webp',  quote: 'Good mobile experience and responsive layout.' },
-  { name: 'Priya Iyer',    role: 'India',          avatar: '/images/testimonials/priya-iyer.webp',    quote: 'Transactions appeared quickly in the dashboard.' },
-  { name: 'Tunde Okafor',  role: 'Nigeria',        avatar: '/images/testimonials/tunde-okafor.webp',  quote: 'Customer support replied within a reasonable time.' },
-  { name: 'Emma Wilson',   role: 'United Kingdom', avatar: '/images/testimonials/emma-wilson.webp',   quote: 'The verification process was simple to complete.' },
-  { name: 'Daniel Roberts', role: 'Canada',        avatar: '/images/testimonials/daniel-roberts.webp', quote: 'Professional interface with a strong focus on usability.' },
-  { name: 'Aisha Khan',    role: 'United Arab Emirates', avatar: '/images/testimonials/aisha-khan.webp', quote: 'Efficient execution and a polished trading environment.' },
-  { name: 'Marco Rossi',   role: 'Italy',          avatar: '/images/testimonials/marco-rossi.webp',   quote: 'A modern platform built with simplicity in mind.' },
+  { name: 'Aarav Sharma',   role: 'India',                avatar: 'https://i.pravatar.cc/240?u=aarav-sharma',    quote: 'The interface is clean and easy to navigate.' },
+  { name: 'Maria Lopez',    role: 'Spain',                avatar: 'https://i.pravatar.cc/240?u=maria-lopez',     quote: 'Account setup was straightforward and quick.' },
+  { name: 'Hiroshi Tanaka', role: 'Japan',                avatar: 'https://i.pravatar.cc/240?u=hiroshi-tanaka',  quote: 'I like how simple the trading dashboard feels.' },
+  { name: 'Sofia Müller',   role: 'Germany',              avatar: 'https://i.pravatar.cc/240?u=sofia-mueller',   quote: 'The platform performance has been smooth so far.' },
+  { name: 'Liam O\'Connor', role: 'Ireland',              avatar: 'https://i.pravatar.cc/240?u=liam-oconnor',    quote: 'Good mobile experience and responsive layout.' },
+  { name: 'Priya Iyer',     role: 'India',                avatar: 'https://i.pravatar.cc/240?u=priya-iyer',      quote: 'Transactions appeared quickly in the dashboard.' },
+  { name: 'Tunde Okafor',   role: 'Nigeria',              avatar: 'https://i.pravatar.cc/240?u=tunde-okafor',    quote: 'Customer support replied within a reasonable time.' },
+  { name: 'Emma Wilson',    role: 'United Kingdom',       avatar: 'https://i.pravatar.cc/240?u=emma-wilson',     quote: 'The verification process was simple to complete.' },
+  { name: 'Daniel Roberts', role: 'Canada',               avatar: 'https://i.pravatar.cc/240?u=daniel-roberts',  quote: 'Professional interface with a strong focus on usability.' },
+  { name: 'Aisha Khan',     role: 'United Arab Emirates', avatar: 'https://i.pravatar.cc/240?u=aisha-khan',      quote: 'Efficient execution and a polished trading environment.' },
+  { name: 'Marco Rossi',    role: 'Italy',                avatar: 'https://i.pravatar.cc/240?u=marco-rossi',     quote: 'A modern platform built with simplicity in mind.' },
 ] as const;
 
 export const FAQ = [
@@ -158,7 +161,7 @@ export const FAQ = [
   },
   {
     q: 'How do I get the 100% Welcome Bonus?',
-    a: 'The 100% Welcome Bonus is applied automatically to your first qualifying deposit — no promo code required. Deposit $100 → trade with $200 of equity; deposit $1,000 → trade with $2,000. The bonus is fully tradeable from the moment it lands in your account, and unlocks for withdrawal after a small lot-volume requirement is met. See the /bonus page for the full tier breakdown.',
+    a: 'The 100% Welcome Bonus is applied automatically to your first qualifying deposit — no promo code required. Deposit $100 → trade with $200 of equity; deposit $1,000 → trade with $2,000. The bonus is fully tradeable from the moment it lands in your account. See the /bonus page for the full tier breakdown.',
   },
   {
     q: 'Which deposit and withdrawal methods are available, and how long do they take?',

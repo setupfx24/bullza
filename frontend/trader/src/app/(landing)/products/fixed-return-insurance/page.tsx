@@ -50,48 +50,6 @@ export default function FixedReturnInsurancePage() {
       {/* Fixed Return rate matrix */}
       <FixedReturnRateTable />
 
-      {/* Plan comparison */}
-      <section id="plans" className="mx-auto max-w-[1200px] px-[var(--gutter)] py-12 sm:py-16">
-        <div className="text-center mb-10">
-          <h2 className="font-display uppercase text-2xl sm:text-3xl md:text-4xl tracking-tight">Plan Comparison</h2>
-          <p className="mt-3 text-foreground/65 max-w-xl mx-auto text-sm sm:text-base">
-            Three tenures. Same capital protection. Pick the timeline that fits your goals.
-          </p>
-        </div>
-
-        <div className="overflow-x-auto -mx-[var(--gutter)] px-[var(--gutter)]">
-          <div className="min-w-[700px] rounded-2xl overflow-hidden border border-foreground/15">
-            <table className="w-full" style={{ borderCollapse: 'collapse' }}>
-              <thead>
-                <tr>
-                  <th className="bg-foreground/[0.04] border-r border-foreground/15 px-5 py-4 text-left text-xs uppercase tracking-[0.16em] text-foreground/55">Feature</th>
-                  <th className="px-5 py-4 text-center font-display uppercase tracking-[0.16em] text-sm text-white border-r border-white/10" style={{ background: 'linear-gradient(180deg, #1f2937 0%, #0a0a0a 100%)' }}>6 Months</th>
-                  <th className="px-5 py-4 text-center font-display uppercase tracking-[0.16em] text-sm text-white border-r border-white/10" style={{ background: 'linear-gradient(180deg, #55a630 0%, #1a3210 100%)' }}>12 Months</th>
-                  <th className="px-5 py-4 text-center font-display uppercase tracking-[0.16em] text-sm text-white" style={{ background: 'linear-gradient(180deg, #d00000 0%, #3d0000 100%)' }}>24 Months</th>
-                </tr>
-              </thead>
-              <tbody>
-                {[
-                  { label: 'Annualised return', a: '6.5% p.a.', b: '8.5% p.a.', c: '10.0% p.a.' },
-                  { label: 'Minimum investment', a: '$1,000',   b: '$2,500',    c: '$5,000' },
-                  { label: 'Capital protection', a: '100%',     b: '100%',      c: '100%' },
-                  { label: 'Payout cycle',       a: 'At maturity', b: 'Quarterly + maturity', c: 'Quarterly + maturity' },
-                  { label: 'Early withdrawal',   a: 'Not available', b: 'After 6 months · fee applies', c: 'After 12 months · fee applies' },
-                  { label: 'Auto-renewal',       a: 'Optional', b: 'Optional', c: 'Optional' },
-                ].map((row) => (
-                  <tr key={row.label} className="border-t border-foreground/10">
-                    <td className="px-5 py-4 text-sm text-foreground/75 bg-foreground/[0.04] border-r border-foreground/15">{row.label}</td>
-                    <td className="px-5 py-4 text-center text-sm text-foreground/90 bg-foreground/[0.02] border-r border-foreground/10">{row.a}</td>
-                    <td className="px-5 py-4 text-center text-sm text-foreground bg-primary/[0.08] border-r border-foreground/10">{row.b}</td>
-                    <td className="px-5 py-4 text-center text-sm text-foreground/90 bg-foreground/[0.02]">{row.c}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </section>
-
       {/* How it works timeline */}
       <section id="how" className="mx-auto max-w-[1200px] px-[var(--gutter)] py-12 sm:py-16">
         <h2 className="text-center font-display uppercase text-2xl sm:text-3xl md:text-4xl tracking-tight mb-12">
