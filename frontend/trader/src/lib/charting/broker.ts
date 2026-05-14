@@ -44,11 +44,31 @@ export function createBroker(host: any): any {
   //      auto-redraw whenever orderUpdate or ordersFullUpdate is called.
   // Polling at 1s gives a smooth P&L badge without hammering the API
   // (positions / prices are already in the local store from the WS feed).
+  //
+  // Critical: when the position SET changes (new position opened, one
+  // closed), positionUpdate() alone won't make TV pick up the new id —
+  // it only refreshes positions it already knows about. We have to call
+  // positionsFullUpdate() + ordersFullUpdate() on transition so TV
+  // re-calls positions() / orders() and renders the new entry / SL / TP
+  // lines on the chart. Tracking by id-set diff so the full update only
+  // fires on real change, not every tick.
+  const prevPosIds = new Set<string>();
   setInterval(() => {
     try {
       if (!getActiveAccount()) return;
       const positions = getPositions();
       const prices = getPrices();
+
+      const curIds = new Set(positions.map((p) => p.id));
+      const changed =
+        curIds.size !== prevPosIds.size ||
+        positions.some((p) => !prevPosIds.has(p.id));
+      if (changed) {
+        prevPosIds.clear();
+        for (const id of curIds) prevPosIds.add(id);
+        _host?.positionsFullUpdate?.();
+        _host?.ordersFullUpdate?.();
+      }
 
       for (const pos of positions) {
         const tick = prices[pos.symbol];

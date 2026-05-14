@@ -133,6 +133,35 @@ function AdvancedChartInner() {
         'paneProperties.backgroundType': 'solid',
         'scalesProperties.textColor': tvTheme === 'dark' ? '#aaaaaa' : '#555555',
         'scalesProperties.backgroundColor': tvTheme === 'dark' ? '#0d0d0d' : '#ffffff',
+        // ── Broker-integration line styling ─────────────────────────────
+        // Position entry, SL, TP lines come from the broker adapter. Default
+        // TV styling makes them nearly invisible on the dark theme; the
+        // client flagged "Execution / SL / TP nothing showing". These
+        // overrides bump line width + use brand-friendly colors that pop
+        // against the chart background.
+        'tradingProperties.lineLength': 80,
+        'tradingProperties.linewidth': 2,
+        'tradingProperties.showPositionsInChart': true,
+        'tradingProperties.showOrdersInChart': true,
+        'tradingProperties.showExecutionsInChart': true,
+        'tradingProperties.horizontalAlignment': 'right',
+        // Entry line — SwisDex green for buys, red for sells (TV handles
+        // direction per-position so we set both buy/sell tints here).
+        'tradingProperties.positionPL.plValueColor': '#9a9a9a',
+        'tradingProperties.position.buyColor': '#55a630',
+        'tradingProperties.position.sellColor': '#ef5350',
+        'tradingProperties.position.linestyle': 0,    // solid
+        'tradingProperties.position.linewidth': 2,
+        // SL line — amber.
+        'tradingProperties.stopLoss.buyColor': '#f59e0b',
+        'tradingProperties.stopLoss.sellColor': '#f59e0b',
+        'tradingProperties.stopLoss.linestyle': 2,    // dashed
+        'tradingProperties.stopLoss.linewidth': 2,
+        // TP line — bright green.
+        'tradingProperties.takeProfit.buyColor': '#22c55e',
+        'tradingProperties.takeProfit.sellColor': '#22c55e',
+        'tradingProperties.takeProfit.linestyle': 2,  // dashed
+        'tradingProperties.takeProfit.linewidth': 2,
       },
       loading_screen: {
         backgroundColor: tvTheme === 'dark' ? '#0e0e0e' : '#f2efe9',
