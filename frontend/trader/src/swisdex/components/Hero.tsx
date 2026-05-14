@@ -54,7 +54,7 @@ export function Hero() {
             transition={{ delay: 0.15, duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
             className="pointer-events-auto"
           >
-            <h1 className="font-display uppercase text-[clamp(28px,6.2vw,52px)] leading-[1.05] tracking-[-0.02em] text-foreground font-bold px-2 max-w-[18ch] sm:max-w-none mx-auto sm:whitespace-nowrap">
+            <h1 className="font-display uppercase text-[clamp(18px,5.2vw,52px)] leading-[1.05] tracking-[-0.02em] text-foreground font-bold px-2 mx-auto whitespace-nowrap">
               <BubbleText text="Trade Smarter Grow Faster" as="span" />
             </h1>
           </motion.div>
@@ -79,7 +79,7 @@ export function Hero() {
             eraseDuration={2.5}
             pauseDuration={1.5}
             startDelay={0.9}
-            className="mt-6 font-body text-base md:text-lg text-foreground/70 max-w-2xl leading-relaxed min-h-[3em]"
+            className="mt-6 font-body text-xs sm:text-sm md:text-lg text-foreground/70 max-w-2xl leading-relaxed min-h-[3em]"
           />
 
           {/* Secondary CTA — primary "Details" button removed per client
