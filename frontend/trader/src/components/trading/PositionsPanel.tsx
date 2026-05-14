@@ -438,26 +438,60 @@ export default function PositionsPanel({ variant = 'default' }: PositionsPanelPr
       setBulkBusy(false);
       return;
     }
-    let closed = 0;
-    let failed = 0;
-    for (const pos of targets) {
-      try {
+
+    // Fire all closes in parallel — the previous sequential await chain
+    // stalled the whole batch when any single close was slow, and it also
+    // had two bugs: (1) audio failures inside the try block bubbled up
+    // and incremented `failed` even though the backend had closed the
+    // position, and (2) errors were swallowed empty so the user had no
+    // diagnostic when "Close All" really did fail. Promise.allSettled
+    // gives a clean per-position result and lets us surface the first
+    // real error message back to the user.
+    type SettleOk = { pos: typeof targets[number]; profit: number };
+    const settled = await Promise.allSettled<SettleOk>(
+      targets.map(async (pos) => {
         const res = await api.post<{ profit?: number; close_price?: number }>(
           `/positions/${pos.id}/close`,
           {},
         );
-        const pnl = res.profit ?? 0;
-        pnl >= 0 ? sounds.profit() : sounds.loss();
+        return { pos, profit: res.profit ?? 0 };
+      }),
+    );
+
+    let closed = 0;
+    let failed = 0;
+    let firstError: string | null = null;
+    for (const r of settled) {
+      if (r.status === 'fulfilled') {
+        const { pos, profit } = r.value;
+        try {
+          (profit >= 0 ? sounds.profit() : sounds.loss());
+        } catch {
+          /* audio context blocked / muted — close already succeeded server-side */
+        }
         removePosition(pos.id);
         closed++;
-      } catch {
+      } else {
         failed++;
+        if (!firstError) {
+          firstError =
+            r.reason instanceof Error
+              ? r.reason.message
+              : typeof r.reason === 'string'
+                ? r.reason
+                : 'Unknown error';
+        }
       }
     }
+
     if (closed > 0)
       toast.success(`${closed} position${closed > 1 ? 's' : ''} closed successfully`);
     if (failed > 0)
-      toast.error(`${failed} position${failed > 1 ? 's' : ''} failed to close`);
+      toast.error(
+        firstError
+          ? `${failed} failed — ${firstError}`
+          : `${failed} position${failed > 1 ? 's' : ''} failed to close`,
+      );
     refreshPositions();
     refreshAccount();
     void loadHistory();

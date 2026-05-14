@@ -8,7 +8,7 @@ import { useAuthStore } from '@/stores/authStore';
 import { useTradingStore } from '@/stores/tradingStore';
 import { NotificationBell } from '@/components/NotificationListener';
 import api from '@/lib/api/client';
-import { ChevronDown, Wallet, Gift, Users } from 'lucide-react';
+import { ChevronDown, Wallet, Gift, Users, Menu } from 'lucide-react';
 
 function formatUsd(n: number) {
   return new Intl.NumberFormat('en-US', {
@@ -85,18 +85,16 @@ export default function AppHeader() {
       <header
         className="h-[56px] sm:h-[65px] flex items-center justify-between px-3 sm:px-5 rounded-xl bg-bg-secondary border border-border-primary"
       >
-        {/* LEFT — swisdex mark toggles the sidebar (no hamburger) */}
+        {/* LEFT — hamburger toggles the sidebar. The brand mark already
+            lives at the top of the sidebar itself, so we don't repeat it
+            inside the content header. */}
         <button
           type="button"
           onClick={toggleSidebar}
-          className="shrink-0 w-10 h-10 flex items-center justify-center rounded-lg hover:bg-bg-hover transition-colors"
+          className="shrink-0 w-10 h-10 flex items-center justify-center rounded-lg border border-border-primary text-text-secondary hover:text-text-primary hover:bg-bg-hover transition-colors"
           aria-label="Toggle menu"
         >
-          <img
-            src="/images/swisdex-logo.png"
-            alt="SwisDex"
-            className="w-9 h-9 object-contain"
-          />
+          <Menu size={20} />
         </button>
 
         {/* RIGHT — Bonus/Referral chips + balance + bell + user */}
