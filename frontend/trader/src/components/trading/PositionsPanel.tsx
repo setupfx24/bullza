@@ -408,7 +408,10 @@ export default function PositionsPanel({ variant = 'default' }: PositionsPanelPr
         pnl >= 0 ? sounds.profit() : sounds.loss();
 
         if (res.remaining_lots && res.remaining_lots > 0) {
-          toast.success(`Partial @ ${res.close_price} | P&L: ${sign}$${pnl.toFixed(2)} | ${res.remaining_lots} lots left`);
+          toast.success(
+            `Partial close @ ${res.close_price}\nBooked: ${sign}$${pnl.toFixed(2)}  •  ${res.remaining_lots} lots remain`,
+            { duration: 5000 },
+          );
         } else {
           toast.success(`Closed @ ${res.close_price} | P&L: ${sign}$${pnl.toFixed(2)}`);
         }

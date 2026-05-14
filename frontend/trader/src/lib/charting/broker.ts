@@ -394,13 +394,35 @@ export function createBroker(host: any): any {
       }
     },
 
-    async closePosition(positionId: string): Promise<void> {
+    async closePosition(positionId: string, amount?: number): Promise<void> {
+      // TradingView passes `amount` when the user closes only part of a
+      // position via the chart (right-click position → close partial, or
+      // the inline close-quantity stepper). We have to forward it as
+      // `lots` to the backend so the partial-close path runs and the
+      // realized profit toast fires; ignoring it (the previous behaviour)
+      // silently turned every partial close on the chart into a full
+      // close and the "booking profit" the trader expected to see for
+      // the partial slice was never surfaced.
       try {
-        await api.post(`/positions/${positionId}/close`, {});
-        _host?.positionUpdate({ id: positionId, qty: 0 });
-        setTimeout(() => {
-          void 0 /* positions update via WS */;
-        }, 500);
+        const body: Record<string, unknown> = {};
+        const isPartial = typeof amount === 'number' && amount > 0;
+        if (isPartial) body.lots = amount;
+        const res = await api.post<{ profit?: number; close_price?: number; remaining_lots?: number }>(
+          `/positions/${positionId}/close`,
+          body,
+        );
+        if (isPartial && typeof res.remaining_lots === 'number' && res.remaining_lots > 0) {
+          _host?.positionUpdate({ id: positionId, qty: res.remaining_lots });
+          const pnl = res.profit ?? 0;
+          const sign = pnl >= 0 ? '+' : '';
+          _host?.showNotification?.(
+            'Partial Close',
+            `Booked ${sign}$${pnl.toFixed(2)} — ${res.remaining_lots} lots remain`,
+            1,
+          );
+        } else {
+          _host?.positionUpdate({ id: positionId, qty: 0 });
+        }
       } catch (e: any) {
         _host?.showNotification?.('Close Failed', e?.message || 'Failed', 0);
         throw e;
@@ -427,6 +449,11 @@ export function createBroker(host: any): any {
           supportOrderBrackets: false,
           supportPositionBrackets: true,    // SL/TP attached to position
           supportClosePosition: true,
+          // Enables TV's "close partial" UI affordances (the close
+          // dialog gains a quantity field; right-click position menu
+          // shows "Close partial"). Our closePosition handler forwards
+          // the amount to the backend as `lots`.
+          supportPartialClosePosition: true,
           supportReversePosition: false,
           supportNativeReversePosition: false,
           supportMarketOrders: true,
