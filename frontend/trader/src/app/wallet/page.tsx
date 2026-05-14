@@ -86,6 +86,9 @@ const CRYPTO_WITHDRAW_METHOD = 'oxapay';
 const CRYPTO_ASSETS = [
   { id: 'BTC', label: 'BTC', sub: 'Bitcoin' },
   { id: 'ETH', label: 'ETH', sub: 'Ethereum' },
+  { id: 'BNB_BSC', label: 'BNB', sub: 'BSC' },
+  { id: 'USDT_BSC', label: 'USDT', sub: 'BSC' },
+  { id: 'USDC_BSC', label: 'USDC', sub: 'BSC' },
   { id: 'USDT_ERC', label: 'USDT', sub: 'ERC20' },
   { id: 'USDC_ERC', label: 'USDC', sub: 'ERC20' },
   { id: 'TRX', label: 'TRX', sub: 'Tron' },
@@ -466,14 +469,34 @@ function WalletPageContent() {
       return;
     }
     if (depositChannel === 'crypto') {
-      // On-site wallet-connect flow: open the modal which calls
-      // POST /wallet/deposit/wallet itself, renders the QR + connect button,
-      // and polls the status. The legacy hosted-redirect path stays mounted
-      // on the backend as a manual fallback (Pay manually link inside the
-      // modal — copy address to any external wallet/exchange).
-      setWalletDepositAmount(amt);
-      setWalletDepositAsset(selectedCryptoDeposit);
-      setWalletDepositOpen(true);
+      // NOWPayments hosted-checkout flow: backend creates an invoice and
+      // returns payment_url. We redirect the browser to it; the user pays
+      // on NOWPayments' page and the IPN webhook credits the deposit once
+      // it confirms on-chain (no manual return-redirect needed — the user
+      // can navigate back to /wallet anytime; the deposit will appear once
+      // status flips to auto_approved server-side).
+      setDepositSubmitting(true);
+      try {
+        const resp = await api.post<{ id: string; status: string; payment_url?: string }>(
+          '/wallet/deposit',
+          {
+            amount: amt,
+            method: CRYPTO_DEPOSIT_METHOD,
+            crypto_currency: selectedCryptoDeposit,
+          },
+        );
+        if (resp.payment_url) {
+          toast.success('Redirecting to NOWPayments…');
+          window.location.href = resp.payment_url;
+          return;
+        }
+        toast.error('Could not start the payment — no checkout URL returned. Try again.');
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : 'Could not start the payment';
+        toast.error(msg);
+      } finally {
+        setDepositSubmitting(false);
+      }
       return;
     }
 
@@ -904,7 +927,7 @@ function WalletPageContent() {
                               : 'border-transparent text-text-tertiary hover:text-text-primary'
                           )}
                         >
-                          {method === 'crypto' ? 'Crypto (Wallet Connect)' : 'Manual (Bank/UPI)'}
+                          {method === 'crypto' ? 'Crypto (NOWPayments)' : 'Manual (Bank/UPI)'}
                         </button>
                       );
                     })}
@@ -931,7 +954,7 @@ function WalletPageContent() {
 
                       <div className="rounded-xl border border-accent/20 bg-accent/5 px-4 py-3">
                         <p className="text-xs text-text-secondary leading-relaxed">
-                          Pay directly from your wallet (MetaMask, Trust, Rainbow, etc.) on Ethereum, BSC, Polygon, or Arbitrum. We'll show a QR code + on-site payment screen — no third-party redirect.
+                          You&apos;ll be redirected to NOWPayments to complete the payment from any wallet (MetaMask, Trust, Binance, etc.). Once the transaction confirms on-chain, your wallet balance is credited automatically.
                         </p>
                       </div>
 
@@ -946,7 +969,7 @@ function WalletPageContent() {
                             : 'bg-accent text-white hover:bg-[#5cffb8] shadow-neon-green-lg'
                         )}
                       >
-                        {depositSubmitting ? 'Processing…' : 'Pay with Crypto'}
+                        {depositSubmitting ? 'Opening NOWPayments…' : 'Pay with Crypto'}
                       </button>
                     </>
                   ) : (
