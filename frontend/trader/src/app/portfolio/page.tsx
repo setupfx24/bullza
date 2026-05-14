@@ -18,6 +18,8 @@ import { Tabs } from '@/components/ui/Tabs';
 
 import DashboardShell from '@/components/layout/DashboardShell';
 
+import DatePicker from '@/components/forms/DatePicker';
+
 import TradingOverview from '@/components/profile/TradingOverview';
 
 import { buildDashboardFromPortfolio } from '@/lib/trading-dashboard';
@@ -619,21 +621,19 @@ function PortfolioPageContent() {
                 they're hidden until selected to avoid clutter. */}
             {tf === 'Custom' && (
               <div className="flex items-center gap-1.5 mr-1">
-                <input
-                  type="date"
+                <DatePicker
                   value={customFrom}
+                  onChange={setCustomFrom}
                   max={customTo || undefined}
-                  onChange={(e) => setCustomFrom(e.target.value)}
-                  className="px-2 py-1 text-[11px] rounded-md bg-bg-secondary border border-border-primary text-text-primary"
+                  placeholder="From"
                 />
                 <span className="text-[10px] text-text-tertiary">to</span>
-                <input
-                  type="date"
+                <DatePicker
                   value={customTo}
+                  onChange={setCustomTo}
                   min={customFrom || undefined}
                   max={ymd(new Date())}
-                  onChange={(e) => setCustomTo(e.target.value)}
-                  className="px-2 py-1 text-[11px] rounded-md bg-bg-secondary border border-border-primary text-text-primary"
+                  placeholder="To"
                 />
               </div>
             )}
