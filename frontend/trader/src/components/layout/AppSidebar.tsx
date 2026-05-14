@@ -25,11 +25,7 @@ import {
   Calculator,
   Gift,
   ChevronDown,
-  CheckSquare,
-  Trophy,
-  Sparkles,
-  ShoppingBag,
-  Coins,
+  Percent,
 } from 'lucide-react';
 
 type LeafItem = { label: string; href: string; icon: any };
@@ -47,11 +43,9 @@ const NAV_ITEMS: NavEntry[] = [
     icon: Gift,
     key: 'earn',
     children: [
-      { label: 'Tasks', href: '/earn/tasks', icon: CheckSquare },
-      { label: 'Leaderboard', href: '/earn/leaderboard', icon: Trophy },
-      { label: 'Play Zone', href: '/earn/play-zone', icon: Sparkles },
-      { label: 'Rewards Store', href: '/earn/store', icon: ShoppingBag },
-      { label: 'Staking', href: '/earn/staking', icon: Coins },
+      { label: 'Bonus', href: '/bonus', icon: Gift },
+      { label: 'Referral', href: '/business', icon: Users },
+      { label: 'Fixed Return', href: '/products/fixed-return-insurance', icon: Percent },
     ],
   },
   { label: 'Trade Insurance', href: '/insurance', icon: ShieldCheck },
