@@ -370,9 +370,9 @@ function BonusCard() {
           <Gift size={26} className="text-[#55a630]" />
         </div>
         <div className="min-w-0 flex-1">
-          <h3 className="text-base font-bold text-text-primary">50% deposit bonus</h3>
+          <h3 className="text-base font-bold text-text-primary">Up to 100% deposit bonus</h3>
           <p className="text-xs text-text-secondary mt-0.5 leading-relaxed">
-            Top up your account and we&apos;ll add 50% extra trading credit. No expiry, fully tradeable.
+            Top up your account and we&apos;ll add up to 100% extra trading credit. No expiry, fully tradeable.
           </p>
           <Link
             href="/wallet"
