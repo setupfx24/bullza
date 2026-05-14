@@ -88,6 +88,22 @@ function AdvancedChartInner() {
       autosize: true,
       debug: false,
 
+      // Timeframe shortcuts surfaced on the chart toolbar (1D, 5D, 1M, …).
+      // The resolutions returned by the datafeed (1, 5, 15, 30, 60, 240, D)
+      // are what the interval picker exposes — `time_frames` adds the
+      // higher-level "show me 1 day of intraday" / "show me 1 month" shortcuts
+      // the client called out as missing.
+      time_frames: [
+        { text: '1D', resolution: '5',   description: '1 Day intraday (5m)' },
+        { text: '5D', resolution: '15',  description: '5 Days (15m)' },
+        { text: '1M', resolution: '60',  description: '1 Month (1H)' },
+        { text: '3M', resolution: '240', description: '3 Months (4H)' },
+        { text: '6M', resolution: '240', description: '6 Months (4H)' },
+        { text: 'YTD', resolution: 'D',  description: 'Year-to-Date' },
+        { text: '1Y', resolution: 'D',   description: '1 Year' },
+        { text: 'ALL', resolution: 'D',  description: 'All available history' },
+      ],
+
       // Trading Terminal — built-in order panel
       broker_factory: (host: any) => createBroker(host),
 

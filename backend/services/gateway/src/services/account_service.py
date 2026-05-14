@@ -18,7 +18,6 @@ from packages.common.src.models import (
     OrderStatus,
     Position,
     PositionStatus,
-    RewardsUserState,
     TradingAccount,
     Transaction,
     User,
@@ -28,27 +27,10 @@ from packages.common.src.redis_client import redis_client, PriceChannel
 
 
 # ─── Per-user leverage cap (Trading_Mechanism.docx risk control) ──────
-# Default ceiling is 1:50 for everyone. KYC + XP unlock higher leverage.
+# Default ceiling is 1:50 for everyone before KYC. KYC approval lifts the
+# cap to the full group ceiling. The XP-tier gate was removed per client
+# request — leverage no longer depends on the user's reward XP level.
 DEFAULT_USER_MAX_LEVERAGE = 50
-
-# XP tier → leverage ceiling. Same XP thresholds as the rewards level
-# system — keeping a single XP ladder so the user-facing story stays
-# coherent ("level up to unlock more leverage").
-XP_LEVERAGE_TIERS = [
-    (0,    50),   # Starter
-    (300,  100),  # Active
-    (1000, 200),  # Skilled
-    (3000, 300),  # Pro
-    (7000, 500),  # Elite
-]
-
-
-def _xp_leverage_cap(xp: int) -> int:
-    cap = DEFAULT_USER_MAX_LEVERAGE
-    for threshold, max_lev in XP_LEVERAGE_TIERS:
-        if xp >= threshold:
-            cap = max_lev
-    return cap
 
 
 async def _user_effective_leverage_cap(
@@ -56,16 +38,16 @@ async def _user_effective_leverage_cap(
     user: User,
     group: AccountGroup,
 ) -> tuple[int, dict]:
-    """Returns (effective_cap, hints) where effective_cap is the smallest of:
+    """Returns (effective_cap, hints) where effective_cap is the smaller of:
         - group.max_leverage / leverage_default (broker ceiling per Phase 2)
         - DEFAULT_USER_MAX_LEVERAGE if KYC is not approved
-        - the user's XP-gated cap
 
-    `hints` carries per-reason flags so the UI can show 'Complete KYC' or
-    'Reach 1,000 XP to unlock 1:200' next to the dropdown."""
+    `hints` carries the KYC flag so the UI can show 'Complete KYC to
+    unlock higher leverage' next to the dropdown.
+    """
     group_cap = int(group.max_leverage or group.leverage_default or 100)
 
-    # Demo accounts ignore KYC + XP gating — full group ceiling applies.
+    # Demo accounts ignore KYC gating — full group ceiling applies.
     if bool(user.is_demo) or bool(group.is_demo):
         return group_cap, {
             "kyc_unlock_required": False,
@@ -74,34 +56,19 @@ async def _user_effective_leverage_cap(
             "next_unlock_leverage": None,
         }
 
-    # KYC gate.
+    # KYC gate is the only remaining personal restriction.
     kyc_ok = (user.kyc_status or "").lower() in ("approved", "verified")
     kyc_cap = group_cap if kyc_ok else DEFAULT_USER_MAX_LEVERAGE
 
-    # XP gate.
-    xp = (await db.execute(
-        select(RewardsUserState.xp).where(RewardsUserState.user_id == user.id)
-    )).scalar_one_or_none()
-    xp_int = int(xp or 0)
-    xp_cap = _xp_leverage_cap(xp_int)
-
-    effective = min(group_cap, kyc_cap, xp_cap)
-
-    # Compute the next unlock that the user can earn — the next XP threshold
-    # whose cap is strictly higher than the *current* effective cap.
-    next_threshold = None
-    next_leverage = None
-    for threshold, lev in XP_LEVERAGE_TIERS:
-        if xp_int < threshold and lev > effective:
-            next_threshold = threshold
-            next_leverage = lev
-            break
+    effective = min(group_cap, kyc_cap)
 
     return effective, {
         "kyc_unlock_required": (not kyc_ok and group_cap > DEFAULT_USER_MAX_LEVERAGE),
-        "xp_unlock_required": (next_threshold is not None),
-        "xp_for_next_unlock": next_threshold,
-        "next_unlock_leverage": next_leverage,
+        # Kept for response-shape compatibility with existing /accounts JSON
+        # contract; always falsy now that XP no longer gates leverage.
+        "xp_unlock_required": False,
+        "xp_for_next_unlock": None,
+        "next_unlock_leverage": None,
     }
 
 
@@ -230,20 +197,12 @@ async def open_live_account(
             new_balance = min_d
 
     num = generate_account_number()
-    # Effective cap = min(group ceiling, KYC gate, XP gate). User-facing
-    # error mentions the most-restrictive reason so the trader knows what
-    # to do next.
+    # Effective cap = min(group ceiling, KYC gate). User-facing error
+    # surfaces the KYC reason when that's what's blocking the cap.
     max_lev, hints = await _user_effective_leverage_cap(db, user, group)
     if req.leverage is not None:
         if req.leverage < 1 or req.leverage > max_lev:
-            reasons: list[str] = []
-            if hints.get("kyc_unlock_required"):
-                reasons.append("complete KYC")
-            if hints.get("xp_unlock_required") and hints.get("xp_for_next_unlock"):
-                reasons.append(
-                    f"reach {hints['xp_for_next_unlock']} XP to unlock 1:{hints['next_unlock_leverage']}"
-                )
-            extra = (" — " + ", ".join(reasons)) if reasons else ""
+            extra = " — complete KYC to unlock higher leverage" if hints.get("kyc_unlock_required") else ""
             raise HTTPException(
                 status_code=400,
                 detail=f"Leverage must be between 1 and {max_lev} for this account type{extra}.",
@@ -447,14 +406,7 @@ async def update_account_leverage(
         max_lev, hints = await _user_effective_leverage_cap(db, u, group)
 
     if leverage > max_lev:
-        reasons: list[str] = []
-        if hints.get("kyc_unlock_required"):
-            reasons.append("complete KYC")
-        if hints.get("xp_unlock_required") and hints.get("xp_for_next_unlock"):
-            reasons.append(
-                f"reach {hints['xp_for_next_unlock']} XP to unlock 1:{hints['next_unlock_leverage']}"
-            )
-        extra = (" — " + ", ".join(reasons)) if reasons else ""
+        extra = " — complete KYC to unlock higher leverage" if hints.get("kyc_unlock_required") else ""
         raise HTTPException(
             status_code=400,
             detail=f"Leverage cannot exceed 1:{max_lev} for this account{extra}",
