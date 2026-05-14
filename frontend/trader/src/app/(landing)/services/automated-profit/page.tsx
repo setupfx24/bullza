@@ -167,7 +167,7 @@ export default function AutomatedProfitPage() {
         </div>
         <div className="grid sm:grid-cols-3 gap-5">
           {[
-            { icon: Gift,   title: 'Welcome Bonus',    amount: 'Up to $200', body: 'Tiered welcome bonus on your first deposit, credited to bonus equity. Tradeable after 5 lots traded.' },
+            { icon: Gift,   title: 'Welcome Bonus',    amount: 'Up to $1,000', body: 'Tiered welcome bonus on your first deposit, credited to bonus equity. Fully tradeable from the moment it lands in your account.' },
             { icon: Users,  title: 'Referral Bonus',   amount: '$50 / friend', body: 'Earn $50 for every funded friend you refer — plus 10% of their first-month profits. No cap.' },
             { icon: Award,  title: 'Loyalty Reward',   amount: '+1% / quarter', body: 'Active accounts earn an extra 1% bonus each quarter, paid as additional algo equity. Compounds.' },
           ].map(({ icon: Icon, title, amount, body }) => (

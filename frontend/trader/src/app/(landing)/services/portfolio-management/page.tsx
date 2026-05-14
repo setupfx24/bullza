@@ -16,16 +16,16 @@ export default function PortfolioManagementPage() {
     <main className="min-h-screen bg-background">
       <BannerPlaceholder
         title="Portfolio Management"
-        tagline="Professional asset allocation managed by verified strategists. Choose MAM for a fully managed account, or PAM for proportional exposure to a master strategy."
+        tagline="Professional asset allocation managed by verified strategists. Choose MAM for a fully managed account, or PAMM for proportional exposure to a master strategy."
       />
 
-      {/* MAM vs PAM comparison */}
+      {/* MAM vs PAMM comparison */}
       <section id="mam-pam" className="mx-auto max-w-[1200px] px-[var(--gutter)] py-12 sm:py-16">
         <div className="text-center mb-10">
           <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full liquid-glass text-[11px] uppercase tracking-[0.16em] text-foreground/70">
             <span className="size-1.5 rounded-full bg-primary" /> Two Allocation Models
           </span>
-          <h2 className="mt-5 font-display uppercase text-2xl sm:text-3xl md:text-4xl tracking-tight">MAM vs PAM</h2>
+          <h2 className="mt-5 font-display uppercase text-2xl sm:text-3xl md:text-4xl tracking-tight">MAM vs PAMM</h2>
           <p className="mt-3 text-foreground/65 max-w-xl mx-auto text-sm sm:text-base">
             Same expert managers, two ways to participate. Pick the model that fits your capital and control preferences.
           </p>
@@ -63,7 +63,7 @@ export default function PortfolioManagementPage() {
             <div className="flex items-center gap-3 mb-5">
               <div className="size-12 rounded-xl bg-primary/25 flex items-center justify-center"><BarChart3 className="size-6 text-primary" /></div>
               <div>
-                <h3 className="font-display uppercase text-2xl tracking-tight">PAM</h3>
+                <h3 className="font-display uppercase text-2xl tracking-tight">PAMM</h3>
                 <div className="text-[11px] uppercase tracking-[0.16em] text-foreground/55">Percentage Allocation Manager</div>
               </div>
             </div>
@@ -106,8 +106,16 @@ export default function PortfolioManagementPage() {
             { name: 'Granite Income',   style: 'Conservative Carry', aum: '$42M', cagr: '+14%', dd: '3.1%' },
           ].map((m) => (
             <article key={m.name} className="liquid-glass rounded-2xl p-6">
-              {/* TODO: Manager headshot / firm logo yahan aayega */}
-              <div className="image-placeholder size-14 rounded-xl bg-foreground/[0.08] mb-4" aria-hidden />
+              {/* Real manager-style photo via pravatar.cc. Swap the URL for a
+                  branded headshot once available. */}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={`https://i.pravatar.cc/120?u=${m.name.toLowerCase().replace(/\s+/g, '-')}`}
+                alt=""
+                className="size-14 rounded-xl mb-4 object-cover"
+                aria-hidden
+                style={{ border: '1px solid rgba(85,166,48,0.3)' }}
+              />
               <h3 className="font-display text-lg uppercase tracking-tight">{m.name}</h3>
               <div className="mt-1 text-[11px] uppercase tracking-[0.16em] text-primary/80">{m.style}</div>
               <dl className="mt-5 grid grid-cols-3 gap-2 text-center">
@@ -157,7 +165,7 @@ export default function PortfolioManagementPage() {
               <thead>
                 <tr>
                   <th className="bg-foreground/[0.04] border-r border-foreground/15 px-5 py-4 text-left text-xs uppercase tracking-[0.16em] text-foreground/55">Fee Type</th>
-                  <th className="px-5 py-4 text-center font-display uppercase tracking-[0.16em] text-sm text-white border-r border-white/10" style={{ background: 'linear-gradient(180deg, #1f2937 0%, #0a0a0a 100%)' }}>PAM</th>
+                  <th className="px-5 py-4 text-center font-display uppercase tracking-[0.16em] text-sm text-white border-r border-white/10" style={{ background: 'linear-gradient(180deg, #1f2937 0%, #0a0a0a 100%)' }}>PAMM</th>
                   <th className="px-5 py-4 text-center font-display uppercase tracking-[0.16em] text-sm text-white" style={{ background: 'linear-gradient(180deg, #55a630 0%, #1a3210 100%)' }}>MAM</th>
                 </tr>
               </thead>
@@ -213,10 +221,10 @@ export default function PortfolioManagementPage() {
         </div>
         <ol className="grid sm:grid-cols-4 gap-5">
           {[
-            { n: '01', icon: Wallet,   title: 'Fund Your Account', body: 'Deposit via crypto, wire, or card. Minimum $1,000 for PAM, $5,000 for MAM.' },
+            { n: '01', icon: Wallet,   title: 'Fund Your Account', body: 'Deposit via crypto, wire, or card. Minimum $1,000 for PAMM, $5,000 for MAM.' },
             { n: '02', icon: Users,    title: 'Choose a Manager',  body: 'Filter by style, AUM, drawdown, and CAGR. Read the prospectus, then allocate.' },
             { n: '03', icon: FileText, title: 'Sign the Agreement', body: 'E-sign the limited-power-of-attorney granting trading-only rights to the manager.' },
-            { n: '04', icon: BarChart3, title: 'Watch & Withdraw',  body: 'Track performance daily. Withdraw any time — anytime for MAM, monthly for PAM.' },
+            { n: '04', icon: BarChart3, title: 'Watch & Withdraw',  body: 'Track performance daily. Withdraw any time — anytime for MAM, monthly for PAMM.' },
           ].map(({ n, icon: Icon, title, body }) => (
             <li key={n} className="liquid-glass rounded-2xl p-6">
               <div className="flex items-center justify-between">
@@ -239,7 +247,7 @@ export default function PortfolioManagementPage() {
             initiated by you — managers can place trades but never move money out of your account.
           </FaqItem>
           <FaqItem q="What happens if my manager underperforms?">
-            You can re-allocate at any time. PAM allows monthly re-allocation; MAM is anytime. There are no
+            You can re-allocate at any time. PAMM allows monthly re-allocation; MAM is anytime. There are no
             penalties for changing or removing a manager.
           </FaqItem>
           <FaqItem q="How is the performance fee calculated?">
@@ -258,7 +266,7 @@ export default function PortfolioManagementPage() {
         <div className="liquid-glass-strong rounded-3xl p-8 sm:p-12 text-center">
           <h2 className="font-display uppercase text-2xl sm:text-3xl tracking-tight">Get a Managed Account</h2>
           <p className="mt-4 text-foreground/70 max-w-xl mx-auto text-sm sm:text-base">
-            Open your SwisDex account, choose MAM or PAM, and allocate to a verified manager in under 24 hours.
+            Open your SwisDex account, choose MAM or PAMM, and allocate to a verified manager in under 24 hours.
           </p>
           <Link href={SIGNUP_HREF} className="mt-7 inline-flex items-center gap-2 rounded-full bg-primary text-white px-6 py-3 text-sm font-semibold uppercase tracking-wider hover:opacity-90">
             Open Account <ArrowUpRight className="size-4" />

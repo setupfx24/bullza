@@ -80,9 +80,9 @@ const RULES: { keys: string[]; reply: string; cta?: { label: string; href: strin
     cta: [{ label: 'See AI trading', href: '/services/ai-auto-trading' }],
   },
   {
-    keys: ['portfolio', 'mam', 'pam', 'managed account', 'manager'],
+    keys: ['portfolio', 'mam', 'pamm', 'managed account', 'manager'],
     reply:
-      'Portfolio Management offers MAM (Multi-Account Manager) and PAM (Percentage Allocation) models. Verified managers, segregated funds, transparent high-water-mark fees. $1,000 minimum for PAM, $5,000 for MAM.',
+      'Portfolio Management offers MAM (Multi-Account Manager) and PAMM (Percentage Allocation Management Module) models. Verified managers, segregated funds, transparent high-water-mark fees. $1,000 minimum for PAMM, $5,000 for MAM.',
     cta: [{ label: 'View managers', href: '/services/portfolio-management' }],
   },
   {

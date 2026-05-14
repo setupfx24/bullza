@@ -121,8 +121,16 @@ export default function MarketResearchPage() {
             { name: 'Aisha K.',   desk: 'Equity Indices', years: '11 yrs' },
           ].map((a) => (
             <article key={a.name} className="liquid-glass rounded-2xl p-6 text-center">
-              {/* TODO: Analyst headshot yahan aayega */}
-              <div className="image-placeholder size-20 rounded-full bg-foreground/[0.08] mx-auto mb-4" aria-hidden />
+              {/* Real analyst-style photo via pravatar.cc. Swap for a branded
+                  headshot once available. */}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={`https://i.pravatar.cc/160?u=analyst-${a.name.toLowerCase().replace(/\W+/g, '-')}`}
+                alt=""
+                className="size-20 rounded-full mx-auto mb-4 object-cover"
+                aria-hidden
+                style={{ border: '1px solid rgba(85,166,48,0.35)' }}
+              />
               <h3 className="font-display text-base uppercase tracking-tight">{a.name}</h3>
               <div className="mt-1 text-[11px] uppercase tracking-[0.16em] text-primary/80">{a.desk}</div>
               <div className="mt-2 text-xs text-foreground/55">{a.years} buy-side experience</div>
