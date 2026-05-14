@@ -14,6 +14,14 @@ import DashboardShell from '@/components/layout/DashboardShell';
 
 import api from '@/lib/api/client';
 
+import { Mail, MessageCircle } from 'lucide-react';
+
+// Quick-contact channels rendered above the ticket list. Both gated on env
+// vars so we never ship a broken mailto:/ or wa.me/ link — leave either
+// empty in .env and that button hides.
+const SUPPORT_EMAIL = (process.env.NEXT_PUBLIC_SUPPORT_EMAIL || '').trim();
+const SUPPORT_WHATSAPP = (process.env.NEXT_PUBLIC_SUPPORT_WHATSAPP || '').trim();
+
 
 
 interface Message {
@@ -450,6 +458,58 @@ export default function SupportPage() {
               </button>
 
             </div>
+
+            {(SUPPORT_EMAIL || SUPPORT_WHATSAPP) && (
+
+              <div className="px-3 py-2 border-b border-border-glass flex items-center gap-2">
+
+                {SUPPORT_EMAIL && (
+
+                  <a
+
+                    href={`mailto:${SUPPORT_EMAIL}`}
+
+                    className="flex-1 inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-md border border-[#55a630]/25 bg-[#55a630]/5 hover:bg-[#55a630]/10 transition-colors text-xs font-medium text-text-primary"
+
+                    title={`Email ${SUPPORT_EMAIL}`}
+
+                  >
+
+                    <Mail size={13} className="text-[#55a630]" />
+
+                    Email
+
+                  </a>
+
+                )}
+
+                {SUPPORT_WHATSAPP && (
+
+                  <a
+
+                    href={`https://wa.me/${SUPPORT_WHATSAPP.replace(/[^\d]/g, '')}`}
+
+                    target="_blank"
+
+                    rel="noopener noreferrer"
+
+                    className="flex-1 inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-md border border-[#25D366]/30 bg-[#25D366]/5 hover:bg-[#25D366]/10 transition-colors text-xs font-medium text-text-primary"
+
+                    title="Chat on WhatsApp"
+
+                  >
+
+                    <MessageCircle size={13} className="text-[#25D366]" />
+
+                    WhatsApp
+
+                  </a>
+
+                )}
+
+              </div>
+
+            )}
 
             <div className="flex-1 overflow-y-auto">
 
