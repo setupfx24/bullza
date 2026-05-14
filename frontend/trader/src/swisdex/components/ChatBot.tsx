@@ -302,8 +302,8 @@ export function ChatBot() {
                 <Bot className="size-5 text-primary" />
               </div>
               <div className="flex-1 min-w-0">
-                <div className="font-display uppercase text-sm tracking-tight text-foreground">SwisBot</div>
-                <div className="flex items-center gap-1.5 text-[11px] text-foreground/55">
+                <div className="font-display uppercase text-sm tracking-tight" style={{ color: '#ffffff' }}>SwisBot</div>
+                <div className="flex items-center gap-1.5 text-[11px]" style={{ color: 'rgba(255,255,255,0.7)' }}>
                   <span className="relative inline-flex">
                     <span className="absolute inset-0 rounded-full bg-primary opacity-60 animate-ping" />
                     <span className="relative size-1.5 rounded-full bg-primary" />
@@ -345,7 +345,12 @@ export function ChatBot() {
                         key={q}
                         type="button"
                         onClick={() => send(q)}
-                        className="text-[11px] px-3 py-1.5 rounded-full border border-primary/40 text-primary hover:bg-primary/15 transition"
+                        className="text-xs font-semibold px-3.5 py-2 rounded-full transition"
+                        style={{
+                          color: '#ffffff',
+                          background: 'hsl(99 55% 42% / 0.22)',
+                          border: '1px solid hsl(99 55% 42% / 0.65)',
+                        }}
                       >
                         {q}
                       </button>
@@ -365,7 +370,11 @@ export function ChatBot() {
                     onChange={(e) => setInput(e.target.value)}
                     placeholder="Ask about bonus, deposits, accounts…"
                     aria-label="Message"
-                    className="flex-1 bg-transparent rounded-full px-4 py-2.5 text-sm text-foreground placeholder:text-foreground/40 outline-none border border-foreground/15 focus:border-primary/60"
+                    className="flex-1 bg-transparent rounded-full px-4 py-2.5 text-sm outline-none border focus:border-primary/60"
+                    style={{
+                      color: '#ffffff',
+                      borderColor: 'rgba(255,255,255,0.15)',
+                    }}
                   />
                   <button
                     type="submit"
@@ -405,9 +414,9 @@ function MessageBubble({ m }: { m: Msg }) {
             isUser ? 'rounded-br-md' : 'rounded-bl-md'
           }`}
           style={{
-            background: isUser ? 'hsl(99 55% 42% / 0.22)' : 'hsl(0 0% 13%)',
-            color: isUser ? 'hsl(99 60% 78%)' : 'hsl(0 0% 92%)',
-            border: isUser ? '1px solid hsl(99 55% 42% / 0.3)' : '1px solid hsl(0 0% 18%)',
+            background: isUser ? 'hsl(99 55% 42% / 0.28)' : 'hsl(0 0% 16%)',
+            color: '#ffffff',
+            border: isUser ? '1px solid hsl(99 55% 42% / 0.5)' : '1px solid hsl(0 0% 22%)',
           }}
         >
           {m.text}
