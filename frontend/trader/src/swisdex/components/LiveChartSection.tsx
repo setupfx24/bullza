@@ -13,21 +13,21 @@ const DEFAULT_SPREAD   = '1.0 pts';
 /* TradingView symbol mapping for every directory item below. */
 const INSTRUMENT_MAP: Record<string, string> = {
   // Indices
-  'SMI':              'TVC:SMI',
+  'SMI':              'BLACKBULL:SMI20',
   'US_500':           'OANDA:SPX500USD',
   'CANNABIS INDEX':   'AMEX:MJ',
   'US_TECH100':       'OANDA:NAS100USD',
   'US_30':            'OANDA:US30USD',
   'US_2000':          'OANDA:US2000USD',
-  'DOLLAR INDEX':     'TVC:DXY',
+  'DOLLAR INDEX':     'CAPITALCOM:DXY',
   'SPAIN 35':         'OANDA:ESP35EUR',
   // Commodities
-  'Crude Oil':        'TVC:USOIL',
+  'Crude Oil':        'OANDA:WTICOUSD',
   'Copper':           'OANDA:XCUUSD',
-  'Brent Oil':        'TVC:UKOIL',
+  'Brent Oil':        'OANDA:BCOUSD',
   'Heating Oil':      'NYMEX:HO1!',
   'Gasoline':         'NYMEX:RB1!',
-  'Natural Gas':      'TVC:NATGAS',
+  'Natural Gas':      'BLACKBULL:NGAS',
   'Gold Trading':     'OANDA:XAUUSD',
   'Silver':           'OANDA:XAGUSD',
   'Wheat':            'CBOT:ZW1!',
