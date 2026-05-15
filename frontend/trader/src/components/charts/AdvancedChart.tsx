@@ -88,25 +88,6 @@ function AdvancedChartInner() {
       autosize: true,
       debug: false,
 
-      // Timeframe shortcuts surfaced on the chart toolbar (1D, 5D, 1M, …).
-      // Resolution strings MUST exactly match what the datafeed declares
-      // in supported_resolutions (datafeed.ts SUPPORTED_RESOLUTIONS:
-      // '1','5','15','30','60','240','1D'). Using 'D' here fails because
-      // TV's internal lookup converts time_frames against the
-      // supported_resolutions list — a miss returns null and the next
-      // Array.map crashes with "Value is null", which blanks the entire
-      // chart (regression on /trading/terminal, 2026-05-15).
-      time_frames: [
-        { text: '1D',  resolution: '5',   description: '1 Day intraday (5m)' },
-        { text: '5D',  resolution: '15',  description: '5 Days (15m)' },
-        { text: '1M',  resolution: '60',  description: '1 Month (1H)' },
-        { text: '3M',  resolution: '240', description: '3 Months (4H)' },
-        { text: '6M',  resolution: '240', description: '6 Months (4H)' },
-        { text: 'YTD', resolution: '1D',  description: 'Year-to-Date' },
-        { text: '1Y',  resolution: '1D',  description: '1 Year' },
-        { text: 'ALL', resolution: '1D',  description: 'All available history' },
-      ],
-
       // Trading Terminal — built-in order panel
       broker_factory: (host: any) => createBroker(host),
 
@@ -152,35 +133,6 @@ function AdvancedChartInner() {
         'paneProperties.backgroundType': 'solid',
         'scalesProperties.textColor': tvTheme === 'dark' ? '#aaaaaa' : '#555555',
         'scalesProperties.backgroundColor': tvTheme === 'dark' ? '#0d0d0d' : '#ffffff',
-        // ── Broker-integration line styling ─────────────────────────────
-        // Position entry, SL, TP lines come from the broker adapter. Default
-        // TV styling makes them nearly invisible on the dark theme; the
-        // client flagged "Execution / SL / TP nothing showing". These
-        // overrides bump line width + use brand-friendly colors that pop
-        // against the chart background.
-        'tradingProperties.lineLength': 80,
-        'tradingProperties.linewidth': 2,
-        'tradingProperties.showPositionsInChart': true,
-        'tradingProperties.showOrdersInChart': true,
-        'tradingProperties.showExecutionsInChart': true,
-        'tradingProperties.horizontalAlignment': 'right',
-        // Entry line — SwisDex green for buys, red for sells (TV handles
-        // direction per-position so we set both buy/sell tints here).
-        'tradingProperties.positionPL.plValueColor': '#9a9a9a',
-        'tradingProperties.position.buyColor': '#55a630',
-        'tradingProperties.position.sellColor': '#ef5350',
-        'tradingProperties.position.linestyle': 0,    // solid
-        'tradingProperties.position.linewidth': 2,
-        // SL line — amber.
-        'tradingProperties.stopLoss.buyColor': '#f59e0b',
-        'tradingProperties.stopLoss.sellColor': '#f59e0b',
-        'tradingProperties.stopLoss.linestyle': 2,    // dashed
-        'tradingProperties.stopLoss.linewidth': 2,
-        // TP line — bright green.
-        'tradingProperties.takeProfit.buyColor': '#22c55e',
-        'tradingProperties.takeProfit.sellColor': '#22c55e',
-        'tradingProperties.takeProfit.linestyle': 2,  // dashed
-        'tradingProperties.takeProfit.linewidth': 2,
       },
       loading_screen: {
         backgroundColor: tvTheme === 'dark' ? '#0e0e0e' : '#f2efe9',
