@@ -82,22 +82,17 @@ const DEMO_FUNDING_MSG =
 const CRYPTO_DEPOSIT_METHOD = 'nowpayments';
 const CRYPTO_WITHDRAW_METHOD = 'oxapay';
 
-/** UI grid — selection is sent with NOWPayments / payout details for finance matching. */
+/** UI grid — selection is sent with NOWPayments / payout details for finance
+ *  matching. Restricted to BSC (BEP-20) + Tron (TRC-20) chains only since
+ *  the client's NOWPayments payout wallet is on BSC and they want users to
+ *  fund via low-fee stablecoin chains. Re-enable ERC-20 / SOL / native BTC
+ *  here once payout wallets exist on those chains in NOWPayments dashboard. */
 const CRYPTO_ASSETS = [
-  { id: 'BTC', label: 'BTC', sub: 'Bitcoin' },
-  { id: 'ETH', label: 'ETH', sub: 'Ethereum' },
-  { id: 'BNB_BSC', label: 'BNB', sub: 'BSC' },
-  { id: 'USDT_BSC', label: 'USDT', sub: 'BSC' },
-  { id: 'USDC_BSC', label: 'USDC', sub: 'BSC' },
-  { id: 'USDT_ERC', label: 'USDT', sub: 'ERC20' },
-  { id: 'USDC_ERC', label: 'USDC', sub: 'ERC20' },
-  { id: 'TRX', label: 'TRX', sub: 'Tron' },
-  { id: 'USDT_TRC', label: 'USDT', sub: 'TRC20' },
-  { id: 'USDC_TRC', label: 'USDC', sub: 'TRC20' },
-  { id: 'USDT_SOL', label: 'USDT', sub: 'SOL' },
-  { id: 'USDC_SOL', label: 'USDC', sub: 'SOL' },
-  { id: 'SOL', label: 'SOL', sub: 'Solana' },
-  { id: 'XRP', label: 'XRP', sub: 'XRP' },
+  { id: 'USDT_BSC', label: 'USDT', sub: 'BSC (BEP-20)' },
+  { id: 'USDT_TRC', label: 'USDT', sub: 'Tron (TRC-20)' },
+  { id: 'USDC_BSC', label: 'USDC', sub: 'BSC (BEP-20)' },
+  { id: 'BNB_BSC',  label: 'BNB',  sub: 'BSC' },
+  { id: 'TRX',      label: 'TRX',  sub: 'Tron' },
 ] as const;
 
 // 'crypto' = automated provider flow (NOWPayments for deposits, OxaPay-style
@@ -1180,9 +1175,7 @@ function WalletPageContent() {
                         {/* Featured selected coin */}
                         <div className="rounded-xl border border-border-primary bg-bg-secondary p-4 mb-2">
                           <p className="text-base font-bold text-text-primary font-mono flex items-center gap-2.5">
-                            <span className="text-xl leading-none" aria-hidden>
-                              {selectedWithdrawCrypto.id === 'BTC' ? '₿' : '◆'}
-                            </span>
+                            <span className="text-xl leading-none" aria-hidden>◆</span>
                             <span>
                               {selectedWithdrawCrypto.label}{' '}
                               <span className="text-text-tertiary text-sm font-normal">({selectedWithdrawCrypto.sub})</span>
