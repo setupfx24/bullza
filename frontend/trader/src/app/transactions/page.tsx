@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { clsx } from 'clsx';
 import toast from 'react-hot-toast';
 import DashboardShell from '@/components/layout/DashboardShell';
+import DatePicker from '@/components/forms/DatePicker';
 import api from '@/lib/api/client';
 import {
   ArrowUpRight,
@@ -402,19 +403,17 @@ export default function TransactionsPage() {
               ))}
               <div className="w-px h-5 bg-white/8 mx-1" />
               <div className="flex items-center gap-1 sm:gap-1.5 w-full sm:w-auto mt-1.5 sm:mt-0">
-                <input
-                  type="date"
+                <DatePicker
                   value={dateFrom}
-                  onChange={(e) => { setDateFrom(e.target.value); setPage(1); }}
-                  className="px-2 sm:px-2.5 py-1 rounded-lg border border-border-primary bg-bg-secondary text-[10px] sm:text-[11px] text-text-secondary outline-none focus:border-accent/30 flex-1 sm:flex-none sm:w-[120px] min-w-0"
+                  onChange={(v) => { setDateFrom(v); setPage(1); }}
+                  max={dateTo || undefined}
                   placeholder="From"
                 />
                 <span className="text-text-tertiary text-xs shrink-0">–</span>
-                <input
-                  type="date"
+                <DatePicker
                   value={dateTo}
-                  onChange={(e) => { setDateTo(e.target.value); setPage(1); }}
-                  className="px-2 sm:px-2.5 py-1 rounded-lg border border-border-primary bg-bg-secondary text-[10px] sm:text-[11px] text-text-secondary outline-none focus:border-accent/30 flex-1 sm:flex-none sm:w-[120px] min-w-0"
+                  onChange={(v) => { setDateTo(v); setPage(1); }}
+                  min={dateFrom || undefined}
                   placeholder="To"
                 />
               </div>

@@ -33,12 +33,13 @@ Usage: $0 [--no-pull] [--no-build] [--service <name> [--service <name> ...]]
 
   --no-pull        Skip 'git pull origin main'
   --no-build       Skip docker compose build (use existing images)
-  --service <n>    Limit build+up to specific service(s). Repeatable.
+  --service <n>    Limit the BUILD step to specific service(s); the up
+                   step always brings the full stack up. Repeatable.
 
 Examples:
-  $0                                    # full deploy
-  $0 --service trader-frontend          # rebuild just the trader frontend
-  $0 --no-build --service gateway       # bounce gateway with existing image
+  $0                                    # full deploy (rebuild + up everything)
+  $0 --service trader-frontend          # rebuild just trader-frontend, up the full stack
+  $0 --no-build --service gateway       # skip build entirely (--service is a no-op here)
 EOF
       exit 0 ;;
     *) echo "Unknown arg: $1 (try --help)"; exit 2 ;;
@@ -73,12 +74,15 @@ if [[ $BUILD -eq 1 ]]; then
   fi
 fi
 
-echo "==> docker compose up -d"
-if [[ ${#SERVICES[@]} -gt 0 ]]; then
-  "${COMPOSE[@]}" up -d "${SERVICES[@]}"
-else
-  "${COMPOSE[@]}" up -d
-fi
+# `up -d` always runs over the FULL stack — even when --service narrowed
+# the build. Otherwise, if the operator had done `docker compose down`
+# before invoking this script with --service X, only X would come back
+# up and admin-frontend / admin-api / engines would stay down (the
+# 2026-05-14 admin.swisdex.com outage). Compose is idempotent here:
+# already-running containers with unchanged image/config are not touched,
+# so this is safe to run regardless of prior state.
+echo "==> docker compose up -d  (full stack — --service only scopes build)"
+"${COMPOSE[@]}" up -d
 
 echo
 echo "==> Service state (verify 127.0.0.1:30{12,13} / 127.0.0.1:80{02,03} appear in PORTS):"

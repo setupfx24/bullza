@@ -14,10 +14,11 @@ import { clsx } from 'clsx';
 import {
   ChevronDown, ArrowDownToLine, ArrowUpFromLine,
   TrendingUp, TrendingDown, ArrowRight, Gift,
-  ShieldCheck, BadgeCheck, ExternalLink, Loader2,
+  ShieldCheck, ExternalLink, Loader2,
 } from 'lucide-react';
 import DashboardShell from '@/components/layout/DashboardShell';
 import api from '@/lib/api/client';
+import toast from 'react-hot-toast';
 
 interface AccountRow {
   id: string;
@@ -96,32 +97,75 @@ function BrokerHome() {
 
   useEffect(() => {
     let cancelled = false;
-    (async () => {
+    // Daily bars (oldest→newest, today is the last row) only change once a
+    // day, so we fetch them ONCE per symbol and keep the day-open in a ref
+    // that the polling loop reads. Prices come from /prices/all and refresh
+    // every tick — the previous "fetch once on mount" build left the
+    // movers card showing whatever pct was computed at page load and
+    // never updating, which clients read as "Top Movers not live".
+    type BarsResp = { bars?: BarRow[] } | BarRow[] | null | undefined;
+    const dayOpenBySymbol: Record<string, number> = {};
+    const closeFallbackBySymbol: Record<string, number> = {};
+
+    const loadBars = async () => {
+      const barsRaw = await Promise.all(
+        TOP_MOVER_SYMBOLS.map((s) =>
+          api.get<BarsResp>(`/instruments/${s}/bars`, { resolution: '1D' }).catch(() => null as BarsResp),
+        ),
+      );
+      if (cancelled) return;
+      TOP_MOVER_SYMBOLS.forEach((sym, i) => {
+        const resp = barsRaw[i];
+        const bars: BarRow[] = Array.isArray(resp) ? resp : (resp?.bars ?? []);
+        const dayBar = bars.length > 0 ? bars[bars.length - 1] : null;
+        if (dayBar) {
+          dayOpenBySymbol[sym] = Number(dayBar.open);
+          closeFallbackBySymbol[sym] = Number(dayBar.close);
+        }
+      });
+    };
+
+    const recompute = async () => {
       try {
-        const [ticksRaw, ...barsRaw] = await Promise.all([
-          api.get<PriceTick[]>('/instruments/prices/all').catch(() => [] as PriceTick[]),
-          ...TOP_MOVER_SYMBOLS.map((s) =>
-            api.get<BarRow[]>(`/instruments/${s}/bars`, { resolution: '1D' }).catch(() => [] as BarRow[]),
-          ),
-        ]);
+        const ticksRaw = await api.get<PriceTick[]>('/instruments/prices/all').catch(
+          () => [] as PriceTick[],
+        );
         if (cancelled) return;
         const tickMap = new Map<string, number>();
         for (const t of ticksRaw || []) {
           if (t?.symbol && t.bid && t.ask) tickMap.set(t.symbol.toUpperCase(), (t.bid + t.ask) / 2);
         }
-        const out = TOP_MOVER_SYMBOLS.map((sym, i) => {
-          const bars = barsRaw[i] || [];
-          const dayOpen = bars.length > 0 ? Number(bars[bars.length - 1].open) : NaN;
-          const price = tickMap.get(sym) ?? (bars.length > 0 ? Number(bars[bars.length - 1].close) : NaN);
+        const out = TOP_MOVER_SYMBOLS.map((sym) => {
+          const dayOpen = dayOpenBySymbol[sym];
+          const price = tickMap.get(sym) ?? closeFallbackBySymbol[sym] ?? NaN;
           const pct = (Number.isFinite(dayOpen) && dayOpen > 0 && Number.isFinite(price))
             ? ((price - dayOpen) / dayOpen) * 100
             : 0;
           return { symbol: sym, pct, price };
         });
         setMovers(out);
-      } catch {}
+      } catch { /* keep previous values on transient failure */ }
+    };
+
+    // Initial sequence: load bars first so the first render has a valid
+    // dayOpen baseline, then loop the recompute every 5s using the live
+    // /prices/all snapshot. Reload bars hourly so we pick up the new day
+    // when the date rolls over (cheap — 4 small responses cached upstream).
+    const timers: { priceTimer?: ReturnType<typeof setInterval>; barTimer?: ReturnType<typeof setInterval> } = {};
+    (async () => {
+      await loadBars();
+      if (cancelled) return;
+      await recompute();
+      if (cancelled) return;
+      timers.priceTimer = setInterval(() => { void recompute(); }, 5000);
+      timers.barTimer = setInterval(() => { void loadBars(); }, 60 * 60 * 1000);
     })();
-    return () => { cancelled = true; };
+
+    return () => {
+      cancelled = true;
+      if (timers.priceTimer) clearInterval(timers.priceTimer);
+      if (timers.barTimer) clearInterval(timers.barTimer);
+    };
   }, []);
 
   const activeAccount = useMemo(
@@ -138,7 +182,6 @@ function BrokerHome() {
         loading={loading}
       />
       <TopMoversCard movers={movers} />
-      <StatusProgramCard />
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
         <InviteFriendsCard />
         <BonusCard />
@@ -325,71 +368,36 @@ function TopMoversCard({ movers }: { movers: { symbol: string; pct: number; pric
   );
 }
 
-function StatusProgramCard() {
-  return (
-    <Card>
-      <div className="flex flex-col md:flex-row md:items-center gap-4">
-        <div className="flex-1 min-w-0">
-          <h2 className="text-base font-bold text-text-primary mb-2 flex items-center gap-2">
-            <BadgeCheck size={18} className="text-[#55a630]" /> Status program
-          </h2>
-          <div className="flex items-center gap-2 flex-wrap">
-            <Link
-              href="/rewards"
-              className="px-3 py-1.5 text-xs font-semibold rounded-full transition-colors"
-              style={{ background: 'rgba(85,166,48,0.14)', color: '#55a630', border: '1px solid rgba(85,166,48,0.35)' }}
-            >
-              Challenges
-            </Link>
-            <Link
-              href="/rewards"
-              className="px-3 py-1.5 text-xs font-semibold rounded-full transition-colors hover:bg-bg-hover"
-              style={{ border: '1px solid var(--border-primary)', color: 'var(--text-secondary)' }}
-            >
-              My rewards
-            </Link>
-          </div>
-        </div>
-        <div
-          className="md:w-[420px] rounded-xl p-4 flex items-center gap-4"
-          style={{
-            background: 'linear-gradient(135deg, rgba(85,166,48,0.12) 0%, rgba(63,125,34,0.06) 100%)',
-            border: '1px solid rgba(85,166,48,0.32)',
-          }}
-        >
-          <Gift size={28} className="text-[#55a630] shrink-0" />
-          <div className="min-w-0 flex-1">
-            <p className="text-sm font-bold text-text-primary leading-tight">Welcome cashback</p>
-            <p className="text-xs text-text-secondary leading-tight mt-0.5">
-              Activate the welcome program to earn cashback on your first 10 closed trades.
-            </p>
-          </div>
-          <div className="flex items-center gap-2 shrink-0">
-            <Link
-              href="/rewards"
-              className="px-3 py-1.5 text-xs font-bold rounded-md"
-              style={{ background: '#55a630', color: '#1a1408' }}
-            >
-              Activate
-            </Link>
-            <button
-              type="button"
-              className="px-3 py-1.5 text-xs font-semibold rounded-md transition-colors hover:bg-bg-hover"
-              style={{ border: '1px solid var(--border-primary)', color: 'var(--text-secondary)' }}
-            >
-              Decline
-            </button>
-          </div>
-        </div>
-      </div>
-    </Card>
-  );
-}
 
 function InviteFriendsCard() {
+  const [link, setLink] = useState<string>('');
+  const [code, setCode] = useState<string>('');
+
+  useEffect(() => {
+    let cancelled = false;
+    api
+      .get<{ referral_link?: string; referral_code?: string }>('/business/ib/dashboard')
+      .then((d) => {
+        if (cancelled) return;
+        setLink(d.referral_link || '');
+        setCode(d.referral_code || '');
+      })
+      .catch(() => { /* card falls back to the static CTA */ });
+    return () => { cancelled = true; };
+  }, []);
+
+  const onCopy = (value: string) => {
+    try {
+      navigator.clipboard.writeText(value);
+      toast.success('Copied to clipboard');
+    } catch {
+      toast.error('Copy failed — please select the text manually');
+    }
+  };
+
   return (
     <Card>
-      <div className="flex items-center gap-4">
+      <div className="flex items-start gap-4">
         <div
           className="shrink-0 w-14 h-14 rounded-xl flex items-center justify-center"
           style={{ background: 'rgba(34,197,94,0.12)', border: '1px solid rgba(34,197,94,0.3)' }}
@@ -399,14 +407,48 @@ function InviteFriendsCard() {
         <div className="min-w-0 flex-1">
           <h3 className="text-base font-bold text-text-primary">Invite friends, earn together</h3>
           <p className="text-xs text-text-secondary mt-0.5 leading-relaxed">
-            Get a share of every trade your invitees make. Lifetime payouts straight to your main wallet.
+            Share your link — every trade your invitees make earns you commission for life.
           </p>
-          <Link
-            href="/business"
-            className="inline-flex items-center gap-1.5 mt-3 text-xs font-bold text-[#55a630] hover:underline"
-          >
-            Learn details <ArrowRight size={12} />
-          </Link>
+          {link ? (
+            <>
+              <div className="mt-3 flex items-center gap-2">
+                <input
+                  type="text"
+                  readOnly
+                  value={link}
+                  onFocus={(e) => e.currentTarget.select()}
+                  className="flex-1 min-w-0 text-[11px] font-mono bg-bg-secondary border border-border-primary rounded-md px-2.5 py-1.5 text-text-primary outline-none focus:border-[#55a630]/40"
+                />
+                <button
+                  type="button"
+                  onClick={() => onCopy(link)}
+                  className="shrink-0 px-2.5 py-1.5 text-[11px] font-bold rounded-md border border-[#55a630]/40 text-[#55a630] hover:bg-[#55a630]/10 transition-colors"
+                >
+                  Copy
+                </button>
+              </div>
+              {code && (
+                <p className="text-[11px] text-text-tertiary mt-2">
+                  Code:{' '}
+                  <button
+                    type="button"
+                    onClick={() => onCopy(code)}
+                    className="text-[#55a630] font-mono font-bold cursor-pointer hover:underline"
+                    title="Click to copy your referral code"
+                  >
+                    {code}
+                  </button>
+                </p>
+              )}
+            </>
+          ) : (
+            <Link
+              href="/business"
+              className="inline-flex items-center gap-1.5 mt-3 text-xs font-bold text-[#55a630] hover:underline"
+            >
+              Get your referral link <ArrowRight size={12} />
+            </Link>
+          )}
         </div>
       </div>
     </Card>
@@ -424,9 +466,9 @@ function BonusCard() {
           <Gift size={26} className="text-[#55a630]" />
         </div>
         <div className="min-w-0 flex-1">
-          <h3 className="text-base font-bold text-text-primary">50% deposit bonus</h3>
+          <h3 className="text-base font-bold text-text-primary">Up to 100% deposit bonus</h3>
           <p className="text-xs text-text-secondary mt-0.5 leading-relaxed">
-            Top up your account and we&apos;ll add 50% extra trading credit. No expiry, fully tradeable.
+            Top up your account and we&apos;ll add up to 100% extra trading credit. No expiry, fully tradeable.
           </p>
           <Link
             href="/wallet"

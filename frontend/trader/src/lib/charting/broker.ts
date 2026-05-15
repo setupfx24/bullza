@@ -44,11 +44,31 @@ export function createBroker(host: any): any {
   //      auto-redraw whenever orderUpdate or ordersFullUpdate is called.
   // Polling at 1s gives a smooth P&L badge without hammering the API
   // (positions / prices are already in the local store from the WS feed).
+  //
+  // Critical: when the position SET changes (new position opened, one
+  // closed), positionUpdate() alone won't make TV pick up the new id —
+  // it only refreshes positions it already knows about. We have to call
+  // positionsFullUpdate() + ordersFullUpdate() on transition so TV
+  // re-calls positions() / orders() and renders the new entry / SL / TP
+  // lines on the chart. Tracking by id-set diff so the full update only
+  // fires on real change, not every tick.
+  const prevPosIds = new Set<string>();
   setInterval(() => {
     try {
       if (!getActiveAccount()) return;
       const positions = getPositions();
       const prices = getPrices();
+
+      const curIds = new Set(positions.map((p) => p.id));
+      const changed =
+        curIds.size !== prevPosIds.size ||
+        positions.some((p) => !prevPosIds.has(p.id));
+      if (changed) {
+        prevPosIds.clear();
+        for (const id of curIds) prevPosIds.add(id);
+        _host?.positionsFullUpdate?.();
+        _host?.ordersFullUpdate?.();
+      }
 
       for (const pos of positions) {
         const tick = prices[pos.symbol];
@@ -374,13 +394,35 @@ export function createBroker(host: any): any {
       }
     },
 
-    async closePosition(positionId: string): Promise<void> {
+    async closePosition(positionId: string, amount?: number): Promise<void> {
+      // TradingView passes `amount` when the user closes only part of a
+      // position via the chart (right-click position → close partial, or
+      // the inline close-quantity stepper). We have to forward it as
+      // `lots` to the backend so the partial-close path runs and the
+      // realized profit toast fires; ignoring it (the previous behaviour)
+      // silently turned every partial close on the chart into a full
+      // close and the "booking profit" the trader expected to see for
+      // the partial slice was never surfaced.
       try {
-        await api.post(`/positions/${positionId}/close`, {});
-        _host?.positionUpdate({ id: positionId, qty: 0 });
-        setTimeout(() => {
-          void 0 /* positions update via WS */;
-        }, 500);
+        const body: Record<string, unknown> = {};
+        const isPartial = typeof amount === 'number' && amount > 0;
+        if (isPartial) body.lots = amount;
+        const res = await api.post<{ profit?: number; close_price?: number; remaining_lots?: number }>(
+          `/positions/${positionId}/close`,
+          body,
+        );
+        if (isPartial && typeof res.remaining_lots === 'number' && res.remaining_lots > 0) {
+          _host?.positionUpdate({ id: positionId, qty: res.remaining_lots });
+          const pnl = res.profit ?? 0;
+          const sign = pnl >= 0 ? '+' : '';
+          _host?.showNotification?.(
+            'Partial Close',
+            `Booked ${sign}$${pnl.toFixed(2)} — ${res.remaining_lots} lots remain`,
+            1,
+          );
+        } else {
+          _host?.positionUpdate({ id: positionId, qty: 0 });
+        }
       } catch (e: any) {
         _host?.showNotification?.('Close Failed', e?.message || 'Failed', 0);
         throw e;
@@ -407,6 +449,11 @@ export function createBroker(host: any): any {
           supportOrderBrackets: false,
           supportPositionBrackets: true,    // SL/TP attached to position
           supportClosePosition: true,
+          // Enables TV's "close partial" UI affordances (the close
+          // dialog gains a quantity field; right-click position menu
+          // shows "Close partial"). Our closePosition handler forwards
+          // the amount to the backend as `lots`.
+          supportPartialClosePosition: true,
           supportReversePosition: false,
           supportNativeReversePosition: false,
           supportMarketOrders: true,

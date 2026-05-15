@@ -7,9 +7,8 @@ import { useShellStore } from '@/stores/shellStore';
 import { useAuthStore } from '@/stores/authStore';
 import { useTradingStore } from '@/stores/tradingStore';
 import { NotificationBell } from '@/components/NotificationListener';
-import EarnChip from '@/components/earn/EarnChip';
 import api from '@/lib/api/client';
-import { ChevronDown, Wallet } from 'lucide-react';
+import { ChevronDown, Wallet, Gift, Users, Menu } from 'lucide-react';
 
 function formatUsd(n: number) {
   return new Intl.NumberFormat('en-US', {
@@ -86,24 +85,38 @@ export default function AppHeader() {
       <header
         className="h-[56px] sm:h-[65px] flex items-center justify-between px-3 sm:px-5 rounded-xl bg-bg-secondary border border-border-primary"
       >
-        {/* LEFT — swisdex mark toggles the sidebar (no hamburger) */}
+        {/* LEFT — hamburger toggles the sidebar. The brand mark already
+            lives at the top of the sidebar itself, so we don't repeat it
+            inside the content header. */}
         <button
           type="button"
           onClick={toggleSidebar}
-          className="shrink-0 w-10 h-10 flex items-center justify-center rounded-lg hover:bg-bg-hover transition-colors"
+          className="shrink-0 w-10 h-10 flex items-center justify-center rounded-lg border border-border-primary text-text-secondary hover:text-text-primary hover:bg-bg-hover transition-colors"
           aria-label="Toggle menu"
         >
-          <img
-            src="/images/swisdex-logo.png"
-            alt="SwisDex"
-            className="w-9 h-9 object-contain"
-          />
+          <Menu size={20} />
         </button>
 
-        {/* RIGHT — XP/Coin chip + balance + bell + user */}
+        {/* RIGHT — Bonus/Referral chips + balance + bell + user */}
         <div className="flex items-center gap-1.5 sm:gap-3">
-          {/* XP + AC chip — links to /earn/tasks */}
-          <EarnChip />
+          {/* Bonus chip — quick link to the bonus offers page */}
+          <Link
+            href="/bonus"
+            className="hidden md:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-[#55a630]/25 bg-[#55a630]/5 hover:bg-[#55a630]/10 transition-colors"
+            title="View active bonus offers"
+          >
+            <Gift size={13} className="text-[#55a630] shrink-0" />
+            <span className="text-[11px] font-medium text-text-primary">Bonus</span>
+          </Link>
+          {/* Referral chip — quick link to the IB / referral dashboard */}
+          <Link
+            href="/business"
+            className="hidden md:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-[#55a630]/25 bg-[#55a630]/5 hover:bg-[#55a630]/10 transition-colors"
+            title="Invite friends and earn"
+          >
+            <Users size={13} className="text-[#55a630] shrink-0" />
+            <span className="text-[11px] font-medium text-text-primary">Referral</span>
+          </Link>
 
           {/* Balance pill */}
           <Link

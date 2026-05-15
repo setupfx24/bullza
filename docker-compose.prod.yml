@@ -65,6 +65,10 @@ services:
         # SECRET goes to the gateway env (CLOUDFLARE_TURNSTILE_SECRET_KEY)
         # — never expose it to the browser.
         NEXT_PUBLIC_CLOUDFLARE_TURNSTILE_SITE_KEY: ${NEXT_PUBLIC_CLOUDFLARE_TURNSTILE_SITE_KEY:-}
+        # Support quick-contact channels rendered on /support above the
+        # ticket list. Either may be empty — the button hides if so.
+        NEXT_PUBLIC_SUPPORT_EMAIL: ${NEXT_PUBLIC_SUPPORT_EMAIL:-support@swisdex.com}
+        NEXT_PUBLIC_SUPPORT_WHATSAPP: ${NEXT_PUBLIC_SUPPORT_WHATSAPP:-}
     ports:
       - "127.0.0.1:3012:3000"
     environment:

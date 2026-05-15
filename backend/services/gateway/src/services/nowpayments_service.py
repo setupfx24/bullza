@@ -37,6 +37,11 @@ CURRENCY_MAP: dict[str, str] = {
     "USDC_SOL": "usdcsol",
     "SOL": "sol",
     "XRP": "xrp",
+    # BNB Smart Chain — MetaMask's native BNB network. `bnbbsc` is BNB
+    # itself; `usdtbsc` / `usdcbsc` are the BEP-20 stablecoins on BSC.
+    "BNB_BSC": "bnbbsc",
+    "USDT_BSC": "usdtbsc",
+    "USDC_BSC": "usdcbsc",
 }
 
 

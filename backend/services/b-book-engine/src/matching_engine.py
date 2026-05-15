@@ -20,7 +20,7 @@ from packages.common.src.database import AsyncSessionLocal
 from packages.common.src.models import (
     Order, OrderType, OrderSide, OrderStatus,
     Position, PositionStatus, TradingAccount, Instrument,
-    SpreadConfig, ChargeConfig, Transaction, User,
+    SpreadConfig, ChargeConfig, Transaction, TradeHistory, User,
 )
 from packages.common.src.redis_client import redis_client, PriceChannel
 from packages.common.src import corecen_trade_client
@@ -289,10 +289,11 @@ class MatchingEngine:
             symbol=getattr(instrument, "symbol", None),
         )
 
+        closed_at = datetime.now(timezone.utc)
         pos.status = PositionStatus.CLOSED
         pos.close_price = close_price
         pos.profit = profit
-        pos.closed_at = datetime.now(timezone.utc)
+        pos.closed_at = closed_at
 
         account = await db.get(TradingAccount, pos.account_id)
         if account:
@@ -302,9 +303,48 @@ class MatchingEngine:
             account.equity = account.balance + account.credit
             account.free_margin = account.equity - account.margin_used
 
+        # Persist the close to TradeHistory so this row shows up in the
+        # trader's "Closed positions" tab. Previously this engine closed
+        # the position but never wrote history — the gateway's sltp_engine
+        # was supposed to be the historian, but it runs at 1s while this
+        # loop runs at 100ms, so this engine always wins the race and the
+        # row never appeared (client-reported regression: SL/TP closes
+        # missing from history). Also write the matching Transaction so
+        # the balance-history chart / Transactions list pick up the
+        # realized P&L event.
+        side_str = pos.side.value if hasattr(pos.side, "value") else str(pos.side)
+        history = TradeHistory(
+            position_id=pos.id,
+            account_id=pos.account_id,
+            instrument_id=pos.instrument_id,
+            side=pos.side,
+            lots=pos.lots,
+            open_price=pos.open_price,
+            close_price=close_price,
+            swap=pos.swap or Decimal("0"),
+            commission=pos.commission or Decimal("0"),
+            profit=profit,
+            close_reason=reason,
+            opened_at=pos.created_at,
+            closed_at=closed_at,
+        )
+        db.add(history)
+
+        if account:
+            tx = Transaction(
+                user_id=account.user_id,
+                account_id=account.id,
+                type="profit" if profit >= 0 else "loss",
+                amount=profit,
+                balance_after=account.balance,
+                reference_id=pos.id,
+                description=f"{reason.upper()} hit: {instrument.symbol} {side_str} {pos.lots} lots @ {close_price}",
+            )
+            db.add(tx)
+
         logger.info(
             f"Position {pos.id} closed by {reason}: {instrument.symbol} "
-            f"{pos.side.value} @ {close_price}, profit: {profit}"
+            f"{side_str} @ {close_price}, profit: {profit}"
         )
 
         await redis_client.publish(f"account:{pos.account_id}", json.dumps({
