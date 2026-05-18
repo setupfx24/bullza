@@ -472,12 +472,17 @@ function WalletPageContent() {
       // status flips to auto_approved server-side).
       setDepositSubmitting(true);
       try {
+        // Intentionally do NOT send `crypto_currency` — leaving it unset
+        // tells NOWPayments to show their hosted-page coin/network picker
+        // so the user can choose USDT-BSC vs USDT-TRC20 vs USDC-BSC etc.
+        // at checkout time. The picker only surfaces coins that are
+        // enabled in the NOWPayments dashboard, so the operator controls
+        // which networks are offered without touching this code.
         const resp = await api.post<{ id: string; status: string; payment_url?: string }>(
           '/wallet/deposit',
           {
             amount: amt,
             method: CRYPTO_DEPOSIT_METHOD,
-            crypto_currency: selectedCryptoDeposit,
           },
         );
         if (resp.payment_url) {
@@ -949,7 +954,7 @@ function WalletPageContent() {
 
                       <div className="rounded-xl border border-accent/20 bg-accent/5 px-4 py-3">
                         <p className="text-xs text-text-secondary leading-relaxed">
-                          You&apos;ll be redirected to NOWPayments to complete the payment from any wallet (MetaMask, Trust, Binance, etc.). Once the transaction confirms on-chain, your wallet balance is credited automatically.
+                          You&apos;ll be redirected to NOWPayments. Choose the coin and network you want to pay with there (USDT on BSC / TRC-20, USDC, BNB, etc.), then send the amount from your wallet (MetaMask, Trust, Binance, etc.). Once the transaction confirms on-chain, your wallet balance is credited automatically.
                         </p>
                       </div>
 

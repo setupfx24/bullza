@@ -816,9 +816,16 @@ async def handle_nowpayments_webhook(
     elif status in failure:
         deposit.status = "rejected"
         deposit.rejection_reason = f"NOWPayments payment {status}"
-        _send_deposit_failed_email(
-            user_row, deposit, status, method_label="Crypto (NOWPayments)",
-        )
+        # user_row is only loaded inside the `success` branch above; the
+        # failure branch needs its own fetch or the deposit-failed email
+        # call below raises NameError → 500 on every expired/failed/
+        # refunded/partially_paid webhook (regression 2026-05-15).
+        user_q = await db.execute(select(User).where(User.id == deposit.user_id))
+        user_row = user_q.scalar_one_or_none()
+        if user_row:
+            _send_deposit_failed_email(
+                user_row, deposit, status, method_label="Crypto (NOWPayments)",
+            )
         await create_notification(
             db, deposit.user_id,
             title="Deposit not completed",
