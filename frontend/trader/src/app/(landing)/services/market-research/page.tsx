@@ -39,10 +39,15 @@ export default function MarketResearchPage() {
               </Link>
             </div>
           </div>
-          {/* TODO: Sample research report screenshot yahan aayega */}
-          <div className="image-placeholder rounded-2xl bg-foreground/[0.06] min-h-[260px] flex items-center justify-center">
-            <FileText className="size-16 text-primary/40" aria-hidden />
-          </div>
+          {/* Research / chart-analysis stock photo. Swap for a branded
+              report mockup once available. */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="https://images.unsplash.com/photo-1554260570-9140fd3b7614?auto=format&fit=crop&w=900&q=80"
+            alt="Trading charts and market analysis"
+            className="rounded-2xl w-full min-h-[260px] max-h-[340px] object-cover"
+            style={{ border: '1px solid hsl(99 55% 42% / 0.35)' }}
+          />
         </div>
       </section>
 
@@ -105,37 +110,6 @@ export default function MarketResearchPage() {
             Short bias holds while price stays under 1.0905. First target is the prior swing low at 1.0780;
             stretch target 1.0735 if EU CPI surprises soft.
           </p>
-        </div>
-      </section>
-
-      {/* Analyst team */}
-      <section className="mx-auto max-w-[1200px] px-[var(--gutter)] py-12 sm:py-16">
-        <div className="text-center mb-10">
-          <h2 className="font-display uppercase text-2xl sm:text-3xl md:text-4xl tracking-tight">Meet the Research Desk</h2>
-        </div>
-        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
-          {[
-            { name: 'Daniel R.',  desk: 'FX & Rates',    years: '14 yrs' },
-            { name: 'Priya M.',   desk: 'Crypto & DeFi', years: '8 yrs' },
-            { name: 'Marco V.',   desk: 'Metals & Energy', years: '17 yrs' },
-            { name: 'Aisha K.',   desk: 'Equity Indices', years: '11 yrs' },
-          ].map((a) => (
-            <article key={a.name} className="liquid-glass rounded-2xl p-6 text-center">
-              {/* Real analyst-style photo via pravatar.cc. Swap for a branded
-                  headshot once available. */}
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={`https://i.pravatar.cc/160?u=analyst-${a.name.toLowerCase().replace(/\W+/g, '-')}`}
-                alt=""
-                className="size-20 rounded-full mx-auto mb-4 object-cover"
-                aria-hidden
-                style={{ border: '1px solid rgba(85,166,48,0.35)' }}
-              />
-              <h3 className="font-display text-base uppercase tracking-tight">{a.name}</h3>
-              <div className="mt-1 text-[11px] uppercase tracking-[0.16em] text-primary/80">{a.desk}</div>
-              <div className="mt-2 text-xs text-foreground/55">{a.years} buy-side experience</div>
-            </article>
-          ))}
         </div>
       </section>
 

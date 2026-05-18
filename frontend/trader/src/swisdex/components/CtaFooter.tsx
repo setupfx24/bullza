@@ -2,7 +2,7 @@
 
 import { motion } from 'motion/react';
 import Link from 'next/link';
-import { ArrowUpRight, Twitter, Linkedin, Send, Facebook } from 'lucide-react';
+import { ArrowUpRight, Facebook, Instagram, Youtube } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { BlurText } from './BlurText';
 import {
@@ -59,9 +59,6 @@ export function CtaFooter() {
               <ArrowUpRight className="ml-1 size-4" />
             </Link>
           </Button>
-          <Button variant="heroGlass" asChild>
-            <Link href={CTA.secondaryHref}>{CTA.secondary}</Link>
-          </Button>
         </motion.div>
       </div>
 
@@ -78,19 +75,18 @@ export function CtaFooter() {
                   alt={BRAND.name}
                   className="h-9 w-auto object-contain"
                 />
-                <span className="font-display text-lg tracking-tight uppercase">
-                  {BRAND.name}
-                </span>
               </Link>
-              <p className="font-body text-sm text-foreground/65 max-w-xs leading-relaxed">
-                Empowering investors worldwide through AI-driven trading and innovative financial solutions.
+              <p className="font-body text-sm text-foreground/65 max-w-sm leading-relaxed">
+                SwisDex is an institutional-grade forex, CFD broker, and decentralized exchange built for serious traders. It offers fast execution, low spreads, transparent pricing, insured trades, and fully automated trading with no human intervention.
+              </p>
+              <p className="font-body text-sm text-foreground/65 max-w-sm leading-relaxed">
+                SwisDex also provides staking with fixed monthly income, anytime withdrawals, and a rewarding IB (Introducing Broker) program with profit-sharing opportunities for partners and affiliates.
               </p>
               <div className="flex items-center gap-3 mt-2">
                 {[
-                  { Icon: Twitter,  label: 'Twitter / X' },
-                  { Icon: Linkedin, label: 'LinkedIn' },
-                  { Icon: Send,     label: 'Telegram' },
-                  { Icon: Facebook, label: 'Facebook' },
+                  { Icon: Facebook,  label: 'Facebook' },
+                  { Icon: Instagram, label: 'Instagram' },
+                  { Icon: Youtube,   label: 'YouTube' },
                 ].map(({ Icon, label }) => (
                   <a
                     key={label}

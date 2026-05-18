@@ -103,10 +103,15 @@ export default function BonusPage() {
               </Link>
             </div>
           </div>
-          {/* TODO: Bonus illustration / coin-stack animation yahan aayega */}
-          <div className="image-placeholder rounded-2xl bg-foreground/[0.06] min-h-[260px] flex items-center justify-center">
-            <Gift className="size-16 text-primary/40" aria-hidden />
-          </div>
+          {/* Bonus illustration — gold/coins stock photo (swap for branded
+              artwork once available). */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="https://images.unsplash.com/photo-1620266757065-5814239881fd?auto=format&fit=crop&w=900&q=80"
+            alt="Stack of gold coins representing the welcome bonus"
+            className="rounded-2xl w-full min-h-[260px] max-h-[340px] object-cover"
+            style={{ border: '1px solid hsl(99 55% 42% / 0.35)' }}
+          />
         </div>
       </section>
 
@@ -124,18 +129,21 @@ export default function BonusPage() {
 
         <div className="grid md:grid-cols-3 gap-5">
           {TIERS.map((t) => (
+            /* Wrapper keeps the "Most Popular" tab visible — the article
+               itself sets overflow:hidden for the gradient border, so the
+               badge sits on this outer relative element instead of being
+               clipped. */
+            <div key={t.range} className={`relative ${t.popular ? 'mt-3 md:mt-0' : ''}`}>
+              {t.popular && (
+                <span className="absolute -top-3 left-1/2 -translate-x-1/2 z-10 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary text-white text-[10px] uppercase tracking-[0.18em] font-bold whitespace-nowrap shadow-lg">
+                  <Star className="size-3" /> Most Popular
+                </span>
+              )}
             <article
-              key={t.range}
               className={`relative rounded-3xl p-6 sm:p-8 flex flex-col h-full ${
                 t.popular ? 'liquid-glass-strong ring-1 ring-primary/40' : 'liquid-glass'
               }`}
             >
-              {t.popular && (
-                <span className="absolute -top-3 left-1/2 -translate-x-1/2 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary text-white text-[10px] uppercase tracking-[0.18em] font-bold">
-                  <Star className="size-3" /> Most Popular
-                </span>
-              )}
-
               <div className="text-[11px] uppercase tracking-[0.16em] text-foreground/55">Deposit</div>
               <div className="mt-1 font-display text-xl text-foreground tabular-nums">{t.range}</div>
 
@@ -168,6 +176,7 @@ export default function BonusPage() {
                 {t.cta} <ArrowUpRight className="size-4" />
               </Link>
             </article>
+            </div>
           ))}
         </div>
 
@@ -264,7 +273,6 @@ export default function BonusPage() {
             { icon: ShieldCheck, title: 'Transparent Terms',       body: 'Plain-English programme terms. Bonus status and equity are visible in your dashboard from day one.' },
             { icon: Clock,       title: 'No Time Pressure',         body: 'No 30-day deadline games. Take the time you need to trade the unlock volume responsibly.' },
             { icon: Sparkles,    title: 'No Promo Codes',          body: 'Tier is set automatically by deposit size. No emails to chase, no codes to remember.' },
-            { icon: Gift,        title: 'Stacks With Loyalty',      body: 'Welcome bonus stacks on top of ongoing loyalty rewards, referral commissions, and trade cashback.' },
           ].map(({ icon: Icon, title, body }) => (
             <article key={title} className="liquid-glass rounded-2xl p-6">
               <div className="size-11 rounded-xl bg-primary/25 flex items-center justify-center mb-4"><Icon className="size-5 text-primary" /></div>

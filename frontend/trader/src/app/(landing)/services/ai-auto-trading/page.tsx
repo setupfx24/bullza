@@ -42,38 +42,16 @@ export default function AiAutoTradingPage() {
               </Link>
             </div>
           </div>
-          {/* TODO: AI engine screenshot / animation yahan aayega */}
-          <div className="image-placeholder rounded-2xl bg-foreground/[0.06] min-h-[260px] flex items-center justify-center">
-            <Brain className="size-16 text-primary/40" aria-hidden />
-          </div>
+          {/* AI / neural-network themed stock photo. Swap for branded
+              dashboard art once available. */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="https://images.unsplash.com/photo-1620712943543-bcc4688e7485?auto=format&fit=crop&w=900&q=80"
+            alt="AI neural-network visualisation"
+            className="rounded-2xl w-full min-h-[260px] max-h-[340px] object-cover"
+            style={{ border: '1px solid hsl(99 55% 42% / 0.35)' }}
+          />
         </div>
-      </section>
-
-      {/* How it works */}
-      <section id="how-it-works" className="mx-auto max-w-[1200px] px-[var(--gutter)] py-12 sm:py-16">
-        <div className="text-center mb-10">
-          <h2 className="font-display uppercase text-2xl sm:text-3xl md:text-4xl tracking-tight">How the AI Trades</h2>
-          <p className="mt-3 text-foreground/65 max-w-xl mx-auto text-sm sm:text-base">
-            Four steps, repeated thousands of times per second across every market we cover.
-          </p>
-        </div>
-        <ol className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
-          {[
-            { n: '01', icon: Activity,  title: 'Signal Ingestion',  body: 'Price action, order-book depth, news sentiment, and on-chain flow are streamed into the model in real time.' },
-            { n: '02', icon: Brain,     title: 'Pattern Scoring',   body: 'A neural-net ensemble scores every potential setup against 5 years of backtested data and live forward results.' },
-            { n: '03', icon: ShieldCheck, title: 'Risk Gate',       body: 'Every order is sized to account risk %, checked against open exposure, and hedged where required before execution.' },
-            { n: '04', icon: Zap,       title: 'Atomic Execution',  body: 'Smart-order-routing finds the deepest liquidity and fires the order — average fill latency under 25ms.' },
-          ].map(({ n, icon: Icon, title, body }) => (
-            <li key={n} className="liquid-glass rounded-2xl p-6">
-              <div className="flex items-center justify-between">
-                <span className="font-display text-4xl text-primary/70">{n}</span>
-                <div className="size-11 rounded-xl bg-primary/25 flex items-center justify-center"><Icon className="size-5 text-primary" /></div>
-              </div>
-              <h3 className="mt-4 font-display text-lg uppercase tracking-tight">{title}</h3>
-              <p className="mt-2 text-sm text-foreground/65 leading-relaxed">{body}</p>
-            </li>
-          ))}
-        </ol>
       </section>
 
       {/* Features grid */}

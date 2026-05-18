@@ -88,58 +88,7 @@ export default function PortfolioManagementPage() {
         </div>
       </section>
 
-      {/* Manager profiles */}
-      <section id="managers" className="mx-auto max-w-[1200px] px-[var(--gutter)] py-12 sm:py-16">
-        <div className="text-center mb-10">
-          <h2 className="font-display uppercase text-2xl sm:text-3xl md:text-4xl tracking-tight">Featured Managers</h2>
-          <p className="mt-3 text-foreground/65 max-w-xl mx-auto text-sm sm:text-base">
-            Every manager is verified, KYC-checked, and trades a live audited track record before being listed.
-          </p>
-        </div>
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
-          {[
-            { name: 'Helios Capital',   style: 'Trend-Following',  aum: '$24M', cagr: '+34%', dd: '8.2%' },
-            { name: 'Aurum Strategy',   style: 'Macro Forex',      aum: '$18M', cagr: '+28%', dd: '6.7%' },
-            { name: 'Pacific Quant',    style: 'Mean-Reversion',   aum: '$11M', cagr: '+22%', dd: '4.9%' },
-            { name: 'Apex Volatility',  style: 'Vol Arbitrage',    aum: '$31M', cagr: '+41%', dd: '11.3%' },
-            { name: 'Tundra Alpha',     style: 'Crypto Long/Short', aum: '$9M',  cagr: '+52%', dd: '14.8%' },
-            { name: 'Granite Income',   style: 'Conservative Carry', aum: '$42M', cagr: '+14%', dd: '3.1%' },
-          ].map((m) => (
-            <article key={m.name} className="liquid-glass rounded-2xl p-6">
-              {/* Real manager-style photo via pravatar.cc. Swap the URL for a
-                  branded headshot once available. */}
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={`https://i.pravatar.cc/120?u=${m.name.toLowerCase().replace(/\s+/g, '-')}`}
-                alt=""
-                className="size-14 rounded-xl mb-4 object-cover"
-                aria-hidden
-                style={{ border: '1px solid rgba(85,166,48,0.3)' }}
-              />
-              <h3 className="font-display text-lg uppercase tracking-tight">{m.name}</h3>
-              <div className="mt-1 text-[11px] uppercase tracking-[0.16em] text-primary/80">{m.style}</div>
-              <dl className="mt-5 grid grid-cols-3 gap-2 text-center">
-                <div>
-                  <dt className="text-[10px] uppercase tracking-[0.14em] text-foreground/50">AUM</dt>
-                  <dd className="font-display text-base text-foreground tabular-nums">{m.aum}</dd>
-                </div>
-                <div>
-                  <dt className="text-[10px] uppercase tracking-[0.14em] text-foreground/50">CAGR</dt>
-                  <dd className="font-display text-base text-primary tabular-nums">{m.cagr}</dd>
-                </div>
-                <div>
-                  <dt className="text-[10px] uppercase tracking-[0.14em] text-foreground/50">Max DD</dt>
-                  <dd className="font-display text-base text-secondary tabular-nums">{m.dd}</dd>
-                </div>
-              </dl>
-            </article>
-          ))}
-        </div>
-      </section>
-
-      {/* Investor quote — Warren Buffett "make money while you sleep"
-          Sits between Manager profiles and the Fee table per client request
-          ("move this section 2 sections down"). */}
+      {/* Investor quote — Warren Buffett "make money while you sleep" */}
       <QuoteSection
         eyebrow="Why Managed Accounts"
         quote={

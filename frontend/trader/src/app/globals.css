@@ -303,15 +303,35 @@ html, body {
 .tabular-nums { font-variant-numeric: tabular-nums; }
 
 /* Google Translate Element — hide all default UI (we drive it via our
-   own LanguageSwitcher component). */
-.goog-te-banner-frame.skiptranslate { display: none !important; }
-body { top: 0 !important; }
+   own LanguageSwitcher component). Aggressive rules so neither the top
+   banner nor the floating "Show original" tooltip ever shows up, AND
+   nothing Google injects ever intercepts a click on the live page. */
+.goog-te-banner-frame,
+.goog-te-banner-frame.skiptranslate,
+iframe.goog-te-banner-frame,
+iframe.skiptranslate {
+  display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+  height: 0 !important;
+  width: 0 !important;
+  position: absolute !important;
+  top: -9999px !important;
+  left: -9999px !important;
+}
+/* Stop Google from offsetting <body> downwards to make room for its banner. */
+html, body { top: 0 !important; position: static !important; }
 .goog-tooltip,
 .goog-tooltip:hover,
 #goog-gt-tt,
-.goog-te-balloon-frame { display: none !important; }
+.goog-te-balloon-frame { display: none !important; pointer-events: none !important; }
 .goog-text-highlight { background: transparent !important; box-shadow: none !important; }
-.skiptranslate iframe { display: none !important; visibility: hidden !important; }
+.skiptranslate iframe { display: none !important; visibility: hidden !important; pointer-events: none !important; }
+/* The hidden GT mount we render in our own GoogleTranslate.tsx — make
+   absolutely sure it can never block a click even if Google adds new
+   UI inside it in a future widget update. */
+#google_translate_element,
+#google_translate_element * { pointer-events: none !important; }
 
 /* Google injects <font> wrappers around translated text — neutralise them
    so they don't break inline-block layouts, gradients, or responsive

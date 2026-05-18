@@ -3,8 +3,8 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import {
-  ArrowUpRight, Building, ShieldCheck, BarChart3, Wallet, FileText, Gauge,
-  Repeat, Gift, Users, Award, Activity, Star, AlertTriangle, Lock,
+  ArrowUpRight, ShieldCheck, BarChart3, Wallet, FileText, Gauge,
+  Repeat, Gift, Users, Activity, Star, AlertTriangle,
   ChevronDown, CheckCircle2,
 } from 'lucide-react';
 import { BannerPlaceholder } from '@/swisdex/components/BannerPlaceholder';
@@ -45,10 +45,15 @@ export default function AutomatedProfitPage() {
               </Link>
             </div>
           </div>
-          {/* TODO: Bot dashboard mockup yahan aayega */}
-          <div className="image-placeholder rounded-2xl bg-foreground/[0.06] min-h-[260px] flex items-center justify-center">
-            <Building className="size-16 text-primary/40" aria-hidden />
-          </div>
+          {/* Algorithmic-trading dashboard stock photo. Swap for a branded
+              screenshot once the production dashboard art is ready. */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?auto=format&fit=crop&w=900&q=80"
+            alt="Trading dashboard showing algorithmic performance"
+            className="rounded-2xl w-full min-h-[260px] max-h-[340px] object-cover"
+            style={{ border: '1px solid hsl(99 55% 42% / 0.35)' }}
+          />
         </div>
       </section>
 
@@ -168,8 +173,7 @@ export default function AutomatedProfitPage() {
         <div className="grid sm:grid-cols-3 gap-5">
           {[
             { icon: Gift,   title: 'Welcome Bonus',    amount: 'Up to $1,000', body: 'Tiered welcome bonus on your first deposit, credited to bonus equity. Fully tradeable from the moment it lands in your account.' },
-            { icon: Users,  title: 'Referral Bonus',   amount: '$50 / friend', body: 'Earn $50 for every funded friend you refer — plus 10% of their first-month profits. No cap.' },
-            { icon: Award,  title: 'Loyalty Reward',   amount: '+1% / quarter', body: 'Active accounts earn an extra 1% bonus each quarter, paid as additional algo equity. Compounds.' },
+            { icon: Users,  title: 'Referral Bonus',   amount: '$10 / friend', body: 'Earn $10 for every funded friend you refer — plus 10% of their first-month profits. No cap.' },
           ].map(({ icon: Icon, title, amount, body }) => (
             <article key={title} className="liquid-glass rounded-2xl p-6">
               <div className="size-11 rounded-xl bg-primary/25 flex items-center justify-center mb-4"><Icon className="size-5 text-primary" /></div>

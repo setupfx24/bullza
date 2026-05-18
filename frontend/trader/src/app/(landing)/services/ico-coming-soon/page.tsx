@@ -54,7 +54,7 @@ export default function IcoComingSoonPage() {
 
           <p className="mt-6 mx-auto max-w-2xl text-foreground/70 text-sm sm:text-base md:text-lg leading-relaxed">
             Early access to promising blockchain projects, vetted by SwisDex before they hit the wider market.
-            Launching in Q3 2026. Join the early-access list to be notified the moment the first round opens.
+            Coming soon — join the early-access list to be notified the moment the first round opens.
           </p>
 
           {/* Notify form */}
@@ -90,8 +90,8 @@ export default function IcoComingSoonPage() {
       <section className="mx-auto max-w-[1200px] px-[var(--gutter)] py-12 sm:py-16">
         <div className="liquid-glass-strong rounded-3xl p-6 sm:p-10">
           <div className="text-center mb-8">
-            <span className="text-[11px] uppercase tracking-[0.18em] text-foreground/55">Target Launch</span>
-            <div className="mt-2 font-display uppercase text-3xl sm:text-5xl tracking-tight text-foreground">Q3 2026</div>
+            <span className="text-[11px] uppercase tracking-[0.18em] text-foreground/55">Launch</span>
+            <div className="mt-2 font-display uppercase text-3xl sm:text-5xl tracking-tight text-primary">Coming Soon</div>
           </div>
           <div className="grid sm:grid-cols-3 gap-5">
             {[

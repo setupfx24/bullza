@@ -7,6 +7,7 @@ import ScrollProgress from '@/landing/components/animations/ScrollProgress'
 import Footer from '@/landing/components/Footer'
 import { Navbar as SwisDexNavbar } from '@/swisdex/components/Navbar'
 import { ChatBot } from '@/swisdex/components/ChatBot'
+import { ScrollToTopButton } from '@/swisdex/components/ScrollToTopButton'
 import '@/swisdex/styles.css'
 import '@/landing/landing.css'
 
@@ -41,6 +42,7 @@ export default function LandingLayout({ children }: { children: React.ReactNode 
         <ScrollProgress />
         {children}
         <ChatBot />
+        <ScrollToTopButton />
       </PopupProvider>
     )
   }
@@ -54,6 +56,7 @@ export default function LandingLayout({ children }: { children: React.ReactNode 
         <Footer />
       </div>
       <ChatBot />
+      <ScrollToTopButton />
     </PopupProvider>
   )
 }
