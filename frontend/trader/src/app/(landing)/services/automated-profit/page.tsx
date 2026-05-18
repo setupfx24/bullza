@@ -4,11 +4,12 @@ import { useState } from 'react';
 import Link from 'next/link';
 import {
   ArrowUpRight, ShieldCheck, BarChart3, Wallet, FileText, Gauge,
-  Repeat, Gift, Users, Activity, Star, AlertTriangle,
+  Repeat, Gift, Users, Activity, AlertTriangle,
   ChevronDown, CheckCircle2,
 } from 'lucide-react';
 import { BannerPlaceholder } from '@/swisdex/components/BannerPlaceholder';
 import { QuoteSection } from '@/swisdex/components/QuoteSection';
+import { FixedReturnRateTable } from '@/swisdex/components/FixedReturnRateTable';
 
 const SIGNUP_HREF = '/auth/register';
 
@@ -98,72 +99,10 @@ export default function AutomatedProfitPage() {
         }
       />
 
-      {/* 3. Plans */}
-      <section id="plans" className="mx-auto max-w-[1200px] px-[var(--gutter)] py-12 sm:py-16">
-        <div className="text-center mb-10">
-          <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full liquid-glass text-[11px] uppercase tracking-[0.16em] text-foreground/70">
-            <span className="size-1.5 rounded-full bg-primary" /> Three Tiers
-          </span>
-          <h2 className="mt-5 font-display uppercase text-2xl sm:text-3xl md:text-4xl tracking-tight">Pick Your Plan</h2>
-          <p className="mt-3 text-foreground/65 max-w-xl mx-auto text-sm sm:text-base">
-            All plans run the same managed algorithm — minimum capital determines the strategy mix and target band.
-          </p>
-        </div>
-
-        <div className="grid md:grid-cols-3 gap-5">
-          {/* Starter */}
-          <PlanCard
-            tier="Starter"
-            min="$500"
-            band="5 – 8%"
-            features={[
-              'Conservative strategy mix',
-              'Forex majors only',
-              'Weekly performance summary',
-              'Email support',
-              'Monthly withdrawal window',
-            ]}
-            cta="Start with $500"
-          />
-          {/* Growth — popular */}
-          <PlanCard
-            tier="Growth"
-            min="$2,500"
-            band="8 – 12%"
-            popular
-            features={[
-              'Balanced multi-strategy',
-              'Forex + crypto + metals',
-              'Daily performance reports',
-              'Priority chat support',
-              'Bi-weekly withdrawal window',
-              'Compound auto-reinvest option',
-            ]}
-            cta="Most Picked Plan"
-          />
-          {/* Elite */}
-          <PlanCard
-            tier="Elite"
-            min="$10,000"
-            band="12 – 18%"
-            features={[
-              'Aggressive multi-strategy + vol arb',
-              'All markets + early-stage tokens',
-              'Real-time P&L dashboard',
-              'Dedicated account manager',
-              'Anytime withdrawal',
-              'Compound + custom risk profile',
-              'Quarterly strategy review call',
-            ]}
-            cta="Apply for Elite"
-          />
-        </div>
-
-        <p className="mt-6 text-center text-xs text-foreground/45 max-w-2xl mx-auto leading-relaxed">
-          Monthly return bands are historical performance ranges — not guarantees. Past performance does not
-          guarantee future results. See risk disclosure below.
-        </p>
-      </section>
+      {/* 3. Fixed Return policy — return rates by tenure and deposit tier */}
+      <div id="plans">
+        <FixedReturnRateTable />
+      </div>
 
       {/* 4. Offers */}
       <section className="mx-auto max-w-[1200px] px-[var(--gutter)] py-12 sm:py-16">
@@ -364,53 +303,6 @@ export default function AutomatedProfitPage() {
         </div>
       </section>
     </main>
-  );
-}
-
-function PlanCard({
-  tier, min, band, features, cta, popular,
-}: {
-  tier: string;
-  min: string;
-  band: string;
-  features: string[];
-  cta: string;
-  popular?: boolean;
-}) {
-  return (
-    <article className={`rounded-3xl p-6 sm:p-8 flex flex-col h-full ${popular ? 'liquid-glass-strong ring-1 ring-primary/40 relative' : 'liquid-glass'}`}>
-      {popular && (
-        <span className="absolute -top-3 left-1/2 -translate-x-1/2 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary text-white text-[10px] uppercase tracking-[0.18em] font-bold">
-          <Star className="size-3" /> Most Popular
-        </span>
-      )}
-      <h3 className="font-display uppercase text-2xl tracking-tight">{tier}</h3>
-      <div className="mt-2 flex items-baseline gap-2">
-        <span className="font-display text-4xl text-foreground tabular-nums">{min}</span>
-        <span className="text-xs uppercase tracking-[0.16em] text-foreground/55">min</span>
-      </div>
-      <div className="mt-1 text-sm text-primary font-semibold">{band} / month <span className="text-foreground/55 font-normal">target</span></div>
-
-      <ul className="mt-5 space-y-2.5 text-sm text-foreground/75 flex-1">
-        {features.map((f) => (
-          <li key={f} className="flex items-start gap-2.5">
-            <CheckCircle2 className="size-4 text-primary shrink-0 mt-0.5" />
-            <span>{f}</span>
-          </li>
-        ))}
-      </ul>
-
-      <Link
-        href={SIGNUP_HREF}
-        className={`mt-7 inline-flex items-center justify-center gap-2 rounded-full px-5 py-3 text-sm font-semibold uppercase tracking-wider transition ${
-          popular
-            ? 'bg-primary text-white hover:opacity-90'
-            : 'liquid-glass hover:bg-foreground/10'
-        }`}
-      >
-        {cta} <ArrowUpRight className="size-4" />
-      </Link>
-    </article>
   );
 }
 
