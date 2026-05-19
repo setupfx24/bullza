@@ -1,0 +1,339 @@
+'use client';
+
+import { useCallback, useEffect, useState } from 'react';
+import toast from 'react-hot-toast';
+import { Loader2, Save, Plus, Trash2 } from 'lucide-react';
+import { adminApi } from '@/lib/api';
+import { cn } from '@/lib/utils';
+
+interface Tier { label: string; min_amount: number }
+interface Tenure { label: string; days: number }
+interface RateConfig {
+  tiers: Tier[];
+  tenures: Tenure[];
+  rate_matrix_pct: number[][];
+}
+
+const FALLBACK: RateConfig = {
+  tiers: [
+    { label: '$1K',   min_amount: 1000 },
+    { label: '$10K',  min_amount: 10000 },
+    { label: '$25K',  min_amount: 25000 },
+    { label: '$50K',  min_amount: 50000 },
+    { label: '$100K', min_amount: 100000 },
+  ],
+  tenures: [
+    { label: 'Month',     days: 30 },
+    { label: 'Quarter',   days: 90 },
+    { label: 'Half-Year', days: 180 },
+    { label: 'Year',      days: 365 },
+    { label: '2 Year',    days: 730 },
+  ],
+  rate_matrix_pct: [
+    [1.0, 2.0, 2.5, 3.0, 4.0],
+    [2.0, 3.0, 3.0, 3.5, 4.5],
+    [3.0, 4.0, 4.5, 5.0, 5.0],
+    [4.0, 5.0, 5.5, 6.0, 5.5],
+    [5.0, 6.0, 6.5, 7.0, 7.0],
+  ],
+};
+
+export default function FixedReturnConfigPage() {
+  const [cfg, setCfg] = useState<RateConfig>(FALLBACK);
+  const [feePct, setFeePct] = useState<number>(5);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  const fetchData = useCallback(async () => {
+    setLoading(true);
+    try {
+      const all = await adminApi.get<{ key: string; value: any }[]>('/settings');
+      const list = Array.isArray(all) ? all : [];
+      const rates = list.find((s) => s.key === 'fixed_return_rates')?.value;
+      const fee = list.find((s) => s.key === 'fixed_return_early_withdrawal_fee_pct')?.value;
+      if (rates && Array.isArray(rates.tiers)) {
+        setCfg(normalize(rates));
+      }
+      if (fee != null) {
+        const n = Number(fee);
+        if (Number.isFinite(n)) setFeePct(n);
+      }
+    } catch (e: any) {
+      toast.error(e?.message || 'Failed to load Fixed Return config');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { fetchData(); }, [fetchData]);
+
+  const normalize = (raw: any): RateConfig => {
+    const tiers: Tier[] = Array.isArray(raw.tiers) ? raw.tiers : FALLBACK.tiers;
+    const tenures: Tenure[] = Array.isArray(raw.tenures) ? raw.tenures : FALLBACK.tenures;
+    const matrix: number[][] = tenures.map((_, ti) =>
+      tiers.map((_, ci) => {
+        const v = raw.rate_matrix_pct?.[ti]?.[ci];
+        const n = Number(v);
+        return Number.isFinite(n) ? n : 0;
+      }),
+    );
+    return { tiers, tenures, rate_matrix_pct: matrix };
+  };
+
+  const updateCell = (ti: number, ci: number, value: number) => {
+    setCfg((prev) => {
+      const m = prev.rate_matrix_pct.map((row) => row.slice());
+      m[ti][ci] = value;
+      return { ...prev, rate_matrix_pct: m };
+    });
+  };
+
+  const updateTier = (ci: number, field: keyof Tier, value: string) => {
+    setCfg((prev) => {
+      const tiers = prev.tiers.slice();
+      const t = { ...tiers[ci] };
+      if (field === 'min_amount') {
+        const n = Number(value); t.min_amount = Number.isFinite(n) ? n : 0;
+      } else {
+        t.label = value;
+      }
+      tiers[ci] = t;
+      return { ...prev, tiers };
+    });
+  };
+
+  const updateTenure = (ti: number, field: keyof Tenure, value: string) => {
+    setCfg((prev) => {
+      const tenures = prev.tenures.slice();
+      const t = { ...tenures[ti] };
+      if (field === 'days') {
+        const n = Number(value); t.days = Number.isFinite(n) && n > 0 ? Math.floor(n) : 1;
+      } else {
+        t.label = value;
+      }
+      tenures[ti] = t;
+      return { ...prev, tenures };
+    });
+  };
+
+  const addTier = () => {
+    setCfg((prev) => ({
+      ...prev,
+      tiers: [...prev.tiers, { label: 'New', min_amount: 0 }],
+      rate_matrix_pct: prev.rate_matrix_pct.map((row) => [...row, 0]),
+    }));
+  };
+
+  const removeTier = (ci: number) => {
+    if (cfg.tiers.length <= 1) return;
+    setCfg((prev) => ({
+      ...prev,
+      tiers: prev.tiers.filter((_, i) => i !== ci),
+      rate_matrix_pct: prev.rate_matrix_pct.map((row) => row.filter((_, i) => i !== ci)),
+    }));
+  };
+
+  const addTenure = () => {
+    setCfg((prev) => ({
+      ...prev,
+      tenures: [...prev.tenures, { label: 'New', days: 30 }],
+      rate_matrix_pct: [...prev.rate_matrix_pct, prev.tiers.map(() => 0)],
+    }));
+  };
+
+  const removeTenure = (ti: number) => {
+    if (cfg.tenures.length <= 1) return;
+    setCfg((prev) => ({
+      ...prev,
+      tenures: prev.tenures.filter((_, i) => i !== ti),
+      rate_matrix_pct: prev.rate_matrix_pct.filter((_, i) => i !== ti),
+    }));
+  };
+
+  const save = async () => {
+    if (feePct < 0 || feePct > 100) {
+      toast.error('Fee must be between 0 and 100');
+      return;
+    }
+    if (cfg.tiers.some((t) => !t.label.trim() || t.min_amount < 0)) {
+      toast.error('Every tier needs a label and non-negative min amount');
+      return;
+    }
+    if (cfg.tenures.some((t) => !t.label.trim() || t.days <= 0)) {
+      toast.error('Every tenure needs a label and positive days');
+      return;
+    }
+    setSaving(true);
+    try {
+      await adminApi.put('/settings', {
+        settings: {
+          fixed_return_rates: cfg,
+          fixed_return_early_withdrawal_fee_pct: feePct,
+        },
+      });
+      toast.success('Fixed Return config saved');
+    } catch (e: any) {
+      toast.error(e?.message || 'Save failed');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <Loader2 size={20} className="animate-spin text-text-tertiary" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-6 space-y-4">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-lg font-semibold text-text-primary">Fixed Return — Rate Matrix</h1>
+          <p className="text-xxs text-text-tertiary mt-0.5">
+            Rates are the fixed return paid at maturity for the full tenure (not annualised).
+            A user&apos;s lock amount picks the highest tier whose <strong>Min Amount</strong> is ≤ the principal.
+          </p>
+        </div>
+        <button
+          onClick={save}
+          disabled={saving}
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-buy rounded-md hover:bg-buy-light disabled:opacity-50 transition-fast"
+        >
+          {saving ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />} Save
+        </button>
+      </div>
+
+      <div className="bg-bg-secondary border border-border-primary rounded-md p-4">
+        <div className="flex items-center gap-3">
+          <label className="text-xs font-medium text-text-secondary">
+            Early-withdrawal fee (% of principal)
+          </label>
+          <input
+            type="number"
+            min={0}
+            max={100}
+            step="0.01"
+            value={feePct}
+            onChange={(e) => setFeePct(parseFloat(e.target.value) || 0)}
+            className="w-24 px-2 py-1 text-xs bg-bg-input border border-border-primary rounded font-mono tabular-nums text-text-primary"
+          />
+          <span className="text-xxs text-text-tertiary">
+            Applied when user withdraws before maturity. No return is paid on early exit.
+          </span>
+        </div>
+      </div>
+
+      <div className="bg-bg-secondary border border-border-primary rounded-md overflow-x-auto">
+        <table className="w-full min-w-[720px]">
+          <thead>
+            <tr className="border-b border-border-primary bg-bg-tertiary/40">
+              <th className="text-left px-3 py-2 text-xxs font-medium text-text-tertiary uppercase tracking-wide">
+                Tenure
+              </th>
+              <th className="text-left px-3 py-2 text-xxs font-medium text-text-tertiary uppercase tracking-wide">
+                Days
+              </th>
+              {cfg.tiers.map((t, ci) => (
+                <th key={ci} className="px-3 py-2 text-xxs font-medium text-text-tertiary uppercase tracking-wide">
+                  <div className="flex flex-col items-center gap-1">
+                    <input
+                      value={t.label}
+                      onChange={(e) => updateTier(ci, 'label', e.target.value)}
+                      className="w-16 px-1.5 py-0.5 text-[11px] bg-bg-input border border-border-primary rounded font-medium text-text-primary text-center"
+                    />
+                    <input
+                      type="number"
+                      min={0}
+                      step={100}
+                      value={t.min_amount}
+                      onChange={(e) => updateTier(ci, 'min_amount', e.target.value)}
+                      className="w-20 px-1.5 py-0.5 text-[10px] bg-bg-input border border-border-primary rounded font-mono tabular-nums text-text-secondary text-center"
+                      title="Min amount in USD"
+                    />
+                    <button
+                      onClick={() => removeTier(ci)}
+                      disabled={cfg.tiers.length <= 1}
+                      className="p-0.5 text-text-tertiary hover:text-danger disabled:opacity-30 transition-fast"
+                      title="Remove tier"
+                    >
+                      <Trash2 size={10} />
+                    </button>
+                  </div>
+                </th>
+              ))}
+              <th className="px-2 py-2">
+                <button
+                  onClick={addTier}
+                  className="inline-flex items-center gap-1 px-1.5 py-1 text-xxs text-text-secondary border border-border-primary rounded hover:bg-bg-hover"
+                  title="Add tier"
+                >
+                  <Plus size={11} />
+                </button>
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {cfg.tenures.map((tn, ti) => (
+              <tr key={ti} className="border-b border-border-primary/50 hover:bg-bg-hover/30">
+                <td className="px-3 py-2">
+                  <input
+                    value={tn.label}
+                    onChange={(e) => updateTenure(ti, 'label', e.target.value)}
+                    className="w-24 px-2 py-1 text-xs bg-bg-input border border-border-primary rounded text-text-primary"
+                  />
+                </td>
+                <td className="px-3 py-2">
+                  <input
+                    type="number"
+                    min={1}
+                    step={1}
+                    value={tn.days}
+                    onChange={(e) => updateTenure(ti, 'days', e.target.value)}
+                    className="w-16 px-2 py-1 text-xs bg-bg-input border border-border-primary rounded font-mono tabular-nums text-text-primary"
+                  />
+                </td>
+                {cfg.tiers.map((_, ci) => (
+                  <td key={ci} className="px-3 py-2">
+                    <input
+                      type="number"
+                      step="0.1"
+                      min={0}
+                      value={cfg.rate_matrix_pct[ti]?.[ci] ?? 0}
+                      onChange={(e) => updateCell(ti, ci, parseFloat(e.target.value) || 0)}
+                      className="w-16 px-2 py-1 text-xs bg-bg-input border border-border-primary rounded font-mono tabular-nums text-text-primary text-center"
+                    />
+                  </td>
+                ))}
+                <td className="px-2 py-2 text-right">
+                  <button
+                    onClick={() => removeTenure(ti)}
+                    disabled={cfg.tenures.length <= 1}
+                    className={cn(
+                      'p-1 text-text-tertiary hover:text-danger disabled:opacity-30 transition-fast',
+                    )}
+                    title="Remove tenure"
+                  >
+                    <Trash2 size={12} />
+                  </button>
+                </td>
+              </tr>
+            ))}
+            <tr>
+              <td colSpan={cfg.tiers.length + 3} className="px-3 py-2">
+                <button
+                  onClick={addTenure}
+                  className="inline-flex items-center gap-1 px-2 py-1 text-xxs text-text-secondary border border-border-primary rounded hover:bg-bg-hover"
+                >
+                  <Plus size={11} /> Add tenure
+                </button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}

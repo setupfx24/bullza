@@ -45,6 +45,7 @@ const NAV_ITEMS: NavItem[] = [
       { label: 'Charges', href: '/config/charges' },
       { label: 'Spreads', href: '/config/spreads' },
       { label: 'Swaps', href: '/config/swaps' },
+      { label: 'Fixed Return', href: '/config/fixed-return' },
     ],
   },
   { label: 'Social', href: '/social', icon: Share2, perm: 'social.view' },
