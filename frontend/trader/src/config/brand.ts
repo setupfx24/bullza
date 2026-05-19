@@ -3,7 +3,7 @@
  */
 
 export const BRAND_NAME = 'SwisDex';
-export const BRAND_LOGO = '/images/swisdex-logo1.png';
+export const BRAND_LOGO = '/images/swisdex-logo2.png';
 export const BRAND_DOMAIN = 'swisdex.com';
 export const BRAND_SUPPORT_EMAIL = 'support@swisdex.com';
 export const BRAND_COPYRIGHT = `${BRAND_NAME} © ${new Date().getFullYear()}. All rights reserved.`;
