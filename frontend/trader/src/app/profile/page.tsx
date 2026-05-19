@@ -3,7 +3,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { clsx } from 'clsx';
 import toast from 'react-hot-toast';
-import { User, Shield, Bell, Monitor, ChevronRight, Sun, Moon, Palette } from 'lucide-react';
+import { User, Shield, Bell, Monitor, ChevronRight, Sun, Moon, Palette, Copy } from 'lucide-react';
+import { QRCodeSVG } from 'qrcode.react';
 import { useUIStore } from '@/stores/uiStore';
 import { useTradingStore } from '@/stores/tradingStore';
 import { Button } from '@/components/ui/Button';
@@ -89,6 +90,8 @@ export default function ProfilePage() {
   // 2FA setup
   const [showTwoFaSetup, setShowTwoFaSetup] = useState(false);
   const [twoFaUri, setTwoFaUri] = useState('');
+  const [twoFaSecret, setTwoFaSecret] = useState('');
+  const [twoFaBackupCodes, setTwoFaBackupCodes] = useState<string[]>([]);
   const [twoFaCode, setTwoFaCode] = useState('');
   const [settingUp2Fa, setSettingUp2Fa] = useState(false);
   const [verifying2Fa, setVerifying2Fa] = useState(false);
@@ -111,8 +114,10 @@ export default function ProfilePage() {
   const handleSetup2Fa = async () => {
     try {
       setSettingUp2Fa(true);
-      const res = await api.post<{ otp_uri: string }>('/auth/2fa/setup');
-      setTwoFaUri(res.otp_uri);
+      const res = await api.post<{ qr_uri: string; secret: string; backup_codes: string[] }>('/auth/2fa/setup');
+      setTwoFaUri(res.qr_uri || '');
+      setTwoFaSecret(res.secret || '');
+      setTwoFaBackupCodes(Array.isArray(res.backup_codes) ? res.backup_codes : []);
       setShowTwoFaSetup(true);
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : 'Failed to initiate 2FA setup');
@@ -125,7 +130,8 @@ export default function ProfilePage() {
       setVerifying2Fa(true);
       await api.post('/auth/2fa/verify', { code: twoFaCode });
       toast.success('2FA enabled successfully!');
-      setShowTwoFaSetup(false); setTwoFaCode(''); setTwoFaUri('');
+      setShowTwoFaSetup(false);
+      setTwoFaCode(''); setTwoFaUri(''); setTwoFaSecret(''); setTwoFaBackupCodes([]);
       fetchProfile();
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : 'Invalid verification code');
@@ -495,16 +501,65 @@ export default function ProfilePage() {
 
               {showTwoFaSetup ? (
                 <div className="space-y-4">
-                  <div className="bg-bg-secondary border border-border-primary rounded-xl p-4">
-                    <p className="text-xs text-text-secondary mb-2">Scan this URI in your authenticator app:</p>
-                    <div className="font-mono text-xs text-text-primary break-all bg-card rounded-lg p-3 border border-border-primary select-all">{twoFaUri}</div>
+                  <div className="bg-bg-secondary border border-border-primary rounded-xl p-4 flex flex-col items-center gap-3">
+                    <p className="text-xs text-text-secondary text-center">Scan this QR code with your authenticator app (Google Authenticator, Authy, 1Password, etc.):</p>
+                    {twoFaUri ? (
+                      <div className="bg-white p-3 rounded-lg">
+                        <QRCodeSVG value={twoFaUri} size={180} includeMargin={false} level="M" />
+                      </div>
+                    ) : (
+                      <div className="text-xs text-amber-400">QR data missing — try Cancel and Enable again.</div>
+                    )}
+                    {twoFaSecret && (
+                      <div className="w-full">
+                        <p className="text-[11px] text-text-tertiary mb-1 text-center">Or enter this secret manually:</p>
+                        <div className="flex items-center gap-2">
+                          <code className="flex-1 font-mono text-xs text-text-primary bg-card rounded-md px-3 py-2 border border-border-primary select-all break-all">
+                            {twoFaSecret}
+                          </code>
+                          <button
+                            type="button"
+                            onClick={() => { navigator.clipboard.writeText(twoFaSecret); toast.success('Secret copied'); }}
+                            className="p-2 text-text-tertiary hover:text-text-primary border border-border-primary rounded-md"
+                            aria-label="Copy secret"
+                          >
+                            <Copy size={14} />
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
+
+                  {twoFaBackupCodes.length > 0 && (
+                    <div className="rounded-xl border border-amber-500/30 bg-amber-500/[0.06] p-4">
+                      <p className="text-xs font-semibold text-amber-400 mb-1">Save your backup codes</p>
+                      <p className="text-[11px] text-text-secondary mb-3">
+                        Each code can be used <strong>once</strong> if you lose access to your authenticator app.
+                        Store them in your password manager — they will not be shown again.
+                      </p>
+                      <div className="grid grid-cols-2 gap-2 font-mono text-xs text-text-primary">
+                        {twoFaBackupCodes.map((c) => (
+                          <code key={c} className="bg-card rounded-md px-2 py-1.5 border border-border-primary select-all text-center">
+                            {c}
+                          </code>
+                        ))}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => { navigator.clipboard.writeText(twoFaBackupCodes.join('\n')); toast.success('Backup codes copied'); }}
+                        className="mt-2 inline-flex items-center gap-1.5 text-[11px] text-text-secondary hover:text-text-primary"
+                      >
+                        <Copy size={11} /> Copy all
+                      </button>
+                    </div>
+                  )}
+
                   <div>
                     <label className={labelCls}>Verification Code</label>
-                    <input type="text" value={twoFaCode} onChange={(e) => setTwoFaCode(e.target.value)} placeholder="Enter 6-digit code" maxLength={6} className={inputCls} />
+                    <input type="text" inputMode="numeric" autoComplete="one-time-code" value={twoFaCode} onChange={(e) => setTwoFaCode(e.target.value.replace(/\D/g, ''))} placeholder="Enter 6-digit code" maxLength={6} className={inputCls} />
                   </div>
                   <div className="flex gap-2">
-                    <Button variant="ghost" size="sm" onClick={() => { setShowTwoFaSetup(false); setTwoFaCode(''); setTwoFaUri(''); }}>Cancel</Button>
+                    <Button variant="ghost" size="sm" onClick={() => { setShowTwoFaSetup(false); setTwoFaCode(''); setTwoFaUri(''); setTwoFaSecret(''); setTwoFaBackupCodes([]); }}>Cancel</Button>
                     <Button variant="primary" size="sm" onClick={handleVerify2Fa} loading={verifying2Fa}>Verify & Enable</Button>
                   </div>
                 </div>

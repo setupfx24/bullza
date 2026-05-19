@@ -2,6 +2,7 @@
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException, status, Request
+from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from packages.common.src.database import get_db
@@ -254,10 +255,19 @@ async def setup_2fa(request: Request, current_user: dict = Depends(get_current_u
         raise HTTPException(status_code=e.status_code, detail=e.detail)
 
 
+class Verify2FARequest(BaseModel):
+    code: str
+
+
 @router.post("/2fa/verify")
-async def verify_2fa(code: str, request: Request, current_user: dict = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+async def verify_2fa(
+    body: Verify2FARequest,
+    request: Request,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
     try:
-        return await _verify_2fa(user_id=current_user["user_id"], code=code, request=request, db=db)
+        return await _verify_2fa(user_id=current_user["user_id"], code=body.code, request=request, db=db)
     except AuthServiceError as e:
         raise HTTPException(status_code=e.status_code, detail=e.detail)
 
