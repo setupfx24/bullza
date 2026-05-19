@@ -66,6 +66,7 @@ from .play_zone import (
 from .staking import (
     StakingPlan, StakingPosition, StakingRewardAccrual,
 )
+from .fixed_return import FixedReturnLock
 from .vip import VipPass
 from .share import SharedTrade
 
@@ -103,6 +104,8 @@ __all__ = [
     "BiddingRound", "Bid",
     # staking
     "StakingPlan", "StakingPosition", "StakingRewardAccrual",
+    # fixed return
+    "FixedReturnLock",
     # vip
     "VipPass",
     # share

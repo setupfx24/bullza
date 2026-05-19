@@ -1,0 +1,58 @@
+"""Fixed Return API — config (rates + fee), user locks, withdrawals."""
+from __future__ import annotations
+
+from decimal import Decimal
+from typing import Any
+from uuid import UUID
+
+from fastapi import APIRouter, Depends
+from pydantic import BaseModel, Field
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from packages.common.src.auth import get_current_user
+from packages.common.src.database import get_db
+
+from ..services import fixed_return_service
+
+router = APIRouter()
+
+
+class CreateLockRequest(BaseModel):
+    principal: Decimal = Field(gt=0)
+    tenure_label: str
+
+
+@router.get("/config")
+async def get_config() -> dict[str, Any]:
+    """Public — rate matrix + early-withdrawal fee%."""
+    return await fixed_return_service.get_config()
+
+
+@router.get("/locks")
+async def list_locks(
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> list[dict[str, Any]]:
+    return await fixed_return_service.list_locks(current_user["user_id"], db)
+
+
+@router.post("/lock")
+async def create_lock(
+    req: CreateLockRequest,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    return await fixed_return_service.create_lock(
+        current_user["user_id"], req.principal, req.tenure_label, db,
+    )
+
+
+@router.post("/locks/{lock_id}/withdraw")
+async def withdraw_lock(
+    lock_id: UUID,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    return await fixed_return_service.withdraw_lock(
+        lock_id, current_user["user_id"], db,
+    )
