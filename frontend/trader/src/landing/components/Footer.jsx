@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { Twitter, Linkedin, Instagram, Youtube, Mail } from 'lucide-react'
+import { Facebook, Instagram, Youtube, Mail } from 'lucide-react'
 import ScrollReveal from './animations/ScrollReveal'
 
 const columns = {
@@ -41,8 +41,7 @@ const columns = {
 }
 
 const socials = [
-  { icon: Twitter,   href: '#', label: 'Twitter' },
-  { icon: Linkedin,  href: '#', label: 'LinkedIn' },
+  { icon: Facebook,  href: '#', label: 'Facebook' },
   { icon: Instagram, href: '#', label: 'Instagram' },
   { icon: Youtube,   href: '#', label: 'YouTube' },
 ]

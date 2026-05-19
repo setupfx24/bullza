@@ -17,7 +17,7 @@ export default function AboutPage() {
             <span className="text-blue-600">Revolutionizing Global Trading</span>
           </h1>
           <p className="text-lg text-gray-500 max-w-2xl mx-auto leading-relaxed">
-            We're on a mission to democratize trading by providing everyone with institutional-grade tools, transparent pricing, and complete financial freedom.
+            SwisDex is a decentralized exchange paired with a regulated broker — combining on-chain insured trades, non-custodial wallets, institutional-grade tools, and transparent pricing for complete financial freedom.
           </p>
         </div>
       </section>

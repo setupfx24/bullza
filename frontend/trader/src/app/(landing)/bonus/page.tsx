@@ -13,8 +13,8 @@ const SIGNUP_HREF = '/auth/register';
 const TIERS = [
   {
     range: '$100 – $499',
-    bonus: '$100',
-    multiplier: 'Up to 100%',
+    percent: '100%',
+    cap: 'Up to $100',
     features: [
       'Auto-credited within minutes',
       'Tradeable on all instruments',
@@ -24,8 +24,8 @@ const TIERS = [
   },
   {
     range: '$500 – $999',
-    bonus: '$300',
-    multiplier: 'Up to 60%',
+    percent: '60%',
+    cap: 'Up to $300',
     features: [
       'Auto-credited within minutes',
       'Tradeable on all instruments',
@@ -36,15 +36,13 @@ const TIERS = [
   },
   {
     range: '$1,000+',
-    bonus: '$1,000',
-    multiplier: '100% Match',
+    percent: '100%',
+    cap: 'Up to $1,000',
     popular: true,
     features: [
       'Auto-credited within minutes',
       'Tradeable on all instruments',
       'Dedicated account manager',
-      'Free 1-on-1 strategy session',
-      'Cashback on every trade',
     ],
     cta: 'Claim Full $1,000',
   },
@@ -103,10 +101,14 @@ export default function BonusPage() {
               </Link>
             </div>
           </div>
-          {/* TODO: Bonus illustration / coin-stack animation yahan aayega */}
-          <div className="image-placeholder rounded-2xl bg-foreground/[0.06] min-h-[260px] flex items-center justify-center">
-            <Gift className="size-16 text-primary/40" aria-hidden />
-          </div>
+          {/* Bonus illustration — branded artwork dropped by the client. */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/images/bonus_details.png"
+            alt="Welcome bonus illustration"
+            className="rounded-2xl w-full min-h-[260px] max-h-[340px] object-cover"
+            style={{ border: '1px solid hsl(99 55% 42% / 0.35)' }}
+          />
         </div>
       </section>
 
@@ -130,8 +132,11 @@ export default function BonusPage() {
                 t.popular ? 'liquid-glass-strong ring-1 ring-primary/40' : 'liquid-glass'
               }`}
             >
+              {/* Badge sits as a normal flex child so the article's
+                  overflow:hidden (used for the gradient border) doesn't
+                  clip it. */}
               {t.popular && (
-                <span className="absolute -top-3 left-1/2 -translate-x-1/2 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary text-white text-[10px] uppercase tracking-[0.18em] font-bold">
+                <span className="self-center mb-4 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary text-white text-[10px] uppercase tracking-[0.18em] font-bold whitespace-nowrap">
                   <Star className="size-3" /> Most Popular
                 </span>
               )}
@@ -142,10 +147,10 @@ export default function BonusPage() {
               <div className="mt-6 pb-5 border-b border-foreground/10">
                 <div className="text-[11px] uppercase tracking-[0.16em] text-foreground/55">You Get</div>
                 <div className="mt-1 flex items-baseline gap-2">
-                  <span className="font-display text-5xl text-primary tabular-nums">{t.bonus}</span>
+                  <span className="font-display text-5xl text-primary tabular-nums">{t.percent}</span>
                   <span className="text-xs text-foreground/55">bonus</span>
                 </div>
-                <div className="mt-1 text-[11px] uppercase tracking-[0.16em] text-primary/80">{t.multiplier}</div>
+                <div className="mt-1 text-[11px] uppercase tracking-[0.16em] text-primary/80">{t.cap}</div>
               </div>
 
               <ul className="mt-5 space-y-2.5 text-sm text-foreground/75 flex-1">
@@ -174,55 +179,6 @@ export default function BonusPage() {
         <p className="mt-6 text-center text-xs text-foreground/45 max-w-2xl mx-auto leading-relaxed">
           Bonus is credited as tradeable equity on your first qualifying deposit only. Standard programme terms apply.
         </p>
-      </section>
-
-      {/* Comparison table */}
-      <section className="mx-auto max-w-[1200px] px-[var(--gutter)] py-12 sm:py-16">
-        <div className="text-center mb-10">
-          <h2 className="font-display uppercase text-2xl sm:text-3xl md:text-4xl tracking-tight">Bonus Side-by-Side</h2>
-        </div>
-        <div className="overflow-x-auto -mx-[var(--gutter)] px-[var(--gutter)]">
-          <div className="min-w-[700px] rounded-2xl overflow-hidden border border-foreground/15">
-            <table className="w-full" style={{ borderCollapse: 'collapse' }}>
-              <thead>
-                <tr>
-                  <th className="bg-foreground/[0.04] border-r border-foreground/15 px-5 py-4 text-left text-xs uppercase tracking-[0.16em] text-foreground/55">
-                    Deposit Range
-                  </th>
-                  <th className="px-5 py-4 text-center font-display uppercase tracking-[0.16em] text-sm text-white border-r border-white/10"
-                    style={{ background: 'linear-gradient(180deg, #1f2937 0%, #0a0a0a 100%)' }}>
-                    $100 – $499
-                  </th>
-                  <th className="px-5 py-4 text-center font-display uppercase tracking-[0.16em] text-sm text-white border-r border-white/10"
-                    style={{ background: 'linear-gradient(180deg, #2c3e50 0%, #0e1418 100%)' }}>
-                    $500 – $999
-                  </th>
-                  <th className="px-5 py-4 text-center font-display uppercase tracking-[0.16em] text-sm text-white"
-                    style={{ background: 'linear-gradient(180deg, #55a630 0%, #1a3210 100%)' }}>
-                    $1,000+ ★
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {[
-                  { label: 'Bonus credited',     a: '$100',          b: '$300',          c: '$1,000' },
-                  { label: 'Match rate',         a: 'Up to 100%',    b: 'Up to 60%',     c: '100%' },
-                  { label: 'Dedicated manager',  a: '—',             b: '—',             c: '✓' },
-                  { label: 'Strategy session',   a: '—',             b: '—',             c: '✓' },
-                  { label: 'Trade cashback',     a: '—',             b: '—',             c: '✓' },
-                  { label: 'Support',            a: 'Email + chat',  b: 'Priority chat', c: 'Account manager' },
-                ].map((row) => (
-                  <tr key={row.label} className="border-t border-foreground/10">
-                    <td className="px-5 py-4 text-sm text-foreground/75 bg-foreground/[0.04] border-r border-foreground/15">{row.label}</td>
-                    <td className="px-5 py-4 text-center text-sm text-foreground/90 bg-foreground/[0.02] border-r border-foreground/10">{row.a}</td>
-                    <td className="px-5 py-4 text-center text-sm text-foreground/90 bg-foreground/[0.02] border-r border-foreground/10">{row.b}</td>
-                    <td className="px-5 py-4 text-center text-sm text-foreground bg-primary/[0.08]">{row.c}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
       </section>
 
       {/* How it works */}
@@ -264,7 +220,6 @@ export default function BonusPage() {
             { icon: ShieldCheck, title: 'Transparent Terms',       body: 'Plain-English programme terms. Bonus status and equity are visible in your dashboard from day one.' },
             { icon: Clock,       title: 'No Time Pressure',         body: 'No 30-day deadline games. Take the time you need to trade the unlock volume responsibly.' },
             { icon: Sparkles,    title: 'No Promo Codes',          body: 'Tier is set automatically by deposit size. No emails to chase, no codes to remember.' },
-            { icon: Gift,        title: 'Stacks With Loyalty',      body: 'Welcome bonus stacks on top of ongoing loyalty rewards, referral commissions, and trade cashback.' },
           ].map(({ icon: Icon, title, body }) => (
             <article key={title} className="liquid-glass rounded-2xl p-6">
               <div className="size-11 rounded-xl bg-primary/25 flex items-center justify-center mb-4"><Icon className="size-5 text-primary" /></div>

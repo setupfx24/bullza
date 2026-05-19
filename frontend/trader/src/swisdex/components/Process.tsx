@@ -42,7 +42,7 @@ export function Process() {
               <span className="text-primary">3 Simple Steps</span>
             </h3>
             <p className="mt-5 font-body text-foreground/60 max-w-md">
-              Getting started with SwisDex is quick and simple — just follow these steps:
+              From signup to your first live position in three guided steps — no paperwork, no hold-ups, no surprises.
             </p>
             <div className="mt-8">
               <Button variant="hero" asChild>

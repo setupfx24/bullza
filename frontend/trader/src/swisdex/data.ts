@@ -62,7 +62,7 @@ export const HERO = {
   pill: 'Crypto & Forex Investment Platform',
   pillBadge: 'Live',
   headline: 'Trade Smarter Grow Faster',
-  sub: 'SwisDex is a decentralised exchange with on-chain insured trades and licensed broker-grade execution — your funds stay in your wallet, your trades stay protected.',
+  sub: 'SwisDex is a decentralized exchange with on-chain insured trades and licensed broker-grade execution — your funds stay in your wallet, your trades stay protected.',
   ctaPrimary: 'Details',
   ctaSecondary: 'Learn How It Works',
   ctaHref: '/bonus',
@@ -72,13 +72,13 @@ export const HERO = {
 /**
  * Three trust pills rendered above the hero CTAs — the first words a
  * first-time visitor reads. Communicates "what we do" before any scroll:
- * decentralised execution, on-chain trade insurance, regulated broker.
+ * decentralized execution, on-chain trade insurance, regulated broker.
  *
  * Icon names are lucide-react component names — resolved in Hero.tsx via
  * an iconMap so we don't ship the entire icon catalog client-side.
  */
 export const HERO_TRUST_PILLS = [
-  { icon: 'Network',    label: 'Decentralised Exchange', sub: 'Non-custodial. Your wallet, your keys.' },
+  { icon: 'Network',    label: 'Decentralized Exchange', sub: 'Non-custodial. Your wallet, your keys.' },
   { icon: 'ShieldCheck', label: 'Insured Trade',          sub: 'Every position is policy-backed.' },
   { icon: 'BadgeCheck', label: 'Licensed Broker',         sub: 'Institutional-grade execution.' },
 ] as const;
@@ -110,7 +110,7 @@ export const INSTRUMENTS = [
 export const WHY_US = [
   { icon: 'Network',      title: 'Decentralized Exchange',            body: 'Trade directly from your own wallet with non-custodial, on-chain execution — no intermediaries, no counterparty risk. Your keys, your funds.' },
   { icon: 'ShieldCheck',  title: 'Insurance for Traders',             body: 'Every trade is policy-backed with on-chain insurance. If the market moves against you beyond defined thresholds, your insured amount is protected.' },
-  { icon: 'Gift',         title: 'Bonus & Rewards',                   body: 'Earn up to $200 welcome bonus on your first deposit plus ongoing loyalty rewards, referral commissions, and trading cashback on every lot.' },
+  { icon: 'Gift',         title: 'Bonus & Rewards',                   body: 'Get a 100% welcome bonus up to $1,000 on your first deposit — credited within minutes and fully tradeable on a decentralized exchange with insured trades. Stacks with referral commissions and trading cashback.' },
   { icon: 'Lock',         title: 'Fixed Rate Return',                 body: 'Lock in guaranteed fixed returns with our structured investment plans — predictable income with transparent terms and no hidden fees.' },
   { icon: 'Brain',        title: 'AI Trading Software — 90% Accuracy', body: 'Our proprietary AI engine analyses thousands of market signals per second, achieving a verified 90% accuracy rate across forex and crypto pairs.' },
   { icon: 'ShieldPlus',   title: 'Insured Trading',                   body: 'All positions carry built-in trade insurance. Your capital is safeguarded with multi-layer protection — cold storage, encryption, and smart-contract coverage.' },
@@ -126,38 +126,38 @@ export const HOW_IT_WORKS = [
 ] as const;
 
 export const STATS = [
-  { value: '99%',     label: 'Profitable Trades' },
+  { value: '90%',     label: 'Profitable Trades' },
   { value: '55K+',    label: 'Active Investors Worldwide' },
   { value: 'Upto 7%', label: 'Monthly Return' },
   { value: '24/7',    label: 'Automated Trading, Always On' },
 ] as const;
 
 /**
- * Real-looking investor photos are served from pravatar.cc — a free random-
- * avatar service backed by photos from unsplash. Each entry uses a unique
- * ?u={slug} seed so the same person always gets the same face. When you
- * have real branded photos, drop them at /public/images/testimonials/<slug>.webp
- * and swap the URL — the Testimonials component falls back to initials if
- * the image fails to load.
+ * Investor portraits sourced from randomuser.me — free curated headshot
+ * service that returns consistent, professional-looking photos. Each
+ * entry is pinned to a specific portrait ID so the same person always
+ * shows the same face. When real branded photos are available, drop
+ * them at /public/images/testimonials/<slug>.webp and swap the URL —
+ * Testimonials.tsx falls back to initials if the image fails to load.
  */
 export const TESTIMONIALS = [
-  { name: 'Aarav Sharma',   role: 'India',                avatar: 'https://i.pravatar.cc/240?u=aarav-sharma',    quote: 'The interface is clean and easy to navigate.' },
-  { name: 'Maria Lopez',    role: 'Spain',                avatar: 'https://i.pravatar.cc/240?u=maria-lopez',     quote: 'Account setup was straightforward and quick.' },
-  { name: 'Hiroshi Tanaka', role: 'Japan',                avatar: 'https://i.pravatar.cc/240?u=hiroshi-tanaka',  quote: 'I like how simple the trading dashboard feels.' },
-  { name: 'Sofia Müller',   role: 'Germany',              avatar: 'https://i.pravatar.cc/240?u=sofia-mueller',   quote: 'The platform performance has been smooth so far.' },
-  { name: 'Liam O\'Connor', role: 'Ireland',              avatar: 'https://i.pravatar.cc/240?u=liam-oconnor',    quote: 'Good mobile experience and responsive layout.' },
-  { name: 'Priya Iyer',     role: 'India',                avatar: 'https://i.pravatar.cc/240?u=priya-iyer',      quote: 'Transactions appeared quickly in the dashboard.' },
-  { name: 'Tunde Okafor',   role: 'Nigeria',              avatar: 'https://i.pravatar.cc/240?u=tunde-okafor',    quote: 'Customer support replied within a reasonable time.' },
-  { name: 'Emma Wilson',    role: 'United Kingdom',       avatar: 'https://i.pravatar.cc/240?u=emma-wilson',     quote: 'The verification process was simple to complete.' },
-  { name: 'Daniel Roberts', role: 'Canada',               avatar: 'https://i.pravatar.cc/240?u=daniel-roberts',  quote: 'Professional interface with a strong focus on usability.' },
-  { name: 'Aisha Khan',     role: 'United Arab Emirates', avatar: 'https://i.pravatar.cc/240?u=aisha-khan',      quote: 'Efficient execution and a polished trading environment.' },
-  { name: 'Marco Rossi',    role: 'Italy',                avatar: 'https://i.pravatar.cc/240?u=marco-rossi',     quote: 'A modern platform built with simplicity in mind.' },
+  { name: 'Aarav Sharma',   role: 'India',                avatar: 'https://randomuser.me/api/portraits/men/32.jpg',    quote: 'The interface is clean and easy to navigate.' },
+  { name: 'Maria Lopez',    role: 'Spain',                avatar: 'https://randomuser.me/api/portraits/women/44.jpg',  quote: 'Account setup was straightforward and quick.' },
+  { name: 'Hiroshi Tanaka', role: 'Japan',                avatar: 'https://randomuser.me/api/portraits/men/45.jpg',    quote: 'I like how simple the trading dashboard feels.' },
+  { name: 'Sofia Müller',   role: 'Germany',              avatar: 'https://randomuser.me/api/portraits/women/22.jpg',  quote: 'The platform performance has been smooth so far.' },
+  { name: 'Liam O\'Connor', role: 'Ireland',              avatar: 'https://randomuser.me/api/portraits/men/12.jpg',    quote: 'Good mobile experience and responsive layout.' },
+  { name: 'Priya Iyer',     role: 'India',                avatar: 'https://randomuser.me/api/portraits/women/63.jpg',  quote: 'Transactions appeared quickly in the dashboard.' },
+  { name: 'Tunde Okafor',   role: 'Nigeria',              avatar: 'https://randomuser.me/api/portraits/men/56.jpg',    quote: 'Customer support replied within a reasonable time.' },
+  { name: 'Emma Wilson',    role: 'United Kingdom',       avatar: 'https://randomuser.me/api/portraits/women/8.jpg',   quote: 'The verification process was simple to complete.' },
+  { name: 'Daniel Roberts', role: 'Canada',               avatar: 'https://randomuser.me/api/portraits/men/77.jpg',    quote: 'Professional interface with a strong focus on usability.' },
+  { name: 'Aisha Khan',     role: 'United Arab Emirates', avatar: 'https://randomuser.me/api/portraits/women/55.jpg',  quote: 'Efficient execution and a polished trading environment.' },
+  { name: 'Marco Rossi',    role: 'Italy',                avatar: 'https://randomuser.me/api/portraits/men/85.jpg',    quote: 'A modern platform built with simplicity in mind.' },
 ] as const;
 
 export const FAQ = [
   {
     q: 'What is the minimum deposit required to start trading?',
-    a: 'The minimum deposit depends on the account type: Standard $50, ECN $100, and IB partner account $500. A free Demo account with $100,000 in virtual funds is also available — no commitment, identical execution conditions to a live account. Every new trader also receives a 100% Welcome Bonus on the first deposit.',
+    a: 'The minimum deposit depends on the account type: Standard $50, ECN $200, and IB partner account $500. A free Demo account with $100,000 in virtual funds is also available — no commitment, identical execution conditions to a live account. Every new trader also receives a 100% Welcome Bonus on the first deposit.',
   },
   {
     q: 'How do I get the 100% Welcome Bonus?',
@@ -165,7 +165,7 @@ export const FAQ = [
   },
   {
     q: 'Which deposit and withdrawal methods are available, and how long do they take?',
-    a: 'We support bank wire transfers, Visa/Mastercard, Skrill, Neteller, cryptocurrency, and local bank options including UPI. Card and e-wallet deposits are typically instant; bank wires and crypto withdrawals usually settle within 1–3 business days. All deposits are 100% fee-free.',
+    a: 'We support bank wire transfers, Visa/Mastercard, Skrill, Neteller, cryptocurrency, and local bank options including UPI. Card and e-wallet deposits are typically instant; bank wires and crypto withdrawals usually settle within 1–3 business days.',
   },
   {
     q: 'Which trading platforms and devices are supported?',
@@ -181,7 +181,7 @@ export const FAQ = [
   },
   {
     q: 'How do I insure my trades?',
-    a: 'Trade Insurance is built into every position on SwisDex — you do not need to opt in. Each open trade is policy-backed by on-chain insurance up to the policy limit. If the market moves against you beyond the defined threshold, the insured amount is paid out automatically by the smart-contract underwriter. The insurance does not cover market loss within the policy threshold, so always size positions to your own risk tolerance.',
+    a: 'Trade Insurance is built into every position on SwisDex. Each open trade is policy-backed by on-chain insurance up to the policy limit. If the market moves against you beyond the defined threshold, the insured amount is paid out automatically by the smart-contract underwriter. The insurance does not cover market loss within the policy threshold, so always size positions to your own risk tolerance.',
   },
   {
     q: 'How do I apply for the IB program?',

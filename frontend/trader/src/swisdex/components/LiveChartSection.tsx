@@ -8,7 +8,6 @@ import { TradingViewChart } from './TradingViewChart';
 /** Initial chart state — first instrument loaded into the live chart on mount. */
 const DEFAULT_SYMBOL   = 'US30';
 const DEFAULT_TV       = 'OANDA:US30USD';
-const DEFAULT_SPREAD   = '1.0 pts';
 
 /* TradingView symbol mapping for every directory item below. */
 const INSTRUMENT_MAP: Record<string, string> = {
@@ -99,7 +98,6 @@ export function LiveChartSection() {
   // Active chart state — populated by clicking an item in the instrument directory.
   const [activeSymbol, setActiveSymbol] = useState<string>(DEFAULT_SYMBOL);
   const [activeTv,     setActiveTv]     = useState<string>(DEFAULT_TV);
-  const [activeSpread, setActiveSpread] = useState<string>(DEFAULT_SPREAD);
   const chartRef = useRef<HTMLDivElement>(null);
 
   const selectInstrument = (label: string) => {
@@ -107,7 +105,6 @@ export function LiveChartSection() {
     if (!tv) return;
     setActiveSymbol(label);
     setActiveTv(tv);
-    setActiveSpread('Market');
     // Smooth-scroll to the chart card after a short delay so the user sees the update.
     requestAnimationFrame(() => {
       chartRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -152,7 +149,6 @@ export function LiveChartSection() {
                   LIVE
                 </span>
               </div>
-              <div className="text-xs text-foreground/55 hidden sm:block">Spread from {activeSpread}</div>
             </div>
 
             <div className="aspect-[16/8] sm:aspect-[16/7] rounded-2xl overflow-hidden">
@@ -217,13 +213,35 @@ function InstrumentDirectory({
             <div
               key={col.heading}
               className="flex flex-col"
-              onMouseEnter={() => { cancelClose(); setOpenIdx(i); }}
-              onMouseLeave={scheduleClose}
+              /* Pointer-aware hover: mouse only. Touch devices skip these
+                 so the click handler isn't fighting a phantom hover that
+                 mobile browsers emulate on tap (which caused the dropdown
+                 to open then instantly close). */
+              onPointerEnter={(e) => {
+                if (e.pointerType !== 'mouse') return;
+                cancelClose();
+                setOpenIdx(i);
+              }}
+              onPointerLeave={(e) => {
+                if (e.pointerType !== 'mouse') return;
+                scheduleClose();
+              }}
             >
               {/* Category trigger */}
               <button
                 type="button"
-                onClick={() => setOpenIdx((cur) => (cur === i ? -1 : i))}
+                onClick={(e) => {
+                  const next = openIdx === i ? -1 : i;
+                  setOpenIdx(next);
+                  // On mobile, scroll the newly-opened panel into view so the
+                  // user doesn't have to hunt for it after tapping.
+                  if (next !== -1) {
+                    const btn = e.currentTarget;
+                    requestAnimationFrame(() => {
+                      btn.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    });
+                  }
+                }}
                 aria-expanded={isOpen}
                 aria-haspopup="true"
                 aria-label={`Show ${col.heading} instruments`}
