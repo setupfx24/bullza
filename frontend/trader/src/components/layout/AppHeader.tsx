@@ -108,14 +108,14 @@ export default function AppHeader() {
             <Gift size={13} className="text-[#55a630] shrink-0" />
             <span className="text-[11px] font-medium text-text-primary">Bonus</span>
           </Link>
-          {/* Referral chip — quick link to the IB / referral dashboard */}
+          {/* Affiliates chip — quick link to the IB / partner dashboard */}
           <Link
             href="/business"
             className="hidden md:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-[#55a630]/25 bg-[#55a630]/5 hover:bg-[#55a630]/10 transition-colors"
-            title="Invite friends and earn"
+            title="IB Program — invite traders and earn"
           >
             <Users size={13} className="text-[#55a630] shrink-0" />
-            <span className="text-[11px] font-medium text-text-primary">Referral</span>
+            <span className="text-[11px] font-medium text-text-primary">Affiliates</span>
           </Link>
 
           {/* Balance pill */}

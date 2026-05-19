@@ -44,7 +44,6 @@ const NAV_ITEMS: NavEntry[] = [
     key: 'earn',
     children: [
       { label: 'Bonus', href: '/bonus', icon: Gift },
-      { label: 'Referral', href: '/business', icon: Users },
       { label: 'Fixed Return', href: '/products/fixed-return-insurance', icon: Percent },
     ],
   },
