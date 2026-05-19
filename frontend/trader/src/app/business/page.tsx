@@ -303,11 +303,67 @@ function IBTab() {
 
   if (!status?.is_ib) {
 
+    const eligibility = status?.eligibility as
+      | { min_deposit_required_usd: number; total_deposits_usd: number; is_eligible: boolean }
+      | undefined;
+
+    const minRequired = eligibility?.min_deposit_required_usd ?? 0;
+
+    const currentDeposits = eligibility?.total_deposits_usd ?? 0;
+
+    const eligible = eligibility ? eligibility.is_eligible : true;
+
+    const pct = minRequired > 0 ? Math.min(100, (currentDeposits / minRequired) * 100) : 100;
+
+    const remaining = Math.max(0, minRequired - currentDeposits);
+
     return (
 
       <div className="rounded-xl border border-border-primary bg-card p-6 sm:p-10 noise-texture text-center space-y-5 max-w-2xl mx-auto">
 
         <h3 className="text-lg sm:text-xl font-bold text-text-primary">Become an Introducing Broker</h3>
+
+        {eligibility && minRequired > 0 && (
+
+          <div className="rounded-lg border border-border-primary bg-bg-secondary p-4 text-left">
+
+            <div className="flex items-center justify-between gap-2 mb-2">
+
+              <span className="text-xs font-semibold text-text-secondary">Eligibility</span>
+
+              <span className={clsx('text-xs font-bold tabular-nums', eligible ? 'text-success' : 'text-warning')}>
+
+                ${fmt(currentDeposits)} / ${fmt(minRequired)}
+
+              </span>
+
+            </div>
+
+            <div className="h-2 rounded-full bg-bg-tertiary overflow-hidden">
+
+              <div
+
+                className={clsx('h-full transition-all', eligible ? 'bg-success' : 'bg-warning')}
+
+                style={{ width: `${pct}%` }}
+
+              />
+
+            </div>
+
+            <p className={clsx('text-[11px] mt-2', eligible ? 'text-success' : 'text-text-tertiary')}>
+
+              {eligible
+
+                ? 'You meet the minimum deposit requirement. Apply below.'
+
+                : `Deposit ${'$' + fmt(remaining)} more in approved funds to qualify for the IB program.`}
+
+            </p>
+
+          </div>
+
+        )}
 
         <button
 
@@ -315,19 +371,23 @@ function IBTab() {
 
           onClick={handleApply}
 
-          disabled={applying}
+          disabled={applying || !eligible}
 
           className={clsx(
 
             'w-full max-w-xs mx-auto px-6 py-3.5 rounded-xl text-sm font-bold transition-all border-2 border-accent',
 
-            applying ? 'opacity-50 cursor-not-allowed' : 'bg-accent text-black hover:brightness-110 shadow-[0_0_24px_rgba(85,166,48,0.35)]',
+            (applying || !eligible)
+
+              ? 'opacity-50 cursor-not-allowed bg-bg-secondary text-text-tertiary'
+
+              : 'bg-accent text-black hover:brightness-110 shadow-[0_0_24px_rgba(85,166,48,0.35)]',
 
           )}
 
         >
 
-          {applying ? 'Submitting...' : 'Apply Now'}
+          {applying ? 'Submitting...' : eligible ? 'Apply Now' : 'Deposit to Unlock'}
 
         </button>
 

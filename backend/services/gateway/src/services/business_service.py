@@ -8,8 +8,34 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from packages.common.src.models import (
     IBProfile, IBApplication, IBCommission, IBCommissionPlan,
-    Referral, User, TradingAccount,
+    Referral, User, TradingAccount, Deposit,
 )
+from packages.common.src.settings_store import get_float_setting
+
+# Admin-tunable threshold: a user must have accumulated at least this much
+# in approved deposits (USD, lifetime) before being eligible to apply as an
+# IB / sub-broker. Default is $100 so test accounts never accidentally
+# qualify; admin overrides via /admin/settings → ib_min_deposit_usd.
+IB_MIN_DEPOSIT_DEFAULT_USD = 100.0
+
+
+async def _get_ib_min_deposit_usd() -> float:
+    return await get_float_setting("ib_min_deposit_usd", IB_MIN_DEPOSIT_DEFAULT_USD)
+
+
+async def _get_user_total_deposits(user_id: UUID, db: AsyncSession) -> float:
+    """Sum lifetime approved/auto-approved deposits for a user, in USD.
+    Used as the gate for IB eligibility — a user must have demonstrably
+    funded their account before they can earn from referrals.
+    """
+    result = await db.execute(
+        select(func.coalesce(func.sum(Deposit.amount), 0))
+        .where(
+            Deposit.user_id == user_id,
+            Deposit.status.in_(["approved", "auto_approved"]),
+        )
+    )
+    return float(result.scalar() or 0)
 
 
 def _get_frontend_url() -> str:
@@ -48,14 +74,30 @@ async def ib_status(user_id: UUID, db: AsyncSession) -> dict:
             "created_at": profile.created_at.isoformat() if profile.created_at else None,
         }
 
+    # Not an IB yet — surface the eligibility status so the trader UI can
+    # show a progress bar ("$30 / $100 deposited to apply") instead of just
+    # an unexplained disabled button.
+    min_deposit = await _get_ib_min_deposit_usd()
+    total_deposits = await _get_user_total_deposits(user_id, db)
+    eligibility = {
+        "min_deposit_required_usd": min_deposit,
+        "total_deposits_usd": total_deposits,
+        "is_eligible": total_deposits >= min_deposit,
+    }
+
     if application:
         return {
             "is_ib": False,
             "application_status": application.status,
             "applied_at": application.created_at.isoformat() if application.created_at else None,
+            "eligibility": eligibility,
         }
 
-    return {"is_ib": False, "application_status": None}
+    return {
+        "is_ib": False,
+        "application_status": None,
+        "eligibility": eligibility,
+    }
 
 
 async def apply_ib(user_id: UUID, application_data: dict | None, db: AsyncSession) -> dict:
@@ -73,6 +115,22 @@ async def apply_ib(user_id: UUID, application_data: dict | None, db: AsyncSessio
     )
     if existing_app.scalar_one_or_none():
         raise HTTPException(status_code=400, detail="You already have a pending application")
+
+    # Minimum-deposit gate. Admin sets the threshold via system_settings →
+    # ib_min_deposit_usd. We compare against lifetime approved deposits so
+    # a user can't deposit → apply → withdraw → apply-again with a hollow
+    # account.
+    min_deposit = await _get_ib_min_deposit_usd()
+    total_deposits = await _get_user_total_deposits(user_id, db)
+    if total_deposits < min_deposit:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"IB application requires at least ${min_deposit:,.2f} in approved deposits. "
+                f"You currently have ${total_deposits:,.2f}. Deposit the remaining "
+                f"${max(0.0, min_deposit - total_deposits):,.2f} to qualify."
+            ),
+        )
 
     application = IBApplication(
         user_id=user_id,
@@ -105,6 +163,18 @@ async def apply_sub_broker(user_id: UUID, application_data: dict | None, db: Asy
     )
     if existing_profile.scalar_one_or_none():
         raise HTTPException(status_code=400, detail="You already have a business profile")
+
+    # Same min-deposit gate as IB — sub-broker is just a higher tier of IB.
+    min_deposit = await _get_ib_min_deposit_usd()
+    total_deposits = await _get_user_total_deposits(user_id, db)
+    if total_deposits < min_deposit:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"Sub-broker application requires at least ${min_deposit:,.2f} in approved deposits. "
+                f"You currently have ${total_deposits:,.2f}."
+            ),
+        )
 
     data = application_data or {}
     data["type"] = "sub_broker"

@@ -14,6 +14,7 @@ interface Settings {
   max_pending_orders: number;
   max_lot_size: number;
   min_lot_size: number;
+  ib_min_deposit_usd: number;
   maintenance_mode: boolean;
   allow_new_registrations: boolean;
   allow_deposits: boolean;
@@ -34,6 +35,7 @@ const DEFAULT_SETTINGS: Settings = {
   max_pending_orders: 100,
   max_lot_size: 100,
   min_lot_size: 0.01,
+  ib_min_deposit_usd: 100,
   maintenance_mode: false,
   allow_new_registrations: true,
   allow_deposits: true,
@@ -65,6 +67,7 @@ function rowsToSettings(rows: SystemSettingRow[]): Settings {
     max_pending_orders: num('max_pending_orders', DEFAULT_SETTINGS.max_pending_orders),
     max_lot_size: num('max_lot_size', DEFAULT_SETTINGS.max_lot_size),
     min_lot_size: num('min_lot_size', DEFAULT_SETTINGS.min_lot_size),
+    ib_min_deposit_usd: num('ib_min_deposit_usd', DEFAULT_SETTINGS.ib_min_deposit_usd),
     maintenance_mode: bool('maintenance_mode', DEFAULT_SETTINGS.maintenance_mode),
     allow_new_registrations: bool('allow_new_registrations', DEFAULT_SETTINGS.allow_new_registrations),
     allow_deposits: bool('allow_deposits', DEFAULT_SETTINGS.allow_deposits),
@@ -81,6 +84,7 @@ function settingsToPayload(s: Settings): Record<string, number | boolean> {
     max_pending_orders: s.max_pending_orders,
     max_lot_size: s.max_lot_size,
     min_lot_size: s.min_lot_size,
+    ib_min_deposit_usd: s.ib_min_deposit_usd,
     maintenance_mode: s.maintenance_mode,
     allow_new_registrations: s.allow_new_registrations,
     allow_deposits: s.allow_deposits,
@@ -150,6 +154,7 @@ export default function SettingsPage() {
     if (s.min_lot_size <= 0) return 'Min lot size must be greater than 0';
     if (s.max_lot_size <= 0) return 'Max lot size must be greater than 0';
     if (s.min_lot_size >= s.max_lot_size) return 'Min lot size must be less than max lot size';
+    if (s.ib_min_deposit_usd < 0) return 'IB minimum deposit cannot be negative';
     return null;
   };
 
@@ -278,6 +283,33 @@ export default function SettingsPage() {
                       </button>
                     </div>
                   ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-bg-secondary border border-border-primary rounded-md">
+              <div className="px-4 py-3 border-b border-border-primary">
+                <h2 className="text-sm font-medium text-text-primary">Business / IB Program</h2>
+                <p className="text-xxs text-text-tertiary mt-0.5">Eligibility gate for users applying to become an Introducing Broker.</p>
+              </div>
+              <div className="p-4 space-y-3">
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <label className="text-xs text-text-secondary block">Minimum Deposit for IB Application</label>
+                    <p className="text-xxs text-text-tertiary mt-0.5">Lifetime approved deposits required before a user can apply for IB or sub-broker.</p>
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <span className="text-xxs text-text-tertiary">$</span>
+                    <input
+                      type="number"
+                      step="1"
+                      min="0"
+                      value={settings.ib_min_deposit_usd}
+                      onChange={(e) => updateNum('ib_min_deposit_usd', e.target.value)}
+                      className="w-28 text-xs py-1.5 px-2 bg-bg-input border border-border-primary rounded-md font-mono tabular-nums text-right"
+                    />
+                    <span className="text-xxs text-text-tertiary w-8">USD</span>
+                  </div>
                 </div>
               </div>
             </div>
