@@ -249,6 +249,13 @@ function RegisterContent() {
                 style={{ width: '100%', maxWidth: 380 }}
               >
                 <form className="auth-form" onSubmit={handleSubmit} noValidate>
+                  <motion.div {...fadeUp(0.25)} className="flex justify-center mb-1">
+                    <img
+                      src="/images/swisdex_fevicon1.png"
+                      alt="SwisDex"
+                      className="w-12 h-12 object-contain"
+                    />
+                  </motion.div>
                   <motion.div {...fadeUp(0.3)}>
                     <h2 className="auth-form__title">Sign Up Account</h2>
                     <p className="auth-form__subtitle">Enter your personal data to create your account.</p>

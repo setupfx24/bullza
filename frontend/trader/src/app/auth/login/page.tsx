@@ -290,6 +290,13 @@ function LoginContent() {
                 {/* ── SIGN IN ── */}
                 {activeStep === 1 && (
                   <form className="auth-form" onSubmit={handleSignIn} noValidate>
+                    <motion.div {...fadeUp(0.25)} className="flex justify-center mb-1">
+                      <img
+                        src="/images/swisdex_fevicon1.png"
+                        alt="SwisDex"
+                        className="w-12 h-12 object-contain"
+                      />
+                    </motion.div>
                     <motion.div {...fadeUp(0.3)}>
                       <h2 className="auth-form__title">Sign In</h2>
                       <p className="auth-form__subtitle">Enter your credentials to access your account.</p>
