@@ -30,14 +30,14 @@ export function SwisDexWordmark({
           className,
         )}
       >
-        <img src="/images/swisdex-logo1.png" alt="SwisDex" className="w-7 h-7 object-contain" />
+        <img src="/images/swisdex-logo2.png" alt="SwisDex" className="w-7 h-7 object-contain" />
       </Link>
     );
   }
 
   const mark = (
     <span className={cn('inline-flex items-center gap-2 select-none', className)}>
-      <img src="/images/swisdex-logo1.png" alt="SwisDex" className="w-8 h-8 object-contain shrink-0" />
+      <img src="/images/swisdex-logo2.png" alt="SwisDex" className="w-8 h-8 object-contain shrink-0" />
       <span
         className={cn(
           'inline-flex items-baseline font-bold italic tracking-tight',

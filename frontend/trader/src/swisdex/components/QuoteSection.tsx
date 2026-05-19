@@ -69,7 +69,7 @@ export function QuoteSection({
           <div>
             <div className="flex items-center gap-2 mb-6">
               <img
-                src="/images/swisdex-logo1.png"
+                src="/images/swisdex-logo2.png"
                 alt="SwisDex"
                 className="h-7 w-auto opacity-90"
               />
