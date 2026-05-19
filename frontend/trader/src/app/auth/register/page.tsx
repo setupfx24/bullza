@@ -251,7 +251,7 @@ function RegisterContent() {
                 <form className="auth-form" onSubmit={handleSubmit} noValidate>
                   <motion.div {...fadeUp(0.25)} className="flex justify-center mb-1">
                     <img
-                      src="/images/swisdex_fevicon1.png"
+                      src="/images/fevicon1.png"
                       alt="SwisDex"
                       className="w-12 h-12 object-contain"
                     />
