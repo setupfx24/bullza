@@ -72,6 +72,14 @@ class User(Base):
     # Who referred this user (set once at signup). Drives the one-shot
     # first-deposit commission payout in deposit_service.
     referred_by_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    # Last time we emailed the user a KYC-pending nudge. NULL means
+    # we've never nudged them — the engine sends the first at +24h, then
+    # every 7 days while KYC stays pending.
+    kyc_last_reminded_at = Column(DateTime(timezone=True), nullable=True)
+    # When the one-time "100% bonus on your first deposit" email went
+    # out. NULL means the user hasn't been nudged yet; the engine only
+    # sends this once.
+    deposit_nudge_sent_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), default=datetime.utcnow)
     updated_at = Column(DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow)
 
