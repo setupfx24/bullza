@@ -118,6 +118,41 @@ export default function IBPage() {
   const [transferTargetIb, setTransferTargetIb] = useState('');
   const [allAgents, setAllAgents] = useState<IBAgent[]>([]);
 
+  // IB program settings — surfaced here for findability. Persisted via the
+  // generic /settings endpoint (same key as the system Settings page).
+  const [minDeposit, setMinDeposit] = useState<number>(100);
+  const [minDepositLoaded, setMinDepositLoaded] = useState(false);
+  const [savingMinDeposit, setSavingMinDeposit] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const all = await adminApi.get<{ key: string; value: any }[]>('/settings');
+        const list = Array.isArray(all) ? all : [];
+        const row = list.find((s) => s.key === 'ib_min_deposit_usd');
+        if (row != null) {
+          const n = Number(row.value);
+          if (Number.isFinite(n)) setMinDeposit(n);
+        }
+      } catch {/* keep default */} finally {
+        setMinDepositLoaded(true);
+      }
+    })();
+  }, []);
+
+  const saveMinDeposit = async () => {
+    if (minDeposit < 0) { toast.error('Min deposit cannot be negative'); return; }
+    setSavingMinDeposit(true);
+    try {
+      await adminApi.put('/settings', { settings: { ib_min_deposit_usd: minDeposit } });
+      toast.success('IB minimum deposit saved');
+    } catch (e: any) {
+      toast.error(e?.message || 'Save failed');
+    } finally {
+      setSavingMinDeposit(false);
+    }
+  };
+
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
@@ -405,6 +440,36 @@ export default function IBPage() {
             </button>
           </div>
         </div>
+
+        {minDepositLoaded && (
+          <div className="bg-bg-secondary border border-border-primary rounded-md p-4 flex flex-wrap items-center gap-3">
+            <div className="flex-1 min-w-[200px]">
+              <h2 className="text-sm font-semibold text-text-primary">IB Program — Minimum Deposit Gate</h2>
+              <p className="text-xxs text-text-tertiary mt-0.5">
+                A user must have at least this much in lifetime approved deposits before they can submit an IB application.
+                Apply / sub-broker endpoints both enforce this.
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                min={0}
+                step={50}
+                value={minDeposit}
+                onChange={(e) => setMinDeposit(parseFloat(e.target.value) || 0)}
+                className="w-28 text-xs py-1.5 px-2 bg-bg-input border border-border-primary rounded-md font-mono tabular-nums text-right text-text-primary"
+              />
+              <span className="text-xs text-text-tertiary">USD</span>
+              <button
+                onClick={saveMinDeposit}
+                disabled={savingMinDeposit}
+                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-md text-xs font-medium text-white bg-buy hover:bg-buy-light disabled:opacity-50"
+              >
+                {savingMinDeposit ? <Loader2 size={12} className="animate-spin" /> : null} Save
+              </button>
+            </div>
+          </div>
+        )}
 
         <div className="bg-bg-secondary border border-border-primary rounded-md">
           <div className="flex gap-1 p-1 border-b border-border-primary">

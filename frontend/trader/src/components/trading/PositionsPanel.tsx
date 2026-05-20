@@ -1687,6 +1687,29 @@ export default function PositionsPanel({ variant = 'default' }: PositionsPanelPr
                     <span className="text-text-tertiary">Open lots</span>
                     <span className="font-mono text-text-primary">{closeModal.lots}</span>
                   </div>
+                  {/*
+                   * Live booking estimate: open position's unrealised P&L
+                   * scaled to the slice the trader is about to close. Uses
+                   * the same store the table reads, so the number matches
+                   * what they were just looking at in the open-positions
+                   * row to the cent.
+                   */}
+                  {(() => {
+                    const pos = positions.find((p) => p.id === closeModal.id);
+                    const cl = parseFloat(closeModal.closeLots);
+                    if (!pos || !pos.lots || !Number.isFinite(cl) || cl <= 0) return null;
+                    const ratio = Math.min(1, cl / pos.lots);
+                    const booking = (pos.profit ?? 0) * ratio;
+                    const sign = booking >= 0 ? '+' : '';
+                    return (
+                      <div className="flex justify-between text-[11px] font-medium pt-1 mt-1 border-t border-border-primary/50">
+                        <span className="text-text-tertiary">Estimated booking</span>
+                        <span className={clsx('font-mono font-bold tabular-nums', booking >= 0 ? 'text-buy' : 'text-sell')}>
+                          {sign}${Math.abs(booking).toFixed(2)}
+                        </span>
+                      </div>
+                    );
+                  })()}
                 </div>
 
                 <div>
