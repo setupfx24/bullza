@@ -333,6 +333,27 @@ html, body { top: 0 !important; position: static !important; }
 #google_translate_element,
 #google_translate_element * { pointer-events: none !important; }
 
+/* Modern Google Translate widget (post-2023 redesign) uses obfuscated
+   class names prefixed with VIpgJd- and a shadow-DOM <isolated-frame>
+   to render the "Show original" floating chip. Hide all of them — the
+   site is driven by our own LanguageSwitcher, never by Google's UI. */
+isolated-frame,
+[class*='VIpgJd-'],
+.VIpgJd-ZVi9od-ORHb-OEVmcd,
+.VIpgJd-ZVi9od-aZ2wEe-wOHMyf,
+.VIpgJd-ZVi9od-aZ2wEe-OiiCO,
+.VIpgJd-ZVi9od-l4eHX-hSRGPd,
+.VIpgJd-yAWNEb-VIpgJd-fmcmS-sn54Q {
+  display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+  width: 0 !important;
+  height: 0 !important;
+  position: fixed !important;
+  top: -9999px !important;
+  left: -9999px !important;
+}
+
 /* Google injects <font> wrappers around translated text — neutralise them
    so they don't break inline-block layouts, gradients, or responsive
    word-break behaviour. */
