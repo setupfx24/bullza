@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { Facebook, Instagram, Youtube, Mail } from 'lucide-react'
+import { Facebook, Instagram, Linkedin, Youtube, Mail } from 'lucide-react'
 import ScrollReveal from './animations/ScrollReveal'
 
 const columns = {
@@ -41,9 +41,10 @@ const columns = {
 }
 
 const socials = [
-  { icon: Facebook,  href: '#', label: 'Facebook' },
-  { icon: Instagram, href: '#', label: 'Instagram' },
-  { icon: Youtube,   href: '#', label: 'YouTube' },
+  { icon: Facebook,  href: 'https://www.facebook.com/profile.php?id=61589880747321', label: 'Facebook' },
+  { icon: Instagram, href: 'https://www.instagram.com/swisdex/',                     label: 'Instagram' },
+  { icon: Linkedin,  href: 'https://www.linkedin.com/in/swis-dex-a62208410/',        label: 'LinkedIn' },
+  { icon: Youtube,   href: 'https://www.youtube.com/@swisdex',                       label: 'YouTube' },
 ]
 
 export default function Footer() {
@@ -91,6 +92,8 @@ export default function Footer() {
                   <a
                     key={label}
                     href={href}
+                    target="_blank"
+                    rel="noopener noreferrer"
                     aria-label={label}
                     className="w-9 h-9 rounded-full flex items-center justify-center transition-colors"
                     style={{

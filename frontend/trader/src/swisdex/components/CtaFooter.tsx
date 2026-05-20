@@ -2,7 +2,7 @@
 
 import { motion } from 'motion/react';
 import Link from 'next/link';
-import { ArrowUpRight, Facebook, Instagram, Youtube } from 'lucide-react';
+import { ArrowUpRight, Facebook, Instagram, Linkedin, Youtube } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { BlurText } from './BlurText';
 import {
@@ -84,13 +84,16 @@ export function CtaFooter() {
               </p>
               <div className="flex items-center gap-3 mt-2">
                 {[
-                  { Icon: Facebook,  label: 'Facebook' },
-                  { Icon: Instagram, label: 'Instagram' },
-                  { Icon: Youtube,   label: 'YouTube' },
-                ].map(({ Icon, label }) => (
+                  { Icon: Facebook,  label: 'Facebook',  href: 'https://www.facebook.com/profile.php?id=61589880747321' },
+                  { Icon: Instagram, label: 'Instagram', href: 'https://www.instagram.com/swisdex/' },
+                  { Icon: Linkedin,  label: 'LinkedIn',  href: 'https://www.linkedin.com/in/swis-dex-a62208410/' },
+                  { Icon: Youtube,   label: 'YouTube',   href: 'https://www.youtube.com/@swisdex' },
+                ].map(({ Icon, label, href }) => (
                   <a
                     key={label}
-                    href="#"
+                    href={href}
+                    target="_blank"
+                    rel="noopener noreferrer"
                     aria-label={label}
                     className="liquid-glass rounded-full size-9 flex items-center justify-center text-foreground/70 hover:text-foreground transition-colors"
                   >
