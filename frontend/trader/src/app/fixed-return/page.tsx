@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { clsx } from 'clsx';
 import toast from 'react-hot-toast';
-import { Loader2, Lock, AlertTriangle, CheckCircle2, Clock } from 'lucide-react';
+import { Loader2, Lock, AlertTriangle, CheckCircle2, Clock, Calendar } from 'lucide-react';
 
 import DashboardShell from '@/components/layout/DashboardShell';
 import api from '@/lib/api/client';
@@ -15,6 +15,7 @@ interface RateConfig {
   tenures: Tenure[];
   rate_matrix_pct: number[][];
   early_withdrawal_fee_pct: number;
+  lock_months: number;
 }
 
 interface LockRow {
@@ -24,13 +25,18 @@ interface LockRow {
   tenure_label: string;
   tenure_days: number;
   rate_pct: number;
+  lock_months: number;
   locked_at: string | null;
   matures_at: string | null;
+  next_payout_at: string | null;
   settled_at: string | null;
   state: 'active' | 'matured' | 'withdrawn_early';
+  payouts_count: number;
+  total_interest_paid: number;
+  projected_total_interest: number;
+  projected_total_payout: number;
   payout: number | null;
   fee_paid: number | null;
-  projected_payout: number;
 }
 
 const fmtUsd = (n: number) =>
@@ -41,9 +47,9 @@ const fmtDate = (s: string | null) => {
   try { return new Date(s).toLocaleDateString(); } catch { return s; }
 };
 
-const daysBetween = (a: string | null, b: Date) => {
+const daysBetween = (a: string | null, now: Date) => {
   if (!a) return 0;
-  return Math.max(0, Math.ceil((new Date(a).getTime() - b.getTime()) / 86_400_000));
+  return Math.max(0, Math.ceil((new Date(a).getTime() - now.getTime()) / 86_400_000));
 };
 
 export default function FixedReturnPage() {
@@ -98,8 +104,19 @@ export default function FixedReturnPage() {
     return cfg.rate_matrix_pct[tenureIdx]?.[tierIdx] ?? 0;
   }, [cfg, tierIdx, tenureIdx]);
 
-  const projectedPayout = principal * (1 + ratePct / 100);
-  const projectedGain = projectedPayout - principal;
+  // Projected interest. Tenure now controls cadence, not duration —
+  // total interest = principal * rate% * (lockMonths*30.4375 / tenureDays).
+  const projected = useMemo(() => {
+    if (!cfg || tenureIdx < 0 || ratePct <= 0 || principal <= 0) {
+      return { perCycle: 0, cycles: 0, total: 0, payout: principal };
+    }
+    const t = cfg.tenures[tenureIdx];
+    const cycles = Math.max(1, Math.floor((cfg.lock_months * 30.4375) / Math.max(1, t.days)));
+    const perCycle = principal * (ratePct / 100);
+    const total = perCycle * cycles;
+    return { perCycle, cycles, total, payout: principal + total };
+  }, [cfg, tenureIdx, ratePct, principal]);
+
   const minAmount = cfg?.tiers[0]?.min_amount ?? 0;
   const eligible = principal >= minAmount && tenureIdx >= 0;
 
@@ -112,7 +129,7 @@ export default function FixedReturnPage() {
     setSubmitting(true);
     try {
       await api.post('/fixed-return/lock', { principal, tenure_label: tenureLabel });
-      toast.success(`Locked ${fmtUsd(principal)} for ${tenureLabel}`);
+      toast.success(`Locked ${fmtUsd(principal)} for ${cfg.lock_months} months`);
       await load();
     } catch (e: any) {
       toast.error(e?.message || 'Lock failed');
@@ -122,16 +139,17 @@ export default function FixedReturnPage() {
   };
 
   const withdraw = async (l: LockRow) => {
+    if (!cfg) return;
     const now = Date.now();
     const matured = l.matures_at && new Date(l.matures_at).getTime() <= now;
     const msg = matured
-      ? `Mature withdrawal — receive ${fmtUsd(l.projected_payout)} (${fmtUsd(l.principal)} + ${fmtUsd(l.projected_payout - l.principal)}). Continue?`
-      : `Early withdrawal — ${cfg?.early_withdrawal_fee_pct ?? 0}% fee on principal, no return earned. Continue?`;
+      ? `Mature withdrawal — you'll receive your principal of ${fmtUsd(l.principal)} back. Interest (${fmtUsd(l.total_interest_paid)} so far) was already paid in cycles. Continue?`
+      : `Early withdrawal penalty:\n• ${cfg.early_withdrawal_fee_pct}% of principal as the broker break fee\n• ALL interest paid to date (${fmtUsd(l.total_interest_paid)}) claws back from the principal\n\nProjected return: ${fmtUsd(Math.max(0, l.principal * (1 - cfg.early_withdrawal_fee_pct / 100) - l.total_interest_paid))}. Continue?`;
     if (!window.confirm(msg)) return;
     setWithdrawing(l.id);
     try {
       await api.post(`/fixed-return/locks/${l.id}/withdraw`, {});
-      toast.success(matured ? 'Matured payout credited' : 'Funds returned (fee deducted)');
+      toast.success(matured ? 'Principal returned' : 'Funds returned (fee + interest claw-back applied)');
       await load();
     } catch (e: any) {
       toast.error(e?.message || 'Withdrawal failed');
@@ -152,12 +170,14 @@ export default function FixedReturnPage() {
 
   return (
     <DashboardShell>
-      <div className="px-6 py-6 space-y-6 max-w-[1200px] mx-auto">
+      <div className="px-4 sm:px-6 py-6 space-y-6 max-w-[1200px] mx-auto">
         <header>
           <h1 className="text-2xl font-bold text-text-primary">Fixed Return</h1>
-          <p className="mt-1 text-sm text-text-secondary">
-            Lock your principal for a defined tenure and earn a fixed return at maturity.
-            Bigger deposits and longer lock-ups unlock higher rates.
+          <p className="mt-1 text-sm text-text-secondary max-w-2xl">
+            Lock your principal for{' '}
+            <strong className="text-text-primary">{cfg.lock_months} months</strong>.
+            Earn interest every cycle (Month / Quarter / etc. — your choice) and get your
+            principal back at maturity.
           </p>
         </header>
 
@@ -166,7 +186,7 @@ export default function FixedReturnPage() {
           <table className="w-full min-w-[640px] text-sm">
             <thead>
               <tr className="border-b border-border-primary bg-bg-tertiary/40">
-                <th className="text-left px-4 py-3 text-xs uppercase tracking-wide text-text-tertiary">Tenure</th>
+                <th className="text-left px-4 py-3 text-xs uppercase tracking-wide text-text-tertiary">Tenure (payout cycle)</th>
                 {cfg.tiers.map((t, i) => (
                   <th
                     key={i}
@@ -194,7 +214,7 @@ export default function FixedReturnPage() {
                 >
                   <th scope="row" className="text-left px-4 py-3 font-medium text-text-primary">
                     {tn.label}
-                    <div className="text-[10px] font-normal text-text-tertiary mt-0.5">{tn.days} days</div>
+                    <div className="text-[10px] font-normal text-text-tertiary mt-0.5">every {tn.days} days</div>
                   </th>
                   {cfg.tiers.map((_, ci) => {
                     const highlight = ti === tenureIdx && ci === tierIdx;
@@ -216,6 +236,9 @@ export default function FixedReturnPage() {
               ))}
             </tbody>
           </table>
+          <p className="text-[11px] text-text-tertiary px-4 py-2">
+            Each cell is the % paid <strong>per cycle</strong>. Your lock runs for {cfg.lock_months} months total.
+          </p>
         </section>
 
         {/* Calculator + lock form */}
@@ -231,14 +254,14 @@ export default function FixedReturnPage() {
               onChange={(e) => setAmount(e.target.value)}
               className="w-full px-3 py-2 text-sm bg-bg-input border border-border-primary rounded-md font-mono tabular-nums text-text-primary"
             />
-            <label className="block text-xs font-medium text-text-secondary mb-1 mt-3">Tenure</label>
+            <label className="block text-xs font-medium text-text-secondary mb-1 mt-3">Payout cycle</label>
             <select
               value={tenureLabel}
               onChange={(e) => setTenureLabel(e.target.value)}
               className="w-full px-3 py-2 text-sm bg-bg-input border border-border-primary rounded-md text-text-primary"
             >
               {cfg.tenures.map((t) => (
-                <option key={t.label} value={t.label}>{t.label} ({t.days} days)</option>
+                <option key={t.label} value={t.label}>{t.label} (every {t.days} days)</option>
               ))}
             </select>
 
@@ -248,7 +271,7 @@ export default function FixedReturnPage() {
               className="mt-4 inline-flex items-center justify-center gap-2 w-full px-4 py-2.5 bg-accent text-white font-semibold rounded-md hover:bg-accent/90 disabled:opacity-50 transition-fast"
             >
               {submitting ? <Loader2 size={16} className="animate-spin" /> : <Lock size={14} />}
-              Lock {fmtUsd(principal || 0)}
+              Lock {fmtUsd(principal || 0)} for {cfg.lock_months} months
             </button>
             {!eligible && principal > 0 && (
               <p className="mt-2 text-[11px] text-amber-400 flex items-center gap-1">
@@ -267,25 +290,41 @@ export default function FixedReturnPage() {
                 </div>
               </div>
               <div className="rounded-md bg-bg-tertiary/40 p-3">
-                <div className="text-[11px] text-text-tertiary uppercase">Rate</div>
+                <div className="text-[11px] text-text-tertiary uppercase">Rate per cycle</div>
                 <div className="font-mono tabular-nums text-accent mt-1">{ratePct.toFixed(2)}%</div>
               </div>
               <div className="rounded-md bg-bg-tertiary/40 p-3">
-                <div className="text-[11px] text-text-tertiary uppercase">Gain at maturity</div>
+                <div className="text-[11px] text-text-tertiary uppercase">Per cycle</div>
                 <div className="font-mono tabular-nums text-buy mt-1">
-                  {fmtUsd(eligible ? projectedGain : 0)}
+                  {fmtUsd(eligible ? projected.perCycle : 0)}
+                </div>
+                <div className="text-[10px] text-text-tertiary mt-0.5">
+                  × {eligible ? projected.cycles : 0} payouts
                 </div>
               </div>
               <div className="rounded-md bg-bg-tertiary/40 p-3">
-                <div className="text-[11px] text-text-tertiary uppercase">Total payout</div>
-                <div className="font-mono tabular-nums text-text-primary font-semibold mt-1">
-                  {fmtUsd(eligible ? projectedPayout : 0)}
+                <div className="text-[11px] text-text-tertiary uppercase">Total interest</div>
+                <div className="font-mono tabular-nums text-buy font-semibold mt-1">
+                  {fmtUsd(eligible ? projected.total : 0)}
+                </div>
+                <div className="text-[10px] text-text-tertiary mt-0.5">
+                  over {cfg.lock_months} months
                 </div>
               </div>
             </div>
-            <p className="mt-3 text-[11px] text-text-tertiary">
-              Early withdrawal incurs a <strong className="text-text-secondary">{cfg.early_withdrawal_fee_pct}% fee</strong> on
-              principal and forfeits the return earned to date.
+            <div className="mt-3 rounded-md bg-accent/[0.06] border border-accent/25 px-3 py-2">
+              <div className="text-[11px] text-text-tertiary">Total at maturity</div>
+              <div className="font-mono tabular-nums text-text-primary font-bold text-lg">
+                {fmtUsd(eligible ? projected.payout : 0)}
+              </div>
+              <div className="text-[10px] text-text-tertiary mt-0.5">
+                = principal + cumulative interest
+              </div>
+            </div>
+            <p className="mt-3 text-[11px] text-text-tertiary leading-relaxed">
+              <strong className="text-amber-400">Early withdrawal:</strong>{' '}
+              <strong>{cfg.early_withdrawal_fee_pct}% penalty</strong> on principal AND all interest
+              paid so far claws back from the returned amount.
             </p>
           </div>
         </section>
@@ -295,7 +334,7 @@ export default function FixedReturnPage() {
           <h2 className="text-sm font-semibold text-text-primary mb-3">Your locks</h2>
           {locks.length === 0 ? (
             <div className="rounded-xl border border-dashed border-border-primary p-10 text-center text-sm text-text-tertiary">
-              No locks yet. Open one above to start earning fixed returns.
+              No locks yet. Open one above to start earning periodic interest.
             </div>
           ) : (
             <div className="space-y-2">
@@ -306,23 +345,37 @@ export default function FixedReturnPage() {
                 return (
                   <div
                     key={l.id}
-                    className="rounded-xl border border-border-primary bg-bg-secondary p-4 flex flex-wrap items-center gap-4"
+                    className="rounded-xl border border-border-primary bg-bg-secondary p-4 grid grid-cols-2 md:grid-cols-7 gap-3 items-center"
                   >
-                    <div className="min-w-[120px]">
+                    <div>
                       <div className="text-xs text-text-tertiary uppercase">Principal</div>
                       <div className="font-mono tabular-nums text-text-primary font-semibold">
                         {fmtUsd(l.principal)}
                       </div>
                     </div>
-                    <div className="min-w-[100px]">
-                      <div className="text-xs text-text-tertiary uppercase">Tenure</div>
-                      <div className="text-text-primary">{l.tenure_label}</div>
+                    <div>
+                      <div className="text-xs text-text-tertiary uppercase">Cycle</div>
+                      <div className="text-text-primary text-sm">{l.tenure_label}</div>
                     </div>
-                    <div className="min-w-[80px]">
+                    <div>
                       <div className="text-xs text-text-tertiary uppercase">Rate</div>
                       <div className="font-mono tabular-nums text-accent">{l.rate_pct.toFixed(2)}%</div>
                     </div>
-                    <div className="min-w-[120px]">
+                    <div>
+                      <div className="text-xs text-text-tertiary uppercase">Interest paid</div>
+                      <div className="font-mono tabular-nums text-buy">
+                        {fmtUsd(l.total_interest_paid)}
+                      </div>
+                      <div className="text-[10px] text-text-tertiary">{l.payouts_count} cycles</div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-text-tertiary uppercase">Next payout</div>
+                      <div className="text-text-primary text-sm flex items-center gap-1">
+                        <Calendar size={11} className="text-text-tertiary" />
+                        {l.next_payout_at ? fmtDate(l.next_payout_at) : '—'}
+                      </div>
+                    </div>
+                    <div>
                       <div className="text-xs text-text-tertiary uppercase">Matures</div>
                       <div className="text-text-primary text-sm flex items-center gap-1">
                         <Clock size={11} className="text-text-tertiary" />
@@ -334,15 +387,7 @@ export default function FixedReturnPage() {
                         )}
                       </div>
                     </div>
-                    <div className="min-w-[120px]">
-                      <div className="text-xs text-text-tertiary uppercase">
-                        {isActive ? 'Projected payout' : 'Payout'}
-                      </div>
-                      <div className="font-mono tabular-nums text-buy">
-                        {fmtUsd(isActive ? l.projected_payout : (l.payout ?? 0))}
-                      </div>
-                    </div>
-                    <div className="ml-auto flex items-center gap-2">
+                    <div className="col-span-2 md:col-span-1 flex items-center gap-2 md:justify-end">
                       <span
                         className={clsx(
                           'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium',
@@ -364,11 +409,11 @@ export default function FixedReturnPage() {
                             'inline-flex items-center gap-1 px-3 py-1.5 rounded-md text-xs font-semibold transition-fast',
                             matured
                               ? 'bg-buy text-white hover:bg-buy/90'
-                              : 'border border-border-primary text-text-secondary hover:bg-bg-hover',
+                              : 'border border-amber-400/40 text-amber-400 hover:bg-amber-400/10',
                           )}
                         >
                           {withdrawing === l.id && <Loader2 size={11} className="animate-spin" />}
-                          {matured ? 'Withdraw' : 'Withdraw early'}
+                          {matured ? 'Claim principal' : 'Withdraw early'}
                         </button>
                       )}
                     </div>

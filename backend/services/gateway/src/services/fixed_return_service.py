@@ -1,13 +1,10 @@
-"""Fixed Return — list config, create locks, withdraw (early or matured).
+"""Fixed Return v2 — periodic interest payouts, fixed lock months.
 
-Rates and the early-withdrawal fee live in ``system_settings`` so admins
-edit them in one form. The lock state machine is intentionally tiny:
-  active --(matures_at <= now AND user withdraws)--> matured
-  active --(user withdraws before maturity)--> withdrawn_early
-
-Maturity is not auto-credited by a scheduler in this build; the user
-pulls the funds back via /withdraw which the UI surfaces as a button on
-the lock card after matures_at.
+Tenure controls the PAYOUT CADENCE; the full lock duration is a single
+admin setting (``fixed_return_lock_months``, default 24). Interest is
+credited per cycle by ``accrue_due_payouts`` (driven by the engine
+tick). Principal is returned at maturity. Early exit pays a configurable
+penalty AND claws back all interest paid to date.
 """
 from __future__ import annotations
 
@@ -18,30 +15,42 @@ from typing import Optional
 from uuid import UUID
 
 from fastapi import HTTPException
-from sqlalchemy import select
+from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from packages.common.src.database import AsyncSessionLocal
 from packages.common.src.models import FixedReturnLock, User, Transaction
-from packages.common.src.settings_store import get_system_setting, get_float_setting
+from packages.common.src.settings_store import (
+    get_system_setting, get_float_setting, get_int_setting,
+)
 
 logger = logging.getLogger("fixed_return_service")
 
 
 DEFAULT_FEE_PCT = 5.0
+DEFAULT_LOCK_MONTHS = 24
+# 30.4375d ≈ avg month — used only for projection text in the UI; the
+# actual matures_at is computed from real calendar months at creation
+# (SQL `INTERVAL 'N months'`).
+DAYS_PER_MONTH_APPROX = Decimal("30.4375")
 
 
 # ─── Config ──────────────────────────────────────────────────────────
 
 async def get_config() -> dict:
-    """Returns the admin-tunable rate matrix + fee% as one payload.
-
-    Falls back to a sensible default if no system_settings row exists so
-    a fresh database is never blank.
-    """
     raw = await get_system_setting("fixed_return_rates", None)
     rates = raw if isinstance(raw, dict) and raw.get("tiers") else _fallback_rates()
-    fee_pct = await get_float_setting("fixed_return_early_withdrawal_fee_pct", DEFAULT_FEE_PCT)
-    return {**rates, "early_withdrawal_fee_pct": fee_pct}
+    fee_pct = await get_float_setting(
+        "fixed_return_early_withdrawal_fee_pct", DEFAULT_FEE_PCT,
+    )
+    lock_months = await get_int_setting(
+        "fixed_return_lock_months", DEFAULT_LOCK_MONTHS,
+    )
+    return {
+        **rates,
+        "early_withdrawal_fee_pct": fee_pct,
+        "lock_months": lock_months,
+    }
 
 
 def _fallback_rates() -> dict:
@@ -71,7 +80,6 @@ def _fallback_rates() -> dict:
 
 
 def _resolve_tier_index(amount: Decimal, tiers: list[dict]) -> int:
-    """Pick the highest tier whose min_amount is <= the principal."""
     idx = -1
     for i, t in enumerate(tiers):
         if Decimal(str(t.get("min_amount") or 0)) <= amount:
@@ -84,6 +92,17 @@ def _resolve_tenure_index(label: str, tenures: list[dict]) -> int:
         if (t.get("label") or "").lower() == label.lower():
             return i
     return -1
+
+
+def _add_months(dt: datetime, months: int) -> datetime:
+    """Add calendar months to a UTC datetime, clamped at month-end."""
+    year = dt.year + (dt.month - 1 + months) // 12
+    month = (dt.month - 1 + months) % 12 + 1
+    # Day clamp — e.g. Jan 31 + 1 month → Feb 28/29.
+    from calendar import monthrange
+    last_day = monthrange(year, month)[1]
+    day = min(dt.day, last_day)
+    return dt.replace(year=year, month=month, day=day)
 
 
 # ─── Lock flow ───────────────────────────────────────────────────────
@@ -101,6 +120,7 @@ async def create_lock(
     tiers = cfg["tiers"]
     tenures = cfg["tenures"]
     matrix = cfg["rate_matrix_pct"]
+    lock_months = int(cfg.get("lock_months") or DEFAULT_LOCK_MONTHS)
 
     tier_idx = _resolve_tier_index(principal, tiers)
     if tier_idx < 0:
@@ -113,13 +133,13 @@ async def create_lock(
     tenure_idx = _resolve_tenure_index(tenure_label, tenures)
     if tenure_idx < 0:
         raise HTTPException(
-            status_code=400,
-            detail=f"Unknown tenure '{tenure_label}'",
+            status_code=400, detail=f"Unknown tenure '{tenure_label}'",
         )
 
     rate_pct = Decimal(str(matrix[tenure_idx][tier_idx]))
     tier = tiers[tier_idx]
     tenure = tenures[tenure_idx]
+    tenure_days = int(tenure["days"])
 
     user = (await db.execute(
         select(User).where(User.id == user_id).with_for_update()
@@ -137,17 +157,25 @@ async def create_lock(
     user.main_wallet_balance = balance - principal
 
     now = datetime.now(timezone.utc)
-    matures_at = now + timedelta(days=int(tenure["days"]))
+    matures_at = _add_months(now, lock_months)
+    next_payout_at = now + timedelta(days=tenure_days)
+    # If the first cycle would land past maturity (e.g. 2-Year tenure
+    # in a 24-month lock), clamp to maturity so the user receives
+    # exactly one cycle at the end.
+    if next_payout_at > matures_at:
+        next_payout_at = matures_at
 
     lock = FixedReturnLock(
         user_id=user_id,
         principal=principal,
         tier_label=tier["label"],
         tenure_label=tenure["label"],
-        tenure_days=int(tenure["days"]),
+        tenure_days=tenure_days,
         rate_pct=rate_pct,
         locked_at=now,
         matures_at=matures_at,
+        next_payout_at=next_payout_at,
+        lock_months_at_creation=lock_months,
         state="active",
     )
     db.add(lock)
@@ -156,8 +184,8 @@ async def create_lock(
         user_id=user_id,
         type="fixed_return_lock",
         amount=-principal,
-        status="completed",
-        description=f"Fixed Return lock — {tenure['label']} @ {rate_pct}%",
+        balance_after=user.main_wallet_balance,
+        description=f"Fixed Return lock — {tenure['label']} cycle @ {rate_pct}% / {lock_months}m",
     ))
     await db.commit()
     await db.refresh(lock)
@@ -178,9 +206,6 @@ async def withdraw_lock(
     user_id: UUID,
     db: AsyncSession,
 ) -> dict:
-    """User pulls back funds from a lock. If matures_at <= now the full
-    payout (principal + return) is credited. Otherwise it's principal
-    minus the admin-set fee% — no return."""
     lock = (await db.execute(
         select(FixedReturnLock)
         .where(FixedReturnLock.id == lock_id)
@@ -199,32 +224,40 @@ async def withdraw_lock(
 
     now = datetime.now(timezone.utc)
     principal = Decimal(str(lock.principal))
-    rate_pct = Decimal(str(lock.rate_pct))
+    total_interest = Decimal(str(lock.total_interest_paid or 0))
 
     matures_at = lock.matures_at
     if matures_at and matures_at.tzinfo is None:
         matures_at = matures_at.replace(tzinfo=timezone.utc)
 
     if matures_at and matures_at <= now:
-        # Matured — full payout.
-        gain = (principal * rate_pct / Decimal("100")).quantize(Decimal("0.01"))
-        payout = principal + gain
+        # Matured — interest was already paid in cycles; user gets the
+        # principal back, period.
+        payout = principal
         fee = Decimal("0")
         new_state = "matured"
         tx_type = "fixed_return_matured"
-        desc = f"Fixed Return matured — {lock.tenure_label} @ {rate_pct}% (gain ${gain:,.2f})"
+        desc = (
+            f"Fixed Return matured — principal returned "
+            f"(interest paid in {lock.payouts_count} cycles: ${total_interest:,.2f})"
+        )
     else:
-        # Early — fee% on principal, no return.
+        # Early exit. Two penalties stack:
+        #   1. % of principal as the broker's break fee.
+        #   2. All interest paid so far claws back against the principal.
         fee_pct = await get_float_setting(
-            "fixed_return_early_withdrawal_fee_pct", DEFAULT_FEE_PCT
+            "fixed_return_early_withdrawal_fee_pct", DEFAULT_FEE_PCT,
         )
         fee = (principal * Decimal(str(fee_pct)) / Decimal("100")).quantize(Decimal("0.01"))
-        payout = (principal - fee).quantize(Decimal("0.01"))
+        payout = (principal - fee - total_interest).quantize(Decimal("0.01"))
         if payout < 0:
             payout = Decimal("0")
         new_state = "withdrawn_early"
         tx_type = "fixed_return_early"
-        desc = f"Fixed Return early withdrawal — {lock.tenure_label} (fee ${fee:,.2f})"
+        desc = (
+            f"Fixed Return early withdrawal — penalty ${fee:,.2f} + "
+            f"interest claw-back ${total_interest:,.2f}"
+        )
 
     user.main_wallet_balance = Decimal(str(user.main_wallet_balance or 0)) + payout
 
@@ -232,12 +265,13 @@ async def withdraw_lock(
     lock.payout = payout
     lock.fee_paid = fee
     lock.settled_at = now
+    lock.next_payout_at = None  # no more cycles
 
     db.add(Transaction(
         user_id=user_id,
         type=tx_type,
         amount=payout,
-        status="completed",
+        balance_after=user.main_wallet_balance,
         description=desc,
     ))
     await db.commit()
@@ -245,24 +279,124 @@ async def withdraw_lock(
     return _serialize_lock(lock)
 
 
+# ─── Interest payout engine ──────────────────────────────────────────
+
+async def accrue_due_payouts(db: AsyncSession) -> int:
+    """Find every active lock whose next_payout_at <= now and credit
+    one interest cycle. Bumps total_interest_paid + payouts_count, and
+    advances next_payout_at by tenure_days (or clears it once we're past
+    maturity).
+
+    Returns the number of payouts credited.
+
+    Idempotency: we only credit cycles whose next_payout_at is already
+    in the past — engine ticks repeatedly with no state change.
+    """
+    now = datetime.now(timezone.utc)
+    rows = (await db.execute(
+        select(FixedReturnLock).where(
+            FixedReturnLock.state == "active",
+            FixedReturnLock.next_payout_at.is_not(None),
+            FixedReturnLock.next_payout_at <= now,
+        ).with_for_update(skip_locked=True)
+    )).scalars().all()
+
+    paid = 0
+    for lock in rows:
+        try:
+            user = (await db.execute(
+                select(User).where(User.id == lock.user_id).with_for_update()
+            )).scalar_one_or_none()
+            if user is None:
+                lock.next_payout_at = None
+                continue
+
+            interest = (
+                Decimal(str(lock.principal or 0))
+                * Decimal(str(lock.rate_pct or 0))
+                / Decimal("100")
+            ).quantize(Decimal("0.01"))
+            if interest <= 0:
+                lock.next_payout_at = None
+                continue
+
+            user.main_wallet_balance = (
+                Decimal(str(user.main_wallet_balance or 0)) + interest
+            )
+            lock.total_interest_paid = (
+                Decimal(str(lock.total_interest_paid or 0)) + interest
+            )
+            lock.payouts_count = int(lock.payouts_count or 0) + 1
+
+            # Advance the schedule. If the next cycle would land past
+            # maturity we mark the schedule as done (next = NULL) — the
+            # principal will be returned when the user calls withdraw
+            # after matures_at.
+            matures_at = lock.matures_at
+            if matures_at and matures_at.tzinfo is None:
+                matures_at = matures_at.replace(tzinfo=timezone.utc)
+            nxt = (lock.next_payout_at or now)
+            if nxt.tzinfo is None:
+                nxt = nxt.replace(tzinfo=timezone.utc)
+            advanced = nxt + timedelta(days=int(lock.tenure_days or 0))
+            if matures_at and advanced >= matures_at:
+                lock.next_payout_at = None
+            else:
+                lock.next_payout_at = advanced
+
+            db.add(Transaction(
+                user_id=lock.user_id,
+                type="fixed_return_interest",
+                amount=interest,
+                balance_after=user.main_wallet_balance,
+                description=(
+                    f"Fixed Return interest — {lock.tenure_label} cycle "
+                    f"#{lock.payouts_count} ({lock.rate_pct}%)"
+                ),
+            ))
+            paid += 1
+        except Exception as exc:
+            logger.error("Fixed Return payout failed for lock %s: %s", lock.id, exc)
+
+    if paid:
+        await db.commit()
+    return paid
+
+
 # ─── Serialization ───────────────────────────────────────────────────
 
 def _serialize_lock(r: FixedReturnLock) -> dict:
+    principal = Decimal(str(r.principal or 0))
+    rate_pct = Decimal(str(r.rate_pct or 0))
+    interest_paid = Decimal(str(r.total_interest_paid or 0))
+    # Projected total interest assumes the lock runs to maturity. Used
+    # by the trader UI calculator.
+    lock_months = int(r.lock_months_at_creation or 24)
+    cycles_total = max(
+        1,
+        int((Decimal(lock_months) * DAYS_PER_MONTH_APPROX) // Decimal(max(1, r.tenure_days or 1))),
+    )
+    projected_interest = (principal * rate_pct / Decimal("100") * Decimal(cycles_total)).quantize(
+        Decimal("0.01")
+    )
+
     return {
         "id": str(r.id),
-        "principal": float(r.principal or 0),
+        "principal": float(principal),
         "tier_label": r.tier_label,
         "tenure_label": r.tenure_label,
         "tenure_days": int(r.tenure_days or 0),
-        "rate_pct": float(r.rate_pct or 0),
+        "rate_pct": float(rate_pct),
+        "lock_months": lock_months,
         "locked_at": r.locked_at.isoformat() if r.locked_at else None,
         "matures_at": r.matures_at.isoformat() if r.matures_at else None,
+        "next_payout_at": r.next_payout_at.isoformat() if r.next_payout_at else None,
         "settled_at": r.settled_at.isoformat() if r.settled_at else None,
         "state": r.state,
+        "payouts_count": int(r.payouts_count or 0),
+        "total_interest_paid": float(interest_paid),
+        "projected_total_interest": float(projected_interest),
+        "projected_total_payout": float(principal + projected_interest),
         "payout": float(r.payout) if r.payout is not None else None,
         "fee_paid": float(r.fee_paid) if r.fee_paid is not None else None,
-        "projected_payout": float(
-            Decimal(str(r.principal or 0))
-            * (Decimal("1") + Decimal(str(r.rate_pct or 0)) / Decimal("100"))
-        ),
     }
