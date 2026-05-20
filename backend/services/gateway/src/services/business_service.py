@@ -222,6 +222,22 @@ async def ib_dashboard(user_id: UUID, db: AsyncSession) -> dict:
 
     base_url = _get_frontend_url()
 
+    # Tier ladder — surface where the IB sits today + how many more
+    # referrals unlock the next tier so the trader-side page can render
+    # a progress hint without a second roundtrip.
+    from ..engines.ib_engine import get_ib_tiers, resolve_tier_for_count
+
+    tiers = await get_ib_tiers(db)
+    current_tier = resolve_tier_for_count(int(total_referrals or 0), tiers)
+    next_tier = None
+    needed_for_next = None
+    for t in tiers:
+        lo = int(t.get("min_referrals") or 0)
+        if lo > int(total_referrals or 0):
+            next_tier = t
+            needed_for_next = lo - int(total_referrals or 0)
+            break
+
     return {
         "referral_code": profile.referral_code,
         "referral_link": f"{base_url}/auth/register?ref={profile.referral_code}",
@@ -231,6 +247,10 @@ async def ib_dashboard(user_id: UUID, db: AsyncSession) -> dict:
         "pending_payout": float(profile.pending_payout),
         "total_earned": float(profile.total_earned),
         "is_active": profile.is_active,
+        "tier": current_tier,
+        "next_tier": next_tier,
+        "needed_for_next_tier": needed_for_next,
+        "tier_ladder": tiers,
     }
 
 

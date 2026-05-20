@@ -11,7 +11,7 @@ import logging
 from decimal import Decimal
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from packages.common.src.models import (
@@ -22,6 +22,17 @@ from packages.common.src.models import (
 logger = logging.getLogger("ib-engine")
 
 DEFAULT_MLM_DISTRIBUTION = [40, 25, 15, 10, 10]
+
+# Fallback used if the system_settings row is absent — matches the
+# default seeded by migration 0043.
+DEFAULT_IB_TIERS = [
+    {"label": "Starter", "min_referrals": 5,   "max_referrals": 20,   "per_lot": 6,
+     "instant_payout": True, "dedicated_manager": False},
+    {"label": "Pro",     "min_referrals": 21,  "max_referrals": 100,  "per_lot": 8,
+     "instant_payout": True, "dedicated_manager": True},
+    {"label": "Elite",   "min_referrals": 101, "max_referrals": None, "per_lot": 13,
+     "instant_payout": True, "dedicated_manager": True},
+]
 
 
 async def get_mlm_distribution(db: AsyncSession) -> list[int]:
@@ -39,6 +50,54 @@ async def get_mlm_distribution(db: AsyncSession) -> list[int]:
         if isinstance(val, list):
             return [int(x) for x in val]
     return DEFAULT_MLM_DISTRIBUTION
+
+
+async def get_ib_tiers(db: AsyncSession) -> list[dict]:
+    """Read the admin-tunable commission tier ladder."""
+    result = await db.execute(
+        select(SystemSetting).where(SystemSetting.key == "ib_commission_tiers")
+    )
+    setting = result.scalar_one_or_none()
+    if setting and setting.value:
+        val = setting.value
+        if isinstance(val, str):
+            try:
+                val = json.loads(val)
+            except Exception:
+                return DEFAULT_IB_TIERS
+        if isinstance(val, list) and val:
+            return val
+    return DEFAULT_IB_TIERS
+
+
+def resolve_tier_for_count(count: int, tiers: list[dict]) -> dict | None:
+    """Pick the tier whose [min_referrals, max_referrals] window contains
+    ``count``. None means the IB hasn't hit the first threshold yet —
+    they're below the program's lowest tier and earn nothing from the
+    tier ladder (the plan fallback may still apply)."""
+    for t in tiers:
+        lo = int(t.get("min_referrals") or 0)
+        hi = t.get("max_referrals")
+        hi_v = int(hi) if hi is not None else None
+        if count >= lo and (hi_v is None or count <= hi_v):
+            return t
+    return None
+
+
+async def count_active_referrals(db: AsyncSession, ib_profile_id: UUID) -> int:
+    """Active referrals = rows in the referrals table pointing at this IB.
+
+    The tier ladder uses "active referrals" — we treat any Referral row
+    as active (the platform soft-bans rather than deletes), which matches
+    the IB dashboard's display count and keeps the tier resolver in sync
+    with what the trader sees on their /business page.
+    """
+    n = (await db.execute(
+        select(func.count()).select_from(Referral).where(
+            Referral.ib_profile_id == ib_profile_id,
+        )
+    )).scalar() or 0
+    return int(n)
 
 
 async def distribute_ib_commission(
@@ -76,11 +135,25 @@ async def distribute_ib_commission(
         )
         plan = plan_q.scalar_one_or_none()
 
-    # Effective per-lot rate: direct IB's custom override beats plan; plan beats nothing.
+    # Effective per-lot rate priority:
+    #   1. Direct IB's custom override (admin sets this per-agent)
+    #   2. Tier ladder (referral-count-driven from system_settings)
+    #   3. Plan default
     per_lot = None
     if direct_ib.custom_commission_per_lot is not None and direct_ib.custom_commission_per_lot > 0:
         per_lot = Decimal(str(direct_ib.custom_commission_per_lot))
-    elif plan and plan.commission_per_lot is not None:
+
+    if per_lot is None:
+        tiers = await get_ib_tiers(db)
+        active_n = await count_active_referrals(db, direct_ib.id)
+        tier = resolve_tier_for_count(active_n, tiers)
+        if tier and tier.get("per_lot") not in (None, ""):
+            try:
+                per_lot = Decimal(str(tier["per_lot"]))
+            except Exception:
+                per_lot = None
+
+    if per_lot is None and plan and plan.commission_per_lot is not None:
         per_lot = Decimal(str(plan.commission_per_lot))
 
     if per_lot is None or per_lot <= 0:

@@ -47,6 +47,7 @@ const NAV_ITEMS: NavItem[] = [
       { label: 'Swaps', href: '/config/swaps' },
       { label: 'Fixed Return', href: '/config/fixed-return' },
       { label: 'PAMM', href: '/config/pamm' },
+      { label: 'IB Tiers', href: '/config/ib-tiers' },
     ],
   },
   { label: 'Social', href: '/social', icon: Share2, perm: 'social.view' },
