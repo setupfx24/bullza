@@ -597,8 +597,18 @@ async def register_user(
     db.add(user)
     await db.flush()
 
+    # Personal referral code (separate from IB MLM). Filled at signup so
+    # the user has something to share from the /referral page on day 1.
+    from . import referral_service as _ref
+    await _ref.ensure_referral_code(db, user)
+
     if referral_code:
-        await _consume_referral(db, user.id, referral_code)
+        # Try user-level referral first; if that fails, fall back to IB
+        # MLM. The two systems coexist — a code uniquely belongs to one
+        # of them (User.referral_code or IBProfile.referral_code).
+        linked = await _ref.attach_referrer_by_code(db, user.id, referral_code)
+        if linked is None:
+            await _consume_referral(db, user.id, referral_code)
 
     await db.commit()
 
@@ -880,8 +890,13 @@ async def google_oauth(
             db.add(user)
             await db.flush()
             is_new = True
+            # Personal referral code at signup (see register() — same call).
+            from . import referral_service as _ref
+            await _ref.ensure_referral_code(db, user)
             if referral_code:
-                await _consume_referral(db, user.id, referral_code)
+                linked = await _ref.attach_referrer_by_code(db, user.id, referral_code)
+                if linked is None:
+                    await _consume_referral(db, user.id, referral_code)
 
     if user.status == "banned":
         raise AuthServiceError("Account has been banned", 403)

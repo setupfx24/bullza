@@ -205,6 +205,58 @@ async def approve_deposit(
         bonus_msg = f" + ${float(bonus_amount):.2f} bonus ({offer.name})"
         applied_bonuses.append((offer.name, bonus_amount))
 
+    # Personal-referral commission — runs BEFORE commit so the referrer
+    # credit ships in the same transaction as the deposit approval and
+    # bonus. Idempotent: only pays on the first approved deposit.
+    try:
+        # Import is local so the admin service doesn't hard-fail on
+        # startup if the gateway module isn't on the path (shared
+        # packages.common is what we use to talk to the same DB schema,
+        # and the helper there only touches packages.common.src.models).
+        from services.gateway_compat import maybe_pay_referral_on_first_deposit  # type: ignore
+        await maybe_pay_referral_on_first_deposit(db, deposit.user_id, deposit)
+    except ImportError:
+        # Inline implementation if the shim isn't there. Keeps the admin
+        # service self-contained without forcing a cross-service import.
+        from sqlalchemy import select as _sel, func as _func
+        from packages.common.src.models import User as _U, Deposit as _D
+        from packages.common.src.settings_store import get_float_setting as _gfs
+
+        ru = (await db.execute(
+            _sel(_U).where(_U.id == deposit.user_id)
+        )).scalar_one_or_none()
+        if ru is not None and ru.referred_by_user_id is not None:
+            count = (await db.execute(
+                _sel(_func.count()).select_from(_D).where(
+                    _D.user_id == deposit.user_id,
+                    _D.status.in_(["approved", "auto_approved"]),
+                )
+            )).scalar() or 0
+            if count == 1:
+                pct = await _gfs("referral_commission_pct", 5.0)
+                if pct > 0:
+                    amt = (
+                        Decimal(str(deposit.amount or 0))
+                        * Decimal(str(pct)) / Decimal("100")
+                    ).quantize(Decimal("0.01"))
+                    if amt > 0:
+                        ref = (await db.execute(
+                            _sel(_U).where(_U.id == ru.referred_by_user_id)
+                        )).scalar_one_or_none()
+                        if ref is not None:
+                            ref.main_wallet_balance = (
+                                Decimal(str(ref.main_wallet_balance or 0)) + amt
+                            )
+                            db.add(Transaction(
+                                user_id=ref.id,
+                                type="referral_commission",
+                                amount=amt,
+                                balance_after=ref.main_wallet_balance,
+                                reference_id=deposit.id,
+                                description=f"Referral commission — {pct}% of {ru.email or deposit.user_id}'s first deposit",
+                                created_by=admin_id,
+                            ))
+
     await write_audit_log(
         db, admin_id, "approve_deposit", "deposit", deposit_id,
         new_values={"amount": str(deposit.amount), "status": "approved"},

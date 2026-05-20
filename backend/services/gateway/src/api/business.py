@@ -5,8 +5,22 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from packages.common.src.database import get_db
 from packages.common.src.auth import get_current_user
 from ..services import business_service
+from ..services import referral_service
 
 router = APIRouter()
+
+
+@router.get("/referral/me")
+async def my_referral_dashboard(
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """User-level referral dashboard — every user has a code, not just IBs.
+
+    Returns referral_code, count of users they've referred, total
+    commission they've earned, and the current admin-set %.
+    """
+    return await referral_service.get_my_referral_dashboard(db, current_user["user_id"])
 
 
 @router.get("/status")

@@ -63,6 +63,15 @@ class User(Base):
     # ix_users_wallet_address_lower (migration 0034). Set on first SIWE
     # sign-in or after a manual link from /profile/wallet/link.
     wallet_address = Column(String(42), nullable=True)
+    # Personal referral code (separate from IB MLM). Every user gets one
+    # at signup; populated for existing users by migration 0041. The
+    # `?ref=` query string resolves to a user via this code AND falls
+    # through to IBProfile.referral_code if no user match — so signups
+    # from IB links keep paying IB commissions as before.
+    referral_code = Column(String(20), unique=True, nullable=True)
+    # Who referred this user (set once at signup). Drives the one-shot
+    # first-deposit commission payout in deposit_service.
+    referred_by_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
     created_at = Column(DateTime(timezone=True), default=datetime.utcnow)
     updated_at = Column(DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow)
 

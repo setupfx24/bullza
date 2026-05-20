@@ -15,6 +15,7 @@ interface Settings {
   max_lot_size: number;
   min_lot_size: number;
   ib_min_deposit_usd: number;
+  referral_commission_pct: number;
   maintenance_mode: boolean;
   allow_new_registrations: boolean;
   allow_deposits: boolean;
@@ -36,6 +37,7 @@ const DEFAULT_SETTINGS: Settings = {
   max_lot_size: 100,
   min_lot_size: 0.01,
   ib_min_deposit_usd: 100,
+  referral_commission_pct: 5,
   maintenance_mode: false,
   allow_new_registrations: true,
   allow_deposits: true,
@@ -68,6 +70,7 @@ function rowsToSettings(rows: SystemSettingRow[]): Settings {
     max_lot_size: num('max_lot_size', DEFAULT_SETTINGS.max_lot_size),
     min_lot_size: num('min_lot_size', DEFAULT_SETTINGS.min_lot_size),
     ib_min_deposit_usd: num('ib_min_deposit_usd', DEFAULT_SETTINGS.ib_min_deposit_usd),
+    referral_commission_pct: num('referral_commission_pct', DEFAULT_SETTINGS.referral_commission_pct),
     maintenance_mode: bool('maintenance_mode', DEFAULT_SETTINGS.maintenance_mode),
     allow_new_registrations: bool('allow_new_registrations', DEFAULT_SETTINGS.allow_new_registrations),
     allow_deposits: bool('allow_deposits', DEFAULT_SETTINGS.allow_deposits),
@@ -85,6 +88,7 @@ function settingsToPayload(s: Settings): Record<string, number | boolean> {
     max_lot_size: s.max_lot_size,
     min_lot_size: s.min_lot_size,
     ib_min_deposit_usd: s.ib_min_deposit_usd,
+    referral_commission_pct: s.referral_commission_pct,
     maintenance_mode: s.maintenance_mode,
     allow_new_registrations: s.allow_new_registrations,
     allow_deposits: s.allow_deposits,
@@ -155,6 +159,9 @@ export default function SettingsPage() {
     if (s.max_lot_size <= 0) return 'Max lot size must be greater than 0';
     if (s.min_lot_size >= s.max_lot_size) return 'Min lot size must be less than max lot size';
     if (s.ib_min_deposit_usd < 0) return 'IB minimum deposit cannot be negative';
+    if (s.referral_commission_pct < 0 || s.referral_commission_pct > 100) {
+      return 'Referral commission % must be between 0 and 100';
+    }
     return null;
   };
 
@@ -293,8 +300,8 @@ export default function SettingsPage() {
                 <p className="text-xxs text-text-tertiary mt-0.5">Eligibility gate for users applying to become an Introducing Broker.</p>
               </div>
               <div className="p-4 space-y-3">
-                <div className="flex items-center justify-between gap-4">
-                  <div>
+                <div className="flex flex-wrap items-center justify-between gap-4">
+                  <div className="min-w-0 flex-1">
                     <label className="text-xs text-text-secondary block">Minimum Deposit for IB Application</label>
                     <p className="text-xxs text-text-tertiary mt-0.5">Lifetime approved deposits required before a user can apply for IB or sub-broker.</p>
                   </div>
@@ -309,6 +316,39 @@ export default function SettingsPage() {
                       className="w-28 text-xs py-1.5 px-2 bg-bg-input border border-border-primary rounded-md font-mono tabular-nums text-right"
                     />
                     <span className="text-xxs text-text-tertiary w-8">USD</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-bg-secondary border border-border-primary rounded-md">
+              <div className="px-4 py-3 border-b border-border-primary">
+                <h2 className="text-sm font-medium text-text-primary">User Referral Program</h2>
+                <p className="text-xxs text-text-tertiary mt-0.5">
+                  Personal referral commission paid on a referred user&apos;s first approved deposit.
+                  Separate from the IB MLM program.
+                </p>
+              </div>
+              <div className="p-4 space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-4">
+                  <div className="min-w-0 flex-1">
+                    <label className="text-xs text-text-secondary block">Commission on first deposit</label>
+                    <p className="text-xxs text-text-tertiary mt-0.5">
+                      Referrer gets this percentage of the referred user&apos;s first approved deposit,
+                      credited to their main wallet.
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <input
+                      type="number"
+                      step="0.1"
+                      min="0"
+                      max="100"
+                      value={settings.referral_commission_pct}
+                      onChange={(e) => updateNum('referral_commission_pct', e.target.value)}
+                      className="w-24 text-xs py-1.5 px-2 bg-bg-input border border-border-primary rounded-md font-mono tabular-nums text-right"
+                    />
+                    <span className="text-xxs text-text-tertiary w-8">%</span>
                   </div>
                 </div>
               </div>
