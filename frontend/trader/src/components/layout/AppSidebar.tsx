@@ -26,6 +26,7 @@ import {
   Gift,
   ChevronDown,
   Percent,
+  CandlestickChart,
 } from 'lucide-react';
 
 type LeafItem = { label: string; href: string; icon: any };
@@ -38,6 +39,7 @@ const NAV_ITEMS: NavEntry[] = [
   { label: 'Deposit/Withdraw', href: '/wallet', icon: Wallet },
   { label: 'Transactions', href: '/transactions', icon: History },
   { label: 'Portfolio', href: '/portfolio', icon: Receipt },
+  { label: 'Advanced Chart', href: '/advanced-chart', icon: CandlestickChart },
   {
     label: 'Earn',
     icon: Gift,
