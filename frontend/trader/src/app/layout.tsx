@@ -9,7 +9,6 @@ import GoogleAuthProvider from '@/components/providers/GoogleAuthProvider';
 import NotificationListener from '@/components/NotificationListener';
 import ProfileCompleteGate from '@/components/profile/ProfileCompleteGate';
 import TopLoader from '@/components/TopLoader';
-import GoogleTranslate from '@/components/GoogleTranslate';
 
 export const metadata: Metadata = {
   title: 'SwisDex',
@@ -39,8 +38,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 
       </head>
       <body className="min-h-full" suppressHydrationWarning>
-        {/* Google Translate — loaded client-side after hydration to avoid DOM mismatch */}
-        <GoogleTranslate />
         <Suspense fallback={null}>
           <TopLoader />
         </Suspense>

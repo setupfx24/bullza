@@ -7,7 +7,6 @@ import { usePathname } from 'next/navigation';
 import { motion, useScroll, useMotionValueEvent, AnimatePresence } from 'motion/react';
 import { ArrowUpRight, Menu, X, ChevronDown } from 'lucide-react';
 import { Button } from '../ui/Button';
-import { LanguageSwitcher } from './LanguageSwitcher';
 import { NAV_ITEMS, BRAND, SIGNUP_HREF, type NavItem } from '../data';
 
 const useIsomorphicLayoutEffect =
@@ -301,13 +300,6 @@ export function Navbar() {
               </button>
             </div>
           </nav>
-
-          {/* Language switcher — sits OUTSIDE the navbar pill on the right.
-              On small screens it tucks just inside the header padding so it
-              doesn't overlap the hamburger. */}
-          <div className="shrink-0">
-            <LanguageSwitcher />
-          </div>
         </div>
       </motion.header>
 
