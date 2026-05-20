@@ -41,6 +41,7 @@ const FALLBACK: RateConfig = {
 export default function FixedReturnConfigPage() {
   const [cfg, setCfg] = useState<RateConfig>(FALLBACK);
   const [feePct, setFeePct] = useState<number>(5);
+  const [lockMonths, setLockMonths] = useState<number>(24);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -51,12 +52,17 @@ export default function FixedReturnConfigPage() {
       const list = Array.isArray(all) ? all : [];
       const rates = list.find((s) => s.key === 'fixed_return_rates')?.value;
       const fee = list.find((s) => s.key === 'fixed_return_early_withdrawal_fee_pct')?.value;
+      const lock = list.find((s) => s.key === 'fixed_return_lock_months')?.value;
       if (rates && Array.isArray(rates.tiers)) {
         setCfg(normalize(rates));
       }
       if (fee != null) {
         const n = Number(fee);
         if (Number.isFinite(n)) setFeePct(n);
+      }
+      if (lock != null) {
+        const n = Number(lock);
+        if (Number.isFinite(n) && n > 0) setLockMonths(Math.floor(n));
       }
     } catch (e: any) {
       toast.error(e?.message || 'Failed to load Fixed Return config');
@@ -163,12 +169,17 @@ export default function FixedReturnConfigPage() {
       toast.error('Every tenure needs a label and positive days');
       return;
     }
+    if (lockMonths <= 0 || lockMonths > 120) {
+      toast.error('Lock period must be between 1 and 120 months');
+      return;
+    }
     setSaving(true);
     try {
       await adminApi.put('/settings', {
         settings: {
           fixed_return_rates: cfg,
           fixed_return_early_withdrawal_fee_pct: feePct,
+          fixed_return_lock_months: lockMonths,
         },
       });
       toast.success('Fixed Return config saved');
@@ -192,9 +203,10 @@ export default function FixedReturnConfigPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-lg font-semibold text-text-primary">Fixed Return — Rate Matrix</h1>
-          <p className="text-xxs text-text-tertiary mt-0.5">
-            Rates are the fixed return paid at maturity for the full tenure (not annualised).
-            A user&apos;s lock amount picks the highest tier whose <strong>Min Amount</strong> is ≤ the principal.
+          <p className="text-xxs text-text-tertiary mt-0.5 max-w-3xl">
+            Every lock runs for the full <strong>Lock period</strong> below. <strong>Tenure</strong> is the
+            payout cadence — the user receives <em>principal × rate%</em> every cycle (Month / Quarter / etc.)
+            and the principal back at maturity. The cell value is the % paid per cycle.
           </p>
         </div>
         <button
@@ -206,23 +218,49 @@ export default function FixedReturnConfigPage() {
         </button>
       </div>
 
-      <div className="bg-bg-secondary border border-border-primary rounded-md p-4">
-        <div className="flex items-center gap-3">
+      <div className="bg-bg-secondary border border-border-primary rounded-md p-4 flex flex-wrap gap-6">
+        <div className="flex flex-col gap-1">
+          <label className="text-xs font-medium text-text-secondary">
+            Lock period (months)
+          </label>
+          <div className="flex items-center gap-2">
+            <input
+              type="number"
+              min={1}
+              max={120}
+              step={1}
+              value={lockMonths}
+              onChange={(e) => setLockMonths(parseInt(e.target.value) || 1)}
+              className="w-24 px-2 py-1 text-xs bg-bg-input border border-border-primary rounded font-mono tabular-nums text-text-primary"
+            />
+            <span className="text-xxs text-text-tertiary">months</span>
+          </div>
+          <p className="text-[10px] text-text-tertiary max-w-xs">
+            All new locks run for this many calendar months. Principal is returned at maturity;
+            interest is paid in cycles defined by the tenure rows below.
+          </p>
+        </div>
+
+        <div className="flex flex-col gap-1">
           <label className="text-xs font-medium text-text-secondary">
             Early-withdrawal fee (% of principal)
           </label>
-          <input
-            type="number"
-            min={0}
-            max={100}
-            step="0.01"
-            value={feePct}
-            onChange={(e) => setFeePct(parseFloat(e.target.value) || 0)}
-            className="w-24 px-2 py-1 text-xs bg-bg-input border border-border-primary rounded font-mono tabular-nums text-text-primary"
-          />
-          <span className="text-xxs text-text-tertiary">
-            Applied when user withdraws before maturity. No return is paid on early exit.
-          </span>
+          <div className="flex items-center gap-2">
+            <input
+              type="number"
+              min={0}
+              max={100}
+              step="0.01"
+              value={feePct}
+              onChange={(e) => setFeePct(parseFloat(e.target.value) || 0)}
+              className="w-24 px-2 py-1 text-xs bg-bg-input border border-border-primary rounded font-mono tabular-nums text-text-primary"
+            />
+            <span className="text-xxs text-text-tertiary">%</span>
+          </div>
+          <p className="text-[10px] text-text-tertiary max-w-xs">
+            On early withdrawal: <strong>principal × (1 − fee%) − interest paid so far</strong>.
+            Interest payments to date claw back from the returned principal.
+          </p>
         </div>
       </div>
 

@@ -429,6 +429,82 @@ function IBTab() {
 
       </div>
 
+      {dashboard?.tier && (
+
+        <div className="rounded-xl border border-accent/25 bg-accent/[0.04] p-4">
+
+          <div className="flex flex-wrap items-center justify-between gap-3">
+
+            <div>
+
+              <p className="text-xxs text-text-tertiary uppercase">Current tier</p>
+
+              <p className="text-lg font-bold text-accent mt-0.5">
+
+                {dashboard.tier.label}
+
+                <span className="text-text-tertiary text-sm font-normal ml-2">
+
+                  ${dashboard.tier.per_lot}/lot
+
+                  {dashboard.tier.per_referral_bounty != null && dashboard.tier.per_referral_bounty > 0 ? (
+
+                    <> · ${dashboard.tier.per_referral_bounty}/referral</>
+
+                  ) : null}
+
+                </span>
+
+              </p>
+
+              <p className="text-xxs text-text-tertiary mt-1">
+
+                Perks: {dashboard.tier.instant_payout ? '✓ Instant payouts' : '— Manual payouts'}
+
+                {dashboard.tier.dedicated_manager ? ' · ✓ Dedicated manager' : ''}
+
+              </p>
+
+            </div>
+
+            {dashboard?.next_tier && dashboard?.needed_for_next_tier ? (
+
+              <div className="text-right">
+
+                <p className="text-xxs text-text-tertiary uppercase">Next tier</p>
+
+                <p className="text-sm font-bold text-text-primary mt-0.5">
+
+                  {dashboard.next_tier.label} (${dashboard.next_tier.per_lot}/lot{dashboard.next_tier.per_referral_bounty != null && dashboard.next_tier.per_referral_bounty > 0 ? ` · $${dashboard.next_tier.per_referral_bounty}/ref` : ''})
+
+                </p>
+
+                <p className="text-xxs text-text-tertiary mt-1">
+
+                  {dashboard.needed_for_next_tier} more referrals to unlock
+
+                </p>
+
+              </div>
+
+            ) : (
+
+              <div className="text-right">
+
+                <p className="text-xxs text-text-tertiary uppercase">Status</p>
+
+                <p className="text-sm font-bold text-success mt-0.5">Top tier reached</p>
+
+              </div>
+
+            )}
+
+          </div>
+
+        </div>
+
+      )}
+
       <div className="rounded-xl border border-accent/25 bg-accent/[0.04] p-3 text-xs text-text-secondary leading-relaxed">
 
         IB earnings auto-credit to your main wallet as commissions are settled. You can <span className="text-text-primary font-semibold">withdraw them</span> from the Wallet page or <span className="text-text-primary font-semibold">use them to trade</span> by transferring into any trading account — no separate IB wallet to manage.

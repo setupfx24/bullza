@@ -8,8 +8,17 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from packages.common.src.database import get_db
 from packages.common.src.auth import get_current_user
 from ..services import social_service
+from ..services.pamm_config_service import get_pamm_config
 
 router = APIRouter()
+
+
+@router.get("/pamm/config")
+async def pamm_config():
+    """Public — PAMM platform policy (limits, fees, windows). Trader UI
+    reads this to render the deposit-window banner and the fee disclosures.
+    Admin edits these values via /admin/settings."""
+    return await get_pamm_config()
 
 
 @router.get("/leaderboard")

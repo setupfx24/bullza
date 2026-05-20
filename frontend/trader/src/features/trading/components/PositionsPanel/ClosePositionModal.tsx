@@ -3,7 +3,7 @@
 import { createPortal } from 'react-dom';
 import { clsx } from 'clsx';
 import { X, Layers, TrendingUp, TrendingDown } from 'lucide-react';
-import type { InstrumentInfo } from '@/stores/tradingStore';
+import type { InstrumentInfo, Position } from '@/stores/tradingStore';
 import type { CloseModal, BulkCloseType } from './positionsPanel.utils';
 import { snapLotsForCloseFraction, formatLotsInput } from './positionsPanel.utils';
 
@@ -12,6 +12,8 @@ interface ClosePositionModalProps {
   setCloseModal: React.Dispatch<React.SetStateAction<CloseModal>>;
   closeSubmitting: boolean;
   instruments: InstrumentInfo[];
+  /** Live positions — used to read unrealised P&L for the booking preview. */
+  positions?: Position[];
   onClose: (id: string, lots?: number) => void;
   setBulkConfirm: React.Dispatch<React.SetStateAction<BulkCloseType | null>>;
   bulkBusy: boolean;
@@ -25,6 +27,7 @@ export function ClosePositionModal({
   setCloseModal,
   closeSubmitting,
   instruments,
+  positions,
   onClose,
   setBulkConfirm,
   bulkBusy,
@@ -33,6 +36,14 @@ export function ClosePositionModal({
   lossCount,
 }: ClosePositionModalProps) {
   if (!closeModal || typeof document === 'undefined') return null;
+
+  const livePos = positions?.find((p) => p.id === closeModal.id);
+  const livePnl = livePos?.profit ?? 0;
+  const typedLots = parseFloat(closeModal.closeLots);
+  const typedRatio = livePos && livePos.lots > 0 && Number.isFinite(typedLots) && typedLots > 0
+    ? Math.min(1, typedLots / livePos.lots)
+    : null;
+  const typedBooking = typedRatio != null ? livePnl * typedRatio : null;
 
   return createPortal(
     <div className="fixed inset-0 p-0" style={{ zIndex: 2147483646, isolation: 'isolate' }}>
@@ -85,41 +96,68 @@ export function ClosePositionModal({
                 <span className="text-text-tertiary">Open lots</span>
                 <span className="font-mono text-text-primary">{closeModal.lots}</span>
               </div>
+              {typedBooking != null && (
+                <div className="flex justify-between text-[11px] font-medium pt-1 mt-1 border-t border-border-primary/50">
+                  <span className="text-text-tertiary">Estimated booking</span>
+                  <span className={clsx('font-mono font-bold tabular-nums', typedBooking >= 0 ? 'text-buy' : 'text-sell')}>
+                    {typedBooking >= 0 ? '+' : ''}${Math.abs(typedBooking).toFixed(2)}
+                  </span>
+                </div>
+              )}
             </div>
 
             <div>
               <label className={clsx('text-[9px] font-bold uppercase tracking-wider block mb-1.5', 'text-text-tertiary')}>
                 Lots to close
               </label>
-              <div className="flex flex-wrap gap-1.5 mb-2">
-                {([25, 50, 75] as const).map((pct) => (
-                  <button
-                    key={pct}
-                    type="button"
-                    onClick={() => {
-                      setCloseModal((m) => {
-                        if (!m) return m;
-                        const v = snapLotsForCloseFraction(m.lots, m.symbol, instruments, pct / 100);
-                        return { ...m, closeLots: formatLotsInput(v) };
-                      });
-                    }}
-                    className={clsx(
-                      'cursor-pointer px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wide border transition-colors',
-                      'bg-bg-secondary border-border-primary text-text-primary hover:bg-bg-hover',
-                    )}
-                  >
-                    {pct}%
-                  </button>
-                ))}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 mb-2">
+                {([25, 50, 75] as const).map((pct) => {
+                  const v = livePos ? livePnl * (pct / 100) : null;
+                  return (
+                    <button
+                      key={pct}
+                      type="button"
+                      onClick={() => {
+                        setCloseModal((m) => {
+                          if (!m) return m;
+                          const v2 = snapLotsForCloseFraction(m.lots, m.symbol, instruments, pct / 100);
+                          return { ...m, closeLots: formatLotsInput(v2) };
+                        });
+                      }}
+                      className={clsx(
+                        'cursor-pointer flex flex-col items-center justify-center px-2 py-1.5 rounded-md text-[10px] font-bold uppercase tracking-wide border transition-colors',
+                        'bg-bg-secondary border-border-primary text-text-primary hover:bg-bg-hover',
+                      )}
+                    >
+                      <span>{pct}%</span>
+                      {v != null && (
+                        <span className={clsx(
+                          'text-[9px] font-mono normal-case tracking-normal mt-0.5',
+                          v >= 0 ? 'text-buy' : 'text-sell',
+                        )}>
+                          {v >= 0 ? '+' : ''}${Math.abs(v).toFixed(2)}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
                 <button
                   type="button"
                   onClick={() => setCloseModal((m) => m ? { ...m, closeLots: formatLotsInput(m.lots) } : m)}
                   className={clsx(
-                    'cursor-pointer px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wide border transition-colors',
+                    'cursor-pointer flex flex-col items-center justify-center px-2 py-1.5 rounded-md text-[10px] font-bold uppercase tracking-wide border transition-colors',
                     'bg-accent/10 border-accent/25 text-accent hover:bg-accent/15',
                   )}
                 >
-                  Full
+                  <span>Full</span>
+                  {livePos && (
+                    <span className={clsx(
+                      'text-[9px] font-mono normal-case tracking-normal mt-0.5',
+                      livePnl >= 0 ? 'text-buy' : 'text-sell',
+                    )}>
+                      {livePnl >= 0 ? '+' : ''}${Math.abs(livePnl).toFixed(2)}
+                    </span>
+                  )}
                 </button>
               </div>
               <input

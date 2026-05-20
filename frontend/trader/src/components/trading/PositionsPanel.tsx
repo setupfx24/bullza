@@ -1687,6 +1687,29 @@ export default function PositionsPanel({ variant = 'default' }: PositionsPanelPr
                     <span className="text-text-tertiary">Open lots</span>
                     <span className="font-mono text-text-primary">{closeModal.lots}</span>
                   </div>
+                  {/*
+                   * Live booking estimate: open position's unrealised P&L
+                   * scaled to the slice the trader is about to close. Uses
+                   * the same store the table reads, so the number matches
+                   * what they were just looking at in the open-positions
+                   * row to the cent.
+                   */}
+                  {(() => {
+                    const pos = positions.find((p) => p.id === closeModal.id);
+                    const cl = parseFloat(closeModal.closeLots);
+                    if (!pos || !pos.lots || !Number.isFinite(cl) || cl <= 0) return null;
+                    const ratio = Math.min(1, cl / pos.lots);
+                    const booking = (pos.profit ?? 0) * ratio;
+                    const sign = booking >= 0 ? '+' : '';
+                    return (
+                      <div className="flex justify-between text-[11px] font-medium pt-1 mt-1 border-t border-border-primary/50">
+                        <span className="text-text-tertiary">Estimated booking</span>
+                        <span className={clsx('font-mono font-bold tabular-nums', booking >= 0 ? 'text-buy' : 'text-sell')}>
+                          {sign}${Math.abs(booking).toFixed(2)}
+                        </span>
+                      </div>
+                    );
+                  })()}
                 </div>
 
                 <div>
@@ -1698,41 +1721,75 @@ export default function PositionsPanel({ variant = 'default' }: PositionsPanelPr
                   >
                     Lots to close
                   </label>
-                  <div className="flex flex-wrap gap-1.5 mb-2">
-                    {([25, 50, 75] as const).map((pct) => (
-                      <button
-                        key={pct}
-                        type="button"
-                        onClick={() => {
-                          setCloseModal((m) => {
-                            if (!m) return m;
-                            const v = snapLotsForCloseFraction(m.lots, m.symbol, instruments, pct / 100);
-                            return { ...m, closeLots: formatLotsInput(v) };
-                          });
-                        }}
-                        className={clsx(
-                          'cursor-pointer px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wide border transition-colors',
-                          'bg-bg-secondary border-border-primary text-text-primary hover:bg-bg-hover',
-                        )}
-                      >
-                        {pct}%
-                      </button>
-                    ))}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setCloseModal((m) =>
-                          m ? { ...m, closeLots: formatLotsInput(m.lots) } : m,
-                        );
-                      }}
-                      className={clsx(
-                        'cursor-pointer px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wide border transition-colors',
-                        'bg-accent/10 border-accent/25 text-accent hover:bg-accent/15',
-                      )}
-                    >
-                      Full
-                    </button>
-                  </div>
+                  {(() => {
+                    // Per-button booking preview: trader sees the realised
+                    // P&L they'd book at each preset before clicking. The
+                    // sign is colour-coded so a glance tells them whether
+                    // 25%/50%/75%/Full is profit or loss.
+                    const pos = positions.find((p) => p.id === closeModal.id);
+                    const livePnl = pos?.profit ?? 0;
+                    const previewFor = (frac: number) => {
+                      const sign = livePnl >= 0 ? '+' : '';
+                      const v = livePnl * frac;
+                      return { label: `${sign}$${Math.abs(v).toFixed(2)}`, positive: v >= 0 };
+                    };
+                    return (
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 mb-2">
+                        {([25, 50, 75] as const).map((pct) => {
+                          const pv = pos ? previewFor(pct / 100) : null;
+                          return (
+                            <button
+                              key={pct}
+                              type="button"
+                              onClick={() => {
+                                setCloseModal((m) => {
+                                  if (!m) return m;
+                                  const v = snapLotsForCloseFraction(m.lots, m.symbol, instruments, pct / 100);
+                                  return { ...m, closeLots: formatLotsInput(v) };
+                                });
+                              }}
+                              className={clsx(
+                                'cursor-pointer flex flex-col items-center justify-center px-2 py-1.5 rounded-md text-[10px] font-bold uppercase tracking-wide border transition-colors',
+                                'bg-bg-secondary border-border-primary text-text-primary hover:bg-bg-hover',
+                              )}
+                            >
+                              <span>{pct}%</span>
+                              {pv && (
+                                <span className={clsx(
+                                  'text-[9px] font-mono normal-case tracking-normal mt-0.5',
+                                  pv.positive ? 'text-buy' : 'text-sell',
+                                )}>
+                                  {pv.label}
+                                </span>
+                              )}
+                            </button>
+                          );
+                        })}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setCloseModal((m) =>
+                              m ? { ...m, closeLots: formatLotsInput(m.lots) } : m,
+                            );
+                          }}
+                          className={clsx(
+                            'cursor-pointer flex flex-col items-center justify-center px-2 py-1.5 rounded-md text-[10px] font-bold uppercase tracking-wide border transition-colors',
+                            'bg-accent/10 border-accent/25 text-accent hover:bg-accent/15',
+                          )}
+                        >
+                          <span>Full</span>
+                          {pos && (
+                            <span className={clsx(
+                              'text-[9px] font-mono normal-case tracking-normal mt-0.5',
+                              livePnl >= 0 ? 'text-buy' : 'text-sell',
+                            )}>
+                              {livePnl >= 0 ? '+' : ''}${Math.abs(livePnl).toFixed(2)}
+                            </span>
+                          )}
+                        </button>
+                      </div>
+                    );
+                  })()}
                   <input
                     type="number"
                     step="0.01"

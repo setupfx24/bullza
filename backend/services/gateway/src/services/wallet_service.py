@@ -469,6 +469,20 @@ async def handle_oxapay_webhook(
             bonus_msg = f" + ${float(bonus_amount):.2f} bonus ({offer.name})"
             applied_bonuses.append((offer.name, bonus_amount))
 
+        # Personal-referral commission (separate from IB MLM). Pays on the
+        # FIRST approved/auto-approved deposit only; later deposits are
+        # no-ops. Wrapped so a referral-side error never blocks the
+        # deposit credit itself.
+        try:
+            from .referral_service import (
+                maybe_pay_referral_on_first_deposit,
+                maybe_pay_ib_referral_bounty,
+            )
+            await maybe_pay_referral_on_first_deposit(db, deposit.user_id, deposit)
+            await maybe_pay_ib_referral_bounty(db, deposit.user_id, deposit)
+        except Exception as _re:
+            logger.warning("auto-deposit referral commission failed: %s", _re)
+
         await create_notification(
             db, deposit.user_id,
             title="Deposit approved",
@@ -783,6 +797,20 @@ async def handle_nowpayments_webhook(
             ))
             bonus_msg = f" + ${float(bonus_amount):.2f} bonus ({offer.name})"
             applied_bonuses.append((offer.name, bonus_amount))
+
+        # Personal-referral commission (separate from IB MLM). Pays on the
+        # FIRST approved/auto-approved deposit only; later deposits are
+        # no-ops. Wrapped so a referral-side error never blocks the
+        # deposit credit itself.
+        try:
+            from .referral_service import (
+                maybe_pay_referral_on_first_deposit,
+                maybe_pay_ib_referral_bounty,
+            )
+            await maybe_pay_referral_on_first_deposit(db, deposit.user_id, deposit)
+            await maybe_pay_ib_referral_bounty(db, deposit.user_id, deposit)
+        except Exception as _re:
+            logger.warning("auto-deposit referral commission failed: %s", _re)
 
         await create_notification(
             db, deposit.user_id,

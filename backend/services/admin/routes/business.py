@@ -14,6 +14,23 @@ from services import business_service
 router = APIRouter(prefix="/business", tags=["Business"])
 
 
+@router.get("/referral/overview")
+async def referral_overview(
+    page: int = Query(1, ge=1),
+    per_page: int = Query(20, ge=1, le=100),
+    admin: User = Depends(require_permission("ib.view")),
+    db: AsyncSession = Depends(get_db),
+):
+    """Admin oversight for the personal-referral program (not IB MLM).
+
+    Returns: current commission %, total paid, count of referred users,
+    top referrers by earnings, and a paginated list of recent payouts.
+    """
+    return await business_service.referral_program_overview(
+        page=page, per_page=per_page, db=db,
+    )
+
+
 @router.get("/ib/applications")
 async def list_ib_applications(
     page: int = Query(1, ge=1),

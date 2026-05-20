@@ -205,6 +205,136 @@ async def approve_deposit(
         bonus_msg = f" + ${float(bonus_amount):.2f} bonus ({offer.name})"
         applied_bonuses.append((offer.name, bonus_amount))
 
+    # Personal-referral commission — runs BEFORE commit so the referrer
+    # credit ships in the same transaction as the deposit approval and
+    # bonus. Idempotent: only pays on the first approved deposit.
+    try:
+        # Import is local so the admin service doesn't hard-fail on
+        # startup if the gateway module isn't on the path (shared
+        # packages.common is what we use to talk to the same DB schema,
+        # and the helper there only touches packages.common.src.models).
+        from services.gateway_compat import maybe_pay_referral_on_first_deposit  # type: ignore
+        await maybe_pay_referral_on_first_deposit(db, deposit.user_id, deposit)
+    except ImportError:
+        # Inline implementation if the shim isn't there. Keeps the admin
+        # service self-contained without forcing a cross-service import.
+        from sqlalchemy import select as _sel, func as _func
+        from packages.common.src.models import User as _U, Deposit as _D
+        from packages.common.src.settings_store import get_float_setting as _gfs
+
+        ru = (await db.execute(
+            _sel(_U).where(_U.id == deposit.user_id)
+        )).scalar_one_or_none()
+        if ru is not None and ru.referred_by_user_id is not None:
+            count = (await db.execute(
+                _sel(_func.count()).select_from(_D).where(
+                    _D.user_id == deposit.user_id,
+                    _D.status.in_(["approved", "auto_approved"]),
+                )
+            )).scalar() or 0
+            if count == 1:
+                pct = await _gfs("referral_commission_pct", 5.0)
+                if pct > 0:
+                    amt = (
+                        Decimal(str(deposit.amount or 0))
+                        * Decimal(str(pct)) / Decimal("100")
+                    ).quantize(Decimal("0.01"))
+                    if amt > 0:
+                        ref = (await db.execute(
+                            _sel(_U).where(_U.id == ru.referred_by_user_id)
+                        )).scalar_one_or_none()
+                        if ref is not None:
+                            ref.main_wallet_balance = (
+                                Decimal(str(ref.main_wallet_balance or 0)) + amt
+                            )
+                            db.add(Transaction(
+                                user_id=ref.id,
+                                type="referral_commission",
+                                amount=amt,
+                                balance_after=ref.main_wallet_balance,
+                                reference_id=deposit.id,
+                                description=f"Referral commission — {pct}% of {ru.email or deposit.user_id}'s first deposit",
+                                created_by=admin_id,
+                            ))
+
+        # IB per-referral bounty (separate flat payout to the IB upline
+        # of the referred user; first-deposit gated, tier-scaled).
+        try:
+            from sqlalchemy import select as _sel2
+            from packages.common.src.models import (
+                User as _Uu, Referral as _R, IBProfile as _IB, SystemSetting as _SS,
+            )
+            import json as _json
+
+            count2 = (await db.execute(
+                _sel(_func.count()).select_from(_D).where(
+                    _D.user_id == deposit.user_id,
+                    _D.status.in_(["approved", "auto_approved"]),
+                )
+            )).scalar() or 0
+            if count2 == 1:
+                r2 = (await db.execute(
+                    _sel2(_R).where(_R.referred_id == deposit.user_id).limit(1)
+                )).scalar_one_or_none()
+                if r2 is not None and r2.ib_profile_id is not None:
+                    ib2 = (await db.execute(
+                        _sel2(_IB).where(_IB.id == r2.ib_profile_id)
+                    )).scalar_one_or_none()
+                    if ib2 is not None and ib2.is_active:
+                        tiers_row = (await db.execute(
+                            _sel2(_SS).where(_SS.key == "ib_commission_tiers")
+                        )).scalar_one_or_none()
+                        tiers = []
+                        if tiers_row and tiers_row.value:
+                            raw = tiers_row.value
+                            if isinstance(raw, str):
+                                try:
+                                    raw = _json.loads(raw)
+                                except Exception:
+                                    raw = []
+                            if isinstance(raw, list):
+                                tiers = raw
+                        active_n2 = (await db.execute(
+                            _sel(_func.count()).select_from(_R).where(_R.ib_profile_id == ib2.id)
+                        )).scalar() or 0
+                        chosen = None
+                        for t in tiers:
+                            lo = int(t.get("min_referrals") or 0)
+                            hi = t.get("max_referrals")
+                            hi_v = int(hi) if hi is not None else None
+                            if active_n2 >= lo and (hi_v is None or active_n2 <= hi_v):
+                                chosen = t
+                                break
+                        if chosen is not None:
+                            bounty_raw = chosen.get("per_referral_bounty")
+                            try:
+                                bounty = Decimal(str(bounty_raw or 0)).quantize(Decimal("0.01"))
+                            except Exception:
+                                bounty = Decimal("0")
+                            if bounty > 0:
+                                ib_user = (await db.execute(
+                                    _sel2(_Uu).where(_Uu.id == ib2.user_id)
+                                )).scalar_one_or_none()
+                                if ib_user is not None:
+                                    ib_user.main_wallet_balance = (
+                                        Decimal(str(ib_user.main_wallet_balance or 0)) + bounty
+                                    )
+                                    db.add(Transaction(
+                                        user_id=ib_user.id,
+                                        type="ib_referral_bounty",
+                                        amount=bounty,
+                                        balance_after=ib_user.main_wallet_balance,
+                                        reference_id=deposit.id,
+                                        description=(
+                                            f"IB referral bounty — {chosen.get('label')} tier "
+                                            f"(${float(bounty):.2f}) for first deposit by {deposit.user_id}"
+                                        ),
+                                        created_by=admin_id,
+                                    ))
+        except Exception:
+            # Bounty is best-effort; never block the deposit approval.
+            pass
+
     await write_audit_log(
         db, admin_id, "approve_deposit", "deposit", deposit_id,
         new_values={"amount": str(deposit.amount), "status": "approved"},

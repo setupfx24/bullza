@@ -46,6 +46,8 @@ const NAV_ITEMS: NavItem[] = [
       { label: 'Spreads', href: '/config/spreads' },
       { label: 'Swaps', href: '/config/swaps' },
       { label: 'Fixed Return', href: '/config/fixed-return' },
+      { label: 'PAMM', href: '/config/pamm' },
+      { label: 'IB Tiers', href: '/config/ib-tiers' },
     ],
   },
   { label: 'Social', href: '/social', icon: Share2, perm: 'social.view' },
@@ -54,6 +56,7 @@ const NAV_ITEMS: NavItem[] = [
     children: [
       { label: 'Overview', href: '/business' },
       { label: 'IB Program', href: '/business/ib' },
+      { label: 'User Referrals', href: '/business/referral' },
       { label: 'Sub-Broker', href: '/business/sub-broker' },
       { label: 'Copy Masters', href: '/business/masters' },
       { label: 'MLM Config', href: '/business/mlm' },

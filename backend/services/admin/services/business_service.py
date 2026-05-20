@@ -23,6 +23,96 @@ from packages.common.src.admin_schemas import (
 from dependencies import write_audit_log
 
 
+async def referral_program_overview(
+    page: int, per_page: int, db: AsyncSession,
+) -> dict:
+    """Admin-side stats + recent payouts for the user-level referral
+    program (NOT the IB MLM tree — that's covered by ib_tree).
+
+    Money was credited via wallet_service / deposit_service writing a
+    Transaction row with type='referral_commission' on every first-deposit
+    payout. We pull aggregates from those rows here so no new ledger is
+    needed.
+    """
+    cur_pct_row = (await db.execute(
+        select(SystemSetting).where(SystemSetting.key == "referral_commission_pct")
+    )).scalar_one_or_none()
+    cur_pct = float(cur_pct_row.value) if cur_pct_row and cur_pct_row.value is not None else 5.0
+
+    total_paid = (await db.execute(
+        select(func.coalesce(func.sum(Transaction.amount), 0))
+        .where(Transaction.type == "referral_commission")
+    )).scalar() or 0
+
+    total_payouts = (await db.execute(
+        select(func.count()).select_from(Transaction)
+        .where(Transaction.type == "referral_commission")
+    )).scalar() or 0
+
+    total_referred_users = (await db.execute(
+        select(func.count()).select_from(User)
+        .where(User.referred_by_user_id.is_not(None))
+    )).scalar() or 0
+
+    # Top 5 referrers by total commission earned.
+    top_rows = (await db.execute(
+        select(
+            Transaction.user_id.label("user_id"),
+            func.sum(Transaction.amount).label("earned"),
+            func.count().label("payouts"),
+        )
+        .where(Transaction.type == "referral_commission")
+        .group_by(Transaction.user_id)
+        .order_by(func.sum(Transaction.amount).desc())
+        .limit(5)
+    )).all()
+    top_referrers: list[dict] = []
+    for r in top_rows:
+        u = (await db.execute(select(User).where(User.id == r.user_id))).scalar_one_or_none()
+        top_referrers.append({
+            "user_id": str(r.user_id),
+            "name": (u.first_name or "") + (f" {u.last_name}" if u and u.last_name else "") if u else "",
+            "email": u.email if u else "",
+            "earned": float(r.earned or 0),
+            "payouts": int(r.payouts or 0),
+        })
+
+    # Paginated recent payouts.
+    offset = (page - 1) * per_page
+    payout_rows = (await db.execute(
+        select(Transaction)
+        .where(Transaction.type == "referral_commission")
+        .order_by(Transaction.created_at.desc())
+        .offset(offset).limit(per_page)
+    )).scalars().all()
+    items: list[dict] = []
+    for tx in payout_rows:
+        receiver = (await db.execute(select(User).where(User.id == tx.user_id))).scalar_one_or_none()
+        items.append({
+            "id": str(tx.id),
+            "referrer_user_id": str(tx.user_id),
+            "referrer_email": receiver.email if receiver else "",
+            "amount": float(tx.amount or 0),
+            "description": tx.description or "",
+            "deposit_id": str(tx.reference_id) if tx.reference_id else None,
+            "created_at": tx.created_at.isoformat() if tx.created_at else None,
+        })
+
+    return {
+        "commission_pct": cur_pct,
+        "total_paid": float(total_paid),
+        "total_payouts": int(total_payouts),
+        "total_referred_users": int(total_referred_users),
+        "top_referrers": top_referrers,
+        "recent_payouts": {
+            "items": items,
+            "page": page,
+            "per_page": per_page,
+            "total": int(total_payouts),
+        },
+    }
+
+
 async def list_ib_applications(
     page: int, per_page: int, status_filter: str | None, db: AsyncSession,
 ):

@@ -10,7 +10,7 @@ import { useAuthStore } from '@/stores/authStore';
 import api from '@/lib/api/client';
 import {
   TrendingUp, Users, DollarSign, AlertCircle, BarChart2,
-  Wallet, Clock, CheckCircle, Info,
+  Wallet, Clock, CheckCircle, Info, Calendar,
 } from 'lucide-react';
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
@@ -219,6 +219,32 @@ export default function PammPage() {
   const [myProvider, setMyProvider] = useState<MyProvider | null>(null);
   const [providerChecked, setProviderChecked] = useState(false);
   const [applying, setApplying] = useState(false);
+
+  // PAMM platform policy (admin-tunable) — drives the deposit-window banner
+  // and the manager-commission cap hint on the Become Manager form.
+  const [pammPolicy, setPammPolicy] = useState<{
+    manager_min_deposit_usd: number;
+    application_fee_usd: number;
+    max_manager_commission_pct: number;
+    exclude_bonus_funds: boolean;
+    dep_window_start_day: number;
+    dep_window_end_day: number;
+    trade_window_start_day: number;
+    trade_window_end_day: number;
+    annual_maintenance_pct: number;
+    monthly_profit_fee_pct: number;
+  } | null>(null);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const p = await api.get<any>('/social/pamm/config');
+        setPammPolicy(p);
+      } catch {
+        /* fall back silently — the banner is informational only */
+      }
+    })();
+  }, []);
 
   // Refill modal
   const [refillTarget, setRefillTarget] = useState<MyAllocation | null>(null);
@@ -472,6 +498,34 @@ export default function PammPage() {
           <h1 className="text-xl font-bold text-text-primary">PAMM</h1>
           <p className="text-sm text-text-secondary mt-0.5">Pooled managed-account investing</p>
         </div>
+
+        {/* PAMM policy banner — deposit window + monthly fee disclosure. */}
+        {pammPolicy && (
+          <div className="rounded-xl border border-accent/25 bg-accent/[0.04] p-3 text-[11px] text-text-secondary leading-relaxed flex flex-wrap items-center gap-x-4 gap-y-1">
+            <span className="inline-flex items-center gap-1">
+              <Calendar size={12} className="text-accent" />
+              <span>
+                Deposits & withdrawals:{' '}
+                <strong className="text-text-primary">day {pammPolicy.dep_window_start_day}–{pammPolicy.dep_window_end_day}</strong> of each month
+              </span>
+            </span>
+            <span className="inline-flex items-center gap-1">
+              <Clock size={12} className="text-accent" />
+              <span>
+                Trading:{' '}
+                <strong className="text-text-primary">day {pammPolicy.trade_window_start_day}–{pammPolicy.trade_window_end_day}</strong>
+              </span>
+            </span>
+            <span className="inline-flex items-center gap-1">
+              <Info size={12} className="text-accent" />
+              <span>
+                Company fees:{' '}
+                <strong className="text-text-primary">{pammPolicy.monthly_profit_fee_pct}%</strong> monthly profit ·{' '}
+                <strong className="text-text-primary">{pammPolicy.annual_maintenance_pct}%</strong> annual maintenance
+              </span>
+            </span>
+          </div>
+        )}
 
         {/* Tab bar */}
         <div className="flex gap-1 p-1 rounded-xl bg-bg-secondary border border-border-primary">
@@ -749,6 +803,19 @@ export default function PammPage() {
                   <h2 className="text-base font-bold text-text-primary">Apply as PAMM Manager</h2>
                   <p className="text-xs text-text-tertiary mt-1">Submit your application for admin review</p>
                 </div>
+
+                {pammPolicy && (
+                  <div className="rounded-lg border border-amber-400/30 bg-amber-400/[0.06] px-3 py-2.5 text-[11px] text-text-secondary space-y-1">
+                    <div>
+                      <strong className="text-text-primary">${pammPolicy.manager_min_deposit_usd.toLocaleString()}</strong> minimum wallet balance required,
+                      plus a <strong className="text-text-primary">${pammPolicy.application_fee_usd}</strong> non-refundable application fee
+                      charged on submit.
+                    </div>
+                    <div>
+                      Performance fee is capped at <strong className="text-text-primary">{pammPolicy.max_manager_commission_pct}%</strong> by platform policy.
+                    </div>
+                  </div>
+                )}
 
                 <div className="space-y-4">
                   <div className="rounded-lg border border-border-primary bg-bg-secondary/50 px-3 py-2.5 text-xs text-text-secondary">
