@@ -11,14 +11,17 @@ interface Tier {
   // null = no upper bound (the top tier).
   max_referrals: number | null;
   per_lot: number;
+  // Flat one-time payout per referred user's first approved deposit.
+  // Separate from the per-lot stream that pays as referrals trade.
+  per_referral_bounty: number;
   instant_payout: boolean;
   dedicated_manager: boolean;
 }
 
 const FALLBACK: Tier[] = [
-  { label: 'Starter', min_referrals: 5,   max_referrals: 20,   per_lot: 6,  instant_payout: true, dedicated_manager: false },
-  { label: 'Pro',     min_referrals: 21,  max_referrals: 100,  per_lot: 8,  instant_payout: true, dedicated_manager: true  },
-  { label: 'Elite',   min_referrals: 101, max_referrals: null, per_lot: 13, instant_payout: true, dedicated_manager: true  },
+  { label: 'Starter', min_referrals: 5,   max_referrals: 20,   per_lot: 6,  per_referral_bounty: 5,  instant_payout: true, dedicated_manager: false },
+  { label: 'Pro',     min_referrals: 21,  max_referrals: 100,  per_lot: 8,  per_referral_bounty: 7,  instant_payout: true, dedicated_manager: true  },
+  { label: 'Elite',   min_referrals: 101, max_referrals: null, per_lot: 13, per_referral_bounty: 10, instant_payout: true, dedicated_manager: true  },
 ];
 
 export default function IBTiersAdminPage() {
@@ -49,6 +52,7 @@ export default function IBTiersAdminPage() {
     min_referrals: Number(r.min_referrals) || 0,
     max_referrals: r.max_referrals == null ? null : Number(r.max_referrals) || 0,
     per_lot: Number(r.per_lot) || 0,
+    per_referral_bounty: Number(r.per_referral_bounty) || 0,
     instant_payout: r.instant_payout !== false,
     dedicated_manager: !!r.dedicated_manager,
   });
@@ -66,7 +70,7 @@ export default function IBTiersAdminPage() {
     const lo = last ? (last.max_referrals ?? last.min_referrals) + 1 : 1;
     setTiers([
       ...tiers,
-      { label: 'New tier', min_referrals: lo, max_referrals: lo + 9, per_lot: 0, instant_payout: true, dedicated_manager: false },
+      { label: 'New tier', min_referrals: lo, max_referrals: lo + 9, per_lot: 0, per_referral_bounty: 0, instant_payout: true, dedicated_manager: false },
     ]);
   };
 
@@ -76,8 +80,8 @@ export default function IBTiersAdminPage() {
   };
 
   const save = async () => {
-    if (tiers.some((t) => !t.label.trim() || t.per_lot < 0 || t.min_referrals < 0)) {
-      toast.error('Every tier needs a label, non-negative threshold and per-lot.');
+    if (tiers.some((t) => !t.label.trim() || t.per_lot < 0 || t.per_referral_bounty < 0 || t.min_referrals < 0)) {
+      toast.error('Every tier needs a label, non-negative threshold, per-lot and bounty.');
       return;
     }
     // Ensure tiers are sorted by min_referrals ascending and non-overlapping —
@@ -141,6 +145,7 @@ export default function IBTiersAdminPage() {
               <th className="text-left px-3 py-2 text-xxs font-medium text-text-tertiary uppercase tracking-wide">Min referrals</th>
               <th className="text-left px-3 py-2 text-xxs font-medium text-text-tertiary uppercase tracking-wide">Max referrals</th>
               <th className="text-left px-3 py-2 text-xxs font-medium text-text-tertiary uppercase tracking-wide">Per-lot ($)</th>
+              <th className="text-left px-3 py-2 text-xxs font-medium text-text-tertiary uppercase tracking-wide">Per-referral bounty ($)</th>
               <th className="text-center px-3 py-2 text-xxs font-medium text-text-tertiary uppercase tracking-wide">Instant payout</th>
               <th className="text-center px-3 py-2 text-xxs font-medium text-text-tertiary uppercase tracking-wide">Dedicated manager</th>
               <th className="px-2 py-2"></th>
@@ -181,6 +186,14 @@ export default function IBTiersAdminPage() {
                     className="w-24 px-2 py-1 text-xs bg-bg-input border border-border-primary rounded font-mono tabular-nums text-text-primary"
                   />
                 </td>
+                <td className="px-3 py-2">
+                  <input
+                    type="number" min={0} step={0.5}
+                    value={t.per_referral_bounty}
+                    onChange={(e) => updateTier(i, 'per_referral_bounty', parseFloat(e.target.value) || 0)}
+                    className="w-24 px-2 py-1 text-xs bg-bg-input border border-border-primary rounded font-mono tabular-nums text-text-primary"
+                  />
+                </td>
                 <td className="px-3 py-2 text-center">
                   <input
                     type="checkbox"
@@ -210,7 +223,7 @@ export default function IBTiersAdminPage() {
               </tr>
             ))}
             <tr>
-              <td colSpan={7} className="px-3 py-2">
+              <td colSpan={8} className="px-3 py-2">
                 <button
                   onClick={addTier}
                   className="inline-flex items-center gap-1 px-2 py-1 text-xxs text-text-secondary border border-border-primary rounded hover:bg-bg-hover"
@@ -223,11 +236,18 @@ export default function IBTiersAdminPage() {
         </table>
       </div>
 
-      <p className="text-[11px] text-text-tertiary max-w-2xl">
-        <strong>Resolver priority for per-lot:</strong> 1) a per-agent custom override on the
-        IB profile, 2) this tier ladder, 3) the IB commission plan&apos;s default. The first
-        non-null value wins.
-      </p>
+      <div className="text-[11px] text-text-tertiary max-w-2xl space-y-1">
+        <p>
+          <strong>Per-lot</strong> resolver priority: 1) a per-agent custom override on the
+          IB profile, 2) this tier ladder, 3) the IB commission plan&apos;s default.
+          First non-null wins.
+        </p>
+        <p>
+          <strong>Per-referral bounty</strong> is paid once, when a referred user makes their
+          first approved deposit. The IB&apos;s current tier (by active-referral count) determines
+          the amount.
+        </p>
+      </div>
     </div>
   );
 }

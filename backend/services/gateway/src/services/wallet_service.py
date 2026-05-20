@@ -474,8 +474,12 @@ async def handle_oxapay_webhook(
         # no-ops. Wrapped so a referral-side error never blocks the
         # deposit credit itself.
         try:
-            from .referral_service import maybe_pay_referral_on_first_deposit
+            from .referral_service import (
+                maybe_pay_referral_on_first_deposit,
+                maybe_pay_ib_referral_bounty,
+            )
             await maybe_pay_referral_on_first_deposit(db, deposit.user_id, deposit)
+            await maybe_pay_ib_referral_bounty(db, deposit.user_id, deposit)
         except Exception as _re:
             logger.warning("auto-deposit referral commission failed: %s", _re)
 
@@ -799,8 +803,12 @@ async def handle_nowpayments_webhook(
         # no-ops. Wrapped so a referral-side error never blocks the
         # deposit credit itself.
         try:
-            from .referral_service import maybe_pay_referral_on_first_deposit
+            from .referral_service import (
+                maybe_pay_referral_on_first_deposit,
+                maybe_pay_ib_referral_bounty,
+            )
             await maybe_pay_referral_on_first_deposit(db, deposit.user_id, deposit)
+            await maybe_pay_ib_referral_bounty(db, deposit.user_id, deposit)
         except Exception as _re:
             logger.warning("auto-deposit referral commission failed: %s", _re)
 

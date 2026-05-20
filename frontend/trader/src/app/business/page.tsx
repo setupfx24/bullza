@@ -447,6 +447,12 @@ function IBTab() {
 
                   ${dashboard.tier.per_lot}/lot
 
+                  {dashboard.tier.per_referral_bounty != null && dashboard.tier.per_referral_bounty > 0 ? (
+
+                    <> · ${dashboard.tier.per_referral_bounty}/referral</>
+
+                  ) : null}
+
                 </span>
 
               </p>
@@ -467,7 +473,11 @@ function IBTab() {
 
                 <p className="text-xxs text-text-tertiary uppercase">Next tier</p>
 
-                <p className="text-sm font-bold text-text-primary mt-0.5">{dashboard.next_tier.label} (${dashboard.next_tier.per_lot}/lot)</p>
+                <p className="text-sm font-bold text-text-primary mt-0.5">
+
+                  {dashboard.next_tier.label} (${dashboard.next_tier.per_lot}/lot{dashboard.next_tier.per_referral_bounty != null && dashboard.next_tier.per_referral_bounty > 0 ? ` · $${dashboard.next_tier.per_referral_bounty}/ref` : ''})
+
+                </p>
 
                 <p className="text-xxs text-text-tertiary mt-1">
 

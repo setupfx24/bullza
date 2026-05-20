@@ -21,7 +21,7 @@ from uuid import UUID
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from packages.common.src.models import User, Deposit, Transaction
+from packages.common.src.models import User, Deposit, Transaction, IBProfile, Referral
 from packages.common.src.settings_store import get_float_setting
 
 logger = logging.getLogger("referral_service")
@@ -188,4 +188,92 @@ async def get_my_referral_dashboard(db: AsyncSession, user_id: UUID) -> dict:
         "referrals": int(referrals),
         "total_earned": float(total_earned),
         "commission_pct": float(pct),
+    }
+
+
+# ─── IB per-referral bounty (separate from user-level commission) ────
+
+async def maybe_pay_ib_referral_bounty(
+    db: AsyncSession, user_id: UUID, deposit: Deposit
+) -> Optional[dict]:
+    """Pay a flat bounty to the IB upline if this is the referred user's
+    first approved deposit. Idempotent — runs the same first-deposit
+    check as the user-level commission, but pays a TIER-SCALED FLAT
+    amount instead of a percentage and only when an IB is in the chain.
+
+    Caller is expected to call this AFTER setting deposit.status to
+    approved / auto_approved. Returns the payout breakdown or None if
+    nothing was paid.
+    """
+    # First-deposit gate — same logic as the user-level commission so
+    # both payouts move together. Both helpers are idempotent.
+    count = (await db.execute(
+        select(func.count()).select_from(Deposit).where(
+            Deposit.user_id == user_id,
+            Deposit.status.in_(["approved", "auto_approved"]),
+        )
+    )).scalar()
+    if (count or 0) != 1:
+        return None
+
+    # Find the IB the user signed up under via the Referral table (IB
+    # MLM lineage, NOT the user-level User.referred_by_user_id).
+    ref_row = (await db.execute(
+        select(Referral).where(Referral.referred_id == user_id).limit(1)
+    )).scalar_one_or_none()
+    if ref_row is None or ref_row.ib_profile_id is None:
+        return None
+
+    ib = (await db.execute(
+        select(IBProfile).where(IBProfile.id == ref_row.ib_profile_id).with_for_update()
+    )).scalar_one_or_none()
+    if ib is None or not ib.is_active:
+        return None
+
+    # Local import to keep referral_service free of engine deps.
+    from ..engines.ib_engine import (
+        get_ib_tiers, resolve_tier_for_count, count_active_referrals,
+    )
+
+    tiers = await get_ib_tiers(db)
+    active_n = await count_active_referrals(db, ib.id)
+    tier = resolve_tier_for_count(active_n, tiers)
+    if not tier:
+        return None
+    bounty_raw = tier.get("per_referral_bounty")
+    if bounty_raw in (None, ""):
+        return None
+    try:
+        bounty = Decimal(str(bounty_raw)).quantize(Decimal("0.01"))
+    except Exception:
+        return None
+    if bounty <= 0:
+        return None
+
+    ib_user = (await db.execute(
+        select(User).where(User.id == ib.user_id).with_for_update()
+    )).scalar_one_or_none()
+    if ib_user is None:
+        return None
+
+    ib_user.main_wallet_balance = Decimal(str(ib_user.main_wallet_balance or 0)) + bounty
+
+    db.add(Transaction(
+        user_id=ib_user.id,
+        type="ib_referral_bounty",
+        amount=bounty,
+        balance_after=ib_user.main_wallet_balance,
+        reference_id=deposit.id,
+        description=(
+            f"IB referral bounty — {tier.get('label')} tier "
+            f"(${float(bounty):.2f}) for {ib_user.email or ib_user.id}'s referral first deposit"
+        ),
+    ))
+
+    return {
+        "ib_user_id": str(ib_user.id),
+        "referred_user_id": str(user_id),
+        "deposit_id": str(deposit.id),
+        "tier": tier.get("label"),
+        "bounty": float(bounty),
     }
