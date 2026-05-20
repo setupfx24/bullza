@@ -429,6 +429,12 @@ function IBTab() {
 
       </div>
 
+      <div className="rounded-xl border border-accent/25 bg-accent/[0.04] p-3 text-xs text-text-secondary leading-relaxed">
+
+        IB earnings auto-credit to your main wallet as commissions are settled. You can <span className="text-text-primary font-semibold">withdraw them</span> from the Wallet page or <span className="text-text-primary font-semibold">use them to trade</span> by transferring into any trading account — no separate IB wallet to manage.
+
+      </div>
+
 
 
       {dashboard?.referral_link && (
