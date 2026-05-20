@@ -87,7 +87,7 @@ export function CtaFooter() {
                   { Icon: Facebook,  label: 'Facebook',  href: 'https://www.facebook.com/profile.php?id=61589880747321' },
                   { Icon: Instagram, label: 'Instagram', href: 'https://www.instagram.com/swisdex/' },
                   { Icon: Linkedin,  label: 'LinkedIn',  href: 'https://www.linkedin.com/in/swis-dex-a62208410/' },
-                  { Icon: Youtube,   label: 'YouTube',   href: 'https://www.youtube.com/@swisdex' },
+                  { Icon: Youtube,   label: 'YouTube',   href: 'https://youtube.com/@swisdex-u7q' },
                 ].map(({ Icon, label, href }) => (
                   <a
                     key={label}
@@ -138,7 +138,11 @@ export function CtaFooter() {
                 Contact
               </span>
               <span className="font-body text-sm text-foreground/70">support@swisdex.com</span>
-              <span className="font-body text-sm text-foreground/70">Zurich, Switzerland</span>
+              <span className="font-body text-sm text-foreground/70 leading-relaxed">
+                SwisDex Office 23US,<br />
+                18 Young St, UNIT LGE 1/1,<br />
+                Edinburgh EH2 4JB, Scotland
+              </span>
               <span className="font-body text-sm text-foreground/70">24/7 Available</span>
             </div>
           </div>

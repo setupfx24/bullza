@@ -72,7 +72,7 @@ const Contact = () => {
     {
       icon: MapPin,
       title: 'Visit Us',
-      content: '123 Financial District, London, UK',
+      content: 'Office 23US, 18 Young St, UNIT LGE 1/1, Edinburgh EH2 4JB, Scotland',
       link: '#'
     }
   ]
@@ -177,9 +177,10 @@ const Contact = () => {
                 <Card className="p-8 mb-6">
                   <h3 className="text-xl font-semibold text-white mb-4">SwisDex Ltd</h3>
                   <p className="text-text-secondary mb-4">
-                    123 Financial District<br />
-                    London, EC2N 2DL<br />
-                    United Kingdom
+                    Office 23US, 18 Young St<br />
+                    UNIT LGE 1/1<br />
+                    Edinburgh EH2 4JB<br />
+                    Scotland
                   </p>
                   <div className="space-y-2">
                     <p className="text-text-secondary">

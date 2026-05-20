@@ -44,7 +44,7 @@ const socials = [
   { icon: Facebook,  href: 'https://www.facebook.com/profile.php?id=61589880747321', label: 'Facebook' },
   { icon: Instagram, href: 'https://www.instagram.com/swisdex/',                     label: 'Instagram' },
   { icon: Linkedin,  href: 'https://www.linkedin.com/in/swis-dex-a62208410/',        label: 'LinkedIn' },
-  { icon: Youtube,   href: 'https://www.youtube.com/@swisdex',                       label: 'YouTube' },
+  { icon: Youtube,   href: 'https://youtube.com/@swisdex-u7q',                       label: 'YouTube' },
 ]
 
 export default function Footer() {
