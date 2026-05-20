@@ -621,6 +621,22 @@ async def withdraw_managed_account(
     )
     master = master_result.scalar_one_or_none()
 
+    # PAMM-only — gate withdrawals to the same monthly window as deposits.
+    if allocation.copy_type == "pamm":
+        from .pamm_config_service import get_pamm_config, in_deposit_withdrawal_window
+
+        cfg = await get_pamm_config()
+        if not in_deposit_withdrawal_window(cfg):
+            start = cfg.get("dep_window_start_day")
+            end = cfg.get("dep_window_end_day")
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"PAMM withdrawals are only processed between day {start} and day {end} "
+                    f"of each month. Your share will be available in the next window."
+                ),
+            )
+
     # ─── PAMM withdrawal ────────────────────────────────────────────────
     # Pooled-fund model: investor has no sub-account. Their share of the
     # master's pool = (allocation_amount / sum(active allocations)) *
@@ -934,6 +950,55 @@ async def apply_as_master(
                     "eligibility": elig,
                 },
             )
+
+    # PAMM-only policy gates: admin sets a min wallet balance, a flat
+    # application fee, and a ceiling on the manager's performance cut.
+    # signal_provider / mamm are unaffected so existing copy-trading flows
+    # behave exactly as before.
+    if (master_type or "").lower() == "pamm":
+        from .pamm_config_service import get_pamm_config
+
+        cfg = await get_pamm_config()
+
+        user_row = (await db.execute(
+            select(User).where(User.id == user_id).with_for_update()
+        )).scalar_one_or_none()
+        if user_row is None:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        min_deposit = Decimal(str(cfg.get("manager_min_deposit_usd") or 0))
+        app_fee = Decimal(str(cfg.get("application_fee_usd") or 0))
+        max_commission = Decimal(str(cfg.get("max_manager_commission_pct") or 100))
+
+        wallet = Decimal(str(user_row.main_wallet_balance or 0))
+        if wallet < min_deposit + app_fee:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"PAMM application requires at least ${min_deposit:,.2f} in wallet "
+                    f"plus a ${app_fee:,.2f} application fee. You have ${wallet:,.2f}."
+                ),
+            )
+        if performance_fee_pct > max_commission:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"Manager performance commission is capped at {max_commission}%. "
+                    f"Requested {performance_fee_pct}%."
+                ),
+            )
+
+        # Charge the application fee. We don't refund on admin rejection —
+        # the fee covers the broker's review effort regardless of outcome.
+        if app_fee > 0:
+            user_row.main_wallet_balance = wallet - app_fee
+            db.add(Transaction(
+                user_id=user_id,
+                type="pamm_application_fee",
+                amount=-app_fee,
+                description="PAMM master application fee",
+            ))
+
     strategy_info = None
     if external_pnl_url:
         strategy_info = {"external_pnl_url": external_pnl_url}
@@ -1248,6 +1313,23 @@ async def invest_managed_account(
     master = master_result.scalar_one_or_none()
     if not master:
         raise HTTPException(status_code=404, detail="Managed account not found")
+
+    # PAMM only — gate investor deposits to the admin's monthly window.
+    # MAMM has no pooled-fund timing constraint, so it stays unaffected.
+    if (master.master_type or "").lower() == "pamm":
+        from .pamm_config_service import get_pamm_config, in_deposit_withdrawal_window
+
+        cfg = await get_pamm_config()
+        if not in_deposit_withdrawal_window(cfg):
+            start = cfg.get("dep_window_start_day")
+            end = cfg.get("dep_window_end_day")
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"PAMM deposits are only accepted between day {start} and day {end} "
+                    f"of each month. Please try again during the next window."
+                ),
+            )
 
     if amount < master.min_investment:
         raise HTTPException(status_code=400, detail=f"Minimum investment is {master.min_investment}")
