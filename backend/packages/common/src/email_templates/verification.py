@@ -37,8 +37,8 @@ def render_verification_reminder(
         cta_url=f"{trader_app_url.rstrip('/')}/profile/kyc",
         footer_note=(
             f"You signed up {days_since_signup} day(s) ago. "
-            "We'll send one more reminder if your account stays unverified, "
-            "then we'll stop emailing about this."
+            "We'll keep sending a friendly weekly reminder until your "
+            "account is verified."
         ),
     )
     text = (

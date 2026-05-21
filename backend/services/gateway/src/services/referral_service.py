@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import logging
 import secrets
+from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Optional
 from uuid import UUID
@@ -21,8 +22,10 @@ from uuid import UUID
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from packages.common.src.models import User, Deposit, Transaction, IBProfile, Referral
-from packages.common.src.settings_store import get_float_setting
+from packages.common.src.models import (
+    User, Deposit, Transaction, IBProfile, Referral, TradeHistory, TradingAccount,
+)
+from packages.common.src.settings_store import get_float_setting, get_int_setting
 
 logger = logging.getLogger("referral_service")
 
@@ -92,38 +95,62 @@ async def attach_referrer_by_code(
 async def maybe_pay_referral_on_first_deposit(
     db: AsyncSession, user_id: UUID, deposit: Deposit
 ) -> Optional[dict]:
-    """Pay the referrer their commission if this deposit is the user's
-    FIRST approved/auto-approved deposit and the user has a referrer.
+    """Legacy hook kept as a no-op for callers that still import it.
 
-    Idempotent on retries: walks the user's approved deposits and only
-    pays if there is exactly one (the row just being approved). Caller
-    is expected to call this AFTER setting deposit.status = approved.
-    Returns the payout breakdown or None if nothing was paid.
+    Referral commission used to fire on the referred user's first
+    approved deposit; the client changed the model to a fixed amount
+    paid AFTER the referred user completes >= 3 trades. New entry
+    point is ``maybe_pay_referral_after_trades`` below, called from
+    trading_service.close_position when a trade is booked.
+    """
+    return None
+
+
+async def maybe_pay_referral_after_trades(
+    db: AsyncSession, user_id: UUID
+) -> Optional[dict]:
+    """Pay the referrer a FLAT USD amount when this user crosses the
+    qualifying trade count (admin setting, default 3). Two gates make
+    sure we never double-pay:
+
+      1. ``users.referral_qualified_at`` must still be NULL — once we
+         pay, we stamp it and never re-check.
+      2. The user must have a referrer set (User.referred_by_user_id),
+         which is populated by ``attach_referrer_by_code`` at signup.
+
+    Caller writes a TradeHistory row first (this helper counts
+    history rows to decide), then invokes this. Best-effort: any
+    error inside is swallowed so a referral hiccup never blocks
+    the trade close itself.
     """
     user = (await db.execute(
         select(User).where(User.id == user_id).with_for_update()
     )).scalar_one_or_none()
     if user is None or user.referred_by_user_id is None:
         return None
+    if user.referral_qualified_at is not None:
+        return None  # already paid
 
-    # First-deposit gate: count of approved/auto_approved deposits should
-    # equal exactly 1 after this row was just approved.
-    count = (await db.execute(
-        select(func.count()).select_from(Deposit).where(
-            Deposit.user_id == user_id,
-            Deposit.status.in_(["approved", "auto_approved"]),
-        )
-    )).scalar()
-    if (count or 0) != 1:
+    required = await get_int_setting("referral_qualifying_trades", 3)
+    if required <= 0:
+        required = 3
+
+    # Count of CLOSED trades. TradeHistory ties to TradingAccount, so
+    # we join to user_id. Open positions don't count — spec is
+    # 'three trades completed'.
+    trade_count = (await db.execute(
+        select(func.count())
+        .select_from(TradeHistory)
+        .join(TradingAccount, TradingAccount.id == TradeHistory.account_id)
+        .where(TradingAccount.user_id == user_id)
+    )).scalar() or 0
+    if trade_count < required:
         return None
 
-    pct = await get_float_setting("referral_commission_pct", 5.0)
-    if pct <= 0:
+    amount_usd = await get_float_setting("referral_commission_amount_usd", 5.0)
+    if amount_usd <= 0:
         return None
-
-    amount = (Decimal(str(deposit.amount or 0)) * Decimal(str(pct)) / Decimal("100")).quantize(Decimal("0.01"))
-    if amount <= 0:
-        return None
+    amount = Decimal(str(amount_usd)).quantize(Decimal("0.01"))
 
     referrer = (await db.execute(
         select(User).where(User.id == user.referred_by_user_id).with_for_update()
@@ -131,22 +158,27 @@ async def maybe_pay_referral_on_first_deposit(
     if referrer is None:
         return None
 
-    referrer.main_wallet_balance = Decimal(str(referrer.main_wallet_balance or 0)) + amount
+    referrer.main_wallet_balance = (
+        Decimal(str(referrer.main_wallet_balance or 0)) + amount
+    )
+    user.referral_qualified_at = datetime.now(timezone.utc)
 
     db.add(Transaction(
         user_id=referrer.id,
         type="referral_commission",
         amount=amount,
         balance_after=referrer.main_wallet_balance,
-        reference_id=deposit.id,
-        description=f"Referral commission — {pct}% of {user.email or user_id}'s first deposit",
+        reference_id=user_id,
+        description=(
+            f"Referral payout — {user.email or user_id} qualified "
+            f"({trade_count} trades)"
+        ),
     ))
 
     return {
         "referrer_id": str(referrer.id),
         "user_id": str(user_id),
-        "deposit_id": str(deposit.id),
-        "pct": float(pct),
+        "trades": int(trade_count),
         "amount": float(amount),
     }
 
@@ -181,13 +213,30 @@ async def get_my_referral_dashboard(db: AsyncSession, user_id: UUID) -> dict:
         )
     )).scalar() or 0
 
-    pct = await get_float_setting("referral_commission_pct", 5.0)
+    amount_usd = await get_float_setting("referral_commission_amount_usd", 5.0)
+    required_trades = await get_int_setting("referral_qualifying_trades", 3)
+
+    # Qualified vs pending breakdown — how many of this user's
+    # referrals have already triggered a payout vs. how many are
+    # still trading toward the threshold.
+    qualified = (await db.execute(
+        select(func.count()).select_from(User).where(
+            User.referred_by_user_id == user_id,
+            User.referral_qualified_at.is_not(None),
+        )
+    )).scalar() or 0
 
     return {
         "referral_code": user.referral_code,
         "referrals": int(referrals),
+        "qualified_referrals": int(qualified),
+        "pending_referrals": int(max(0, int(referrals) - int(qualified))),
         "total_earned": float(total_earned),
-        "commission_pct": float(pct),
+        "amount_per_referral_usd": float(amount_usd),
+        "required_trades": int(required_trades),
+        # Kept for backward compat with any older client build that
+        # still reads `commission_pct`. New clients ignore it.
+        "commission_pct": 0.0,
     }
 
 

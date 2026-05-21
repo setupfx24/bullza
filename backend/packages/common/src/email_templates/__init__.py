@@ -22,6 +22,7 @@ from .rewards import render_mission_completed, render_tier_upgraded
 from .staking import render_staking_digest
 from .verification import render_verification_reminder
 from .dashboard_access import render_dashboard_access
+from .deposit_bonus_offer import render_first_deposit_bonus_offer
 
 __all__ = [
     "render_layout",
@@ -43,4 +44,5 @@ __all__ = [
     "render_staking_digest",
     "render_verification_reminder",
     "render_dashboard_access",
+    "render_first_deposit_bonus_offer",
 ]

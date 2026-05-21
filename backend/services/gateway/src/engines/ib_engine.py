@@ -84,6 +84,26 @@ def resolve_tier_for_count(count: int, tiers: list[dict]) -> dict | None:
     return None
 
 
+async def _referred_account_type_key(db: AsyncSession, order_id: UUID) -> str | None:
+    """Return the lowercase AccountGroup name for the account that
+    placed ``order_id`` — used to look up the right per-lot rate in
+    the tier's per_lot_by_account_type map. Returns None if any
+    join fails (caller falls back to the flat per_lot).
+    """
+    from packages.common.src.models import Order, TradingAccount, AccountGroup
+
+    row = (await db.execute(
+        select(AccountGroup.name)
+        .select_from(Order)
+        .join(TradingAccount, TradingAccount.id == Order.account_id)
+        .join(AccountGroup, AccountGroup.id == TradingAccount.account_group_id)
+        .where(Order.id == order_id)
+    )).first()
+    if not row or not row[0]:
+        return None
+    return str(row[0]).strip().lower()
+
+
 async def count_active_referrals(db: AsyncSession, ib_profile_id: UUID) -> int:
     """Active referrals = rows in the referrals table pointing at this IB.
 
@@ -136,9 +156,14 @@ async def distribute_ib_commission(
         plan = plan_q.scalar_one_or_none()
 
     # Effective per-lot rate priority:
-    #   1. Direct IB's custom override (admin sets this per-agent)
-    #   2. Tier ladder (referral-count-driven from system_settings)
-    #   3. Plan default
+    #   1. Direct IB's custom override (admin sets this per-agent).
+    #   2. Tier ladder, BY ACCOUNT TYPE of the referred user. A trade
+    #      on a Standard account can pay a different per-lot than the
+    #      same trade on ECN/VIP — Standard pays less, ECN/VIP more.
+    #      Lookup key is the AccountGroup.name lowercased.
+    #   3. Tier ladder's flat per_lot (fallback when the account type
+    #      isn't keyed in per_lot_by_account_type).
+    #   4. Plan default.
     per_lot = None
     if direct_ib.custom_commission_per_lot is not None and direct_ib.custom_commission_per_lot > 0:
         per_lot = Decimal(str(direct_ib.custom_commission_per_lot))
@@ -147,11 +172,23 @@ async def distribute_ib_commission(
         tiers = await get_ib_tiers(db)
         active_n = await count_active_referrals(db, direct_ib.id)
         tier = resolve_tier_for_count(active_n, tiers)
-        if tier and tier.get("per_lot") not in (None, ""):
-            try:
-                per_lot = Decimal(str(tier["per_lot"]))
-            except Exception:
-                per_lot = None
+        if tier:
+            # Look up the referred user's account-type bucket. The
+            # commission row that pays is the one tied to the same
+            # account that placed the order. Falls through to the
+            # flat per_lot if the account-type bucket is missing.
+            acct_type_key = await _referred_account_type_key(db, order_id) or ""
+            type_map = tier.get("per_lot_by_account_type") or {}
+            raw = type_map.get(acct_type_key) if acct_type_key else None
+            if raw in (None, "") and isinstance(type_map, dict):
+                raw = type_map.get("standard")  # last-resort default
+            if raw in (None, ""):
+                raw = tier.get("per_lot")
+            if raw not in (None, ""):
+                try:
+                    per_lot = Decimal(str(raw))
+                except Exception:
+                    per_lot = None
 
     if per_lot is None and plan and plan.commission_per_lot is not None:
         per_lot = Decimal(str(plan.commission_per_lot))

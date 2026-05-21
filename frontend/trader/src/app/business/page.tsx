@@ -443,19 +443,60 @@ function IBTab() {
 
                 {dashboard.tier.label}
 
-                <span className="text-text-tertiary text-sm font-normal ml-2">
+                {dashboard.tier.per_referral_bounty != null && dashboard.tier.per_referral_bounty > 0 ? (
 
-                  ${dashboard.tier.per_lot}/lot
+                  <span className="text-text-tertiary text-sm font-normal ml-2">
 
-                  {dashboard.tier.per_referral_bounty != null && dashboard.tier.per_referral_bounty > 0 ? (
+                    · ${dashboard.tier.per_referral_bounty}/referral bounty
 
-                    <> · ${dashboard.tier.per_referral_bounty}/referral</>
+                  </span>
 
-                  ) : null}
-
-                </span>
+                ) : null}
 
               </p>
+
+              {/* Per-lot breakdown across account types — what the IB earns
+                  varies by which account type the referred user trades on. */}
+
+              {dashboard.tier.per_lot_by_account_type ? (
+
+                <div className="flex flex-wrap gap-3 mt-2 text-xs text-text-secondary">
+
+                  {[
+
+                    { key: 'standard', label: 'Standard' },
+
+                    { key: 'ecn',      label: 'ECN' },
+
+                    { key: 'vip',      label: 'VIP' },
+
+                  ].map((a) => {
+
+                    const rate = dashboard.tier.per_lot_by_account_type?.[a.key];
+
+                    if (rate == null) return null;
+
+                    return (
+
+                      <span key={a.key} className="inline-flex items-baseline gap-1">
+
+                        <span className="text-text-tertiary">{a.label}:</span>
+
+                        <strong className="text-text-primary font-mono tabular-nums">${rate}/lot</strong>
+
+                      </span>
+
+                    );
+
+                  })}
+
+                </div>
+
+              ) : (
+
+                <p className="text-sm font-mono text-text-primary mt-1">${dashboard.tier.per_lot}/lot</p>
+
+              )}
 
               <p className="text-xxs text-text-tertiary mt-1">
 

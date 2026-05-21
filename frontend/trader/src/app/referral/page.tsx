@@ -9,9 +9,19 @@ import api from '@/lib/api/client';
 
 interface ReferralDashboard {
   referral_code: string | null;
+  /** Total users this user has referred (qualified + pending combined). */
   referrals: number;
+  /** Referrals who already hit the trade threshold and paid out. */
+  qualified_referrals?: number;
+  /** Referrals signed up but haven't yet closed enough trades. */
+  pending_referrals?: number;
   total_earned: number;
-  commission_pct: number;
+  /** Flat USD amount paid per qualified referral. */
+  amount_per_referral_usd?: number;
+  /** Number of closed trades a referred user must complete (default 3). */
+  required_trades?: number;
+  /** Legacy field — older builds return a percentage; new clients ignore. */
+  commission_pct?: number;
 }
 
 function fmt(n: number) {
@@ -63,23 +73,43 @@ export default function ReferralPage() {
             <Gift size={22} className="text-accent" /> Referral
           </h1>
           <p className="mt-1 text-sm text-text-secondary">
-            Invite friends and earn{' '}
-            <strong className="text-text-primary">{data?.commission_pct ?? 0}%</strong>{' '}
-            of their first deposit, credited straight to your wallet.
+            Invite friends and earn a flat{' '}
+            <strong className="text-text-primary">${fmt(data?.amount_per_referral_usd ?? 0)}</strong>{' '}
+            per qualified referral. They qualify after completing{' '}
+            <strong className="text-text-primary">{data?.required_trades ?? 3}</strong>{' '}
+            closed trades.
             For the bigger multi-level commission program, see{' '}
             <Link href="/business" className="text-accent hover:underline">Affiliates (IB)</Link>.
           </p>
         </header>
 
         {/* Stats */}
-        <section className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <section className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <div className="rounded-xl border border-border-primary bg-card p-4">
             <div className="flex items-center gap-2 text-xs text-text-tertiary uppercase">
-              <Users size={12} /> Referrals
+              <Users size={12} /> Total referrals
             </div>
             <p className="text-xl font-bold font-mono tabular-nums mt-1 text-accent">
               {data?.referrals ?? 0}
             </p>
+          </div>
+          <div className="rounded-xl border border-border-primary bg-card p-4">
+            <div className="flex items-center gap-2 text-xs text-text-tertiary uppercase">
+              <Gift size={12} /> Qualified
+            </div>
+            <p className="text-xl font-bold font-mono tabular-nums mt-1 text-buy">
+              {data?.qualified_referrals ?? 0}
+            </p>
+            <p className="text-[10px] text-text-tertiary mt-0.5">paid out</p>
+          </div>
+          <div className="rounded-xl border border-border-primary bg-card p-4">
+            <div className="flex items-center gap-2 text-xs text-text-tertiary uppercase">
+              <Users size={12} /> Pending
+            </div>
+            <p className="text-xl font-bold font-mono tabular-nums mt-1 text-amber-400">
+              {data?.pending_referrals ?? 0}
+            </p>
+            <p className="text-[10px] text-text-tertiary mt-0.5">need {data?.required_trades ?? 3} trades</p>
           </div>
           <div className="rounded-xl border border-border-primary bg-card p-4">
             <div className="flex items-center gap-2 text-xs text-text-tertiary uppercase">
@@ -88,15 +118,6 @@ export default function ReferralPage() {
             <p className="text-xl font-bold font-mono tabular-nums mt-1 text-buy">
               ${fmt(data?.total_earned ?? 0)}
             </p>
-          </div>
-          <div className="rounded-xl border border-border-primary bg-card p-4">
-            <div className="flex items-center gap-2 text-xs text-text-tertiary uppercase">
-              <Gift size={12} /> Rate
-            </div>
-            <p className="text-xl font-bold font-mono tabular-nums mt-1 text-text-primary">
-              {data?.commission_pct ?? 0}%
-            </p>
-            <p className="text-[10px] text-text-tertiary mt-0.5">paid on first deposit</p>
           </div>
         </section>
 
@@ -140,9 +161,12 @@ export default function ReferralPage() {
         )}
 
         <section className="rounded-xl border border-accent/25 bg-accent/[0.04] p-4 text-xs text-text-secondary leading-relaxed">
-          Commission is paid in cash once each referred user makes their first approved deposit.
-          The amount goes straight to your <strong className="text-text-primary">main wallet</strong>
-          {' '}— withdraw it from the Wallet page or transfer into any trading account to trade with it.
+          <strong className="text-text-primary">How it works:</strong> share your link → friend registers
+          with your code → they close{' '}
+          <strong className="text-text-primary">{data?.required_trades ?? 3}</strong> trades →
+          you get a flat{' '}
+          <strong className="text-text-primary">${fmt(data?.amount_per_referral_usd ?? 0)}</strong>{' '}
+          credited to your main wallet. Withdraw or trade with it as you like — no separate balance.
         </section>
       </div>
     </DashboardShell>
