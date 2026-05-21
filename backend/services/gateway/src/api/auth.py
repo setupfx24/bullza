@@ -50,6 +50,41 @@ async def platform_status():
     }
 
 
+@router.get("/company-ib-code")
+async def company_ib_code(db: AsyncSession = Depends(get_db)):
+    """Public: returns the company / 'House' IB's referral code if one is
+    designated. Used by the signup page's 'Apply' button to populate the
+    referral code field with the broker's own IB code so unreferred
+    signups can still claim the welcome bonus through the house tree.
+
+    Returns ``{"referral_code": null}`` when no company IB is designated
+    or the picked user has no active IB profile. The endpoint deliberately
+    exposes only the code — no user identity, no stats — because it's
+    unauthenticated.
+    """
+    from packages.common.src.settings_store import get_system_setting
+    from packages.common.src.models import IBProfile
+
+    raw_uid = await get_system_setting("company_ib_user_id", None)
+    if not raw_uid or not isinstance(raw_uid, str) or not raw_uid.strip():
+        return {"referral_code": None}
+
+    try:
+        from uuid import UUID as _UUID
+        uid = _UUID(raw_uid.strip())
+    except Exception:
+        return {"referral_code": None}
+
+    from sqlalchemy import select as _select
+    row = (await db.execute(
+        _select(IBProfile).where(
+            IBProfile.user_id == uid,
+            IBProfile.is_active == True,
+        )
+    )).scalar_one_or_none()
+    return {"referral_code": row.referral_code if row else None}
+
+
 @router.post("/register", status_code=status.HTTP_201_CREATED)
 async def register(req: RegisterRequest, request: Request, db: AsyncSession = Depends(get_db)):
     # Cloudflare Turnstile gate — no-ops if SECRET isn't configured (dev /
