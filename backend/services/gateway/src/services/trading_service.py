@@ -894,11 +894,20 @@ async def close_position(position_id: UUID, req, user_id: UUID, db: AsyncSession
 
     # Personal-referral payout (flat $ amount, gated on the user
     # completing the qualifying trade count — default 3). Idempotent
-    # via users.referral_qualified_at. Wrapped so a payout-side error
-    # never blocks the close.
+    # via users.referral_qualified_at.
+    #
+    # Wrapped in a SAVEPOINT so any failure inside the helper rolls back
+    # ONLY the referral writes — the parent transaction (position close
+    # + Transaction row + account balance update) stays clean and the
+    # outer db.commit() below still succeeds. Earlier wrapping was just
+    # try/except, which catches the exception but leaves the session
+    # marked rolled-back; the next operation then 500s. Discovered when
+    # Close All hit 500 on every position after the first one fired the
+    # referral helper.
     try:
-        from . import referral_service as _ref
-        await _ref.maybe_pay_referral_after_trades(db, user_id)
+        async with db.begin_nested():
+            from . import referral_service as _ref
+            await _ref.maybe_pay_referral_after_trades(db, user_id)
     except Exception as _re:
         logger.warning("referral payout after close failed: %s", _re)
 

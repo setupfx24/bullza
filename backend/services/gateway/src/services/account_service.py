@@ -462,11 +462,12 @@ async def delete_trading_account(
     if not account:
         raise HTTPException(status_code=404, detail="Account not found")
 
-    if account.is_demo:
-        raise HTTPException(
-            status_code=400,
-            detail="Demo accounts cannot be deleted.",
-        )
+    # Demo accounts WERE blocked here. Client needs to be able to delete
+    # practice accounts so they can create fresh ones (otherwise the
+    # account list grows unbounded). We still run the close-positions +
+    # cancel-orders sanitisation below; the only thing we MUST NOT do
+    # for demos is sweep the (fake) balance into the user's real main
+    # wallet — that's gated further down.
 
     user = await db.get(User, user_id)
     if not user:
@@ -496,15 +497,19 @@ async def delete_trading_account(
     )
 
     # 3. If this account hosts an approved master, run the master-shutdown flow.
-    master_q = await db.execute(
-        select(MasterAccount).where(
-            MasterAccount.account_id == account_id,
-            MasterAccount.status == "approved",
-        )
-    )
-    master = master_q.scalar_one_or_none()
+    #    Demos can't be masters, so we skip the query entirely for them —
+    #    saves a roundtrip and avoids any future model drift surprises.
+    master = None
     followers_refunded = 0
     total_refunded = Decimal("0")
+    if not account.is_demo:
+        master_q = await db.execute(
+            select(MasterAccount).where(
+                MasterAccount.account_id == account_id,
+                MasterAccount.status == "approved",
+            )
+        )
+        master = master_q.scalar_one_or_none()
     if master:
         allocs_q = await db.execute(
             select(InvestorAllocation).where(
@@ -578,17 +583,22 @@ async def delete_trading_account(
         alloc.status = "closed"
 
     # 5. Sweep own balance + credit to owner's main wallet.
-    sweep = (account.balance or Decimal("0")) + (account.credit or Decimal("0"))
-    if sweep > 0:
-        user.main_wallet_balance = (user.main_wallet_balance or Decimal("0")) + sweep
-        db.add(Transaction(
-            user_id=user.id,
-            account_id=account.id,
-            type="transfer",
-            amount=sweep,
-            balance_after=user.main_wallet_balance,
-            description="Trading account closed — balance returned to main wallet",
-        ))
+    #    Demo accounts hold FAKE money — never sweep that into the user's
+    #    real main wallet. Just zero the demo balance and skip the
+    #    transfer Transaction row.
+    sweep = Decimal("0")
+    if not account.is_demo:
+        sweep = (account.balance or Decimal("0")) + (account.credit or Decimal("0"))
+        if sweep > 0:
+            user.main_wallet_balance = (user.main_wallet_balance or Decimal("0")) + sweep
+            db.add(Transaction(
+                user_id=user.id,
+                account_id=account.id,
+                type="transfer",
+                amount=sweep,
+                balance_after=user.main_wallet_balance,
+                description="Trading account closed — balance returned to main wallet",
+            ))
 
     account.balance = Decimal("0")
     account.credit = Decimal("0")
@@ -599,6 +609,8 @@ async def delete_trading_account(
 
     await db.commit()
 
+    if account.is_demo:
+        return MessageResponse(message="Demo account closed.")
     if master and followers_refunded:
         return MessageResponse(
             message=(
