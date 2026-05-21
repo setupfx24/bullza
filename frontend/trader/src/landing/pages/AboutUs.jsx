@@ -111,7 +111,7 @@ const AboutUs = () => {
           <ScrollReveal variant="fadeUp">
             <div className="max-w-4xl mx-auto mb-16">
               <p className="text-lg text-text-secondary leading-relaxed mb-6">
-                Founded in 2010, SwisDex is a globally regulated forex and CFD broker headquartered in London, UK, and a decentralized exchange offering on-chain insured trades and non-custodial wallet trading. With over 500,000 clients across 150+ countries, we've built our reputation on transparency, speed, and trust.
+                Founded in 2010, SwisDex is a globally regulated forex and CFD broker headquartered at Office 23US, 18 Young St, UNIT LGE 1/1, Edinburgh EH2 4JB, Scotland, and a decentralized exchange offering on-chain insured trades and non-custodial wallet trading. With over 500,000 clients across 150+ countries, we've built our reputation on transparency, speed, and trust.
               </p>
               <p className="text-lg text-text-secondary leading-relaxed">
                 Our mission is to democratize access to global financial markets by providing cutting-edge technology, competitive pricing, and world-class support. Whether you're a beginner taking your first steps in trading or a seasoned professional, SwisDex provides the tools, platforms, and expertise you need to succeed.

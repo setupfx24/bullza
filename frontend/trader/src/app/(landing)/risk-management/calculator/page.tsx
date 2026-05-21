@@ -181,10 +181,10 @@ export default function CalculatorPage() {
               <Target className="size-5 text-primary" /> Recommended Position
             </h2>
 
-            <Stat label="Standard Lots"  value={fmt(result.stdLots,   3)} accent />
+            <Stat label="Standard Lots"  value={fmt(result.stdLots,   4)} accent />
             <div className="grid grid-cols-2 gap-3">
-              <Stat label="Mini Lots"  value={fmt(result.miniLots,  2)} />
-              <Stat label="Micro Lots" value={fmt(result.microLots, 1)} />
+              <Stat label="Mini Lots"  value={fmt(result.miniLots,  3)} />
+              <Stat label="Micro Lots" value={fmt(result.microLots, 2)} />
             </div>
             <Stat label="Position Size (units)" value={fmt(result.positionUnits, 0)} />
 

@@ -110,8 +110,8 @@ export default function ContactPage() {
           <div className="grid md:grid-cols-2 gap-8">
             {[
               {
-                city: 'UK Office',
-                address: 'Office 9364hn, 3 Fitzroy Place, Glasgow City Centre, UK, G3 7RH',
+                city: 'Scotland Office',
+                address: 'SwisDex Office 23US, 18 Young St, UNIT LGE 1/1, Edinburgh EH2 4JB, Scotland',
                 hours: 'Mon-Fri: 9:00 AM - 6:00 PM GMT',
               },
               {

@@ -13,8 +13,8 @@ export default function LandingFooter() {
               Professional multi-asset trading platform. Licensed under Investment Dealer Licence No. MAK21098161, St. Lucia.
             </p>
             <p className="text-gray-500 text-sm">
-              <span className="font-medium text-gray-900">UK Office:</span><br />
-              Office 9364hn, 3 Fitzroy Place, Glasgow City Centre, UK, G3 7RH
+              <span className="font-medium text-gray-900">Scotland Office:</span><br />
+              SwisDex Office 23US, 18 Young St, UNIT LGE 1/1, Edinburgh EH2 4JB, Scotland
             </p>
           </div>
 
