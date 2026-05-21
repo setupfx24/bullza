@@ -14,6 +14,7 @@ import {
   FOOTER_SERVICES,
   RISK_DISCLAIMER,
 } from '../data';
+import { TrustBadges } from './TrustBadges';
 
 export function CtaFooter() {
   return (
@@ -61,6 +62,8 @@ export function CtaFooter() {
           </Button>
         </motion.div>
       </div>
+
+      <TrustBadges />
 
       <div className="relative z-10 w-full border-t border-border">
         <div
