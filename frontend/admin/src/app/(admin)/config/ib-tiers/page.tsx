@@ -5,12 +5,26 @@ import toast from 'react-hot-toast';
 import { Loader2, Save, Plus, Trash2 } from 'lucide-react';
 import { adminApi } from '@/lib/api';
 
+type AccountTypeKey = 'standard' | 'ecn' | 'vip';
+
+const ACCOUNT_TYPES: { key: AccountTypeKey; label: string }[] = [
+  { key: 'standard', label: 'Standard' },
+  { key: 'ecn',      label: 'ECN' },
+  { key: 'vip',      label: 'VIP' },
+];
+
 interface Tier {
   label: string;
   min_referrals: number;
   // null = no upper bound (the top tier).
   max_referrals: number | null;
+  // Flat per-lot fallback used when the user's account type isn't keyed in
+  // per_lot_by_account_type below. Stays on the JSON for backward compat.
   per_lot: number;
+  // Per-account-type per-lot rates. The IB engine looks up the
+  // referred user's AccountGroup.name (lowercased) and uses this map's
+  // value before falling back to `per_lot`.
+  per_lot_by_account_type: Record<AccountTypeKey, number>;
   // Flat one-time payout per referred user's first approved deposit.
   // Separate from the per-lot stream that pays as referrals trade.
   per_referral_bounty: number;
@@ -19,9 +33,15 @@ interface Tier {
 }
 
 const FALLBACK: Tier[] = [
-  { label: 'Starter', min_referrals: 5,   max_referrals: 20,   per_lot: 6,  per_referral_bounty: 5,  instant_payout: true, dedicated_manager: false },
-  { label: 'Pro',     min_referrals: 21,  max_referrals: 100,  per_lot: 8,  per_referral_bounty: 7,  instant_payout: true, dedicated_manager: true  },
-  { label: 'Elite',   min_referrals: 101, max_referrals: null, per_lot: 13, per_referral_bounty: 10, instant_payout: true, dedicated_manager: true  },
+  { label: 'Starter', min_referrals: 5,   max_referrals: 20,   per_lot: 6,
+    per_lot_by_account_type: { standard: 5, ecn: 7, vip: 8 },
+    per_referral_bounty: 5,  instant_payout: true, dedicated_manager: false },
+  { label: 'Pro',     min_referrals: 21,  max_referrals: 100,  per_lot: 8,
+    per_lot_by_account_type: { standard: 7, ecn: 9, vip: 10 },
+    per_referral_bounty: 7,  instant_payout: true, dedicated_manager: true  },
+  { label: 'Elite',   min_referrals: 101, max_referrals: null, per_lot: 13,
+    per_lot_by_account_type: { standard: 10, ecn: 13, vip: 15 },
+    per_referral_bounty: 10, instant_payout: true, dedicated_manager: true  },
 ];
 
 export default function IBTiersAdminPage() {
@@ -47,15 +67,37 @@ export default function IBTiersAdminPage() {
 
   useEffect(() => { load(); }, [load]);
 
-  const normalize = (r: any): Tier => ({
-    label: String(r.label || ''),
-    min_referrals: Number(r.min_referrals) || 0,
-    max_referrals: r.max_referrals == null ? null : Number(r.max_referrals) || 0,
-    per_lot: Number(r.per_lot) || 0,
-    per_referral_bounty: Number(r.per_referral_bounty) || 0,
-    instant_payout: r.instant_payout !== false,
-    dedicated_manager: !!r.dedicated_manager,
-  });
+  const normalize = (r: any): Tier => {
+    const fallbackPerLot = Number(r.per_lot) || 0;
+    const rawMap = (r.per_lot_by_account_type || {}) as Record<string, unknown>;
+    const per_lot_by_account_type: Record<AccountTypeKey, number> = {
+      standard: Number(rawMap.standard ?? fallbackPerLot) || 0,
+      ecn: Number(rawMap.ecn ?? fallbackPerLot) || 0,
+      vip: Number(rawMap.vip ?? fallbackPerLot) || 0,
+    };
+    return {
+      label: String(r.label || ''),
+      min_referrals: Number(r.min_referrals) || 0,
+      max_referrals: r.max_referrals == null ? null : Number(r.max_referrals) || 0,
+      per_lot: fallbackPerLot,
+      per_lot_by_account_type,
+      per_referral_bounty: Number(r.per_referral_bounty) || 0,
+      instant_payout: r.instant_payout !== false,
+      dedicated_manager: !!r.dedicated_manager,
+    };
+  };
+
+  const updateRate = (tierIdx: number, key: AccountTypeKey, value: number) => {
+    setTiers((prev) => {
+      const next = prev.slice();
+      const cur = next[tierIdx];
+      next[tierIdx] = {
+        ...cur,
+        per_lot_by_account_type: { ...cur.per_lot_by_account_type, [key]: value },
+      };
+      return next;
+    });
+  };
 
   const updateTier = <K extends keyof Tier>(i: number, field: K, value: Tier[K]) => {
     setTiers((prev) => {
@@ -70,7 +112,16 @@ export default function IBTiersAdminPage() {
     const lo = last ? (last.max_referrals ?? last.min_referrals) + 1 : 1;
     setTiers([
       ...tiers,
-      { label: 'New tier', min_referrals: lo, max_referrals: lo + 9, per_lot: 0, per_referral_bounty: 0, instant_payout: true, dedicated_manager: false },
+      {
+        label: 'New tier',
+        min_referrals: lo,
+        max_referrals: lo + 9,
+        per_lot: 0,
+        per_lot_by_account_type: { standard: 0, ecn: 0, vip: 0 },
+        per_referral_bounty: 0,
+        instant_payout: true,
+        dedicated_manager: false,
+      },
     ]);
   };
 
@@ -144,7 +195,11 @@ export default function IBTiersAdminPage() {
               <th className="text-left px-3 py-2 text-xxs font-medium text-text-tertiary uppercase tracking-wide">Label</th>
               <th className="text-left px-3 py-2 text-xxs font-medium text-text-tertiary uppercase tracking-wide">Min referrals</th>
               <th className="text-left px-3 py-2 text-xxs font-medium text-text-tertiary uppercase tracking-wide">Max referrals</th>
-              <th className="text-left px-3 py-2 text-xxs font-medium text-text-tertiary uppercase tracking-wide">Per-lot ($)</th>
+              {ACCOUNT_TYPES.map((a) => (
+                <th key={a.key} className="text-left px-3 py-2 text-xxs font-medium text-text-tertiary uppercase tracking-wide">
+                  Per-lot {a.label} ($)
+                </th>
+              ))}
               <th className="text-left px-3 py-2 text-xxs font-medium text-text-tertiary uppercase tracking-wide">Per-referral bounty ($)</th>
               <th className="text-center px-3 py-2 text-xxs font-medium text-text-tertiary uppercase tracking-wide">Instant payout</th>
               <th className="text-center px-3 py-2 text-xxs font-medium text-text-tertiary uppercase tracking-wide">Dedicated manager</th>
@@ -178,14 +233,16 @@ export default function IBTiersAdminPage() {
                     className="w-20 px-2 py-1 text-xs bg-bg-input border border-border-primary rounded font-mono tabular-nums text-text-primary"
                   />
                 </td>
-                <td className="px-3 py-2">
-                  <input
-                    type="number" min={0} step={0.5}
-                    value={t.per_lot}
-                    onChange={(e) => updateTier(i, 'per_lot', parseFloat(e.target.value) || 0)}
-                    className="w-24 px-2 py-1 text-xs bg-bg-input border border-border-primary rounded font-mono tabular-nums text-text-primary"
-                  />
-                </td>
+                {ACCOUNT_TYPES.map((a) => (
+                  <td key={a.key} className="px-3 py-2">
+                    <input
+                      type="number" min={0} step={0.5}
+                      value={t.per_lot_by_account_type[a.key]}
+                      onChange={(e) => updateRate(i, a.key, parseFloat(e.target.value) || 0)}
+                      className="w-20 px-2 py-1 text-xs bg-bg-input border border-border-primary rounded font-mono tabular-nums text-text-primary"
+                    />
+                  </td>
+                ))}
                 <td className="px-3 py-2">
                   <input
                     type="number" min={0} step={0.5}
@@ -223,7 +280,7 @@ export default function IBTiersAdminPage() {
               </tr>
             ))}
             <tr>
-              <td colSpan={8} className="px-3 py-2">
+              <td colSpan={10} className="px-3 py-2">
                 <button
                   onClick={addTier}
                   className="inline-flex items-center gap-1 px-2 py-1 text-xxs text-text-secondary border border-border-primary rounded hover:bg-bg-hover"

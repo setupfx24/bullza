@@ -80,6 +80,10 @@ class User(Base):
     # out. NULL means the user hasn't been nudged yet; the engine only
     # sends this once.
     deposit_nudge_sent_at = Column(DateTime(timezone=True), nullable=True)
+    # Set when this referred user crossed the qualifying trade count
+    # (default 3) and the referrer's flat-amount payout was credited.
+    # NULL until the threshold is hit; once set we never re-pay.
+    referral_qualified_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), default=datetime.utcnow)
     updated_at = Column(DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow)
 

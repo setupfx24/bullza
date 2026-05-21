@@ -892,6 +892,16 @@ async def close_position(position_id: UUID, req, user_id: UUID, db: AsyncSession
     except Exception as _exc:
         logger.debug("rewards mark_progress failed: %s", _exc)
 
+    # Personal-referral payout (flat $ amount, gated on the user
+    # completing the qualifying trade count — default 3). Idempotent
+    # via users.referral_qualified_at. Wrapped so a payout-side error
+    # never blocks the close.
+    try:
+        from . import referral_service as _ref
+        await _ref.maybe_pay_referral_after_trades(db, user_id)
+    except Exception as _re:
+        logger.warning("referral payout after close failed: %s", _re)
+
     await db.commit()
 
     # Fire-and-forget: notification, Redis publish — don't block response

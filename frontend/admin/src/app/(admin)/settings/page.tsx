@@ -15,7 +15,8 @@ interface Settings {
   max_lot_size: number;
   min_lot_size: number;
   ib_min_deposit_usd: number;
-  referral_commission_pct: number;
+  referral_commission_amount_usd: number;
+  referral_qualifying_trades: number;
   maintenance_mode: boolean;
   allow_new_registrations: boolean;
   allow_deposits: boolean;
@@ -37,7 +38,8 @@ const DEFAULT_SETTINGS: Settings = {
   max_lot_size: 100,
   min_lot_size: 0.01,
   ib_min_deposit_usd: 100,
-  referral_commission_pct: 5,
+  referral_commission_amount_usd: 5,
+  referral_qualifying_trades: 3,
   maintenance_mode: false,
   allow_new_registrations: true,
   allow_deposits: true,
@@ -70,7 +72,14 @@ function rowsToSettings(rows: SystemSettingRow[]): Settings {
     max_lot_size: num('max_lot_size', DEFAULT_SETTINGS.max_lot_size),
     min_lot_size: num('min_lot_size', DEFAULT_SETTINGS.min_lot_size),
     ib_min_deposit_usd: num('ib_min_deposit_usd', DEFAULT_SETTINGS.ib_min_deposit_usd),
-    referral_commission_pct: num('referral_commission_pct', DEFAULT_SETTINGS.referral_commission_pct),
+    referral_commission_amount_usd: num(
+      'referral_commission_amount_usd',
+      DEFAULT_SETTINGS.referral_commission_amount_usd as number,
+    ),
+    referral_qualifying_trades: num(
+      'referral_qualifying_trades',
+      DEFAULT_SETTINGS.referral_qualifying_trades as number,
+    ),
     maintenance_mode: bool('maintenance_mode', DEFAULT_SETTINGS.maintenance_mode),
     allow_new_registrations: bool('allow_new_registrations', DEFAULT_SETTINGS.allow_new_registrations),
     allow_deposits: bool('allow_deposits', DEFAULT_SETTINGS.allow_deposits),
@@ -88,7 +97,8 @@ function settingsToPayload(s: Settings): Record<string, number | boolean> {
     max_lot_size: s.max_lot_size,
     min_lot_size: s.min_lot_size,
     ib_min_deposit_usd: s.ib_min_deposit_usd,
-    referral_commission_pct: s.referral_commission_pct,
+    referral_commission_amount_usd: s.referral_commission_amount_usd,
+    referral_qualifying_trades: s.referral_qualifying_trades,
     maintenance_mode: s.maintenance_mode,
     allow_new_registrations: s.allow_new_registrations,
     allow_deposits: s.allow_deposits,
@@ -159,8 +169,11 @@ export default function SettingsPage() {
     if (s.max_lot_size <= 0) return 'Max lot size must be greater than 0';
     if (s.min_lot_size >= s.max_lot_size) return 'Min lot size must be less than max lot size';
     if (s.ib_min_deposit_usd < 0) return 'IB minimum deposit cannot be negative';
-    if (s.referral_commission_pct < 0 || s.referral_commission_pct > 100) {
-      return 'Referral commission % must be between 0 and 100';
+    if (s.referral_commission_amount_usd < 0) {
+      return 'Referral payout cannot be negative';
+    }
+    if (s.referral_qualifying_trades < 1) {
+      return 'Qualifying trades must be at least 1';
     }
     return null;
   };
@@ -325,30 +338,50 @@ export default function SettingsPage() {
               <div className="px-4 py-3 border-b border-border-primary">
                 <h2 className="text-sm font-medium text-text-primary">User Referral Program</h2>
                 <p className="text-xxs text-text-tertiary mt-0.5">
-                  Personal referral commission paid on a referred user&apos;s first approved deposit.
+                  Flat payout the referrer earns once their referred user qualifies.
                   Separate from the IB MLM program.
                 </p>
               </div>
               <div className="p-4 space-y-3">
                 <div className="flex flex-wrap items-center justify-between gap-4">
                   <div className="min-w-0 flex-1">
-                    <label className="text-xs text-text-secondary block">Commission on first deposit</label>
+                    <label className="text-xs text-text-secondary block">Payout per qualified referral</label>
                     <p className="text-xxs text-text-tertiary mt-0.5">
-                      Referrer gets this percentage of the referred user&apos;s first approved deposit,
-                      credited to their main wallet.
+                      Flat USD credited to the referrer&apos;s main wallet when the referred user
+                      completes the qualifying trade count below.
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <span className="text-xxs text-text-tertiary">$</span>
+                    <input
+                      type="number"
+                      step="0.5"
+                      min="0"
+                      value={settings.referral_commission_amount_usd as number}
+                      onChange={(e) => updateNum('referral_commission_amount_usd', e.target.value)}
+                      className="w-24 text-xs py-1.5 px-2 bg-bg-input border border-border-primary rounded-md font-mono tabular-nums text-right"
+                    />
+                    <span className="text-xxs text-text-tertiary w-8">USD</span>
+                  </div>
+                </div>
+                <div className="flex flex-wrap items-center justify-between gap-4">
+                  <div className="min-w-0 flex-1">
+                    <label className="text-xs text-text-secondary block">Qualifying trades</label>
+                    <p className="text-xxs text-text-tertiary mt-0.5">
+                      Number of CLOSED trades the referred user must make before the payout fires.
+                      Open positions don&apos;t count.
                     </p>
                   </div>
                   <div className="flex items-center gap-1 shrink-0">
                     <input
                       type="number"
-                      step="0.1"
-                      min="0"
-                      max="100"
-                      value={settings.referral_commission_pct}
-                      onChange={(e) => updateNum('referral_commission_pct', e.target.value)}
+                      step="1"
+                      min="1"
+                      value={settings.referral_qualifying_trades as number}
+                      onChange={(e) => updateNum('referral_qualifying_trades', e.target.value)}
                       className="w-24 text-xs py-1.5 px-2 bg-bg-input border border-border-primary rounded-md font-mono tabular-nums text-right"
                     />
-                    <span className="text-xxs text-text-tertiary w-8">%</span>
+                    <span className="text-xxs text-text-tertiary w-8">trades</span>
                   </div>
                 </div>
               </div>
