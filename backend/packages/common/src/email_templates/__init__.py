@@ -23,6 +23,9 @@ from .staking import render_staking_digest
 from .verification import render_verification_reminder
 from .dashboard_access import render_dashboard_access
 from .deposit_bonus_offer import render_first_deposit_bonus_offer
+from .eligibility import render_fr_insurance_eligibility
+from .maintenance import render_maintenance_notice
+from .statement import render_statement_digest
 
 __all__ = [
     "render_layout",
@@ -45,4 +48,7 @@ __all__ = [
     "render_verification_reminder",
     "render_dashboard_access",
     "render_first_deposit_bonus_offer",
+    "render_fr_insurance_eligibility",
+    "render_maintenance_notice",
+    "render_statement_digest",
 ]
