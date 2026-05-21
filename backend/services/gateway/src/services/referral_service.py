@@ -25,7 +25,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from packages.common.src.models import (
     User, Deposit, Transaction, IBProfile, Referral, TradeHistory, TradingAccount,
 )
-from packages.common.src.settings_store import get_float_setting, get_int_setting
+from packages.common.src.settings_store import (
+    get_float_setting, get_int_setting, get_system_setting,
+)
 
 logger = logging.getLogger("referral_service")
 
@@ -147,7 +149,42 @@ async def maybe_pay_referral_after_trades(
     if trade_count < required:
         return None
 
-    amount_usd = await get_float_setting("referral_commission_amount_usd", 5.0)
+    # Per-account-type payout. We look up the referred user's PRIMARY
+    # account type and use the per-type bounty; fall back to the flat
+    # legacy amount if either the map or the type is missing. The
+    # primary account = their first non-demo trading account (matches
+    # what the trader-side picker shows them).
+    from packages.common.src.models import AccountGroup
+    from packages.common.src.settings_store import get_system_setting
+
+    acct_type_row = (await db.execute(
+        select(AccountGroup.name)
+        .select_from(TradingAccount)
+        .join(AccountGroup, AccountGroup.id == TradingAccount.account_group_id)
+        .where(
+            TradingAccount.user_id == user_id,
+            TradingAccount.is_demo.is_(False),
+        )
+        .order_by(TradingAccount.created_at.asc())
+        .limit(1)
+    )).first()
+    acct_type_key = (acct_type_row[0] if acct_type_row else "").strip().lower()
+
+    type_map_raw = await get_system_setting("referral_commission_amounts_usd", None)
+    type_map = type_map_raw if isinstance(type_map_raw, dict) else {}
+    amount_usd = None
+    if acct_type_key:
+        v = type_map.get(acct_type_key)
+        if v not in (None, ""):
+            try:
+                amount_usd = float(v)
+            except (TypeError, ValueError):
+                amount_usd = None
+    if amount_usd is None:
+        # Fall through to the flat legacy setting so a missing per-type
+        # row never silently zeroes the payout.
+        amount_usd = await get_float_setting("referral_commission_amount_usd", 5.0)
+
     if amount_usd <= 0:
         return None
     amount = Decimal(str(amount_usd)).quantize(Decimal("0.01"))
@@ -215,6 +252,16 @@ async def get_my_referral_dashboard(db: AsyncSession, user_id: UUID) -> dict:
 
     amount_usd = await get_float_setting("referral_commission_amount_usd", 5.0)
     required_trades = await get_int_setting("referral_qualifying_trades", 3)
+    # Per-account-type breakdown — the trader page renders this so the
+    # user sees what they'd earn for each subscription bracket.
+    type_map_raw = await get_system_setting("referral_commission_amounts_usd", None)
+    amount_by_type: dict[str, float] = {}
+    if isinstance(type_map_raw, dict):
+        for k, v in type_map_raw.items():
+            try:
+                amount_by_type[str(k).lower()] = float(v)
+            except (TypeError, ValueError):
+                pass
 
     # Qualified vs pending breakdown — how many of this user's
     # referrals have already triggered a payout vs. how many are
@@ -233,6 +280,7 @@ async def get_my_referral_dashboard(db: AsyncSession, user_id: UUID) -> dict:
         "pending_referrals": int(max(0, int(referrals) - int(qualified))),
         "total_earned": float(total_earned),
         "amount_per_referral_usd": float(amount_usd),
+        "amount_by_account_type": amount_by_type,
         "required_trades": int(required_trades),
         # Kept for backward compat with any older client build that
         # still reads `commission_pct`. New clients ignore it.

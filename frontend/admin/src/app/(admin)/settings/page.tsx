@@ -16,6 +16,9 @@ interface Settings {
   min_lot_size: number;
   ib_min_deposit_usd: number;
   referral_commission_amount_usd: number;
+  referral_amount_standard_usd: number;
+  referral_amount_ecn_usd: number;
+  referral_amount_vip_usd: number;
   referral_qualifying_trades: number;
   maintenance_mode: boolean;
   allow_new_registrations: boolean;
@@ -39,6 +42,9 @@ const DEFAULT_SETTINGS: Settings = {
   min_lot_size: 0.01,
   ib_min_deposit_usd: 100,
   referral_commission_amount_usd: 5,
+  referral_amount_standard_usd: 5,
+  referral_amount_ecn_usd: 7,
+  referral_amount_vip_usd: 10,
   referral_qualifying_trades: 3,
   maintenance_mode: false,
   allow_new_registrations: true,
@@ -76,6 +82,35 @@ function rowsToSettings(rows: SystemSettingRow[]): Settings {
       'referral_commission_amount_usd',
       DEFAULT_SETTINGS.referral_commission_amount_usd as number,
     ),
+    // Per-account-type map lives under a single JSON key; we explode
+    // it into 3 form fields for the input row, then re-pack on save.
+    referral_amount_standard_usd: (() => {
+      const raw = map['referral_commission_amounts_usd'];
+      if (raw && typeof raw === 'object') {
+        const v = (raw as Record<string, unknown>).standard;
+        const n = typeof v === 'number' ? v : parseFloat(String(v));
+        if (Number.isFinite(n)) return n;
+      }
+      return DEFAULT_SETTINGS.referral_amount_standard_usd as number;
+    })(),
+    referral_amount_ecn_usd: (() => {
+      const raw = map['referral_commission_amounts_usd'];
+      if (raw && typeof raw === 'object') {
+        const v = (raw as Record<string, unknown>).ecn;
+        const n = typeof v === 'number' ? v : parseFloat(String(v));
+        if (Number.isFinite(n)) return n;
+      }
+      return DEFAULT_SETTINGS.referral_amount_ecn_usd as number;
+    })(),
+    referral_amount_vip_usd: (() => {
+      const raw = map['referral_commission_amounts_usd'];
+      if (raw && typeof raw === 'object') {
+        const v = (raw as Record<string, unknown>).vip;
+        const n = typeof v === 'number' ? v : parseFloat(String(v));
+        if (Number.isFinite(n)) return n;
+      }
+      return DEFAULT_SETTINGS.referral_amount_vip_usd as number;
+    })(),
     referral_qualifying_trades: num(
       'referral_qualifying_trades',
       DEFAULT_SETTINGS.referral_qualifying_trades as number,
@@ -87,7 +122,7 @@ function rowsToSettings(rows: SystemSettingRow[]): Settings {
   };
 }
 
-function settingsToPayload(s: Settings): Record<string, number | boolean> {
+function settingsToPayload(s: Settings): Record<string, unknown> {
   return {
     default_leverage: s.default_leverage,
     margin_call_level: s.margin_call_level,
@@ -97,7 +132,16 @@ function settingsToPayload(s: Settings): Record<string, number | boolean> {
     max_lot_size: s.max_lot_size,
     min_lot_size: s.min_lot_size,
     ib_min_deposit_usd: s.ib_min_deposit_usd,
+    // Flat legacy amount stays — used as the fallback when the
+    // referred user's account type isn't in the per-type map below.
     referral_commission_amount_usd: s.referral_commission_amount_usd,
+    // Per-account-type map. Keys are lowercased AccountGroup.name —
+    // the gateway's referral_service indexes against that.
+    referral_commission_amounts_usd: {
+      standard: s.referral_amount_standard_usd,
+      ecn: s.referral_amount_ecn_usd,
+      vip: s.referral_amount_vip_usd,
+    },
     referral_qualifying_trades: s.referral_qualifying_trades,
     maintenance_mode: s.maintenance_mode,
     allow_new_registrations: s.allow_new_registrations,
@@ -345,10 +389,10 @@ export default function SettingsPage() {
               <div className="p-4 space-y-3">
                 <div className="flex flex-wrap items-center justify-between gap-4">
                   <div className="min-w-0 flex-1">
-                    <label className="text-xs text-text-secondary block">Payout per qualified referral</label>
+                    <label className="text-xs text-text-secondary block">Fallback payout (any account type)</label>
                     <p className="text-xxs text-text-tertiary mt-0.5">
-                      Flat USD credited to the referrer&apos;s main wallet when the referred user
-                      completes the qualifying trade count below.
+                      Used only when the referred user&apos;s account type isn&apos;t in the
+                      per-type table below.
                     </p>
                   </div>
                   <div className="flex items-center gap-1 shrink-0">
@@ -362,6 +406,35 @@ export default function SettingsPage() {
                       className="w-24 text-xs py-1.5 px-2 bg-bg-input border border-border-primary rounded-md font-mono tabular-nums text-right"
                     />
                     <span className="text-xxs text-text-tertiary w-8">USD</span>
+                  </div>
+                </div>
+
+                <div className="rounded-md border border-border-primary/60 p-3 space-y-2">
+                  <div className="text-xs text-text-secondary font-medium">Per-account-type payout</div>
+                  <p className="text-xxs text-text-tertiary -mt-1">
+                    Standard / ECN / VIP rates — engine matches by the referred user&apos;s primary trading-account type.
+                  </p>
+                  <div className="grid grid-cols-3 gap-2 pt-1">
+                    {([
+                      { key: 'referral_amount_standard_usd', label: 'Standard' },
+                      { key: 'referral_amount_ecn_usd',      label: 'ECN'      },
+                      { key: 'referral_amount_vip_usd',      label: 'VIP'      },
+                    ] as const).map((f) => (
+                      <label key={f.key} className="flex flex-col gap-1">
+                        <span className="text-xxs text-text-tertiary">{f.label}</span>
+                        <div className="flex items-center gap-1">
+                          <span className="text-xxs text-text-tertiary">$</span>
+                          <input
+                            type="number"
+                            step="0.5"
+                            min="0"
+                            value={settings[f.key] as number}
+                            onChange={(e) => updateNum(f.key, e.target.value)}
+                            className="w-full text-xs py-1.5 px-2 bg-bg-input border border-border-primary rounded-md font-mono tabular-nums text-right"
+                          />
+                        </div>
+                      </label>
+                    ))}
                   </div>
                 </div>
                 <div className="flex flex-wrap items-center justify-between gap-4">

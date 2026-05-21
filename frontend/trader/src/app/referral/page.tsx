@@ -16,8 +16,12 @@ interface ReferralDashboard {
   /** Referrals signed up but haven't yet closed enough trades. */
   pending_referrals?: number;
   total_earned: number;
-  /** Flat USD amount paid per qualified referral. */
+  /** Flat USD amount paid per qualified referral (legacy fallback). */
   amount_per_referral_usd?: number;
+  /** Per-account-type payout. Keys are lowercased account-group names
+      (standard / ecn / vip). The engine picks the rate matching the
+      referred user's primary trading account. */
+  amount_by_account_type?: Record<string, number>;
   /** Number of closed trades a referred user must complete (default 3). */
   required_trades?: number;
   /** Legacy field — older builds return a percentage; new clients ignore. */
@@ -160,13 +164,36 @@ export default function ReferralPage() {
           </section>
         )}
 
-        <section className="rounded-xl border border-accent/25 bg-accent/[0.04] p-4 text-xs text-text-secondary leading-relaxed">
-          <strong className="text-text-primary">How it works:</strong> share your link → friend registers
-          with your code → they close{' '}
-          <strong className="text-text-primary">{data?.required_trades ?? 3}</strong> trades →
-          you get a flat{' '}
-          <strong className="text-text-primary">${fmt(data?.amount_per_referral_usd ?? 0)}</strong>{' '}
-          credited to your main wallet. Withdraw or trade with it as you like — no separate balance.
+        <section className="rounded-xl border border-accent/25 bg-accent/[0.04] p-4 text-xs text-text-secondary leading-relaxed space-y-3">
+          <div>
+            <strong className="text-text-primary">How it works:</strong> share your link → friend
+            registers with your code → they close{' '}
+            <strong className="text-text-primary">{data?.required_trades ?? 3}</strong> trades →
+            you get a flat USD payout credited to your main wallet. Withdraw or trade with it
+            as you like — no separate balance.
+          </div>
+
+          {data?.amount_by_account_type && Object.keys(data.amount_by_account_type).length > 0 && (
+            <div>
+              <p className="text-text-tertiary mb-1.5">Payout by your friend&apos;s account type:</p>
+              <div className="grid grid-cols-3 gap-2">
+                {(['standard', 'ecn', 'vip'] as const).map((k) => {
+                  const v = data.amount_by_account_type?.[k];
+                  if (v == null) return null;
+                  return (
+                    <div key={k} className="rounded-md bg-bg-secondary border border-border-primary px-2 py-1.5">
+                      <div className="text-[10px] uppercase tracking-wider text-text-tertiary">{k}</div>
+                      <div className="text-text-primary font-mono tabular-nums">${fmt(v)}</div>
+                    </div>
+                  );
+                })}
+              </div>
+              <p className="text-[10px] text-text-tertiary mt-1.5">
+                The engine matches your friend&apos;s primary trading-account type to pick the rate.
+                Higher-tier subscriptions pay more.
+              </p>
+            </div>
+          )}
         </section>
       </div>
     </DashboardShell>

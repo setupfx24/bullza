@@ -21,25 +21,33 @@ cd "$REPO_ROOT"
 
 PULL=1
 BUILD=1
+MIGRATE=1
 SERVICES=()
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --no-pull)   PULL=0;  shift ;;
-    --no-build)  BUILD=0; shift ;;
-    --service)   SERVICES+=("$2"); shift 2 ;;
+    --no-pull)    PULL=0;    shift ;;
+    --no-build)   BUILD=0;   shift ;;
+    --no-migrate) MIGRATE=0; shift ;;
+    --service)    SERVICES+=("$2"); shift 2 ;;
     -h|--help)
       cat <<EOF
-Usage: $0 [--no-pull] [--no-build] [--service <name> [--service <name> ...]]
+Usage: $0 [--no-pull] [--no-build] [--no-migrate] [--service <name> [--service <name> ...]]
 
   --no-pull        Skip 'git pull origin main'
   --no-build       Skip docker compose build (use existing images)
+  --no-migrate     Skip Alembic upgrade head. Only use when you know
+                   the DB is already on the right revision — leaving
+                   migrations un-applied is the #1 cause of post-deploy
+                   502s (gateway crashes on first query against a
+                   missing column).
   --service <n>    Limit the BUILD step to specific service(s); the up
                    step always brings the full stack up. Repeatable.
 
 Examples:
-  $0                                    # full deploy (rebuild + up everything)
+  $0                                    # full deploy (rebuild + migrate + up everything)
   $0 --service trader-frontend          # rebuild just trader-frontend, up the full stack
   $0 --no-build --service gateway       # skip build entirely (--service is a no-op here)
+  $0 --no-migrate                       # rebuild + up, skip Alembic
 EOF
       exit 0 ;;
     *) echo "Unknown arg: $1 (try --help)"; exit 2 ;;
@@ -72,6 +80,21 @@ if [[ $BUILD -eq 1 ]]; then
   else
     "${COMPOSE[@]}" build --no-cache
   fi
+fi
+
+# Run pending migrations BEFORE bringing the stack up. The migrate
+# service is profile-gated (won't auto-start with normal up), so we
+# invoke it explicitly. --exit-code-from migrate makes the run blocking
+# and propagates the alembic exit code — if a migration fails, we abort
+# the deploy instead of letting the gateway start against a stale DB
+# and crash-loop with 'column does not exist'. The 2026-05-21 outage
+# (502 for ~2 hours after 0045/0046 shipped without migrate) is the
+# regression this prevents.
+if [[ $MIGRATE -eq 1 ]]; then
+  echo "==> docker compose --profile migrate up migrate  (Alembic upgrade head)"
+  "${COMPOSE[@]}" --profile migrate up --exit-code-from migrate migrate
+  # Clean up the one-shot container so it doesn't show in `ps` output.
+  "${COMPOSE[@]}" --profile migrate rm -f migrate >/dev/null 2>&1 || true
 fi
 
 # `up -d` always runs over the FULL stack — even when --service narrowed

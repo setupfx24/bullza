@@ -23,6 +23,137 @@ from packages.common.src.admin_schemas import (
 from dependencies import write_audit_log
 
 
+async def get_company_ib(db: AsyncSession) -> dict:
+    """Return the currently designated company / house IB along with its
+    referral link and a referral-count stat. Used by the admin
+    /business/ib panel.
+
+    Empty payload (user fields = null) means no designation yet — the
+    admin picks one from the IB dropdown.
+    """
+    from packages.common.src.settings_store import (
+        get_bool_setting, get_system_setting,
+    )
+
+    raw_uid = await get_system_setting("company_ib_user_id", None)
+    attach = await get_bool_setting("company_ib_attach_unreferred", False)
+
+    out: dict = {
+        "user_id": None,
+        "user_email": None,
+        "ib_profile_id": None,
+        "referral_code": None,
+        "referral_link": None,
+        "referrals_count": 0,
+        "attach_unreferred": bool(attach),
+    }
+
+    if not raw_uid or not isinstance(raw_uid, str) or not raw_uid.strip():
+        return out
+
+    try:
+        import uuid as _uuid
+        uid = _uuid.UUID(raw_uid.strip())
+    except (ValueError, AttributeError):
+        return out
+
+    user_row = (await db.execute(select(User).where(User.id == uid))).scalar_one_or_none()
+    if user_row is None:
+        return out
+    ib_row = (await db.execute(
+        select(IBProfile).where(IBProfile.user_id == uid)
+    )).scalar_one_or_none()
+    if ib_row is None:
+        # User exists but has no IB profile — show it so admin sees the
+        # broken state and can fix it from the panel.
+        return {**out, "user_id": str(user_row.id), "user_email": user_row.email}
+
+    # Build a marketing-friendly link from the broker's public frontend
+    # URL (falls back to the canonical swisdex.com when env isn't set).
+    from packages.common.src.config import get_settings as _gs
+    base_url = (_gs().TRADER_APP_URL or "https://swisdex.com").rstrip("/")
+    link = f"{base_url}/auth/register?ref={ib_row.referral_code}"
+
+    n = (await db.execute(
+        select(func.count()).select_from(Referral).where(
+            Referral.ib_profile_id == ib_row.id,
+        )
+    )).scalar() or 0
+
+    return {
+        "user_id": str(user_row.id),
+        "user_email": user_row.email,
+        "ib_profile_id": str(ib_row.id),
+        "referral_code": ib_row.referral_code,
+        "referral_link": link,
+        "referrals_count": int(n),
+        "attach_unreferred": bool(attach),
+    }
+
+
+async def set_company_ib(
+    user_id_str: str,
+    attach_unreferred: bool,
+    admin_id,
+    ip_address: str | None,
+    db: AsyncSession,
+) -> dict:
+    """Designate (or clear) the company / house IB.
+
+    Pass an empty string to clear. Otherwise the user_id MUST be an
+    existing user with an active IBProfile — we validate before saving
+    so the admin doesn't accidentally point at a non-IB user.
+    """
+    from packages.common.src.settings_store import invalidate_cache
+
+    cleaned = (user_id_str or "").strip()
+    if cleaned:
+        try:
+            import uuid as _uuid
+            uid = _uuid.UUID(cleaned)
+        except (ValueError, AttributeError):
+            raise HTTPException(status_code=400, detail="Invalid user_id format")
+        ib_row = (await db.execute(
+            select(IBProfile).where(
+                IBProfile.user_id == uid,
+                IBProfile.is_active == True,
+            )
+        )).scalar_one_or_none()
+        if ib_row is None:
+            raise HTTPException(
+                status_code=400,
+                detail="Selected user does not have an active IB profile",
+            )
+
+    # Upsert both settings rows in one shot.
+    now = datetime.utcnow()
+    for key, value in [
+        ("company_ib_user_id", cleaned),
+        ("company_ib_attach_unreferred", bool(attach_unreferred)),
+    ]:
+        existing = (await db.execute(
+            select(SystemSetting).where(SystemSetting.key == key)
+        )).scalar_one_or_none()
+        if existing is None:
+            db.add(SystemSetting(key=key, value=value, updated_by=admin_id))
+        else:
+            existing.value = value
+            existing.updated_by = admin_id
+            existing.updated_at = now
+
+    await write_audit_log(
+        db, admin_id, "set_company_ib", "system_setting", None,
+        new_values={
+            "company_ib_user_id": cleaned,
+            "company_ib_attach_unreferred": bool(attach_unreferred),
+        },
+        ip_address=ip_address,
+    )
+    await db.commit()
+    await invalidate_cache()
+    return await get_company_ib(db)
+
+
 async def referral_program_overview(
     page: int, per_page: int, db: AsyncSession,
 ) -> dict:

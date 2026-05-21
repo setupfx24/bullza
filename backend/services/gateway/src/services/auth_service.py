@@ -448,6 +448,48 @@ async def _consume_referral(db: AsyncSession, user_id: UUID, referral_code: str)
             logger.debug("signup referral bonus failed: %s", _e)
 
 
+async def _attach_to_company_ib(db: AsyncSession, user_id: UUID) -> None:
+    """If admin has designated a company IB AND the auto-attach toggle is
+    on, parent any unreferred signup under that IB. This is what makes
+    the 'House IB' a real default sink — bonus campaigns + organic
+    signups all roll up to it so the broker can see them in one tree.
+    """
+    from packages.common.src.settings_store import (
+        get_bool_setting, get_system_setting,
+    )
+
+    if not await get_bool_setting("company_ib_attach_unreferred", False):
+        return
+    raw_uid = await get_system_setting("company_ib_user_id", None)
+    if not raw_uid or not isinstance(raw_uid, str) or not raw_uid.strip():
+        return
+    try:
+        company_user_id = UUID(raw_uid.strip())
+    except (ValueError, AttributeError):
+        return
+    if company_user_id == user_id:
+        return  # self-attribution guard
+
+    ib_q = await db.execute(
+        select(IBProfile).where(
+            IBProfile.user_id == company_user_id,
+            IBProfile.is_active == True,
+        )
+    )
+    company_ib = ib_q.scalar_one_or_none()
+    if not company_ib:
+        # Admin pointed at a user that has no active IB profile — silent
+        # no-op rather than block signup. They'll see the warning on the
+        # admin Company-IB panel.
+        return
+
+    db.add(Referral(
+        referrer_id=company_ib.user_id,
+        referred_id=user_id,
+        ib_profile_id=company_ib.id,
+    ))
+
+
 # ─── Core: issue auth response ───────────────────────────────────────────
 
 async def issue_auth_json_response(
@@ -602,6 +644,7 @@ async def register_user(
     from . import referral_service as _ref
     await _ref.ensure_referral_code(db, user)
 
+    linked_to_referrer = False
     if referral_code:
         # Try user-level referral first; if that fails, fall back to IB
         # MLM. The two systems coexist — a code uniquely belongs to one
@@ -609,6 +652,16 @@ async def register_user(
         linked = await _ref.attach_referrer_by_code(db, user.id, referral_code)
         if linked is None:
             await _consume_referral(db, user.id, referral_code)
+        linked_to_referrer = True  # any code attempt counts; bad codes still mean "they tried"
+
+    # Fallback: if no ?ref= was used at all, optionally parent the new
+    # user under the designated company IB so the house tree captures
+    # all organic signups (admin toggle: company_ib_attach_unreferred).
+    if not linked_to_referrer:
+        try:
+            await _attach_to_company_ib(db, user.id)
+        except Exception as _ce:
+            logger.debug("company-IB attach failed: %s", _ce)
 
     await db.commit()
 
@@ -897,6 +950,11 @@ async def google_oauth(
                 linked = await _ref.attach_referrer_by_code(db, user.id, referral_code)
                 if linked is None:
                     await _consume_referral(db, user.id, referral_code)
+            else:
+                try:
+                    await _attach_to_company_ib(db, user.id)
+                except Exception as _ce:
+                    logger.debug("company-IB attach (google) failed: %s", _ce)
 
     if user.status == "banned":
         raise AuthServiceError("Account has been banned", 403)
