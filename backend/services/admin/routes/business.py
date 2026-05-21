@@ -1,6 +1,7 @@
 import uuid
 
 from fastapi import APIRouter, Depends, Query, Request
+from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from packages.common.src.database import get_db
@@ -12,6 +13,38 @@ from packages.common.src.admin_schemas import (
 from services import business_service
 
 router = APIRouter(prefix="/business", tags=["Business"])
+
+
+class CompanyIBDesignateIn(BaseModel):
+    # Empty string clears the designation.
+    user_id: str
+    attach_unreferred: bool = False
+
+
+@router.get("/company-ib")
+async def get_company_ib(
+    admin: User = Depends(require_permission("ib.view")),
+    db: AsyncSession = Depends(get_db),
+):
+    """Show which user is currently designated as the company / house IB,
+    plus its referral link and a quick stat (referrals on file)."""
+    return await business_service.get_company_ib(db)
+
+
+@router.put("/company-ib")
+async def set_company_ib(
+    body: CompanyIBDesignateIn,
+    request: Request,
+    admin: User = Depends(require_permission("ib.manage")),
+    db: AsyncSession = Depends(get_db),
+):
+    return await business_service.set_company_ib(
+        user_id_str=body.user_id,
+        attach_unreferred=body.attach_unreferred,
+        admin_id=admin.id,
+        ip_address=request.client.host if request.client else None,
+        db=db,
+    )
 
 
 @router.get("/referral/overview")

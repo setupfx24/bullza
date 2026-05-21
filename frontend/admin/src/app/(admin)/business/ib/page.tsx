@@ -153,6 +153,53 @@ export default function IBPage() {
     }
   };
 
+  // Company / House IB state — the designated IB the broker uses for
+  // its own marketing campaigns and as the default parent for
+  // unreferred signups when the auto-attach toggle is on.
+  interface CompanyIBState {
+    user_id: string | null;
+    user_email: string | null;
+    ib_profile_id: string | null;
+    referral_code: string | null;
+    referral_link: string | null;
+    referrals_count: number;
+    attach_unreferred: boolean;
+  }
+  const [companyIB, setCompanyIB] = useState<CompanyIBState | null>(null);
+  const [companyIBLoaded, setCompanyIBLoaded] = useState(false);
+  const [companyIBPicker, setCompanyIBPicker] = useState<string>('');
+  const [companyIBAttach, setCompanyIBAttach] = useState<boolean>(false);
+  const [savingCompanyIB, setSavingCompanyIB] = useState(false);
+
+  const loadCompanyIB = useCallback(async () => {
+    try {
+      const c = await adminApi.get<CompanyIBState>('/business/company-ib');
+      setCompanyIB(c);
+      setCompanyIBPicker(c?.user_id || '');
+      setCompanyIBAttach(!!c?.attach_unreferred);
+    } catch {/* leave default */} finally {
+      setCompanyIBLoaded(true);
+    }
+  }, []);
+
+  useEffect(() => { loadCompanyIB(); }, [loadCompanyIB]);
+
+  const saveCompanyIB = async () => {
+    setSavingCompanyIB(true);
+    try {
+      const updated = await adminApi.put<CompanyIBState>('/business/company-ib', {
+        user_id: companyIBPicker,
+        attach_unreferred: companyIBAttach,
+      });
+      setCompanyIB(updated);
+      toast.success(companyIBPicker ? 'Company IB updated' : 'Company IB cleared');
+    } catch (e: any) {
+      toast.error(e?.message || 'Save failed');
+    } finally {
+      setSavingCompanyIB(false);
+    }
+  };
+
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
@@ -468,6 +515,98 @@ export default function IBPage() {
                 {savingMinDeposit ? <Loader2 size={12} className="animate-spin" /> : null} Save
               </button>
             </div>
+          </div>
+        )}
+
+        {/* Company / House IB — the IB the broker owns and uses for its
+            own bonus campaigns and as the default parent for unreferred
+            signups. Designate any approved IB from the dropdown. */}
+        {companyIBLoaded && (
+          <div className="bg-bg-secondary border border-accent/30 rounded-md p-4 space-y-3">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h2 className="text-sm font-semibold text-text-primary">Company / House IB</h2>
+                <p className="text-xxs text-text-tertiary mt-0.5 max-w-2xl">
+                  Designate one of the approved IBs as the company&apos;s own. Use its
+                  referral link in marketing campaigns; optionally auto-attach all
+                  unreferred signups under it so the house tree captures organic traffic.
+                </p>
+              </div>
+              <button
+                onClick={saveCompanyIB}
+                disabled={savingCompanyIB}
+                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-md text-xs font-medium text-white bg-buy hover:bg-buy-light disabled:opacity-50"
+              >
+                {savingCompanyIB ? <Loader2 size={12} className="animate-spin" /> : null} Save
+              </button>
+            </div>
+
+            <div className="grid sm:grid-cols-[1fr_auto] gap-3 items-start">
+              <div className="space-y-2">
+                <label className="text-xxs text-text-tertiary uppercase tracking-wide block">Designated IB</label>
+                <select
+                  value={companyIBPicker}
+                  onChange={(e) => setCompanyIBPicker(e.target.value)}
+                  className="w-full text-xs py-1.5 px-2 bg-bg-input border border-border-primary rounded-md text-text-primary"
+                >
+                  <option value="">— None (not designated) —</option>
+                  {agents.map((a) => (
+                    <option key={a.id} value={a.user_id}>
+                      {a.user_name} ({a.user_email}) · {a.referral_code}
+                    </option>
+                  ))}
+                </select>
+                <label className="flex items-center gap-2 text-xs text-text-secondary cursor-pointer mt-1">
+                  <input
+                    type="checkbox"
+                    checked={companyIBAttach}
+                    onChange={(e) => setCompanyIBAttach(e.target.checked)}
+                    className="rounded border-border-primary"
+                  />
+                  <span>Auto-attach unreferred signups under this IB</span>
+                </label>
+              </div>
+              <div className="text-xxs text-text-tertiary space-y-1 min-w-[180px]">
+                <div>
+                  <div className="text-text-tertiary">Current</div>
+                  <div className="text-text-primary font-mono text-xs truncate">
+                    {companyIB?.user_email || '—'}
+                  </div>
+                </div>
+                {companyIB?.referral_code && (
+                  <div>
+                    <div className="text-text-tertiary">Code</div>
+                    <div className="text-text-primary font-mono text-xs">{companyIB.referral_code}</div>
+                  </div>
+                )}
+                <div>
+                  <div className="text-text-tertiary">Referrals on file</div>
+                  <div className="text-text-primary font-mono text-xs">{companyIB?.referrals_count ?? 0}</div>
+                </div>
+              </div>
+            </div>
+
+            {companyIB?.referral_link && (
+              <div className="flex flex-wrap items-center gap-2 pt-1">
+                <input
+                  type="text"
+                  readOnly
+                  value={companyIB.referral_link}
+                  className="flex-1 min-w-[280px] text-xs py-1.5 px-2 bg-bg-input border border-border-primary rounded-md font-mono text-text-secondary"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!companyIB.referral_link) return;
+                    navigator.clipboard.writeText(companyIB.referral_link);
+                    toast.success('Link copied');
+                  }}
+                  className="px-2 py-1.5 text-xs border border-border-primary rounded-md text-text-secondary hover:bg-bg-hover"
+                >
+                  Copy
+                </button>
+              </div>
+            )}
           </div>
         )}
 
