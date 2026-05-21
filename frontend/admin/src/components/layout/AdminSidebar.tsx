@@ -65,6 +65,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Analytics', href: '/analytics', icon: BarChart3, perm: 'analytics.view' },
   { label: 'Audit logs', href: '/audit-logs', icon: ScrollText, perm: 'audit_logs.view' },
   { label: 'Bonus', href: '/bonus', icon: Gift, perm: 'bonus.view' },
+  { label: 'Trade Insurance', href: '/insurance', icon: ShieldCheck, perm: '*' },
   { label: 'Play Zone', href: '/play-zone', icon: Sparkles, perm: '*' },
   { label: 'Lifestyle Queue', href: '/lifestyle', icon: Package, perm: '*' },
   { label: 'Banners', href: '/banners', icon: Image, perm: 'banners.view' },
