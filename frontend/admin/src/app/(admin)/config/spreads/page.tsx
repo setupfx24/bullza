@@ -7,12 +7,16 @@ import toast from 'react-hot-toast';
 import { Loader2, Plus, Save, Trash2, X } from 'lucide-react';
 
 interface Instrument { id: string; symbol: string; display_name: string; segment: string; segment_id: string | null; }
+interface AccountGroup { id: string; name: string }
 interface SpreadRow {
   _key: string;
   scope: string;
   instrument_id: string | null;
   segment_id: string | null;
   user_id: string | null;
+  /** NULL = applies to every account type (wildcard). When set, this rule
+      only fires for trades on accounts in this group. */
+  account_group_id: string | null;
   spread_type: string;
   value: number;
   is_enabled: boolean;
@@ -23,6 +27,7 @@ const newKey = () => `row_${Date.now().toString(36)}_${Math.random().toString(36
 
 export default function SpreadsPage() {
   const [instruments, setInstruments] = useState<Instrument[]>([]);
+  const [accountGroups, setAccountGroups] = useState<AccountGroup[]>([]);
   const [rows, setRows] = useState<SpreadRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -33,15 +38,26 @@ export default function SpreadsPage() {
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const [instRes, spreadRes] = await Promise.all([
+      const [instRes, spreadRes, groupRes] = await Promise.all([
         adminApi.get<{ items: Instrument[] }>('/config/instruments'),
         adminApi.get<any[]>('/config/spreads'),
+        // /admin/account-types returns the AccountGroup list (Standard,
+        // ECN, VIP, ...). Used to power the per-account-type dropdown
+        // on each rule row. Falls back to empty list if endpoint changes.
+        adminApi.get<{ items: AccountGroup[] } | AccountGroup[]>('/account-types').catch(() => ({ items: [] as AccountGroup[] })),
       ]);
       setInstruments(instRes.items || []);
+      const groupsRaw: any = groupRes;
+      const groupsList: AccountGroup[] = Array.isArray(groupsRaw)
+        ? groupsRaw
+        : (groupsRaw?.items || []);
+      setAccountGroups(groupsList);
       setRows((spreadRes || []).map((c: any) => ({
         _key: newKey(),
         scope: c.scope, instrument_id: c.instrument_id, segment_id: c.segment_id,
-        user_id: c.user_id, spread_type: c.spread_type, value: c.value, is_enabled: c.is_enabled,
+        user_id: c.user_id,
+        account_group_id: c.account_group_id ?? null,
+        spread_type: c.spread_type, value: c.value, is_enabled: c.is_enabled,
         _user_label: c.user_id ? `User ${c.user_id.slice(0, 8)}` : undefined,
       })));
     } catch (e: any) { toast.error(e.message || 'Failed to load'); } finally { setLoading(false); }
@@ -49,7 +65,7 @@ export default function SpreadsPage() {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
-  const addRow = (scope: string) => setRows(prev => [...prev, { _key: newKey(), scope, instrument_id: null, segment_id: null, user_id: null, spread_type: 'fixed', value: 1, is_enabled: true }]);
+  const addRow = (scope: string) => setRows(prev => [...prev, { _key: newKey(), scope, instrument_id: null, segment_id: null, user_id: null, account_group_id: null, spread_type: 'fixed', value: 1, is_enabled: true }]);
   const updateRow = (key: string, field: string, val: any) => {
     setRows(prev => prev.map(r => {
       if (r._key !== key) return r;
@@ -75,7 +91,7 @@ export default function SpreadsPage() {
       const normalized = normalizeRows(next);
       const cleaned = normalized.filter(r => !(r.scope === 'user' && !r.user_id));
       await adminApi.put('/config/spreads', {
-        configs: cleaned.map(r => ({ scope: r.scope, instrument_id: r.instrument_id, segment_id: r.segment_id, user_id: r.user_id, spread_type: r.spread_type, value: r.value, is_enabled: r.is_enabled })),
+        configs: cleaned.map(r => ({ scope: r.scope, instrument_id: r.instrument_id, segment_id: r.segment_id, user_id: r.user_id, account_group_id: r.account_group_id, spread_type: r.spread_type, value: r.value, is_enabled: r.is_enabled })),
       });
       toast.success('Rule removed');
     } catch (e: any) {
@@ -100,7 +116,7 @@ export default function SpreadsPage() {
     const cleaned = normalizeRows(rows);
     setSaving(true);
     try {
-      await adminApi.put('/config/spreads', { configs: cleaned.map(r => ({ scope: r.scope, instrument_id: r.instrument_id, segment_id: r.segment_id, user_id: r.user_id, spread_type: r.spread_type, value: r.value, is_enabled: r.is_enabled })) });
+      await adminApi.put('/config/spreads', { configs: cleaned.map(r => ({ scope: r.scope, instrument_id: r.instrument_id, segment_id: r.segment_id, user_id: r.user_id, account_group_id: r.account_group_id, spread_type: r.spread_type, value: r.value, is_enabled: r.is_enabled })) });
       toast.success('Spreads saved'); fetchData();
     } catch (e: any) { toast.error(e.message || 'Save failed'); } finally { setSaving(false); }
   };
@@ -120,12 +136,12 @@ export default function SpreadsPage() {
         <div className="overflow-visible">
           <table className="w-full">
             <thead><tr className="border-b border-border-primary bg-bg-tertiary/40">
-              {(scopeType === 'instrument' ? ['Instrument'] : scopeType === 'user' ? ['User', 'Instrument'] : []).concat(['Type', 'Value (pips)', 'On', '']).map(c => (
+              {(scopeType === 'instrument' ? ['Instrument'] : scopeType === 'user' ? ['User', 'Instrument'] : []).concat(['Account type', 'Type', 'Value (pips)', 'On', '']).map(c => (
                 <th key={c} className="text-left px-3 py-2 text-xxs font-medium text-text-tertiary uppercase tracking-wide">{c}</th>
               ))}
             </tr></thead>
             <tbody>
-              {items.length === 0 ? <tr><td colSpan={6} className="px-4 py-6 text-center text-xxs text-text-tertiary">No rules.</td></tr> : items.map(r => {
+              {items.length === 0 ? <tr><td colSpan={7} className="px-4 py-6 text-center text-xxs text-text-tertiary">No rules.</td></tr> : items.map(r => {
                 const k = r._key;
                 return (
                   <tr key={k} className="border-b border-border-primary/50 hover:bg-bg-hover/30">
@@ -148,6 +164,17 @@ export default function SpreadsPage() {
                     {(scopeType === 'instrument' || scopeType === 'user') && (
                       <td className="px-3 py-2"><select value={r.instrument_id || ''} onChange={e => updateRow(k, 'instrument_id', e.target.value || null)} className="text-xs py-1 pl-2 pr-6 appearance-none bg-bg-input border border-border-primary rounded text-text-primary w-32"><option value="">All</option>{instruments.map(i => <option key={i.id} value={i.id}>{i.symbol}</option>)}</select></td>
                     )}
+                    <td className="px-3 py-2">
+                      <select
+                        value={r.account_group_id || ''}
+                        onChange={e => updateRow(k, 'account_group_id', e.target.value || null)}
+                        className="text-xs py-1 pl-2 pr-6 appearance-none bg-bg-input border border-border-primary rounded text-text-primary w-28"
+                        title="Account types this rule applies to. 'Any' = wildcard."
+                      >
+                        <option value="">Any</option>
+                        {accountGroups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
+                      </select>
+                    </td>
                     <td className="px-3 py-2"><select value={r.spread_type} onChange={e => updateRow(k, 'spread_type', e.target.value)} className="text-xs py-1 pl-2 pr-6 appearance-none bg-bg-input border border-border-primary rounded text-text-primary w-24"><option value="fixed">Fixed</option><option value="variable">Variable</option></select></td>
                     <td className="px-3 py-2"><input type="number" step="0.1" min="0" value={r.value} onChange={e => updateRow(k, 'value', parseFloat(e.target.value) || 0)} className="w-20 px-2 py-1 text-xs bg-bg-input border border-border-primary rounded font-mono tabular-nums text-text-primary" /></td>
                     <td className="px-3 py-2"><button onClick={() => updateRow(k, 'is_enabled', !r.is_enabled)} className={cn('w-8 h-4 rounded-full transition-fast relative', r.is_enabled ? 'bg-buy' : 'bg-bg-hover border border-border-primary')}><span className={cn('absolute top-0.5 w-3 h-3 rounded-full bg-white shadow transition-fast', r.is_enabled ? 'left-[16px]' : 'left-0.5')} /></button></td>

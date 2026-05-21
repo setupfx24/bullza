@@ -332,6 +332,9 @@ class ChargeConfigIn(BaseModel):
     segment_id: Optional[str] = None
     instrument_id: Optional[str] = None
     user_id: Optional[str] = None
+    # NULL = wildcard (matches every account type). When set, the
+    # resolver prefers this row over wildcards at the same scope.
+    account_group_id: Optional[str] = None
     charge_type: str
     value: float
     is_enabled: bool = True
@@ -343,6 +346,7 @@ class ChargeConfigOut(BaseModel):
     segment_id: Optional[str] = None
     instrument_id: Optional[str] = None
     user_id: Optional[str] = None
+    account_group_id: Optional[str] = None
     charge_type: str
     value: float
     is_enabled: bool
@@ -357,6 +361,7 @@ class SpreadConfigIn(BaseModel):
     segment_id: Optional[str] = None
     instrument_id: Optional[str] = None
     user_id: Optional[str] = None
+    account_group_id: Optional[str] = None
     spread_type: str
     value: float
     is_enabled: bool = True
@@ -368,6 +373,7 @@ class SpreadConfigOut(BaseModel):
     segment_id: Optional[str] = None
     instrument_id: Optional[str] = None
     user_id: Optional[str] = None
+    account_group_id: Optional[str] = None
     spread_type: str
     value: float
     is_enabled: bool

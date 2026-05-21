@@ -4,13 +4,33 @@ from decimal import Decimal
 from typing import Optional, Tuple
 from uuid import UUID
 
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from packages.common.src.models import (
     ChargeConfig, SpreadConfig, Instrument, InstrumentConfig,
     AccountGroup, RewardsUserState,
 )
+
+
+def _acct_grp_clause(model, account_group_id: Optional[UUID]):
+    """WHERE-clause helper that matches rows for the given account group
+    AND wildcard (NULL) rows. When ``account_group_id`` is None we ONLY
+    match wildcards — exactly the behaviour the resolver had before this
+    column existed, so legacy rows keep working.
+    """
+    if account_group_id is None:
+        return model.account_group_id.is_(None)
+    return or_(
+        model.account_group_id == account_group_id,
+        model.account_group_id.is_(None),
+    )
+
+
+def _acct_grp_order(model):
+    """Sort matching rows (non-NULL account_group_id) BEFORE wildcards so
+    ``.limit(1)`` picks the more-specific rule when both exist."""
+    return model.account_group_id.is_(None).asc()
 
 
 # ─── XP-tier brokerage discount ─────────────────────────────────────
@@ -60,23 +80,22 @@ async def resolve_spread_config(
     db: AsyncSession,
     instrument: Instrument,
     user_id: Optional[UUID] = None,
+    account_group_id: Optional[UUID] = None,
 ) -> Tuple[Decimal, str, Decimal]:
     """Returns (spread_value, spread_type, price_impact).
 
-    Priority chain (highest → lowest), mirrors ``resolve_commission`` so admin's
-    "All" + specific overrides behave the same across charges and spreads:
-      1. User override for this specific instrument
-      2. User override global (user, null instrument)
-      3. Per-instrument rule (instrument scope, this instrument)
-      4. Per-segment rule (segment scope, this instrument's segment)
+    Priority chain (highest → lowest):
+      1. User override + this instrument
+      2. User override + any instrument
+      3. Instrument scope (this instrument)
+      4. Segment scope (this instrument's segment)
       5. Default (all instruments)
       6. Zero
 
-    A specific instrument rule wins for that symbol; "All" fills in for the rest.
-
-    ``price_impact`` on ``instrument_configs`` is returned for APIs but is **not**
-    applied to Redis stream quotes — widths come only from ``spread_configs``
-    so the admin default matches the terminal ``Spr`` display.
+    At every scope, the resolver also factors in account_group_id:
+    a row whose ``account_group_id`` matches wins over a NULL-wildcard
+    row at the same scope. Pass account_group_id=None to keep the
+    pre-0049 behaviour (wildcards only).
     """
     pimp = await _instrument_config_price_impact(db, instrument.id)
 
@@ -87,65 +106,72 @@ async def resolve_spread_config(
             pimp,
         )
 
+    agc = _acct_grp_clause(SpreadConfig, account_group_id)
+    ago = _acct_grp_order(SpreadConfig)
+
     if user_id:
-        ur = await db.execute(
+        urow = (await db.execute(
             select(SpreadConfig)
             .where(
                 func.lower(SpreadConfig.scope) == "user",
                 SpreadConfig.is_enabled == True,
                 SpreadConfig.user_id == user_id,
                 SpreadConfig.instrument_id == instrument.id,
+                agc,
             )
+            .order_by(ago)
             .limit(1)
-        )
-        urow = ur.scalar_one_or_none()
+        )).scalar_one_or_none()
         if urow:
             return _to_tuple(urow)
 
-        ur2 = await db.execute(
+        urow2 = (await db.execute(
             select(SpreadConfig)
             .where(
                 func.lower(SpreadConfig.scope) == "user",
                 SpreadConfig.is_enabled == True,
                 SpreadConfig.user_id == user_id,
                 SpreadConfig.instrument_id.is_(None),
+                agc,
             )
+            .order_by(ago)
             .limit(1)
-        )
-        urow2 = ur2.scalar_one_or_none()
+        )).scalar_one_or_none()
         if urow2:
             return _to_tuple(urow2)
 
-    ir = await db.execute(
+    irow = (await db.execute(
         select(SpreadConfig)
         .where(
             func.lower(SpreadConfig.scope) == "instrument",
             SpreadConfig.is_enabled == True,
             SpreadConfig.user_id.is_(None),
             SpreadConfig.instrument_id == instrument.id,
+            agc,
         )
+        .order_by(ago)
         .limit(1)
-    )
-    irow = ir.scalar_one_or_none()
+    )).scalar_one_or_none()
     if irow:
         return _to_tuple(irow)
 
     if instrument.segment_id:
-        sr = await db.execute(
+        srow = (await db.execute(
             select(SpreadConfig)
             .where(
                 func.lower(SpreadConfig.scope) == "segment",
                 SpreadConfig.is_enabled == True,
                 SpreadConfig.user_id.is_(None),
                 SpreadConfig.segment_id == instrument.segment_id,
+                agc,
             )
+            .order_by(ago)
             .limit(1)
-        )
-        srow = sr.scalar_one_or_none()
+        )).scalar_one_or_none()
         if srow:
             return _to_tuple(srow)
 
-    dr = await db.execute(
+    default_cfg = (await db.execute(
         select(SpreadConfig)
         .where(
             func.lower(SpreadConfig.scope) == "default",
@@ -153,11 +179,11 @@ async def resolve_spread_config(
             SpreadConfig.instrument_id.is_(None),
             SpreadConfig.segment_id.is_(None),
             SpreadConfig.user_id.is_(None),
+            agc,
         )
-        .order_by(SpreadConfig.created_at.desc())
+        .order_by(ago, SpreadConfig.created_at.desc())
         .limit(1)
-    )
-    default_cfg = dr.scalar_one_or_none()
+    )).scalar_one_or_none()
     if default_cfg:
         return _to_tuple(default_cfg)
 
@@ -254,33 +280,38 @@ async def resolve_commission(
 
     base_commission: Optional[Decimal] = None
 
+    agc = _acct_grp_clause(ChargeConfig, account_group_id)
+    ago = _acct_grp_order(ChargeConfig)
+
     if user_id is not None:
-        ur = await db.execute(
+        urow = (await db.execute(
             select(ChargeConfig)
             .where(
                 func.lower(ChargeConfig.scope) == "user",
                 ChargeConfig.is_enabled == True,
                 ChargeConfig.user_id == user_id,
                 ChargeConfig.instrument_id == instrument.id,
+                agc,
             )
+            .order_by(ago)
             .limit(1)
-        )
-        urow = ur.scalar_one_or_none()
+        )).scalar_one_or_none()
         if urow:
             base_commission = _commission_from_config(urow, lots, notional)
 
         if base_commission is None:
-            ur2 = await db.execute(
+            urow2 = (await db.execute(
                 select(ChargeConfig)
                 .where(
                     func.lower(ChargeConfig.scope) == "user",
                     ChargeConfig.is_enabled == True,
                     ChargeConfig.user_id == user_id,
                     ChargeConfig.instrument_id.is_(None),
+                    agc,
                 )
+                .order_by(ago)
                 .limit(1)
-            )
-            urow2 = ur2.scalar_one_or_none()
+            )).scalar_one_or_none()
             if urow2:
                 base_commission = _commission_from_config(urow2, lots, notional)
 
@@ -294,6 +325,7 @@ async def resolve_commission(
                 ChargeConfig.scope == scope,
                 ChargeConfig.is_enabled == True,
                 ChargeConfig.user_id.is_(None),
+                agc,
             )
             if scope == "instrument":
                 q = q.where(ChargeConfig.instrument_id == inst_id)
@@ -304,8 +336,9 @@ async def resolve_commission(
                     ChargeConfig.instrument_id.is_(None),
                     ChargeConfig.segment_id.is_(None),
                 )
-            r = await db.execute(q.limit(1))
-            cfg = r.scalar_one_or_none()
+            cfg = (await db.execute(
+                q.order_by(ago).limit(1)
+            )).scalar_one_or_none()
             if cfg:
                 base_commission = _commission_from_config(cfg, lots, notional)
                 break
