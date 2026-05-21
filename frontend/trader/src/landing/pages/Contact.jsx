@@ -66,8 +66,8 @@ const Contact = () => {
     {
       icon: Phone,
       title: 'Call Us',
-      content: '+44 20 1234 5678',
-      link: 'tel:+442012345678'
+      content: '+44 7737119979',
+      link: 'tel:+447737119979'
     },
     {
       icon: MapPin,
@@ -184,13 +184,10 @@ const Contact = () => {
                   </p>
                   <div className="space-y-2">
                     <p className="text-text-secondary">
-                      <span className="text-white font-semibold">Phone:</span> +44 20 1234 5678
+                      <span className="text-white font-semibold">Phone:</span> +44 7737119979
                     </p>
                     <p className="text-text-secondary">
                       <span className="text-white font-semibold">Email:</span> support@swisdex.com
-                    </p>
-                    <p className="text-text-secondary">
-                      <span className="text-white font-semibold">Hours:</span> Mon-Fri, 9:00 AM - 6:00 PM GMT
                     </p>
                   </div>
                 </Card>
