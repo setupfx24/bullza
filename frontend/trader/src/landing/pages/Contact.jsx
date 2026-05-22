@@ -60,8 +60,8 @@ const Contact = () => {
     {
       icon: Mail,
       title: 'Email Us',
-      content: 'support@swisdex.com',
-      link: 'mailto:support@swisdex.com'
+      content: 'info@swisdex.com',
+      link: 'mailto:info@swisdex.com'
     },
     {
       icon: Phone,
@@ -187,7 +187,7 @@ const Contact = () => {
                       <span className="text-white font-semibold">Phone:</span> +44 7737119979
                     </p>
                     <p className="text-text-secondary">
-                      <span className="text-white font-semibold">Email:</span> support@swisdex.com
+                      <span className="text-white font-semibold">Email:</span> info@swisdex.com
                     </p>
                   </div>
                 </Card>
