@@ -100,7 +100,7 @@ async def send_due_reminders(db: AsyncSession) -> int:
                 days_since_signup=days_old,
                 trader_app_url=app_url,
             )
-            fire_and_forget(send_email(u.email, subject, html, text=text))
+            fire_and_forget(send_email(u.email, subject, html, text=text, category="support"))
         except Exception as exc:
             logger.warning("KYC reminder render failed for %s: %s", u.email, exc)
             continue

@@ -444,6 +444,82 @@ async def update_ib_commission(
     return {"message": "IB commission updated successfully"}
 
 
+# ─── Custom referral_code editing ────────────────────────────────────────
+# The IB approval path auto-generates an `IB + 8-char random` code. Admins
+# sometimes need a vanity code for a known IB (e.g. the Super IB / house
+# master) — "SDASIA" reads better in marketing than "IB7H2KQ9". This
+# endpoint lets a super-admin overwrite the code with strict validation.
+
+_REF_CODE_MIN = 3
+_REF_CODE_MAX = 20
+
+
+def _validate_referral_code(raw: str) -> str:
+    code = (raw or "").strip().upper()
+    if not code:
+        raise HTTPException(status_code=400, detail="Referral code is required")
+    if len(code) < _REF_CODE_MIN or len(code) > _REF_CODE_MAX:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Referral code must be {_REF_CODE_MIN}-{_REF_CODE_MAX} characters",
+        )
+    # Allow A-Z 0-9 only — keeps copy-paste in marketing material clean
+    # and survives case-insensitive URL parsers.
+    import re as _re
+    if not _re.fullmatch(r"[A-Z0-9]+", code):
+        raise HTTPException(
+            status_code=400,
+            detail="Referral code may only contain A-Z and 0-9 (no spaces or punctuation)",
+        )
+    return code
+
+
+async def update_ib_referral_code(
+    agent_id: uuid.UUID,
+    new_code: str,
+    admin_id: uuid.UUID,
+    ip_address: str | None,
+    db: AsyncSession,
+) -> dict:
+    """Overwrite an IB's referral_code with an admin-supplied vanity value.
+    Validates length + charset, enforces uniqueness across active codes,
+    audit-logs the old → new transition."""
+    code = _validate_referral_code(new_code)
+
+    profile = (await db.execute(
+        select(IBProfile).where(IBProfile.id == agent_id)
+    )).scalar_one_or_none()
+    if not profile:
+        raise HTTPException(status_code=404, detail="IB profile not found")
+
+    if profile.referral_code == code:
+        return {"message": "No change", "referral_code": code}
+
+    clash = (await db.execute(
+        select(IBProfile.id).where(
+            IBProfile.referral_code == code,
+            IBProfile.id != agent_id,
+        )
+    )).first()
+    if clash:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Referral code '{code}' is already in use by another IB",
+        )
+
+    old_code = profile.referral_code
+    profile.referral_code = code
+
+    await write_audit_log(
+        db, admin_id, "update_ib_referral_code", "ib_profile", agent_id,
+        old_values={"referral_code": old_code},
+        new_values={"referral_code": code},
+        ip_address=ip_address,
+    )
+    await db.commit()
+    return {"message": "Referral code updated", "referral_code": code}
+
+
 async def reject_active_ib(
     agent_id: uuid.UUID, body: RejectIBIn,
     admin_id: uuid.UUID, ip_address: str | None, db: AsyncSession,
@@ -1241,6 +1317,133 @@ async def create_master(
         "pool_account_number": pool_account.account_number,
         "message": "Master created and approved",
     }
+
+
+async def list_master_allocations(
+    master_id: uuid.UUID, db: AsyncSession,
+) -> dict:
+    """List every InvestorAllocation under a master with the joined investor
+    user + investor account. Drives the MAM page's Investors drawer so admin
+    can see who's allocated, with what effective fee, and edit per-investor
+    overrides."""
+    master = (await db.execute(
+        select(MasterAccount).where(MasterAccount.id == master_id)
+    )).scalar_one_or_none()
+    if not master:
+        raise HTTPException(status_code=404, detail="Master not found")
+
+    result = await db.execute(
+        select(
+            InvestorAllocation,
+            User.first_name, User.last_name, User.email,
+            TradingAccount.account_number, TradingAccount.balance,
+            TradingAccount.equity,
+        )
+        .join(User, InvestorAllocation.investor_user_id == User.id)
+        .outerjoin(
+            TradingAccount,
+            InvestorAllocation.investor_account_id == TradingAccount.id,
+        )
+        .where(InvestorAllocation.master_id == master_id)
+        .order_by(InvestorAllocation.created_at.desc())
+    )
+    items = []
+    for alloc, fn, ln, email, acct_num, balance, equity in result.all():
+        items.append({
+            "id": str(alloc.id),
+            "investor_user_id": str(alloc.investor_user_id),
+            "investor_account_id": str(alloc.investor_account_id) if alloc.investor_account_id else None,
+            "investor_name": f"{fn or ''} {ln or ''}".strip() or email,
+            "investor_email": email,
+            "account_number": acct_num,
+            "account_balance": float(balance) if balance is not None else None,
+            "account_equity": float(equity) if equity is not None else None,
+            "copy_type": alloc.copy_type,
+            "status": alloc.status,
+            "allocation_amount": float(alloc.allocation_amount or 0),
+            "allocation_pct": float(alloc.allocation_pct) if alloc.allocation_pct is not None else None,
+            "max_drawdown_pct": float(alloc.max_drawdown_pct) if alloc.max_drawdown_pct is not None else None,
+            "max_lot_override": float(alloc.max_lot_override) if alloc.max_lot_override is not None else None,
+            "total_profit": float(alloc.total_profit or 0),
+            "performance_fee_pct_override": float(alloc.performance_fee_pct_override) if alloc.performance_fee_pct_override is not None else None,
+            "admin_commission_pct_override": float(alloc.admin_commission_pct_override) if alloc.admin_commission_pct_override is not None else None,
+            "admin_notes": alloc.admin_notes,
+            "effective_performance_fee_pct": float(
+                alloc.performance_fee_pct_override
+                if alloc.performance_fee_pct_override is not None
+                else (master.performance_fee_pct or 0)
+            ),
+            "effective_admin_commission_pct": float(
+                alloc.admin_commission_pct_override
+                if alloc.admin_commission_pct_override is not None
+                else (master.admin_commission_pct or 0)
+            ),
+            "created_at": alloc.created_at.isoformat() if alloc.created_at else None,
+            "last_distribution_at": alloc.last_distribution_at.isoformat() if alloc.last_distribution_at else None,
+        })
+    return {
+        "items": items,
+        "master_defaults": {
+            "performance_fee_pct": float(master.performance_fee_pct or 0),
+            "management_fee_pct": float(master.management_fee_pct or 0),
+            "admin_commission_pct": float(master.admin_commission_pct or 0),
+        },
+    }
+
+
+async def update_master_allocation(
+    master_id: uuid.UUID,
+    allocation_id: uuid.UUID,
+    patch: dict,
+    admin_id: uuid.UUID,
+    ip_address: str | None,
+    db: AsyncSession,
+) -> dict:
+    """Admin patch on a single investor_allocations row. Only the fields
+    listed below are honored. Passing JSON null for a fee override clears
+    it so the investor falls back to the master default; passing 0
+    explicitly stores a real 0% rate."""
+    alloc = (await db.execute(
+        select(InvestorAllocation).where(
+            InvestorAllocation.id == allocation_id,
+            InvestorAllocation.master_id == master_id,
+        )
+    )).scalar_one_or_none()
+    if not alloc:
+        raise HTTPException(status_code=404, detail="Allocation not found for this master")
+
+    decimal_fields = (
+        "allocation_amount", "allocation_pct", "max_drawdown_pct",
+        "max_lot_override",
+        "performance_fee_pct_override", "admin_commission_pct_override",
+    )
+    str_fields = ("status", "copy_type", "admin_notes")
+
+    changed: dict = {}
+    for f in decimal_fields:
+        if f in patch:
+            v = patch[f]
+            new_val = None if v is None or v == "" else Decimal(str(v))
+            setattr(alloc, f, new_val)
+            changed[f] = float(new_val) if new_val is not None else None
+    for f in str_fields:
+        if f in patch:
+            v = patch[f]
+            setattr(alloc, f, v if v != "" else None)
+            changed[f] = v
+
+    if "status" in changed and changed["status"] not in (None, "active", "paused", "closed"):
+        raise HTTPException(
+            status_code=400,
+            detail="status must be one of: active, paused, closed",
+        )
+
+    await write_audit_log(
+        db, admin_id, "update_master_allocation", "investor_allocation", allocation_id,
+        new_values=changed, ip_address=ip_address,
+    )
+    await db.commit()
+    return {"message": "Allocation updated", "changed": changed}
 
 
 async def update_master(

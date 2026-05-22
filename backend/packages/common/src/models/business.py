@@ -139,6 +139,12 @@ class InvestorAllocation(Base):
     status = Column(String(20), default="active")
     total_profit = Column(Numeric(18, 8), default=0)
     last_distribution_at = Column(DateTime(timezone=True), nullable=True)
+    # Per-investor admin overrides (migration 0052). NULL = inherit from
+    # master_accounts. Honored by copy_engine._close_copy when computing
+    # performance fee + the broker's slice of it.
+    performance_fee_pct_override = Column(Numeric(5, 2), nullable=True)
+    admin_commission_pct_override = Column(Numeric(5, 2), nullable=True)
+    admin_notes = Column(Text, nullable=True)
     created_at = Column(DateTime(timezone=True), default=datetime.utcnow)
 
 

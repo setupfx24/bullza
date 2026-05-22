@@ -33,6 +33,12 @@ interface Deposit {
   created_at: string;
   note?: string;
   reason?: string;
+  // Bonus request fields (migration 0054). bonus_code is the promo
+  // string the user typed at deposit time. bonus_status walks through
+  // pending → granted | denied.
+  bonus_code?: string | null;
+  bonus_status?: 'pending' | 'granted' | 'denied' | null;
+  bonus_amount?: number | null;
 }
 
 interface WithdrawalBankDetails {
@@ -454,6 +460,7 @@ export default function DepositsPage() {
                             'Transaction ID',
                             'Screenshot',
                             'Status',
+                            'Bonus',
                             'Date',
                             'Actions',
                           ].map((col) => (
@@ -511,6 +518,85 @@ export default function DepositsPage() {
                               >
                                 {statusLabel(d.status)}
                               </span>
+                            </td>
+                            <td className="px-4 py-2.5">
+                              {d.bonus_code ? (
+                                <div className="flex flex-col gap-1 items-start">
+                                  <span className="text-xxs font-mono font-semibold text-accent">
+                                    {d.bonus_code}
+                                  </span>
+                                  <span
+                                    className={cn(
+                                      'inline-flex px-1.5 py-0.5 rounded-sm text-[10px] font-medium capitalize',
+                                      d.bonus_status === 'granted'
+                                        ? 'bg-success/15 text-success'
+                                        : d.bonus_status === 'denied'
+                                          ? 'bg-danger/15 text-danger'
+                                          : 'bg-warning/15 text-warning',
+                                    )}
+                                  >
+                                    {d.bonus_status || 'pending'}
+                                    {d.bonus_amount != null && d.bonus_status === 'granted' && (
+                                      <> · ${formatMoney(d.bonus_amount)}</>
+                                    )}
+                                  </span>
+                                  {d.bonus_status === 'pending' && (
+                                    <div className="flex items-center gap-1 mt-1">
+                                      <button
+                                        type="button"
+                                        onClick={async () => {
+                                          const amt = window.prompt(
+                                            `Grant bonus for code ${d.bonus_code}\nDeposit: $${formatMoney(d.amount)}\nUser: ${d.user_email}\n\nEnter bonus amount (USD):`,
+                                          );
+                                          if (!amt) return;
+                                          const n = parseFloat(amt);
+                                          if (!Number.isFinite(n) || n <= 0) {
+                                            toast.error('Invalid amount');
+                                            return;
+                                          }
+                                          try {
+                                            await adminApi.post(
+                                              `/finance/deposits/${d.id}/grant-bonus`,
+                                              { amount: n },
+                                            );
+                                            toast.success(`$${n.toFixed(2)} bonus granted`);
+                                            fetchDeposits();
+                                          } catch (e: any) {
+                                            toast.error(e?.message || 'Grant failed');
+                                          }
+                                        }}
+                                        className="px-1.5 py-0.5 rounded-sm text-[10px] font-medium bg-success/15 text-success border border-success/30 hover:bg-success/25"
+                                      >
+                                        Grant
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={async () => {
+                                          const reason = window.prompt(
+                                            `Deny bonus for code ${d.bonus_code}\n\nReason (sent to user):`,
+                                          );
+                                          if (reason === null) return;
+                                          try {
+                                            await adminApi.post(
+                                              `/finance/deposits/${d.id}/deny-bonus`,
+                                              { reason: reason.trim() || 'Denied by admin' },
+                                            );
+                                            toast.success('Bonus denied');
+                                            fetchDeposits();
+                                          } catch (e: any) {
+                                            toast.error(e?.message || 'Deny failed');
+                                          }
+                                        }}
+                                        className="px-1.5 py-0.5 rounded-sm text-[10px] font-medium bg-danger/15 text-danger border border-danger/30 hover:bg-danger/25"
+                                      >
+                                        Deny
+                                      </button>
+                                    </div>
+                                  )}
+                                </div>
+                              ) : (
+                                <span className="text-xxs text-text-tertiary">—</span>
+                              )}
                             </td>
                             <td className="px-4 py-2.5 text-xs text-text-tertiary font-mono tabular-nums whitespace-nowrap">
                               {formatDate(d.created_at)}

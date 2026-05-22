@@ -67,7 +67,9 @@ async def send_maintenance_broadcast(
         raise HTTPException(status_code=400, detail="SMTP is not configured")
 
     q = select(User).where(
-        User.is_active.is_(True),
+        # User state lives in `status` string column ("active"/"suspended"
+        # /"closed"). No is_active boolean.
+        User.status == "active",
         User.email_verified.is_(True),
     )
     users = (await db.execute(q)).scalars().all()
@@ -116,7 +118,9 @@ async def send_maintenance_broadcast(
             )
         except Exception:
             continue
-        fire_and_forget(send_email(u.email, subject, html, text=text))
+        # Maintenance broadcasts are a generic platform-wide notice — they
+        # don't belong to any product category. info@ is the right alias.
+        fire_and_forget(send_email(u.email, subject, html, text=text, category="info"))
         sent_count += 1
         # Per-100 throttle: SMTP relays (Hostinger / SES) flag bursts
         # over ~30/sec. The default 500ms per 100 mails ≈ 200 mails/sec

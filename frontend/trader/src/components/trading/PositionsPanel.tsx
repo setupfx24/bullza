@@ -442,59 +442,58 @@ export default function PositionsPanel({ variant = 'default' }: PositionsPanelPr
       return;
     }
 
-    // Fire all closes in parallel — the previous sequential await chain
-    // stalled the whole batch when any single close was slow, and it also
-    // had two bugs: (1) audio failures inside the try block bubbled up
-    // and incremented `failed` even though the backend had closed the
-    // position, and (2) errors were swallowed empty so the user had no
-    // diagnostic when "Close All" really did fail. Promise.allSettled
-    // gives a clean per-position result and lets us surface the first
-    // real error message back to the user.
-    type SettleOk = { pos: typeof targets[number]; profit: number };
-    const settled = await Promise.allSettled<SettleOk>(
-      targets.map(async (pos) => {
-        const res = await api.post<{ profit?: number; close_price?: number }>(
-          `/positions/${pos.id}/close`,
-          {},
-        );
-        return { pos, profit: res.profit ?? 0 };
-      }),
-    );
+    if (!activeAccount) {
+      toast.error('No account selected');
+      setBulkBusy(false);
+      return;
+    }
 
-    let closed = 0;
-    let failed = 0;
-    let firstError: string | null = null;
-    for (const r of settled) {
-      if (r.status === 'fulfilled') {
-        const { pos, profit } = r.value;
+    // Single bulk endpoint — the previous fan-out of N parallel POST
+    // /close calls race-conditioned on the shared trading_account row
+    // and surfaced "Request failed" for most of the closes. The backend
+    // now closes sequentially in one session and returns per-position
+    // outcomes; we only need to render them.
+    try {
+      const res = await api.post<{
+        closed_count: number;
+        failed_count: number;
+        skipped_no_tick: number;
+        skipped_mam_copy: number;
+        total_profit: number;
+        closed: { position_id: string; symbol: string | null; profit: number; close_price: number }[];
+        failed: { position_id: string; symbol: string | null; reason: string; status_code: number }[];
+      }>(
+        '/positions/close-all',
+        { account_id: activeAccount.id, filter: type },
+        { timeoutMs: 60_000 },
+      );
+
+      for (const c of res.closed) {
         try {
-          (profit >= 0 ? sounds.profit() : sounds.loss());
+          (c.profit >= 0 ? sounds.profit() : sounds.loss());
         } catch {
           /* audio context blocked / muted — close already succeeded server-side */
         }
-        removePosition(pos.id);
-        closed++;
-      } else {
-        failed++;
-        if (!firstError) {
-          firstError =
-            r.reason instanceof Error
-              ? r.reason.message
-              : typeof r.reason === 'string'
-                ? r.reason
-                : 'Unknown error';
-        }
+        removePosition(c.position_id);
       }
+
+      if (res.closed_count > 0) {
+        const sign = res.total_profit >= 0 ? '+' : '';
+        toast.success(
+          `${res.closed_count} position${res.closed_count > 1 ? 's' : ''} closed — booked ${sign}$${res.total_profit.toFixed(2)}`,
+        );
+      }
+      if (res.failed_count > 0) {
+        const firstReason = res.failed[0]?.reason || 'Unknown error';
+        toast.error(`${res.failed_count} failed — ${firstReason}`);
+      }
+      if (res.skipped_mam_copy > 0) {
+        toast(`${res.skipped_mam_copy} MAM-copied position${res.skipped_mam_copy > 1 ? 's' : ''} skipped (only master can close)`, { icon: 'ℹ️' });
+      }
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Close All failed');
     }
 
-    if (closed > 0)
-      toast.success(`${closed} position${closed > 1 ? 's' : ''} closed successfully`);
-    if (failed > 0)
-      toast.error(
-        firstError
-          ? `${failed} failed — ${firstError}`
-          : `${failed} position${failed > 1 ? 's' : ''} failed to close`,
-      );
     refreshPositions();
     refreshAccount();
     void loadHistory();

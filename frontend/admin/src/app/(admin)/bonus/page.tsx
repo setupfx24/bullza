@@ -10,13 +10,25 @@ interface BonusOffer {
   id: string;
   name: string;
   bonus_type: string;
-  bonus_value: number;
+  // Backend keeps `percentage` and `fixed_amount` separate; the form lets
+  // admin pick a type and types only one number. We resolve the value here
+  // when reading from the API so the UI shows the right column.
+  percentage: number | null;
+  fixed_amount: number | null;
   min_deposit: number;
+  max_deposit: number | null;
+  max_bonus: number | null;
   lots_required: number;
   target_audience: string;
-  start_date: string;
-  end_date: string;
+  starts_at: string | null;
+  expires_at: string | null;
   is_active: boolean;
+  // Tier-display extras — admin manages these to drive the trader /bonus page.
+  perks: string[] | null;
+  is_popular: boolean;
+  sort_order: number;
+  cta_label: string | null;
+  tagline: string | null;
   allocations_count?: number;
 }
 
@@ -41,13 +53,23 @@ function formatMoney(n: number) {
 
 const EMPTY_FORM = {
   name: '',
-  bonus_type: 'deposit',
+  bonus_type: 'percentage',
   bonus_value: '',
   min_deposit: '',
+  // Empty = no upper bound (top-tier card, "$X+" on the trader page).
+  max_deposit: '',
+  max_bonus: '',
   lots_required: '',
   target_audience: 'all',
-  start_date: '',
-  end_date: '',
+  starts_at: '',
+  expires_at: '',
+  is_active: true,
+  // Tier-display fields — drive the trader /bonus page cards.
+  perks: '',         // one bullet per line
+  is_popular: false,
+  sort_order: '0',
+  cta_label: '',
+  tagline: '',
 };
 
 export default function BonusPage() {
@@ -87,15 +109,29 @@ export default function BonusPage() {
 
   const openEdit = (offer: BonusOffer) => {
     setEditId(offer.id);
+    // Pick the right "value" column based on the type so admin always
+    // sees their last-saved number, even when switching between
+    // percentage and fixed types.
+    const value = offer.bonus_type === 'percentage' || offer.bonus_type === 'deposit'
+      ? offer.percentage
+      : offer.fixed_amount;
     setForm({
       name: offer.name,
-      bonus_type: offer.bonus_type,
-      bonus_value: String(offer.bonus_value),
-      min_deposit: String(offer.min_deposit),
-      lots_required: String(offer.lots_required),
-      target_audience: offer.target_audience,
-      start_date: offer.start_date,
-      end_date: offer.end_date,
+      bonus_type: offer.bonus_type || 'percentage',
+      bonus_value: value != null ? String(value) : '',
+      min_deposit: String(offer.min_deposit ?? 0),
+      max_deposit: offer.max_deposit != null ? String(offer.max_deposit) : '',
+      max_bonus: offer.max_bonus != null ? String(offer.max_bonus) : '',
+      lots_required: String(offer.lots_required ?? 0),
+      target_audience: offer.target_audience || 'all',
+      starts_at: offer.starts_at ? offer.starts_at.slice(0, 10) : '',
+      expires_at: offer.expires_at ? offer.expires_at.slice(0, 10) : '',
+      is_active: offer.is_active,
+      perks: Array.isArray(offer.perks) ? offer.perks.join('\n') : '',
+      is_popular: !!offer.is_popular,
+      sort_order: String(offer.sort_order ?? 0),
+      cta_label: offer.cta_label || '',
+      tagline: offer.tagline || '',
     });
     setShowModal(true);
   };
@@ -104,15 +140,34 @@ export default function BonusPage() {
     if (!form.name.trim()) { toast.error('Name is required'); return; }
     setSubmitting(true);
     try {
-      const body = {
+      const val = parseFloat(form.bonus_value);
+      const perksList = form.perks
+        .split('\n')
+        .map((s) => s.trim())
+        .filter(Boolean);
+      // Map the single "Value" form field to the right backend column.
+      // Percentage / deposit-match flows persist `percentage`; fixed and
+      // no_deposit persist `fixed_amount`. Keeps the form simple but the
+      // backend strict.
+      const isPctType = form.bonus_type === 'percentage' || form.bonus_type === 'deposit';
+      const body: Record<string, unknown> = {
         name: form.name,
         bonus_type: form.bonus_type,
-        bonus_value: parseFloat(form.bonus_value) || 0,
+        percentage: isPctType ? (Number.isFinite(val) ? val : null) : null,
+        fixed_amount: !isPctType ? (Number.isFinite(val) ? val : null) : null,
         min_deposit: parseFloat(form.min_deposit) || 0,
+        max_deposit: form.max_deposit.trim() === '' ? null : parseFloat(form.max_deposit),
+        max_bonus: form.max_bonus.trim() === '' ? null : parseFloat(form.max_bonus),
         lots_required: parseFloat(form.lots_required) || 0,
         target_audience: form.target_audience,
-        start_date: form.start_date,
-        end_date: form.end_date,
+        starts_at: form.starts_at || null,
+        expires_at: form.expires_at || null,
+        is_active: form.is_active,
+        perks: perksList.length ? perksList : null,
+        is_popular: form.is_popular,
+        sort_order: parseInt(form.sort_order, 10) || 0,
+        cta_label: form.cta_label.trim() || null,
+        tagline: form.tagline.trim() || null,
       };
       if (editId) {
         await adminApi.put(`/bonus/offers/${editId}`, body);
@@ -130,7 +185,7 @@ export default function BonusPage() {
     }
   };
 
-  const updateForm = (key: string, val: string) => setForm((f) => ({ ...f, [key]: val }));
+  const updateForm = (key: string, val: string | boolean) => setForm((f) => ({ ...f, [key]: val }));
 
   return (
     <>
@@ -184,46 +239,68 @@ export default function BonusPage() {
                     <table className="w-full min-w-[900px]">
                       <thead>
                         <tr className="border-b border-border-primary bg-bg-tertiary/40">
-                          {['Name', 'Type', 'Value', 'Min Deposit', 'Lots Req.', 'Audience', 'Period', 'Status', 'Actions'].map((col) => (
-                            <th key={col} className={cn('text-left px-4 py-2.5 text-xxs font-medium text-text-tertiary uppercase tracking-wide', ['Value', 'Min Deposit'].includes(col) && 'text-right', col === 'Actions' && 'text-right')}>
+                          {['Order', 'Name', 'Type', 'Value', 'Deposit Range', 'Cap', 'Popular', 'Status', 'Actions'].map((col) => (
+                            <th key={col} className={cn('text-left px-4 py-2.5 text-xxs font-medium text-text-tertiary uppercase tracking-wide', ['Value', 'Deposit Range', 'Cap'].includes(col) && 'text-right', col === 'Actions' && 'text-right', ['Order', 'Popular', 'Status'].includes(col) && 'text-center')}>
                               {col}
                             </th>
                           ))}
                         </tr>
                       </thead>
                       <tbody>
-                        {offers.map((offer) => (
-                          <tr key={offer.id} className="border-b border-border-primary/50 transition-fast hover:bg-bg-hover">
-                            <td className="px-4 py-2.5">
-                              <div className="flex items-center gap-1.5">
-                                <Gift size={12} className="text-accent" />
-                                <span className="text-xs text-text-primary">{offer.name}</span>
-                              </div>
-                            </td>
-                            <td className="px-4 py-2.5">
-                              <span className="inline-flex px-1.5 py-0.5 rounded-sm text-xxs font-medium bg-buy/15 text-buy">{offer.bonus_type}</span>
-                            </td>
-                            <td className="px-4 py-2.5 text-xs text-text-primary text-right font-mono tabular-nums">
-                              {offer.bonus_type === 'percentage' ? `${offer.bonus_value}%` : `$${formatMoney(offer.bonus_value)}`}
-                            </td>
-                            <td className="px-4 py-2.5 text-xs text-text-secondary text-right font-mono tabular-nums">${formatMoney(offer.min_deposit)}</td>
-                            <td className="px-4 py-2.5 text-xs text-text-secondary font-mono tabular-nums">{offer.lots_required}</td>
-                            <td className="px-4 py-2.5 text-xs text-text-secondary">{offer.target_audience}</td>
-                            <td className="px-4 py-2.5 text-xxs text-text-tertiary font-mono tabular-nums">
-                              {offer.start_date || '—'} → {offer.end_date || '—'}
-                            </td>
-                            <td className="px-4 py-2.5">
-                              <span className={cn('inline-flex px-1.5 py-0.5 rounded-sm text-xxs font-medium', offer.is_active ? 'bg-success/15 text-success' : 'bg-text-tertiary/15 text-text-tertiary')}>
-                                {offer.is_active ? 'Active' : 'Inactive'}
-                              </span>
-                            </td>
-                            <td className="px-4 py-2.5 text-right">
-                              <button onClick={() => openEdit(offer)} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xxs font-medium text-text-secondary border border-border-primary hover:bg-bg-hover transition-fast">
-                                <Pencil size={12} /> Edit
-                              </button>
-                            </td>
-                          </tr>
-                        ))}
+                        {offers.map((offer) => {
+                          const value = offer.bonus_type === 'percentage' || offer.bonus_type === 'deposit'
+                            ? offer.percentage
+                            : offer.fixed_amount;
+                          const valueLabel = value == null
+                            ? '—'
+                            : (offer.bonus_type === 'percentage' || offer.bonus_type === 'deposit')
+                              ? `${value}%`
+                              : `$${formatMoney(value)}`;
+                          const range = offer.max_deposit == null
+                            ? `$${formatMoney(offer.min_deposit)}+`
+                            : `$${formatMoney(offer.min_deposit)} – $${formatMoney(offer.max_deposit)}`;
+                          return (
+                            <tr key={offer.id} className="border-b border-border-primary/50 transition-fast hover:bg-bg-hover">
+                              <td className="px-4 py-2.5 text-xs text-text-tertiary text-center font-mono tabular-nums">{offer.sort_order}</td>
+                              <td className="px-4 py-2.5">
+                                <div className="flex items-center gap-1.5">
+                                  <Gift size={12} className="text-accent" />
+                                  <span className="text-xs text-text-primary">{offer.name}</span>
+                                </div>
+                                {offer.tagline && (
+                                  <p className="text-xxs text-text-tertiary mt-0.5">{offer.tagline}</p>
+                                )}
+                              </td>
+                              <td className="px-4 py-2.5">
+                                <span className="inline-flex px-1.5 py-0.5 rounded-sm text-xxs font-medium bg-buy/15 text-buy">{offer.bonus_type}</span>
+                              </td>
+                              <td className="px-4 py-2.5 text-xs text-text-primary text-right font-mono tabular-nums">
+                                {valueLabel}
+                              </td>
+                              <td className="px-4 py-2.5 text-xs text-text-secondary text-right font-mono tabular-nums">{range}</td>
+                              <td className="px-4 py-2.5 text-xs text-text-secondary text-right font-mono tabular-nums">
+                                {offer.max_bonus != null ? `$${formatMoney(offer.max_bonus)}` : '—'}
+                              </td>
+                              <td className="px-4 py-2.5 text-center">
+                                {offer.is_popular ? (
+                                  <span className="inline-flex px-1.5 py-0.5 rounded-sm text-xxs font-medium bg-accent/15 text-accent">★</span>
+                                ) : (
+                                  <span className="text-text-tertiary text-xxs">—</span>
+                                )}
+                              </td>
+                              <td className="px-4 py-2.5 text-center">
+                                <span className={cn('inline-flex px-1.5 py-0.5 rounded-sm text-xxs font-medium', offer.is_active ? 'bg-success/15 text-success' : 'bg-text-tertiary/15 text-text-tertiary')}>
+                                  {offer.is_active ? 'Active' : 'Inactive'}
+                                </span>
+                              </td>
+                              <td className="px-4 py-2.5 text-right">
+                                <button onClick={() => openEdit(offer)} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xxs font-medium text-text-secondary border border-border-primary hover:bg-bg-hover transition-fast">
+                                  <Pencil size={12} /> Edit
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>
@@ -285,59 +362,132 @@ export default function BonusPage() {
 
       {showModal && (
         <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" onClick={() => setShowModal(false)}>
-          <div className="bg-bg-secondary border border-border-primary rounded-md shadow-modal w-full max-w-lg" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-bg-secondary border border-border-primary rounded-md shadow-modal w-full max-w-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="px-5 py-4 border-b border-border-primary">
-              <h3 className="text-sm font-semibold text-text-primary">{editId ? 'Edit Offer' : 'Create Bonus Offer'}</h3>
+              <h3 className="text-sm font-semibold text-text-primary">{editId ? 'Edit Bonus Tier' : 'Create Bonus Tier'}</h3>
+              <p className="text-xxs text-text-tertiary mt-0.5">
+                Drives one card on the trader <span className="text-text-secondary font-medium">/bonus</span> page.
+                Set deposit range, bonus %, cap, and perks. Inactive tiers are hidden from the trader page.
+              </p>
             </div>
-            <div className="px-5 py-4 space-y-3 max-h-[60vh] overflow-y-auto">
-              <div>
-                <label className="block text-xxs text-text-tertiary mb-1">Name</label>
-                <input value={form.name} onChange={(e) => updateForm('name', e.target.value)} className="w-full text-xs py-1.5 px-2 bg-bg-input border border-border-primary rounded-md" placeholder="e.g. Welcome Bonus 50%" />
+            <div className="px-5 py-4 space-y-4 max-h-[70vh] overflow-y-auto">
+              {/* ── Identity ──────────────────────────────────────────── */}
+              <div className="grid grid-cols-3 gap-3">
+                <div className="col-span-2">
+                  <label className="block text-xxs text-text-tertiary mb-1">Name (internal)</label>
+                  <input value={form.name} onChange={(e) => updateForm('name', e.target.value)} className="w-full text-xs py-1.5 px-2 bg-bg-input border border-border-primary rounded-md" placeholder="e.g. Tier 1 — Starter Match" />
+                </div>
+                <div>
+                  <label className="block text-xxs text-text-tertiary mb-1">Sort Order</label>
+                  <input type="number" step="1" value={form.sort_order} onChange={(e) => updateForm('sort_order', e.target.value)} className="w-full text-xs py-1.5 px-2 bg-bg-input border border-border-primary rounded-md font-mono" title="Lower = left-most card on /bonus page" />
+                </div>
               </div>
-              <div className="grid grid-cols-2 gap-3">
+
+              {/* ── Bonus value ───────────────────────────────────────── */}
+              <div className="grid grid-cols-3 gap-3">
                 <div>
                   <label className="block text-xxs text-text-tertiary mb-1">Bonus Type</label>
                   <select value={form.bonus_type} onChange={(e) => updateForm('bonus_type', e.target.value)} className="w-full text-xs py-1.5 px-2 bg-bg-input border border-border-primary rounded-md">
-                    <option value="deposit">Deposit Bonus</option>
-                    <option value="percentage">Percentage</option>
-                    <option value="fixed">Fixed Amount</option>
-                    <option value="no_deposit">No Deposit</option>
+                    <option value="percentage">% of Deposit</option>
+                    <option value="deposit">Deposit Match (legacy)</option>
+                    <option value="fixed">Fixed $ Amount</option>
+                    <option value="no_deposit">No-Deposit Bonus</option>
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xxs text-text-tertiary mb-1">Bonus Value</label>
-                  <input type="number" step="0.01" value={form.bonus_value} onChange={(e) => updateForm('bonus_value', e.target.value)} className="w-full text-xs py-1.5 px-2 bg-bg-input border border-border-primary rounded-md" placeholder="e.g. 50" />
+                  <label className="block text-xxs text-text-tertiary mb-1">
+                    Value {(form.bonus_type === 'percentage' || form.bonus_type === 'deposit') ? '(%)' : '($)'}
+                  </label>
+                  <input type="number" step="0.01" value={form.bonus_value} onChange={(e) => updateForm('bonus_value', e.target.value)} className="w-full text-xs py-1.5 px-2 bg-bg-input border border-border-primary rounded-md font-mono" placeholder="e.g. 100" />
+                </div>
+                <div>
+                  <label className="block text-xxs text-text-tertiary mb-1">Cap ($)</label>
+                  <input type="number" step="0.01" value={form.max_bonus} onChange={(e) => updateForm('max_bonus', e.target.value)} className="w-full text-xs py-1.5 px-2 bg-bg-input border border-border-primary rounded-md font-mono" placeholder="e.g. 1000" title="Max bonus amount. Renders as 'Up to $X' on the card." />
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-3">
+
+              {/* ── Deposit range ─────────────────────────────────────── */}
+              <div className="grid grid-cols-3 gap-3">
                 <div>
                   <label className="block text-xxs text-text-tertiary mb-1">Min Deposit ($)</label>
-                  <input type="number" step="0.01" value={form.min_deposit} onChange={(e) => updateForm('min_deposit', e.target.value)} className="w-full text-xs py-1.5 px-2 bg-bg-input border border-border-primary rounded-md" placeholder="e.g. 100" />
+                  <input type="number" step="0.01" value={form.min_deposit} onChange={(e) => updateForm('min_deposit', e.target.value)} className="w-full text-xs py-1.5 px-2 bg-bg-input border border-border-primary rounded-md font-mono" placeholder="e.g. 100" />
+                </div>
+                <div>
+                  <label className="block text-xxs text-text-tertiary mb-1">Max Deposit ($)</label>
+                  <input type="number" step="0.01" value={form.max_deposit} onChange={(e) => updateForm('max_deposit', e.target.value)} className="w-full text-xs py-1.5 px-2 bg-bg-input border border-border-primary rounded-md font-mono" placeholder="blank = no upper bound" />
                 </div>
                 <div>
                   <label className="block text-xxs text-text-tertiary mb-1">Lots Required</label>
-                  <input type="number" step="0.01" value={form.lots_required} onChange={(e) => updateForm('lots_required', e.target.value)} className="w-full text-xs py-1.5 px-2 bg-bg-input border border-border-primary rounded-md" placeholder="e.g. 5" />
+                  <input type="number" step="0.01" value={form.lots_required} onChange={(e) => updateForm('lots_required', e.target.value)} className="w-full text-xs py-1.5 px-2 bg-bg-input border border-border-primary rounded-md font-mono" placeholder="e.g. 5" />
                 </div>
               </div>
-              <div>
-                <label className="block text-xxs text-text-tertiary mb-1">Target Audience</label>
-                <select value={form.target_audience} onChange={(e) => updateForm('target_audience', e.target.value)} className="w-full text-xs py-1.5 px-2 bg-bg-input border border-border-primary rounded-md">
-                  <option value="all">All Users</option>
-                  <option value="new">New Users Only</option>
-                  <option value="vip">VIP Users</option>
-                  <option value="ib">IB Users</option>
-                </select>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
+
+              {/* ── Trader-page display ───────────────────────────────── */}
+              <div className="rounded-md bg-accent/5 border border-accent/30 p-3 space-y-3">
+                <p className="text-xxs font-semibold text-accent uppercase tracking-wide">Trader /bonus page card</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xxs text-text-tertiary mb-1">CTA Button Label</label>
+                    <input value={form.cta_label} onChange={(e) => updateForm('cta_label', e.target.value)} className="w-full text-xs py-1.5 px-2 bg-bg-input border border-border-primary rounded-md" placeholder="auto: 'Deposit $100'" />
+                  </div>
+                  <div>
+                    <label className="block text-xxs text-text-tertiary mb-1">Tagline (optional)</label>
+                    <input value={form.tagline} onChange={(e) => updateForm('tagline', e.target.value)} className="w-full text-xs py-1.5 px-2 bg-bg-input border border-border-primary rounded-md" placeholder="e.g. Welcome Match" />
+                  </div>
+                </div>
                 <div>
-                  <label className="block text-xxs text-text-tertiary mb-1">Start Date</label>
-                  <input type="date" value={form.start_date} onChange={(e) => updateForm('start_date', e.target.value)} className="w-full text-xs py-1.5 px-2 bg-bg-input border border-border-primary rounded-md" />
+                  <label className="block text-xxs text-text-tertiary mb-1">
+                    Perks <span className="text-text-tertiary">(one per line)</span>
+                  </label>
+                  <textarea
+                    rows={4}
+                    value={form.perks}
+                    onChange={(e) => updateForm('perks', e.target.value)}
+                    placeholder={'Auto-credited within minutes\nTradeable on all instruments\nEmail + chat support'}
+                    className="w-full text-xs py-1.5 px-2 bg-bg-input border border-border-primary rounded-md resize-none"
+                  />
+                </div>
+                <label className="flex items-center gap-2 text-xs text-text-secondary cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={form.is_popular}
+                    onChange={(e) => updateForm('is_popular', e.target.checked)}
+                    className="w-3.5 h-3.5"
+                  />
+                  Mark as <span className="text-accent font-semibold">Most Popular</span> (highlighted card)
+                </label>
+              </div>
+
+              {/* ── Audience + window ─────────────────────────────────── */}
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-xxs text-text-tertiary mb-1">Audience</label>
+                  <select value={form.target_audience} onChange={(e) => updateForm('target_audience', e.target.value)} className="w-full text-xs py-1.5 px-2 bg-bg-input border border-border-primary rounded-md">
+                    <option value="all">All Users</option>
+                    <option value="new">New Users Only</option>
+                    <option value="vip">VIP Users</option>
+                    <option value="ib">IB Users</option>
+                  </select>
                 </div>
                 <div>
-                  <label className="block text-xxs text-text-tertiary mb-1">End Date</label>
-                  <input type="date" value={form.end_date} onChange={(e) => updateForm('end_date', e.target.value)} className="w-full text-xs py-1.5 px-2 bg-bg-input border border-border-primary rounded-md" />
+                  <label className="block text-xxs text-text-tertiary mb-1">Starts At</label>
+                  <input type="date" value={form.starts_at} onChange={(e) => updateForm('starts_at', e.target.value)} className="w-full text-xs py-1.5 px-2 bg-bg-input border border-border-primary rounded-md" />
+                </div>
+                <div>
+                  <label className="block text-xxs text-text-tertiary mb-1">Expires At</label>
+                  <input type="date" value={form.expires_at} onChange={(e) => updateForm('expires_at', e.target.value)} className="w-full text-xs py-1.5 px-2 bg-bg-input border border-border-primary rounded-md" />
                 </div>
               </div>
+
+              <label className="flex items-center gap-2 text-xs text-text-secondary cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={form.is_active}
+                  onChange={(e) => updateForm('is_active', e.target.checked)}
+                  className="w-3.5 h-3.5"
+                />
+                Active — visible on the trader /bonus page
+              </label>
             </div>
             <div className="px-5 py-3 border-t border-border-primary flex justify-end gap-2">
               <button onClick={() => setShowModal(false)} className="px-3 py-1.5 rounded-md text-xs text-text-secondary border border-border-primary hover:bg-bg-hover transition-fast">Cancel</button>

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import {
   ArrowUpRight, Users, Zap, Wallet, CheckCircle2, ChevronDown,
@@ -9,7 +9,138 @@ import { BannerPlaceholder } from '@/swisdex/components/BannerPlaceholder';
 
 const SIGNUP_HREF = '/auth/register';
 
+/** Wire shape from /api/v1/referral/tiers — kept lean: only the fields
+ *  the marketing page actually renders. Admin owns the data in
+ *  /config/ib-tiers (system_settings.ib_commission_tiers). */
+type ApiTier = {
+  label: string;
+  min_referrals: number;
+  max_referrals: number | null;   // null = top tier (rendered as "X+")
+  per_referral_bounty: number;
+  instant_payout: boolean;
+};
+
+type DisplayTier = {
+  label: string;
+  range: string;     // "5 – 20" / "100+"
+  bounty: string;    // "$5"
+  payout: string;    // "Instant" / "Weekly"
+};
+
+/** Admin-driven qualification conditions surfaced under the table.
+ *  Server enforces these in referral_service.maybe_pay_referral_after_trades —
+ *  this object is just what the marketing page renders so trader copy
+ *  always matches the live engine. */
+type Qualification = {
+  requires_kyc: boolean;
+  requires_funded_account: boolean;
+  required_trades: number;
+};
+
+const DEFAULT_QUALIFICATION: Qualification = {
+  requires_kyc: true,
+  requires_funded_account: true,
+  required_trades: 3,
+};
+
+/** Fallback shown while the API is loading or empty. Mirrors the visual
+ *  design the client signed off on, so a fresh install still renders the
+ *  ladder rather than going blank. */
+const FALLBACK_TIERS: DisplayTier[] = [
+  { label: 'Starter', range: '5 – 20',  bounty: '$5',  payout: 'Instant' },
+  { label: 'Pro',     range: '21 – 100', bounty: '$7',  payout: 'Instant' },
+  { label: 'Elite',   range: '100+',     bounty: '$10', payout: 'Instant' },
+];
+
+const fmtUsd = (n: number) =>
+  n >= 1
+    ? `$${Number.isInteger(n) ? n : n.toFixed(2).replace(/\.00$/, '')}`
+    : `$${n.toFixed(2)}`;
+
+function adaptApi(t: ApiTier): DisplayTier {
+  const lo = t.min_referrals;
+  const range = t.max_referrals == null
+    ? `${lo}+`
+    : `${lo} – ${t.max_referrals}`;
+  return {
+    label: t.label,
+    range,
+    bounty: fmtUsd(t.per_referral_bounty || 0),
+    payout: t.instant_payout ? 'Instant' : 'Weekly',
+  };
+}
+
+/** Header gradient cycles through (neutral / brand / accent) so the third
+ *  card visually pops as the top tier. Keyed by index — admin can add 4+
+ *  tiers and the cycle keeps going. */
+const TIER_HEADER_GRADIENTS = [
+  'linear-gradient(180deg, #1f2937 0%, #0a0a0a 100%)',
+  'linear-gradient(180deg, #55a630 0%, #1a3210 100%)',
+  'linear-gradient(180deg, #d00000 0%, #3d0000 100%)',
+];
+
+/** Comma-join with " and " before the last element so the activation
+ *  sentence reads naturally for 1, 2, or 3 conditions. */
+function joinClauses(parts: string[]): string {
+  if (parts.length === 0) return '';
+  if (parts.length === 1) return parts[0];
+  if (parts.length === 2) return `${parts[0]} and ${parts[1]}`;
+  return `${parts.slice(0, -1).join(', ')}, and ${parts[parts.length - 1]}`;
+}
+
+function ordinal(n: number): string {
+  const s = ['th', 'st', 'nd', 'rd'];
+  const v = n % 100;
+  return `${n}${s[(v - 20) % 10] || s[v] || s[0]}`;
+}
+
 export default function ReferralPage() {
+  // Admin-managed tiers + qualification gates. Both fall back to the
+  // documented defaults if the API is unreachable so the marketing page
+  // never goes blank or out-of-sync with backend reality on first deploy.
+  const [tiers, setTiers] = useState<DisplayTier[]>(FALLBACK_TIERS);
+  const [qual, setQual] = useState<Qualification>(DEFAULT_QUALIFICATION);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch('/api/v1/referral/tiers', { credentials: 'omit' });
+        if (!res.ok) return;
+        const data: {
+          tiers?: ApiTier[];
+          qualification?: Partial<Qualification>;
+        } = await res.json();
+        if (cancelled) return;
+        const list = (data.tiers || []).map(adaptApi);
+        if (list.length > 0) setTiers(list);
+        if (data.qualification) {
+          setQual({
+            requires_kyc: data.qualification.requires_kyc ?? DEFAULT_QUALIFICATION.requires_kyc,
+            requires_funded_account:
+              data.qualification.requires_funded_account ?? DEFAULT_QUALIFICATION.requires_funded_account,
+            required_trades:
+              data.qualification.required_trades ?? DEFAULT_QUALIFICATION.required_trades,
+          });
+        }
+      } catch {
+        /* keep fallback — public marketing page must never error out */
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  // Compose the activation copy from the admin gates so the card stays
+  // accurate when admin flips KYC / funded off for a promo. Always lists
+  // "signs up via your referral link" — that's structural, not a toggle.
+  const activationBits: string[] = ['signs up via your referral link'];
+  if (qual.requires_kyc) activationBits.push('completes KYC verification');
+  if (qual.requires_funded_account) activationBits.push('funds their account');
+  const activationSentence = `Your friend ${joinClauses(activationBits)}.`;
+  const tradesTitle = `Minimum ${qual.required_trades} trade${qual.required_trades === 1 ? '' : 's'}`;
+  const tradesBody = `Your friend places at least ${qual.required_trades} trade${qual.required_trades === 1 ? '' : 's'} after activation. The moment the ${ordinal(qual.required_trades)} trade closes, your bounty is paid instantly.`;
+
+
   return (
     <main className="min-h-screen bg-background">
       <BannerPlaceholder
@@ -63,26 +194,58 @@ export default function ReferralPage() {
                   <th className="bg-foreground/[0.04] border-r border-foreground/15 px-5 py-4 text-left text-xs uppercase tracking-[0.16em] text-foreground/55">
                     Active Referrals
                   </th>
-                  <th className="px-5 py-4 text-center font-display uppercase tracking-[0.16em] text-sm text-white border-r border-white/10"
-                    style={{ background: 'linear-gradient(180deg, #1f2937 0%, #0a0a0a 100%)' }}>5 – 20</th>
-                  <th className="px-5 py-4 text-center font-display uppercase tracking-[0.16em] text-sm text-white border-r border-white/10"
-                    style={{ background: 'linear-gradient(180deg, #55a630 0%, #1a3210 100%)' }}>21 – 100</th>
-                  <th className="px-5 py-4 text-center font-display uppercase tracking-[0.16em] text-sm text-white"
-                    style={{ background: 'linear-gradient(180deg, #d00000 0%, #3d0000 100%)' }}>100+</th>
+                  {tiers.map((t, i) => (
+                    <th
+                      key={`${t.label}-${i}`}
+                      className={`px-5 py-4 text-center font-display uppercase tracking-[0.16em] text-sm text-white${
+                        i < tiers.length - 1 ? ' border-r border-white/10' : ''
+                      }`}
+                      style={{ background: TIER_HEADER_GRADIENTS[i % TIER_HEADER_GRADIENTS.length] }}
+                    >
+                      {t.range}
+                    </th>
+                  ))}
                 </tr>
               </thead>
               <tbody>
-                {[
-                  { label: 'Per-referral bounty', a: '$5',      b: '$7',      c: '$10'     },
-                  { label: 'Payout',              a: 'Instant', b: 'Instant', c: 'Instant' },
-                ].map((row) => (
-                  <tr key={row.label} className="border-t border-foreground/10">
-                    <td className="px-5 py-4 text-sm text-foreground/75 bg-foreground/[0.04] border-r border-foreground/15">{row.label}</td>
-                    <td className="px-5 py-4 text-center text-sm text-foreground/90 bg-foreground/[0.02] border-r border-foreground/10">{row.a}</td>
-                    <td className="px-5 py-4 text-center text-sm text-foreground bg-primary/[0.08] border-r border-foreground/10">{row.b}</td>
-                    <td className="px-5 py-4 text-center text-sm text-foreground/90 bg-foreground/[0.02]">{row.c}</td>
-                  </tr>
-                ))}
+                {/* Per-referral bounty row */}
+                <tr className="border-t border-foreground/10">
+                  <td className="px-5 py-4 text-sm text-foreground/75 bg-foreground/[0.04] border-r border-foreground/15">
+                    Per-referral bounty
+                  </td>
+                  {tiers.map((t, i) => {
+                    const isMid = tiers.length >= 3 && i === Math.floor(tiers.length / 2);
+                    return (
+                      <td
+                        key={`bounty-${i}`}
+                        className={`px-5 py-4 text-center text-sm ${
+                          isMid ? 'text-foreground bg-primary/[0.08]' : 'text-foreground/90 bg-foreground/[0.02]'
+                        }${i < tiers.length - 1 ? ' border-r border-foreground/10' : ''}`}
+                      >
+                        {t.bounty}
+                      </td>
+                    );
+                  })}
+                </tr>
+                {/* Payout row */}
+                <tr className="border-t border-foreground/10">
+                  <td className="px-5 py-4 text-sm text-foreground/75 bg-foreground/[0.04] border-r border-foreground/15">
+                    Payout
+                  </td>
+                  {tiers.map((t, i) => {
+                    const isMid = tiers.length >= 3 && i === Math.floor(tiers.length / 2);
+                    return (
+                      <td
+                        key={`payout-${i}`}
+                        className={`px-5 py-4 text-center text-sm ${
+                          isMid ? 'text-foreground bg-primary/[0.08]' : 'text-foreground/90 bg-foreground/[0.02]'
+                        }${i < tiers.length - 1 ? ' border-r border-foreground/10' : ''}`}
+                      >
+                        {t.payout}
+                      </td>
+                    );
+                  })}
+                </tr>
               </tbody>
             </table>
           </div>
@@ -110,8 +273,8 @@ export default function ReferralPage() {
           </div>
           <ol className="grid sm:grid-cols-2 gap-4">
             {[
-              { n: '1', title: 'Activation of user',  body: 'Your friend signs up via your referral link, completes KYC verification, and funds their account.' },
-              { n: '2', title: 'Minimum 3 trades',    body: 'Your friend places at least 3 trades after activation. The moment the 3rd trade closes, your bounty is paid instantly.' },
+              { n: '1', title: 'Activation of user',  body: activationSentence },
+              { n: '2', title: tradesTitle,           body: tradesBody },
             ].map((t) => (
               <li key={t.n} className="liquid-glass rounded-2xl p-5 sm:p-6">
                 <div className="flex items-center justify-between">

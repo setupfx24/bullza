@@ -99,11 +99,13 @@ export default function AppHeader() {
 
         {/* RIGHT — Bonus/Referral chips + balance + bell + user */}
         <div className="flex items-center gap-1.5 sm:gap-3">
-          {/* Bonus chip — quick link to the bonus offers page */}
+          {/* Bonus chip — anchors into /wallet#bonus where the trader
+              sees active offers + their bonus history. (`/bonus` alone
+              falls through to the marketing landing group.) */}
           <Link
-            href="/bonus"
+            href="/wallet#bonus"
             className="hidden md:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-[#55a630]/25 bg-[#55a630]/5 hover:bg-[#55a630]/10 transition-colors"
-            title="View active bonus offers"
+            title="View active bonus offers + your bonus history"
           >
             <Gift size={13} className="text-[#55a630] shrink-0" />
             <span className="text-[11px] font-medium text-text-primary">Bonus</span>

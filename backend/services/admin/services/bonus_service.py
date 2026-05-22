@@ -11,27 +11,66 @@ from packages.common.src.admin_schemas import BonusOfferIn, BonusOfferOut, UserB
 from dependencies import write_audit_log
 
 
-async def list_bonus_offers(db: AsyncSession) -> list:
-    result = await db.execute(select(BonusOffer).order_by(BonusOffer.created_at.desc()))
-    offers = result.scalars().all()
-    return [
-        BonusOfferOut(
-            id=str(o.id),
-            name=o.name,
-            bonus_type=o.bonus_type,
-            percentage=float(o.percentage) if o.percentage else None,
-            fixed_amount=float(o.fixed_amount) if o.fixed_amount else None,
-            min_deposit=float(o.min_deposit or 0),
-            max_bonus=float(o.max_bonus) if o.max_bonus else None,
-            lots_required=float(o.lots_required or 0),
-            target_audience=o.target_audience or "all",
-            starts_at=o.starts_at,
-            expires_at=o.expires_at,
-            is_active=o.is_active,
-            created_at=o.created_at,
+def _offer_to_out(o: BonusOffer) -> BonusOfferOut:
+    return BonusOfferOut(
+        id=str(o.id),
+        name=o.name,
+        bonus_type=o.bonus_type,
+        percentage=float(o.percentage) if o.percentage else None,
+        fixed_amount=float(o.fixed_amount) if o.fixed_amount else None,
+        min_deposit=float(o.min_deposit or 0),
+        max_deposit=float(o.max_deposit) if o.max_deposit is not None else None,
+        max_bonus=float(o.max_bonus) if o.max_bonus else None,
+        lots_required=float(o.lots_required or 0),
+        target_audience=o.target_audience or "all",
+        starts_at=o.starts_at,
+        expires_at=o.expires_at,
+        is_active=o.is_active,
+        perks=list(o.perks) if isinstance(o.perks, list) else None,
+        is_popular=bool(o.is_popular),
+        sort_order=int(o.sort_order or 0),
+        cta_label=o.cta_label,
+        tagline=o.tagline,
+        created_at=o.created_at,
+    )
+
+
+async def list_bonus_offers(db: AsyncSession) -> dict:
+    """Sorted by (sort_order ASC, min_deposit ASC) so the trader /bonus page
+    renders tier cards in admin-intended order. Wrapped in `{offers: [...]}`
+    to match what the admin UI expects (legacy shape returned a bare list).
+    """
+    result = await db.execute(
+        select(BonusOffer).order_by(
+            BonusOffer.sort_order.asc(),
+            BonusOffer.min_deposit.asc(),
+            BonusOffer.created_at.desc(),
         )
-        for o in offers
-    ]
+    )
+    offers = result.scalars().all()
+    return {"offers": [_offer_to_out(o) for o in offers]}
+
+
+def _apply_offer_fields(offer: BonusOffer, body: BonusOfferIn) -> None:
+    """Shared field-copy between create and update so the two paths stay
+    in lockstep when we add more bonus fields."""
+    offer.name = body.name
+    offer.bonus_type = body.bonus_type
+    offer.percentage = Decimal(str(body.percentage)) if body.percentage is not None else None
+    offer.fixed_amount = Decimal(str(body.fixed_amount)) if body.fixed_amount is not None else None
+    offer.min_deposit = Decimal(str(body.min_deposit))
+    offer.max_deposit = Decimal(str(body.max_deposit)) if body.max_deposit is not None else None
+    offer.max_bonus = Decimal(str(body.max_bonus)) if body.max_bonus is not None else None
+    offer.lots_required = Decimal(str(body.lots_required))
+    offer.target_audience = body.target_audience
+    offer.starts_at = body.starts_at
+    offer.expires_at = body.expires_at
+    offer.is_active = body.is_active
+    offer.perks = list(body.perks) if body.perks else None
+    offer.is_popular = bool(body.is_popular)
+    offer.sort_order = int(body.sort_order or 0)
+    offer.cta_label = body.cta_label or None
+    offer.tagline = body.tagline or None
 
 
 async def create_bonus_offer(
@@ -40,19 +79,8 @@ async def create_bonus_offer(
     ip_address: str | None,
     db: AsyncSession,
 ) -> dict:
-    offer = BonusOffer(
-        name=body.name,
-        bonus_type=body.bonus_type,
-        percentage=Decimal(str(body.percentage)) if body.percentage else None,
-        fixed_amount=Decimal(str(body.fixed_amount)) if body.fixed_amount else None,
-        min_deposit=Decimal(str(body.min_deposit)),
-        max_bonus=Decimal(str(body.max_bonus)) if body.max_bonus else None,
-        lots_required=Decimal(str(body.lots_required)),
-        target_audience=body.target_audience,
-        starts_at=body.starts_at,
-        expires_at=body.expires_at,
-        is_active=body.is_active,
-    )
+    offer = BonusOffer()
+    _apply_offer_fields(offer, body)
     db.add(offer)
     await db.flush()
 
@@ -78,18 +106,7 @@ async def update_bonus_offer(
         raise HTTPException(status_code=404, detail="Bonus offer not found")
 
     old_values = {"name": offer.name, "is_active": offer.is_active}
-
-    offer.name = body.name
-    offer.bonus_type = body.bonus_type
-    offer.percentage = Decimal(str(body.percentage)) if body.percentage else None
-    offer.fixed_amount = Decimal(str(body.fixed_amount)) if body.fixed_amount else None
-    offer.min_deposit = Decimal(str(body.min_deposit))
-    offer.max_bonus = Decimal(str(body.max_bonus)) if body.max_bonus else None
-    offer.lots_required = Decimal(str(body.lots_required))
-    offer.target_audience = body.target_audience
-    offer.starts_at = body.starts_at
-    offer.expires_at = body.expires_at
-    offer.is_active = body.is_active
+    _apply_offer_fields(offer, body)
 
     await write_audit_log(
         db, admin_id, "update_bonus_offer", "bonus_offer", offer_id,

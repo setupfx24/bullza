@@ -102,7 +102,7 @@ async def send_due_reminders(db: AsyncSession) -> int:
                 trader_app_url=app_url,
                 bonus_pct=ADVERTISED_BONUS_PCT,
             )
-            fire_and_forget(send_email(u.email, subject, html, text=text))
+            fire_and_forget(send_email(u.email, subject, html, text=text, category="account"))
         except Exception as exc:
             logger.warning("deposit nudge render failed for %s: %s", u.email, exc)
             continue

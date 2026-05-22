@@ -1,7 +1,7 @@
 """Profile Service — User profile CRUD, KYC document handling, session management."""
 import logging
 import uuid as _uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from uuid import UUID
 
@@ -149,12 +149,41 @@ async def update_profile(
                     detail="Invalid date of birth — expected YYYY-MM-DD.",
                 )
 
+    # Snapshot completeness BEFORE applying the patch so we can detect the
+    # false→true transition that should fire the welcome email.
+    was_complete = _is_profile_complete(user)
+
     for field, value in update_data.items():
         if value is not None:
             setattr(user, field, value)
 
+    # Detect the transition after the patch and BEFORE commit so we can
+    # stamp welcome_email_sent_at in the same write. Demo / staff users
+    # are excluded inside _is_profile_complete already.
+    now_complete = _is_profile_complete(user)
+    should_fire_welcome = (
+        (not was_complete)
+        and now_complete
+        and user.welcome_email_sent_at is None
+    )
+    if should_fire_welcome:
+        user.welcome_email_sent_at = datetime.now(timezone.utc)
+
     await db.commit()
     await db.refresh(user)
+
+    # Fire the dashboard-access email AFTER the commit succeeds — if SMTP
+    # fails we've already saved the profile, and the same idempotency
+    # column will prevent a duplicate send when the user re-saves.
+    # send_dashboard_access_email is itself fire-and-forget, so this call
+    # never blocks the response.
+    if should_fire_welcome:
+        try:
+            await send_dashboard_access_email(user_id=user.id, db=db)
+        except Exception as e:
+            logger.warning(
+                "Auto welcome email failed for %s: %s", user.email, e,
+            )
 
     return {
         "id": str(user.id),
@@ -171,6 +200,28 @@ async def update_profile(
         "theme": user.theme,
         "message": "Profile updated",
     }
+
+
+def _is_profile_complete(user) -> bool:
+    """Mirror of auth_service.get_me's profile_complete logic so update_profile
+    can detect the same transition without an extra DB roundtrip. Demo + staff
+    short-circuit to True so they never trigger the auto-welcome path."""
+    if bool(getattr(user, "is_demo", False)):
+        return True
+    role = (getattr(user, "role", None) or "").lower()
+    if role in ("admin", "super_admin", "employee", "manager", "support"):
+        return True
+    return bool(
+        (user.first_name or "").strip()
+        and (user.last_name or "").strip()
+        and (user.phone or "").strip()
+        and (user.country or "").strip()
+        and (user.address or "").strip()
+        and (user.city or "").strip()
+        and (user.state or "").strip()
+        and (user.postal_code or "").strip()
+        and user.date_of_birth is not None
+    )
 
 
 async def change_password(
@@ -462,7 +513,7 @@ async def send_dashboard_access_email(
             first_name=user.first_name,
             dashboard_url=dashboard_url,
         )
-        fire_and_forget(send_email(user.email, subject, html, text=text))
+        fire_and_forget(send_email(user.email, subject, html, text=text, category="support"))
     except Exception as e:
         logger.warning(
             "dashboard-access email scheduling failed for %s: %s",

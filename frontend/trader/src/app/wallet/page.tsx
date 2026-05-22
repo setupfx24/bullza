@@ -21,6 +21,7 @@ import {
   ArrowUpFromLine,
   TrendingUp,
   X,
+  AlertTriangle,
 } from 'lucide-react';
 
 interface AccountItem {
@@ -44,6 +45,14 @@ interface WalletData {
   balance: number;
   currency: string;
   main_wallet_balance: number;
+  /** Welcome-bonus credit. Tradeable (sweeps to account.credit on the
+   *  next main→trading transfer) but NOT withdrawable. Wiped on the
+   *  user's first approved withdrawal. */
+  main_wallet_bonus: number;
+  /** ISO timestamp when admin first approved a withdrawal — once set,
+   *  any leftover bonus has been forfeited and future deposits will
+   *  not grant a new welcome bonus. */
+  bonus_forfeited_at: string | null;
   total_deposited: number;
   total_withdrawn: number;
   pending_withdrawals: number;
@@ -55,6 +64,8 @@ interface WalletSummaryResponse {
   credit?: number;
   equity?: number;
   main_wallet_balance?: number;
+  main_wallet_bonus?: number;
+  bonus_forfeited_at?: string | null;
   total_deposited?: number;
   total_withdrawn?: number;
   total_live_balance?: number;
@@ -69,6 +80,49 @@ interface WalletListItem {
   amount: number;
   status: string;
   currency: string;
+}
+
+interface BonusOfferLite {
+  id: string;
+  name: string;
+  bonus_type: string | null;
+  percentage: number | null;
+  fixed_amount: number | null;
+  min_deposit: number;
+  max_bonus: number | null;
+  lots_required: number;
+  target_audience: string | null;
+  starts_at: string | null;
+  expires_at: string | null;
+}
+
+interface MyBonusRow {
+  id: string;
+  offer_name: string | null;
+  amount: number;
+  lots_traded: number;
+  lots_required: number;
+  status: string;
+  released_at: string | null;
+  expires_at: string | null;
+  created_at: string | null;
+}
+
+interface BonusRequestRow {
+  deposit_id: string;
+  deposit_amount: number;
+  deposit_status: string;
+  bonus_code: string;
+  bonus_status: 'pending' | 'granted' | 'denied' | null;
+  bonus_amount: number | null;
+  decided_at: string | null;
+  created_at: string | null;
+}
+
+interface BonusOverview {
+  active_offers: BonusOfferLite[];
+  my_bonuses: MyBonusRow[];
+  recent_requests: BonusRequestRow[];
 }
 
 const DEMO_FUNDING_MSG =
@@ -145,6 +199,14 @@ function WalletPageContent() {
   const [depositProofFile, setDepositProofFile] = useState<File | null>(null);
   const [manualBankInfo, setManualBankInfo] = useState<ManualBankDetailsResponse | null>(null);
   const [depositSubmitting, setDepositSubmitting] = useState(false);
+  // Optional promo / bonus code typed at deposit time. Pending → admin
+  // reviews + grants manually from the admin deposits page. Empty by
+  // default; deposit goes through normally without any bonus request.
+  const [depositBonusCode, setDepositBonusCode] = useState('');
+
+  // Bonus overview block (Bonus chip in header jumps to /wallet#bonus).
+  const [bonusOverview, setBonusOverview] = useState<BonusOverview | null>(null);
+  const [bonusLoading, setBonusLoading] = useState(false);
 
   const [withdrawChannel, setWithdrawChannel] = useState<FundingChannel>('crypto');
   const [withdrawAmount, setWithdrawAmount] = useState('');
@@ -182,6 +244,8 @@ function WalletPageContent() {
         let currency = 'USD';
         let balance = 0;
         let mainWalletBalance = 0;
+        let mainWalletBonus = 0;
+        let bonusForfeitedAt: string | null = null;
         let totalDeposited = 0;
         let totalWithdrawn = 0;
         let totalLiveBalance: number | undefined;
@@ -191,6 +255,8 @@ function WalletPageContent() {
           const live = s.live_accounts || [];
           setLiveAccounts(live);
           mainWalletBalance = Number(s.main_wallet_balance) || 0;
+          mainWalletBonus = Number(s.main_wallet_bonus) || 0;
+          bonusForfeitedAt = s.bonus_forfeited_at ?? null;
           totalDeposited = Number(s.total_deposited) || 0;
           totalWithdrawn = Number(s.total_withdrawn) || 0;
           totalLiveBalance =
@@ -243,6 +309,8 @@ function WalletPageContent() {
           balance,
           currency,
           main_wallet_balance: mainWalletBalance,
+          main_wallet_bonus: mainWalletBonus,
+          bonus_forfeited_at: bonusForfeitedAt,
           total_deposited: totalDeposited,
           total_withdrawn: totalWithdrawn,
           pending_withdrawals: pendingWd,
@@ -258,6 +326,8 @@ function WalletPageContent() {
           balance: 0,
           currency: 'USD',
           main_wallet_balance: 0,
+          main_wallet_bonus: 0,
+          bonus_forfeited_at: null,
           total_deposited: 0,
           total_withdrawn: 0,
           pending_withdrawals: 0,
@@ -319,6 +389,7 @@ function WalletPageContent() {
     setDepositAmount('');
     setDepositTxId('');
     setDepositProofFile(null);
+    setDepositBonusCode('');
     setDepositUiSection('crypto');
     setManualBankInfo(null);
     setFundMainTab('deposit');
@@ -344,6 +415,41 @@ function WalletPageContent() {
     if (fundMainTab !== 'deposit' || depositUiSection !== 'manual') return;
     void loadManualBankDetails();
   }, [fundMainTab, depositUiSection, loadManualBankDetails]);
+
+  // Bonus overview — fetched on mount + after the deposit form closes so
+  // a freshly typed bonus_code shows up in the "Recent requests" list
+  // immediately. Failure stays silent (the chip still works as a section
+  // jump even if data isn't there yet).
+  const loadBonusOverview = useCallback(async () => {
+    setBonusLoading(true);
+    try {
+      const res = await api.get<BonusOverview>('/wallet/bonus/overview');
+      setBonusOverview(res);
+    } catch {
+      /* ignore */
+    } finally {
+      setBonusLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadBonusOverview();
+  }, [loadBonusOverview]);
+
+  // Scroll-to-anchor when the page is opened with /wallet#bonus (header
+  // Bonus chip). Next.js's automatic hash scroll happens before the
+  // section renders, so we re-trigger after the first paint.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (window.location.hash !== '#bonus') return;
+    const id = window.setTimeout(() => {
+      document.getElementById('bonus')?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start',
+      });
+    }, 250);
+    return () => window.clearTimeout(id);
+  }, [bonusOverview]);
 
   /** Open withdraw modal from main wallet (?action=withdraw); external payouts use main balance only. */
   useEffect(() => {
@@ -478,11 +584,16 @@ function WalletPageContent() {
         // at checkout time. The picker only surfaces coins that are
         // enabled in the NOWPayments dashboard, so the operator controls
         // which networks are offered without touching this code.
+        // Forward the promo code to the gateway so the deposit row is
+        // stamped with bonus_code + bonus_status='pending'. Admin reviews
+        // and grants on the deposits page after the IPN confirms.
+        const _bonus = depositBonusCode.trim().toUpperCase();
         const resp = await api.post<{ id: string; status: string; payment_url?: string }>(
           '/wallet/deposit',
           {
             amount: amt,
             method: CRYPTO_DEPOSIT_METHOD,
+            ...(_bonus ? { bonus_code: _bonus } : {}),
           },
         );
         if (resp.payment_url) {
@@ -514,6 +625,8 @@ function WalletPageContent() {
       fd.append('amount', String(amt));
       fd.append('transaction_id', depositTxId.trim());
       fd.append('file', depositProofFile);
+      const bonusTrim = depositBonusCode.trim();
+      if (bonusTrim) fd.append('bonus_code', bonusTrim);
       const token = api.getToken();
       const res = await fetch('/api/v1/wallet/deposit/manual', {
         method: 'POST',
@@ -540,6 +653,7 @@ function WalletPageContent() {
       }
       toast.success(`Manual deposit of $${amt.toLocaleString()} submitted — pending approval`);
       void fetchData(true);
+      void loadBonusOverview();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Deposit failed');
     } finally {
@@ -716,6 +830,28 @@ function WalletPageContent() {
                     <p className="text-sm sm:text-lg md:text-xl font-bold tabular-nums font-mono text-text-primary truncate">
                       {fmt(wallet?.main_wallet_balance ?? 0)}
                     </p>
+                    {/* Bonus credit lives next to the cash balance so the
+                        user understands at a glance which portion is
+                        withdrawable. Bonus is tradeable but cleared on
+                        the first withdrawal (migration 0056). */}
+                    {(wallet?.main_wallet_bonus ?? 0) > 0 && (
+                      <div className="mt-1.5 pt-1.5 border-t border-[#55a630]/10">
+                        <p className="text-[8px] sm:text-[9px] font-bold uppercase tracking-widest text-amber-400/70 mb-0.5">
+                          Bonus credit
+                        </p>
+                        <p className="text-xs sm:text-sm font-bold tabular-nums font-mono text-amber-400 truncate">
+                          {fmt(wallet?.main_wallet_bonus ?? 0)}
+                        </p>
+                        <p className="text-[8px] sm:text-[9px] text-text-tertiary mt-0.5 leading-tight">
+                          Tradeable, not withdrawable. Cleared on first withdrawal.
+                        </p>
+                      </div>
+                    )}
+                    {wallet?.bonus_forfeited_at && (wallet?.main_wallet_bonus ?? 0) === 0 && (
+                      <p className="mt-1.5 pt-1.5 border-t border-text-tertiary/10 text-[8px] sm:text-[9px] text-text-tertiary leading-tight">
+                        Welcome-bonus eligibility used (forfeited on first withdrawal).
+                      </p>
+                    )}
                   </div>
                   {liveAccounts.length > 0 && (
                     <button
@@ -958,6 +1094,27 @@ function WalletPageContent() {
                         </p>
                       </div>
 
+                      {/* Promo / bonus code — mirrors the field on the Manual
+                          tab. Backend already accepts `bonus_code` on
+                          /wallet/deposit (admin reviews + grants on approval),
+                          this just surfaces it to crypto-paying users too. */}
+                      <div className="space-y-1 min-w-0">
+                        <label className="text-xs text-text-secondary">
+                          Bonus / promo code <span className="text-text-tertiary text-[10px]">(optional)</span>
+                        </label>
+                        <input
+                          type="text"
+                          value={depositBonusCode}
+                          onChange={(e) => setDepositBonusCode(e.target.value.toUpperCase())}
+                          placeholder="e.g. SD100"
+                          maxLength={40}
+                          className="w-full px-4 py-3 rounded-xl border border-border-primary bg-bg-secondary text-text-primary placeholder:text-text-tertiary outline-none focus:border-accent/50 font-mono text-sm"
+                        />
+                        <p className="text-[10px] text-text-tertiary mt-1">
+                          Have a promo code? Type it here. Admin will review your request and credit the bonus separately to your main wallet once the deposit confirms.
+                        </p>
+                      </div>
+
                       <button
                         type="button"
                         onClick={() => void submitDeposit()}
@@ -1093,6 +1250,22 @@ function WalletPageContent() {
                           )}
                         </label>
                       </div>
+                      <div className="space-y-1 min-w-0">
+                        <label className="text-xs text-text-secondary">
+                          Bonus / promo code <span className="text-text-tertiary text-[10px]">(optional)</span>
+                        </label>
+                        <input
+                          type="text"
+                          value={depositBonusCode}
+                          onChange={(e) => setDepositBonusCode(e.target.value.toUpperCase())}
+                          placeholder="e.g. SD100"
+                          maxLength={40}
+                          className="w-full px-4 py-3 rounded-xl border border-border-primary bg-bg-secondary text-text-primary placeholder:text-text-tertiary outline-none focus:border-accent/50 font-mono text-sm"
+                        />
+                        <p className="text-[10px] text-text-tertiary mt-1">
+                          Have a promo code? Type it here. Admin will review your request and credit the bonus separately to your main wallet.
+                        </p>
+                      </div>
                       <button
                         type="button"
                         onClick={() => void submitDeposit()}
@@ -1144,6 +1317,26 @@ function WalletPageContent() {
                     Withdrawals are sent from your <span className="text-text-primary font-medium">main wallet</span> only. Ensure the amount
                     you need is available on the main wallet before requesting a payout.
                   </p>
+
+                  {/* First-withdrawal forfeiture warning — the welcome
+                      bonus disappears on first approved withdrawal. Only
+                      shown when the user actually has pending bonus
+                      (main wallet OR any account credit) and hasn't
+                      already forfeited it. */}
+                  {!wallet?.bonus_forfeited_at &&
+                    ((wallet?.main_wallet_bonus ?? 0) > 0 ||
+                      liveAccounts.some((a) => Number(a.credit) > 0)) && (
+                      <div className="rounded-xl border border-amber-500/40 bg-amber-500/[0.07] p-3 flex gap-2.5">
+                        <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                        <div className="text-[11px] text-amber-200/90 leading-relaxed">
+                          <span className="font-bold text-amber-300">Heads-up — bonus forfeiture.</span>{' '}
+                          You currently have a welcome bonus credit. Submitting your
+                          first withdrawal clears it immediately (both main-wallet bonus
+                          and any bonus credit currently on a trading account). Trading
+                          profits already in your account balance are unaffected.
+                        </div>
+                      </div>
+                    )}
 
                   {/* Payment method sub-tabs */}
                   <div className="flex gap-1 p-1 rounded-xl bg-bg-secondary border border-border-secondary">
@@ -1409,6 +1602,140 @@ function WalletPageContent() {
               </p>
             </div>
           </div>
+
+          {/* Bonus section — header chip jumps here (/wallet#bonus). */}
+          <section id="bonus" className="scroll-mt-24 space-y-3">
+            <div className="flex items-center justify-between gap-2">
+              <h2 className="text-base font-bold text-text-primary">Bonus &amp; promo</h2>
+              <button
+                type="button"
+                onClick={() => void loadBonusOverview()}
+                disabled={bonusLoading}
+                className="text-[10px] uppercase tracking-wider text-text-tertiary hover:text-text-primary disabled:opacity-50"
+              >
+                {bonusLoading ? 'Refreshing…' : 'Refresh'}
+              </button>
+            </div>
+
+            {/* Active offers */}
+            <div className="rounded-xl border border-border-glass/30 bg-bg-secondary/40 p-4">
+              <p className="text-xxs font-bold uppercase tracking-wide text-[#55a630] mb-2">Active offers</p>
+              {!bonusOverview || bonusOverview.active_offers.length === 0 ? (
+                <p className="text-xs text-text-tertiary">No active offers at the moment. Check back later.</p>
+              ) : (
+                <ul className="space-y-2">
+                  {bonusOverview.active_offers.map((o) => (
+                    <li
+                      key={o.id}
+                      className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-bg-primary/40 border border-border-glass/20 px-3 py-2"
+                    >
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-text-primary truncate">{o.name}</p>
+                        <p className="text-[10px] text-text-tertiary">
+                          {o.percentage ? `${o.percentage}% of deposit` :
+                            o.fixed_amount ? `$${o.fixed_amount.toFixed(2)} fixed` : 'Custom'}
+                          {o.min_deposit > 0 && <> · min ${o.min_deposit.toFixed(2)}</>}
+                          {o.max_bonus && <> · cap ${o.max_bonus.toFixed(2)}</>}
+                          {o.expires_at && <> · ends {new Date(o.expires_at).toLocaleDateString()}</>}
+                        </p>
+                      </div>
+                      <span className="shrink-0 text-[10px] font-bold uppercase tracking-wider text-[#55a630] bg-[#55a630]/10 border border-[#55a630]/25 rounded-full px-2 py-0.5">
+                        {o.bonus_type || 'bonus'}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <p className="text-[10px] text-text-tertiary mt-2">
+                Have a code? Type it in the deposit form&apos;s <span className="text-text-secondary font-medium">Bonus / promo code</span> field
+                and admin will review your request.
+              </p>
+            </div>
+
+            {/* Recent bonus requests on deposits */}
+            <div className="rounded-xl border border-border-glass/30 bg-bg-secondary/40 p-4">
+              <p className="text-xxs font-bold uppercase tracking-wide text-[#55a630] mb-2">My bonus requests</p>
+              {!bonusOverview || bonusOverview.recent_requests.length === 0 ? (
+                <p className="text-xs text-text-tertiary">You haven&apos;t requested a bonus code on any deposit yet.</p>
+              ) : (
+                <ul className="space-y-2">
+                  {bonusOverview.recent_requests.map((r) => (
+                    <li
+                      key={r.deposit_id}
+                      className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-bg-primary/40 border border-border-glass/20 px-3 py-2"
+                    >
+                      <div className="min-w-0">
+                        <p className="text-sm font-mono font-semibold text-text-primary">{r.bonus_code}</p>
+                        <p className="text-[10px] text-text-tertiary">
+                          Deposit ${r.deposit_amount.toFixed(2)} · {r.created_at ? new Date(r.created_at).toLocaleString() : '—'}
+                        </p>
+                      </div>
+                      <div className="shrink-0 text-right">
+                        <span
+                          className={clsx(
+                            'inline-block text-[10px] font-bold uppercase tracking-wider rounded-full px-2 py-0.5 border',
+                            r.bonus_status === 'granted'
+                              ? 'bg-success/15 text-success border-success/30'
+                              : r.bonus_status === 'denied'
+                                ? 'bg-sell/15 text-sell border-sell/30'
+                                : 'bg-warning/15 text-warning border-warning/30',
+                          )}
+                        >
+                          {r.bonus_status || 'pending'}
+                        </span>
+                        {r.bonus_amount != null && r.bonus_status === 'granted' && (
+                          <p className="text-[10px] text-success font-mono mt-0.5">+${r.bonus_amount.toFixed(2)}</p>
+                        )}
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+
+            {/* Active / past UserBonus rows */}
+            <div className="rounded-xl border border-border-glass/30 bg-bg-secondary/40 p-4">
+              <p className="text-xxs font-bold uppercase tracking-wide text-[#55a630] mb-2">My bonus history</p>
+              {!bonusOverview || bonusOverview.my_bonuses.length === 0 ? (
+                <p className="text-xs text-text-tertiary">No bonuses credited yet.</p>
+              ) : (
+                <ul className="space-y-2">
+                  {bonusOverview.my_bonuses.map((b) => (
+                    <li
+                      key={b.id}
+                      className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-bg-primary/40 border border-border-glass/20 px-3 py-2"
+                    >
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-text-primary truncate">{b.offer_name || 'Bonus credit'}</p>
+                        <p className="text-[10px] text-text-tertiary">
+                          {b.created_at ? new Date(b.created_at).toLocaleString() : '—'}
+                          {b.lots_required > 0 && (
+                            <> · lots traded {b.lots_traded.toFixed(2)} / {b.lots_required.toFixed(2)}</>
+                          )}
+                          {b.expires_at && <> · expires {new Date(b.expires_at).toLocaleDateString()}</>}
+                        </p>
+                      </div>
+                      <div className="shrink-0 text-right">
+                        <p className="text-sm font-mono font-bold text-success">+${b.amount.toFixed(2)}</p>
+                        <span
+                          className={clsx(
+                            'inline-block text-[9px] font-bold uppercase tracking-wider rounded-full px-1.5 py-0.5 mt-0.5 border',
+                            b.status === 'released' || b.status === 'active'
+                              ? 'bg-success/15 text-success border-success/30'
+                              : b.status === 'expired' || b.status === 'forfeited'
+                                ? 'bg-text-tertiary/15 text-text-tertiary border-border-glass/30'
+                                : 'bg-warning/15 text-warning border-warning/30',
+                          )}
+                        >
+                          {b.status}
+                        </span>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </section>
         </div>
       </div>
 

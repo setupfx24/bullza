@@ -72,7 +72,12 @@ class UserOut(BaseModel):
 class AccountTypeIn(BaseModel):
     name: str
     description: Optional[str] = None
+    # Default leverage when a brand-new account in this group is created.
     leverage_default: int = 100
+    # Hard ceiling on leverage for accounts in this group. NULL = ceiling
+    # equals leverage_default (legacy behaviour). Trading_service uses
+    # min(this, instrument_config.leverage_max) when computing margin.
+    max_leverage: Optional[int] = None
     spread_markup_default: Decimal = Decimal("0")
     commission_default: Decimal = Decimal("0")
     minimum_deposit: Decimal = Decimal("0")
@@ -86,6 +91,7 @@ class AccountTypeOut(BaseModel):
     name: str
     description: Optional[str] = None
     leverage_default: int
+    max_leverage: Optional[int] = None
     spread_markup_default: Decimal
     commission_default: Decimal
     minimum_deposit: Decimal
@@ -265,6 +271,12 @@ class DepositOut(BaseModel):
     created_at: Optional[datetime] = None
     user_email: Optional[str] = None
     user_name: Optional[str] = None
+    # Bonus request fields (migration 0054). NULL bonus_code = no bonus
+    # requested at deposit time; the existing auto-apply BonusOffer
+    # loop still runs in that case.
+    bonus_code: Optional[str] = None
+    bonus_status: Optional[str] = None
+    bonus_amount: Optional[float] = None
 
     class Config:
         from_attributes = True
@@ -559,12 +571,22 @@ class BonusOfferIn(BaseModel):
     percentage: Optional[float] = None
     fixed_amount: Optional[float] = None
     min_deposit: float = 0
+    # Upper bound of the deposit-range card on the /bonus page. None = top
+    # tier, rendered as "$X+". Presentation-only; the auto-apply engine
+    # ignores it.
+    max_deposit: Optional[float] = None
     max_bonus: Optional[float] = None
     lots_required: float = 0
     target_audience: str = "all"
     starts_at: Optional[datetime] = None
     expires_at: Optional[datetime] = None
     is_active: bool = True
+    # Tier-display extras (admin-managed cards on the trader /bonus page).
+    perks: Optional[list[str]] = None
+    is_popular: bool = False
+    sort_order: int = 0
+    cta_label: Optional[str] = None
+    tagline: Optional[str] = None
 
 
 class BonusOfferOut(BaseModel):
@@ -574,12 +596,18 @@ class BonusOfferOut(BaseModel):
     percentage: Optional[float] = None
     fixed_amount: Optional[float] = None
     min_deposit: float
+    max_deposit: Optional[float] = None
     max_bonus: Optional[float] = None
     lots_required: float
     target_audience: str
     starts_at: Optional[datetime] = None
     expires_at: Optional[datetime] = None
     is_active: bool
+    perks: Optional[list[str]] = None
+    is_popular: bool = False
+    sort_order: int = 0
+    cta_label: Optional[str] = None
+    tagline: Optional[str] = None
     created_at: Optional[datetime] = None
 
     class Config:

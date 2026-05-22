@@ -204,7 +204,7 @@ async def approve_kyc(
                 first_name=user.first_name,
                 trader_app_url=getattr(settings, "TRADER_APP_URL", "https://trade.swisdex.com"),
             )
-            fire_and_forget(send_email(user.email, subject, html, text=text))
+            fire_and_forget(send_email(user.email, subject, html, text=text, category="support"))
     except Exception:
         pass
 
@@ -267,7 +267,7 @@ async def reject_kyc(
                 reason=reason_str or None,
                 trader_app_url=getattr(settings, "TRADER_APP_URL", "https://trade.swisdex.com"),
             )
-            fire_and_forget(send_email(user.email, subject, html, text=text))
+            fire_and_forget(send_email(user.email, subject, html, text=text, category="support"))
     except Exception:
         pass
 

@@ -256,7 +256,7 @@ def _send_welcome_email(user: User, *, via_google: bool) -> None:
             username=user.email,
             trading_id=trading_id,
         )
-        fire_and_forget(send_email(user.email, subject, html, text=text))
+        fire_and_forget(send_email(user.email, subject, html, text=text, category="support"))
     except Exception as e:
         logger.warning("welcome email scheduling failed for %s: %s", user.email, e)
 
@@ -301,7 +301,7 @@ def _send_verify_email(user: User, request: Request | None = None) -> None:
             verify_url=verify_url,
             expires_hours=EMAIL_VERIFY_EXPIRES_HOURS,
         )
-        fire_and_forget(send_email(user.email, subject, html, text=text))
+        fire_and_forget(send_email(user.email, subject, html, text=text, category="support"))
     except Exception as e:
         logger.warning("verify-email scheduling failed for %s: %s", user.email, e)
 
@@ -411,7 +411,7 @@ async def _maybe_send_new_login_email(
             when_utc=when_utc,
             trader_app_url=st.TRADER_APP_URL or "https://trade.swisdex.com",
         )
-        fire_and_forget(send_email(user.email, subject, html, text=text))
+        fire_and_forget(send_email(user.email, subject, html, text=text, category="support"))
     except Exception as e:
         logger.debug("new-login email check failed for %s: %s", getattr(user, "email", "?"), e)
 
@@ -488,6 +488,19 @@ async def _attach_to_company_ib(db: AsyncSession, user_id: UUID) -> None:
         referred_id=user_id,
         ib_profile_id=company_ib.id,
     ))
+    # Same treatment as a code-based IB referral — Super IB gets the
+    # XP/AC/PS signup bonus that a regular IB would earn for the same
+    # unreferred user. Without this the Super IB sees the user in its
+    # tree (and earns trade commissions) but is silently shorted on the
+    # one-time signup credit. Best-effort: a rewards failure must not
+    # block signup.
+    try:
+        from . import rewards_service
+        await rewards_service.award_signup_referral_bonus(
+            db, referrer_user_id=company_ib.user_id, referred_user_id=user_id,
+        )
+    except Exception as _e:
+        logger.debug("Super IB signup bonus failed: %s", _e)
 
 
 # ─── Core: issue auth response ───────────────────────────────────────────

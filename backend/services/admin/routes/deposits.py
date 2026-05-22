@@ -1,6 +1,8 @@
 import uuid
+from decimal import Decimal
 
 from fastapi import APIRouter, Depends, Query, Request
+from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from packages.common.src.database import get_db
@@ -76,6 +78,47 @@ async def reject_deposit(
     db: AsyncSession = Depends(get_db),
 ):
     return await deposit_service.reject_deposit(
+        deposit_id=deposit_id, reason=body.reason, admin_id=admin.id,
+        ip_address=request.client.host if request.client else None, db=db,
+    )
+
+
+# ─── Bonus request grant / deny (trader typed a promo code at deposit) ──
+
+class _BonusGrantBody(BaseModel):
+    amount: Decimal
+    description: str | None = None
+
+
+@router.post("/deposits/{deposit_id}/grant-bonus")
+async def grant_deposit_bonus(
+    deposit_id: uuid.UUID,
+    body: _BonusGrantBody,
+    request: Request,
+    admin: User = Depends(require_permission("deposits.approve")),
+    db: AsyncSession = Depends(get_db),
+):
+    """Credit a custom bonus amount for an open bonus request. Idempotent
+    against double-clicks. Re-using deposits.approve permission so the
+    same admin who can approve the deposit can decide its bonus."""
+    return await deposit_service.grant_deposit_bonus(
+        deposit_id=deposit_id, amount=body.amount, description=body.description,
+        admin_id=admin.id,
+        ip_address=request.client.host if request.client else None, db=db,
+    )
+
+
+@router.post("/deposits/{deposit_id}/deny-bonus")
+async def deny_deposit_bonus(
+    deposit_id: uuid.UUID,
+    body: RejectRequest,
+    request: Request,
+    admin: User = Depends(require_permission("deposits.reject")),
+    db: AsyncSession = Depends(get_db),
+):
+    """Mark the bonus request denied — no money moves. Trader gets a
+    notification with the reason."""
+    return await deposit_service.deny_deposit_bonus(
         deposit_id=deposit_id, reason=body.reason, admin_id=admin.id,
         ip_address=request.client.host if request.client else None, db=db,
     )

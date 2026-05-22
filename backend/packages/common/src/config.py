@@ -97,6 +97,27 @@ class Settings(BaseSettings):
     MAIL_FROM_NAME: str = "SwisDex"
     SMTP_USE_TLS: bool = True
 
+    # ─── Per-category From aliases (Hostinger / any SMTP) ────────────────
+    # SMTP authenticates as SMTP_USER (the mailbox owner) but the visible
+    # `From:` header is selected by the call site's category so users see
+    # mails coming from a topical address (account@, voucher@, …) instead
+    # of a single noreply.
+    #
+    # All blank by default — when blank, the call falls back to SMTP_FROM
+    # / SMTP_USER (the legacy single-address behaviour). Once you set them,
+    # category-tagged sends use the alias automatically.
+    #
+    # The aliases MUST already exist in your mail provider (e.g. Hostinger
+    # alias config) AND the provider must allow sending as the alias under
+    # the authenticated mailbox. Hostinger's default is to allow this.
+    SMTP_FROM_ACCOUNT: str = ""      # deposit / withdrawal mails
+    SMTP_FROM_INSURE: str = ""       # insured-trade payouts + reminders
+    SMTP_FROM_AFFILIATES: str = ""   # IB / PAMM / MAM
+    SMTP_FROM_VOUCHER: str = ""      # bonus + referral
+    SMTP_FROM_STACKING: str = ""     # fixed-return + staking
+    SMTP_FROM_INFO: str = ""         # generic website-side mails (default)
+    SMTP_FROM_SUPPORT: str = ""      # auth / KYC / password reset
+
     # ─── Cloudflare Turnstile (bot protection on /auth/register) ─────────
     # When both are set, the register endpoint requires a valid Turnstile
     # token from the client; we POST it to challenges.cloudflare.com/turnstile

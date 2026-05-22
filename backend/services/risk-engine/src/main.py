@@ -283,7 +283,7 @@ class RiskEngine:
                 currency=account.currency or "USD",
                 trader_app_url=getattr(st, "TRADER_APP_URL", None) or "https://trade.swisdex.com",
             )
-            fire_and_forget(send_email(user.email, subject, html, text=text))
+            fire_and_forget(send_email(user.email, subject, html, text=text, category="account"))
         except Exception as e:
             logger.debug("margin call email failed acct=%s: %s", account.account_number, e)
 
@@ -317,7 +317,7 @@ class RiskEngine:
                 currency=account.currency or "USD",
                 trader_app_url=getattr(st, "TRADER_APP_URL", None) or "https://trade.swisdex.com",
             )
-            fire_and_forget(send_email(user.email, subject, html, text=text))
+            fire_and_forget(send_email(user.email, subject, html, text=text, category="account"))
         except Exception as e:
             logger.debug("stop-out email failed acct=%s: %s", account.account_number, e)
 

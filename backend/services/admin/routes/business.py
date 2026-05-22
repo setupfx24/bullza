@@ -127,6 +127,27 @@ async def update_ib_commission(
     )
 
 
+class _RefCodeBody(BaseModel):
+    code: str
+
+
+@router.put("/ib/agents/{agent_id}/referral-code")
+async def update_ib_referral_code(
+    agent_id: uuid.UUID,
+    body: _RefCodeBody,
+    request: Request,
+    admin: User = Depends(require_permission("ib.manage")),
+    db: AsyncSession = Depends(get_db),
+):
+    """Overwrite an IB's auto-generated referral code with a custom vanity
+    code (e.g. 'SDASIA' for the house master). Strict charset + uniqueness
+    validation; audit-logged."""
+    return await business_service.update_ib_referral_code(
+        agent_id=agent_id, new_code=body.code, admin_id=admin.id,
+        ip_address=request.client.host if request.client else None, db=db,
+    )
+
+
 @router.post("/ib/agents/{agent_id}/reject")
 async def reject_active_ib(
     agent_id: uuid.UUID,
@@ -430,4 +451,57 @@ async def update_master(
     return await business_service.update_master(
         master_id=master_id, patch=patch, admin_id=admin.id,
         ip_address=request.client.host if request.client else None, db=db,
+    )
+
+
+# ─── Per-investor allocation management (drives the MAM page Investors drawer) ──
+
+class AllocationUpdateIn(BaseModel):
+    """Admin patch on a single investor_allocations row. Every field is
+    optional — exclude_unset keeps untouched fields untouched. JSON null on
+    a fee override clears it (investor falls back to master default); a
+    real numeric 0 stores 0%."""
+    status: str | None = None  # active | paused | closed
+    copy_type: str | None = None
+    allocation_amount: float | None = None
+    allocation_pct: float | None = None
+    max_drawdown_pct: float | None = None
+    max_lot_override: float | None = None
+    performance_fee_pct_override: float | None = None
+    admin_commission_pct_override: float | None = None
+    admin_notes: str | None = None
+
+
+@router.get("/masters/{master_id}/allocations")
+async def list_master_allocations(
+    master_id: uuid.UUID,
+    admin: User = Depends(require_permission("ib.view")),
+    db: AsyncSession = Depends(get_db),
+):
+    """List every investor allocation on a master, with effective fee % so
+    admin can see at a glance who is on the house rate vs a custom override."""
+    return await business_service.list_master_allocations(master_id=master_id, db=db)
+
+
+@router.patch("/masters/{master_id}/allocations/{allocation_id}")
+async def update_master_allocation(
+    master_id: uuid.UUID,
+    allocation_id: uuid.UUID,
+    body: AllocationUpdateIn,
+    request: Request,
+    admin: User = Depends(require_permission("ib.manage")),
+    db: AsyncSession = Depends(get_db),
+):
+    """Admin patches a single allocation: change status (pause/resume/close),
+    set a custom performance fee just for this investor, cap their max lot,
+    leave an audit note. copy_engine._close_copy reads the overrides on the
+    next close."""
+    patch = body.model_dump(exclude_unset=True)
+    return await business_service.update_master_allocation(
+        master_id=master_id,
+        allocation_id=allocation_id,
+        patch=patch,
+        admin_id=admin.id,
+        ip_address=request.client.host if request.client else None,
+        db=db,
     )

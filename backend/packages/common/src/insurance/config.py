@@ -15,6 +15,23 @@ from ..settings_store import get_system_setting
 @dataclass
 class InsuranceConfig:
     enabled: bool
+    # "risk_score" (legacy) — fee = risk_score × base_constant × tier_mult
+    #   capped at fee_cap. The trade_size_factor input is bounded so a
+    #   10-lot trade barely costs more than a 1-lot trade.
+    # "per_lot" — fee = lots × per_lot_fee[tier], i.e. fee scales linearly
+    #   with the number of lots. fee_cap still applies as a hard ceiling.
+    pricing_mode: str
+    # USD per lot per tier, used only when pricing_mode == "per_lot".
+    # This is the GLOBAL DEFAULT used when no per-account-group override
+    # applies.
+    per_lot_fee: dict[str, float]
+    # Per-account-type override: { "<account_group_id>": {"basic": x, ...} }.
+    # When a quote is requested with an account_id, the resolver looks up
+    # that account's group_id in this map and uses its per-tier rates
+    # instead of the global `per_lot_fee`. Missing tier in a group entry
+    # falls through to the global. Empty {} = no overrides, everyone on
+    # the global rate.
+    per_lot_fee_by_account_group: dict[str, dict[str, float]]
     base_constant: float
     tier_multipliers: dict[str, float]   # {"basic":1, ...}
     coverage_pct: dict[str, float]        # {"basic":20, ...}
@@ -51,6 +68,14 @@ class InsuranceConfig:
 
 _DEFAULTS = InsuranceConfig(
     enabled=True,
+    # Default to per-lot so a 5-lot trade costs ~5× a 1-lot trade.
+    # Admin can flip back to "risk_score" from the insurance settings page.
+    pricing_mode="per_lot",
+    # Rack rates ($/lot/tier) — keep the same 1×/2×/3×/4× spacing as
+    # tier_multipliers so the tier picker stays predictable.
+    per_lot_fee={"basic": 0.50, "advanced": 1.00, "pro": 1.50, "elite": 2.00},
+    # Empty default — no per-account-type overrides until admin adds them.
+    per_lot_fee_by_account_group={},
     base_constant=1.2,
     tier_multipliers={"basic": 1, "advanced": 2, "pro": 3, "elite": 4},
     coverage_pct={"basic": 20, "advanced": 30, "pro": 40, "elite": 50},
@@ -95,8 +120,19 @@ async def load_config() -> InsuranceConfig:
         except ValueError:
             blackout = None
 
+    mode_raw = str(await _get("insurance_pricing_mode", _DEFAULTS.pricing_mode)).strip().lower()
+    pricing_mode = mode_raw if mode_raw in ("per_lot", "risk_score") else _DEFAULTS.pricing_mode
+
     return InsuranceConfig(
         enabled=bool(await _get("insurance_enabled", True)),
+        pricing_mode=pricing_mode,
+        per_lot_fee=dict(await _get("insurance_per_lot_fee", _DEFAULTS.per_lot_fee)),
+        per_lot_fee_by_account_group=dict(
+            await _get(
+                "insurance_per_lot_fee_by_account_group",
+                _DEFAULTS.per_lot_fee_by_account_group,
+            )
+        ),
         base_constant=float(await _get("insurance_base_constant", _DEFAULTS.base_constant)),
         tier_multipliers=dict(await _get("insurance_tier_multipliers", _DEFAULTS.tier_multipliers)),
         coverage_pct=dict(await _get("insurance_coverage_pct", _DEFAULTS.coverage_pct)),

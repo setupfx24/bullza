@@ -211,7 +211,8 @@ async def send_due_statements(db: AsyncSession) -> tuple[int, int]:
 
     users = (await db.execute(
         select(User).where(
-            User.is_active.is_(True),
+            # User state lives in `status` string column. No is_active boolean.
+            User.status == "active",
             User.email_verified.is_(True),
         )
     )).scalars().all()
@@ -253,7 +254,7 @@ async def send_due_statements(db: AsyncSession) -> tuple[int, int]:
                         trader_app_url=app_url,
                         **agg,
                     )
-                    fire_and_forget(send_email(u.email, subject, html, text=text))
+                    fire_and_forget(send_email(u.email, subject, html, text=text, category="account"))
                     sent_w += 1
                 except Exception as exc:
                     logger.warning("Weekly statement render failed for %s: %s", u.email, exc)
@@ -279,7 +280,7 @@ async def send_due_statements(db: AsyncSession) -> tuple[int, int]:
                         trader_app_url=app_url,
                         **agg,
                     )
-                    fire_and_forget(send_email(u.email, subject, html, text=text))
+                    fire_and_forget(send_email(u.email, subject, html, text=text, category="account"))
                     sent_m += 1
                 except Exception as exc:
                     logger.warning("Monthly statement render failed for %s: %s", u.email, exc)

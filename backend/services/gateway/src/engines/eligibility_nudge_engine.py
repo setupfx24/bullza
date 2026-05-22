@@ -85,7 +85,11 @@ async def send_due_eligibility_nudges(db: AsyncSession) -> int:
     # threshold are candidates; the engine picks the flavor in Python.
     candidates = (await db.execute(
         select(User).where(
-            User.is_active.is_(True),
+            # User account state lives in the `status` string column
+            # ("active"/"suspended"/"closed"). There is no is_active
+            # boolean — accidentally referencing one was crashing this
+            # engine on every tick.
+            User.status == "active",
             User.email_verified.is_(True),
             User.kyc_status == "approved",
             or_(
@@ -139,7 +143,12 @@ async def send_due_eligibility_nudges(db: AsyncSession) -> int:
                 funded_balance=funded_balance,
                 trader_app_url=app_url,
             )
-            fire_and_forget(send_email(u.email, subject, html, text=text))
+            # Pick the right alias by flavor — pure insurance pitch goes
+            # from insure@, fixed-return pitch from stacking@, mixed/both
+            # goes from info@ since it's the general "you're eligible"
+            # touch.
+            cat = "insure" if flavor == "insurance" else "stacking" if flavor == "fr" else "info"
+            fire_and_forget(send_email(u.email, subject, html, text=text, category=cat))
         except Exception as exc:
             logger.warning("Eligibility nudge render failed for %s: %s", u.email, exc)
             continue

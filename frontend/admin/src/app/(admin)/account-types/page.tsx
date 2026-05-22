@@ -10,6 +10,9 @@ interface AccountType {
   name: string;
   description?: string | null;
   leverage_default: number;
+  // Hard ceiling on leverage for accounts in this type. NULL = no
+  // separate ceiling (the picker treats leverage_default as the cap).
+  max_leverage: number | null;
   spread_markup_default: string | number;
   commission_default: string | number;
   minimum_deposit: string | number;
@@ -22,6 +25,8 @@ const EMPTY = {
   name: '',
   description: '',
   leverage_default: '100',
+  // Empty string = no ceiling override; server keeps max_leverage NULL.
+  max_leverage: '',
   spread_markup_default: '0',
   commission_default: '0',
   minimum_deposit: '0',
@@ -67,6 +72,7 @@ export default function AccountTypesPage() {
       name: r.name,
       description: r.description ?? '',
       leverage_default: String(r.leverage_default),
+      max_leverage: r.max_leverage != null ? String(r.max_leverage) : '',
       spread_markup_default: String(r.spread_markup_default),
       commission_default: String(r.commission_default),
       minimum_deposit: String(r.minimum_deposit ?? 0),
@@ -84,10 +90,14 @@ export default function AccountTypesPage() {
     }
     setSubmitting(true);
     try {
+      // Empty max_leverage → null (no separate ceiling). Non-empty
+       // parses to int and server rejects max < leverage_default.
+      const maxLevRaw = form.max_leverage.trim();
       const body = {
         name: form.name.trim(),
         description: form.description.trim() || null,
         leverage_default: parseInt(form.leverage_default, 10) || 100,
+        max_leverage: maxLevRaw === '' ? null : (parseInt(maxLevRaw, 10) || null),
         spread_markup_default: parseFloat(String(form.spread_markup_default)) || 0,
         commission_default: parseFloat(String(form.commission_default)) || 0,
         minimum_deposit: parseFloat(String(form.minimum_deposit)) || 0,
@@ -169,7 +179,7 @@ export default function AccountTypesPage() {
             <thead className="bg-bg-tertiary text-text-tertiary text-left">
               <tr>
                 <th className="p-2 font-medium">Name</th>
-                <th className="p-2 font-medium">Leverage</th>
+                <th className="p-2 font-medium">Leverage (default / cap)</th>
                 <th className="p-2 font-medium">Spread +</th>
                 <th className="p-2 font-medium">Comm / lot</th>
                 <th className="p-2 font-medium">Min dep.</th>
@@ -186,7 +196,14 @@ export default function AccountTypesPage() {
                       <span className="ml-2 text-xxs text-warning">inactive</span>
                     )}
                   </td>
-                  <td className="p-2 font-mono tabular-nums">1:{r.leverage_default}</td>
+                  <td className="p-2 font-mono tabular-nums">
+                    1:{r.leverage_default}
+                    {r.max_leverage != null && r.max_leverage !== r.leverage_default && (
+                      <span className="ml-1 text-text-tertiary">
+                        / cap 1:{r.max_leverage}
+                      </span>
+                    )}
+                  </td>
                   <td className="p-2 font-mono tabular-nums">{r.spread_markup_default}</td>
                   <td className="p-2 font-mono tabular-nums">{r.commission_default}</td>
                   <td className="p-2 font-mono tabular-nums">{r.minimum_deposit}</td>
@@ -251,21 +268,39 @@ export default function AccountTypesPage() {
                   <label className="block text-xxs text-text-tertiary mb-1">Default leverage (1:N)</label>
                   <input
                     type="number"
+                    min="1"
                     value={form.leverage_default}
                     onChange={(e) => u('leverage_default', e.target.value)}
                     className="w-full text-xs py-1.5 px-2 bg-bg-input border border-border-primary rounded-md"
                   />
+                  <p className="text-[10px] text-text-tertiary mt-0.5">
+                    What new accounts in this type start with.
+                  </p>
                 </div>
                 <div>
-                  <label className="block text-xxs text-text-tertiary mb-1">Min. deposit (USD)</label>
+                  <label className="block text-xxs text-text-tertiary mb-1">Max leverage (1:N)</label>
                   <input
                     type="number"
-                    step="0.01"
-                    value={form.minimum_deposit}
-                    onChange={(e) => u('minimum_deposit', e.target.value)}
+                    min="1"
+                    placeholder="same as default"
+                    value={form.max_leverage}
+                    onChange={(e) => u('max_leverage', e.target.value)}
                     className="w-full text-xs py-1.5 px-2 bg-bg-input border border-border-primary rounded-md"
                   />
+                  <p className="text-[10px] text-text-tertiary mt-0.5">
+                    Hard ceiling. Leave empty to cap at default. Must be ≥ default.
+                  </p>
                 </div>
+              </div>
+              <div>
+                <label className="block text-xxs text-text-tertiary mb-1">Min. deposit (USD)</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={form.minimum_deposit}
+                  onChange={(e) => u('minimum_deposit', e.target.value)}
+                  className="w-full text-xs py-1.5 px-2 bg-bg-input border border-border-primary rounded-md"
+                />
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div>

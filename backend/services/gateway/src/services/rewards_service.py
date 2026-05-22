@@ -566,7 +566,7 @@ async def _maybe_send_tier_upgrade_email(
         perks=perks,
         trader_app_url=app_url,
     )
-    fire_and_forget(send_email(user.email, subject, html, text=text))
+    fire_and_forget(send_email(user.email, subject, html, text=text, category="voucher"))
 
 
 async def _send_mission_email(db: AsyncSession, user_id, mission: "RewardsMission") -> None:
@@ -592,7 +592,7 @@ async def _send_mission_email(db: AsyncSession, user_id, mission: "RewardsMissio
         reward_currency="USD",
         trader_app_url=app_url,
     )
-    fire_and_forget(send_email(user.email, subject, html, text=text))
+    fire_and_forget(send_email(user.email, subject, html, text=text, category="voucher"))
 
 
 async def mark_progress(

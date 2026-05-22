@@ -82,6 +82,7 @@ async def quote_all_tiers(
     db: Optional[AsyncSession] = None,
     user_id: Optional[UUID] = None,
     is_copy_trade: bool = False,
+    account_group_id: Optional[UUID] = None,
 ) -> list[TierQuote]:
     """Return the four tiered quotes. Caller is expected to pre-check
     `cfg.enabled`, news blackout, and ATR bounds — this function only
@@ -113,10 +114,35 @@ async def quote_all_tiers(
     if db is not None and user_id is not None:
         coverage_multiplier = await _frequent_claim_reduction(db, user_id, cfg)
 
+    # Per-lot pricing branch — fee scales linearly with `lots` so a 10-lot
+    # trade costs ~10× a 1-lot trade (subject to fee_cap). Surcharges still
+    # multiply; risk_score is exposed for the UI but does NOT feed the fee.
+    use_per_lot = (cfg.pricing_mode or "per_lot").lower() == "per_lot"
+
+    # Per-account-type override — admin can pin specific $/lot rates for
+    # users on a given account group (Micro/Standard/Pro/Elite trading
+    # account). When set, those rates REPLACE the global per_lot_fee for
+    # this quote. Missing tier inside a group entry falls back to global.
+    group_overrides: dict[str, float] = {}
+    if account_group_id is not None and cfg.per_lot_fee_by_account_group:
+        raw = cfg.per_lot_fee_by_account_group.get(str(account_group_id))
+        if isinstance(raw, dict):
+            for k, v in raw.items():
+                try:
+                    group_overrides[str(k).lower()] = float(v)
+                except (TypeError, ValueError):
+                    continue
+
     quotes: list[TierQuote] = []
     for tier in TIERS:
-        mult = cfg.tier_multipliers.get(tier, 1)
-        tier_fee = base_fee * mult * (1 + surcharge)
+        if use_per_lot:
+            rate = group_overrides.get(tier)
+            if rate is None:
+                rate = float(cfg.per_lot_fee.get(tier, 0.0) or 0.0)
+            tier_fee = lots * rate * (1 + surcharge)
+        else:
+            mult = cfg.tier_multipliers.get(tier, 1)
+            tier_fee = base_fee * mult * (1 + surcharge)
         final_fee = min(tier_fee, fee_cap)
 
         rack_coverage = cfg.coverage_pct.get(tier, 0)
