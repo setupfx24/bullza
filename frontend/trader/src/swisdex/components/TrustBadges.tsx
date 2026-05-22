@@ -9,12 +9,10 @@
 type Badge = { label: string; sub: string; logo?: string };
 
 const BADGES: Badge[] = [
-  { label: 'Crypto Payments', sub: 'BTC · ETH · USDT',    logo: '/images/badges1.png' },
-  { label: 'NOWPayments',     sub: 'Secure Gateway',      logo: '/images/badges2.png' },
-  { label: 'TradingView',     sub: 'Live Charts',         logo: '/images/badges3.png' },
-  { label: 'Google Play',     sub: 'Android App',         logo: '/images/badges4.png' },
-  { label: 'App Store',       sub: 'iOS App',             logo: '/images/badges5.png' },
-  { label: 'SSL Secured',     sub: '256-bit Encryption',  logo: '/images/badges6.png' },
+  { label: 'Crypto Payments', sub: 'BTC · ETH · USDT',    logo: '/images/b1.png' },
+  { label: 'NOW Payments',    sub: 'Secure Gateway',      logo: '/images/b2.png' },
+  { label: 'Trading View',    sub: 'Live Charts',         logo: '/images/b3.png' },
+  { label: 'SSL Secured',     sub: '256-bit Encryption',  logo: '/images/b4.png' },
 ];
 
 export function TrustBadges() {
@@ -40,19 +38,15 @@ export function TrustBadges() {
               key={label}
               className="px-1.5 py-4 flex flex-col items-center text-center gap-3 w-[130px] sm:w-[140px]"
             >
-              {/* Logo placeholder — blank circle until a real logo PNG is
-                  dropped in /public/images/badges/. When you have one,
-                  set `logo: '/images/badges/<file>.png'` in BADGES above. */}
-              <div
-                className="size-24 rounded-full bg-foreground/[0.06] flex items-center justify-center overflow-hidden"
-                style={{ border: '1px solid hsl(99 55% 42% / 0.35)' }}
-                aria-hidden
-              >
-                {logo && (
-                  /* eslint-disable-next-line @next/next/no-img-element */
-                  <img src={logo} alt="" className="w-full h-full object-contain" />
-                )}
-              </div>
+              {logo && (
+                /* eslint-disable-next-line @next/next/no-img-element */
+                <img
+                  src={logo}
+                  alt=""
+                  className="size-24 object-contain"
+                  aria-hidden
+                />
+              )}
               <div className="flex flex-col leading-tight">
                 <span className="font-display uppercase text-xs tracking-tight text-foreground">
                   {label}

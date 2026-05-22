@@ -11,7 +11,7 @@ export const SIGNUP_HREF = '/auth/register';
 export const BRAND = {
   name: 'SwisDex',
   tagline: 'Trade Smarter. Grow Faster. Invest with Confidence.',
-  logo: '/images/logo.png',
+  logo: '/images/swisdex_png5.png',
 };
 
 // Nav targets all resolve to public landing routes. /markets and
