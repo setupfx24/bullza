@@ -211,7 +211,8 @@ async def send_due_statements(db: AsyncSession) -> tuple[int, int]:
 
     users = (await db.execute(
         select(User).where(
-            User.is_active.is_(True),
+            # User state lives in `status` string column. No is_active boolean.
+            User.status == "active",
             User.email_verified.is_(True),
         )
     )).scalars().all()

@@ -85,7 +85,11 @@ async def send_due_eligibility_nudges(db: AsyncSession) -> int:
     # threshold are candidates; the engine picks the flavor in Python.
     candidates = (await db.execute(
         select(User).where(
-            User.is_active.is_(True),
+            # User account state lives in the `status` string column
+            # ("active"/"suspended"/"closed"). There is no is_active
+            # boolean — accidentally referencing one was crashing this
+            # engine on every tick.
+            User.status == "active",
             User.email_verified.is_(True),
             User.kyc_status == "approved",
             or_(

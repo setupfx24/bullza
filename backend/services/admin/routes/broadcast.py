@@ -67,7 +67,9 @@ async def send_maintenance_broadcast(
         raise HTTPException(status_code=400, detail="SMTP is not configured")
 
     q = select(User).where(
-        User.is_active.is_(True),
+        # User state lives in `status` string column ("active"/"suspended"
+        # /"closed"). No is_active boolean.
+        User.status == "active",
         User.email_verified.is_(True),
     )
     users = (await db.execute(q)).scalars().all()
