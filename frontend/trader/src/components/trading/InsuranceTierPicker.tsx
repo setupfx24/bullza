@@ -115,7 +115,16 @@ export default function InsuranceTierPicker(props: Props) {
             </p>
           )}
           {quotes && !loading && (
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            // Auto-fit by container width — the picker lives inside the
+            // narrow Order Panel right-rail in the trading terminal, so
+            // `sm:grid-cols-4` (viewport-based) would force 4 columns into
+            // a 280–400px container on desktop, breaking the cards. With
+            // `auto-fit minmax(110px,1fr)` the layout naturally produces
+            // 1 / 2 / 3 / 4 columns based on the actual room available.
+            <div
+              className="grid gap-2"
+              style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))' }}
+            >
               {quotes.map((q) => {
                 const active = tier === q.tier;
                 return (
