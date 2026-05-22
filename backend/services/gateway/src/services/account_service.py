@@ -237,10 +237,19 @@ async def open_live_account(
 
 
 async def list_accounts(user_id: UUID, db: AsyncSession) -> dict:
+    # Filter is_active=True so soft-deleted accounts (delete_trading_account
+    # flips is_active to False) disappear from every user-facing picker —
+    # trading terminal account dropdown, wallet → internal transfer picker,
+    # dashboard, PAMM, social, profile, risk-calculator. The deletion
+    # contract docstring promises "disappears from the user's list", and
+    # /wallet/summary already enforces this; /accounts was the outlier.
     result = await db.execute(
         select(TradingAccount)
         .options(selectinload(TradingAccount.account_group))
-        .where(TradingAccount.user_id == user_id)
+        .where(
+            TradingAccount.user_id == user_id,
+            TradingAccount.is_active == True,  # noqa: E712
+        )
     )
     accounts = result.scalars().unique().all()
 
