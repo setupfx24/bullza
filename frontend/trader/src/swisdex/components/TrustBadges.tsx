@@ -1,29 +1,20 @@
 'use client';
 
-import {
-  Bitcoin,
-  Wallet,
-  CandlestickChart,
-  Smartphone,
-  Apple,
-  ShieldCheck,
-  type LucideIcon,
-} from 'lucide-react';
-
 /**
  * "Trusted By" badge row — sits just above the footer on every public
- * landing page. Icons are placeholders; drop branded SVG/PNG logos at
- * /public/images/badges/<slug>.svg and swap the Icon for an <img>.
+ * landing page. Each card has an empty circular placeholder on top
+ * (drop a logo image at /public/images/badges/<slug>.png and swap it
+ * in via the `logo` field below) plus a label + caption underneath.
  */
-type Badge = { Icon: LucideIcon; label: string; sub: string };
+type Badge = { label: string; sub: string; logo?: string };
 
 const BADGES: Badge[] = [
-  { Icon: Bitcoin,          label: 'Crypto Payments', sub: 'BTC · ETH · USDT' },
-  { Icon: Wallet,           label: 'NOWPayments',     sub: 'Secure Gateway'   },
-  { Icon: CandlestickChart, label: 'TradingView',     sub: 'Live Charts'      },
-  { Icon: Smartphone,       label: 'Google Play',     sub: 'Android App'      },
-  { Icon: Apple,            label: 'App Store',       sub: 'iOS App'          },
-  { Icon: ShieldCheck,      label: 'SSL Secured',     sub: '256-bit Encryption' },
+  { label: 'Crypto Payments', sub: 'BTC · ETH · USDT',    logo: '/images/badges1.png' },
+  { label: 'NOWPayments',     sub: 'Secure Gateway',      logo: '/images/badges2.png' },
+  { label: 'TradingView',     sub: 'Live Charts',         logo: '/images/badges3.png' },
+  { label: 'Google Play',     sub: 'Android App',         logo: '/images/badges4.png' },
+  { label: 'App Store',       sub: 'iOS App',             logo: '/images/badges5.png' },
+  { label: 'SSL Secured',     sub: '256-bit Encryption',  logo: '/images/badges6.png' },
 ];
 
 export function TrustBadges() {
@@ -43,13 +34,25 @@ export function TrustBadges() {
         <p className="text-center text-[11px] uppercase tracking-[0.24em] text-foreground/55 mb-7 font-semibold">
           Trusted By
         </p>
-        <div className="flex flex-wrap items-stretch justify-center gap-3 sm:gap-4">
-          {BADGES.map(({ Icon, label, sub }) => (
+        <div className="flex flex-wrap items-stretch justify-center gap-1 sm:gap-2">
+          {BADGES.map(({ label, sub, logo }) => (
             <div
               key={label}
-              className="liquid-glass rounded-2xl px-4 py-3 flex items-center gap-3 min-w-[180px] flex-1 max-w-[220px]"
+              className="px-1.5 py-4 flex flex-col items-center text-center gap-3 w-[130px] sm:w-[140px]"
             >
-              <Icon className="size-6 text-primary shrink-0" aria-hidden />
+              {/* Logo placeholder — blank circle until a real logo PNG is
+                  dropped in /public/images/badges/. When you have one,
+                  set `logo: '/images/badges/<file>.png'` in BADGES above. */}
+              <div
+                className="size-24 rounded-full bg-foreground/[0.06] flex items-center justify-center overflow-hidden"
+                style={{ border: '1px solid hsl(99 55% 42% / 0.35)' }}
+                aria-hidden
+              >
+                {logo && (
+                  /* eslint-disable-next-line @next/next/no-img-element */
+                  <img src={logo} alt="" className="w-full h-full object-contain" />
+                )}
+              </div>
               <div className="flex flex-col leading-tight">
                 <span className="font-display uppercase text-xs tracking-tight text-foreground">
                   {label}

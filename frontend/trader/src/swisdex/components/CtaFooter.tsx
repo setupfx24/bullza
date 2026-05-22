@@ -140,7 +140,7 @@ export function CtaFooter() {
               <span className="font-display uppercase text-xs tracking-wider text-foreground/55 mb-1">
                 Contact
               </span>
-              <span className="font-body text-sm text-foreground/70">support@swisdex.com</span>
+              <span className="font-body text-sm text-foreground/70">info@swisdex.com</span>
               <span className="font-body text-sm text-foreground/70 leading-relaxed">
                 SwisDex Office 23US,<br />
                 18 Young St, UNIT LGE 1/1,<br />

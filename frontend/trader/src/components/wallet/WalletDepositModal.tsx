@@ -256,7 +256,7 @@ function DepositBody({
         <AlertTriangle size={28} className="text-red-400 mx-auto" />
         <h3 className="text-base font-semibold text-text-primary">Deposit rejected</h3>
         <p className="text-sm text-text-secondary">
-          The payment couldn't be confirmed. If the funds left your wallet, contact support@swisdex.com with your tx hash.
+          The payment couldn't be confirmed. If the funds left your wallet, contact info@swisdex.com with your tx hash.
         </p>
         <button
           type="button"

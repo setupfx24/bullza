@@ -119,7 +119,7 @@ const RULES: { keys: string[]; reply: string; cta?: { label: string; href: strin
       "I'm happy to help with anything I can. For a live agent or anything sensitive, please reach our support team directly — they reply within minutes.",
     cta: [
       { label: 'Contact support', href: '/company/contact' },
-      { label: 'Email us',         href: 'mailto:support@swisdex.com' },
+      { label: 'Email us',         href: 'mailto:info@swisdex.com' },
     ],
   },
   {

@@ -82,8 +82,8 @@ export default function Footer() {
 
               <div className="flex items-center gap-2 text-sm mb-5" style={{ color: 'var(--fx-text-3)' }}>
                 <Mail size={14} style={{ color: 'var(--fx-gold-light)' }} />
-                <a href="mailto:support@swisdex.com" className="hover:underline" style={{ color: 'var(--fx-text-2)' }}>
-                  support@swisdex.com
+                <a href="mailto:info@swisdex.com" className="hover:underline" style={{ color: 'var(--fx-text-2)' }}>
+                  info@swisdex.com
                 </a>
               </div>
 
