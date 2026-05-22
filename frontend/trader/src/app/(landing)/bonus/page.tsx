@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import {
   ArrowUpRight, Gift, Wallet, CheckCircle2, Star, Sparkles,
@@ -10,7 +10,73 @@ import { BannerPlaceholder } from '@/swisdex/components/BannerPlaceholder';
 
 const SIGNUP_HREF = '/auth/register';
 
-const TIERS = [
+/** Display shape — what each card renders. */
+type Tier = {
+  range: string;
+  percent: string;
+  cap: string;
+  features: string[];
+  cta: string;
+  popular?: boolean;
+};
+
+/** Wire shape — what /api/v1/bonus/tiers returns. */
+type ApiTier = {
+  id: string;
+  name: string;
+  min_deposit: number;
+  max_deposit: number | null;
+  percentage: number | null;
+  fixed_amount: number | null;
+  max_bonus: number | null;
+  perks: string[];
+  is_popular: boolean;
+  cta_label: string | null;
+  tagline: string | null;
+};
+
+const fmtUsd = (n: number) =>
+  n >= 1000 ? `$${(n / 1000).toFixed(n % 1000 === 0 ? 0 : 1).replace('.0', '')},000`.replace('$,', '$1,').replace('$1,000', '$1,000')
+    : `$${Math.round(n).toLocaleString('en-US')}`;
+
+/** ApiTier → display Tier so admin-driven rows render with the same look
+ *  as the legacy hardcoded array. min_deposit is auto-rounded to whole
+ *  dollars for the "$X – $Y" label; cents stay on the server. */
+function adaptApi(t: ApiTier): Tier {
+  const lo = `$${Math.round(t.min_deposit).toLocaleString('en-US')}`;
+  const hi = t.max_deposit == null ? '+' : ` – $${Math.round(t.max_deposit).toLocaleString('en-US')}`;
+  const range = t.max_deposit == null ? `${lo}+` : `${lo}${hi}`;
+
+  const percent = t.percentage != null
+    ? `${Number.isInteger(t.percentage) ? t.percentage : t.percentage.toFixed(1)}%`
+    : t.fixed_amount != null
+      ? `${fmtUsd(t.fixed_amount)}`
+      : '—';
+
+  const cap = t.max_bonus != null
+    ? `Up to ${fmtUsd(t.max_bonus)}`
+    : t.fixed_amount != null
+      ? 'Flat bonus'
+      : '';
+
+  const cta = t.cta_label && t.cta_label.trim() !== ''
+    ? t.cta_label
+    : `Deposit ${lo}`;
+
+  return {
+    range,
+    percent,
+    cap,
+    features: t.perks?.length ? t.perks : [],
+    cta,
+    popular: t.is_popular,
+  };
+}
+
+// Fallback that mirrors the original design — renders when the API is
+// unreachable or no active tiers are configured by admin yet. Keeps the
+// page populated rather than going blank on a fresh install.
+const FALLBACK_TIERS: Tier[] = [
   {
     range: '$100 – $499',
     percent: '100%',
@@ -49,6 +115,27 @@ const TIERS = [
 ];
 
 export default function BonusPage() {
+  // Admin-managed tiers (from /api/v1/bonus/tiers). Falls back to the
+  // hardcoded list if the API is empty or down so the page never goes
+  // blank on a fresh install or a deploy outage.
+  const [tiers, setTiers] = useState<Tier[]>(FALLBACK_TIERS);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch('/api/v1/bonus/tiers', { credentials: 'omit' });
+        if (!res.ok) return;
+        const data: { tiers?: ApiTier[] } = await res.json();
+        if (cancelled) return;
+        const list = (data.tiers || []).map(adaptApi);
+        if (list.length > 0) setTiers(list);
+      } catch {
+        /* keep fallback — public marketing page must never error out */
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
   return (
     <main className="min-h-screen bg-background">
       <BannerPlaceholder
@@ -125,7 +212,7 @@ export default function BonusPage() {
         </div>
 
         <div className="grid md:grid-cols-3 gap-5">
-          {TIERS.map((t) => (
+          {tiers.map((t) => (
             <article
               key={t.range}
               className={`relative rounded-3xl p-6 sm:p-8 flex flex-col h-full ${

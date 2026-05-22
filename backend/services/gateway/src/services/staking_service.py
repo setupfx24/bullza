@@ -422,7 +422,7 @@ async def weekly_digest(db: AsyncSession, now: Optional[datetime] = None) -> int
             currency="USD",
             trader_app_url=app_url,
         )
-        fire_and_forget(send_email(user.email, subject, html, text=text))
+        fire_and_forget(send_email(user.email, subject, html, text=text, category="stacking"))
         sent += 1
     return sent
 

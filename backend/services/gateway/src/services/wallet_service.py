@@ -11,7 +11,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from packages.common.src.models import (
-    BankAccount, BonusOffer, Deposit, Transaction, TradingAccount, User, Withdrawal,
+    BankAccount, BonusOffer, Deposit, Transaction, TradingAccount, User, UserBonus, Withdrawal,
 )
 from packages.common.src.notify import create_notification
 from packages.common.src.config import get_settings
@@ -71,7 +71,7 @@ def _send_bonus_emails_for_user(
                 new_bonus_balance=user_row.main_wallet_balance,
                 trader_app_url=app_url,
             )
-            fire_and_forget(send_email(user_row.email, subject, html, text=text))
+            fire_and_forget(send_email(user_row.email, subject, html, text=text, category="account"))
     except Exception as _e:
         logger.warning("bonus credited email failed: %s", _e)
 
@@ -103,7 +103,7 @@ def _send_deposit_failed_email(
             reference=str(deposit.id),
             trader_app_url=app_url,
         )
-        fire_and_forget(send_email(user_row.email, subject, html, text=text))
+        fire_and_forget(send_email(user_row.email, subject, html, text=text, category="account"))
     except Exception as _e:
         logger.warning("deposit failed email send failed: %s", _e)
 
@@ -188,6 +188,13 @@ async def create_deposit(req, user_id: UUID, db: AsyncSession) -> dict:
     is_nowpayments = db_method == "nowpayments" and bool(settings.NOWPAYMENTS_API_KEY)
     is_automated_crypto = is_oxapay or is_nowpayments
 
+    # Optional bonus request — trader typed a promo code at deposit time.
+    # Empty/whitespace clears it. Persist as 'pending' so admin sees it
+    # on the deposits page and grants/denies manually.
+    _bonus_code_raw = getattr(req, "bonus_code", None) or ""
+    bonus_code = _bonus_code_raw.strip().upper() or None
+    bonus_status = "pending" if bonus_code else None
+
     deposit = Deposit(
         user_id=user_id,
         account_id=req.account_id if req.account_id else None,
@@ -199,6 +206,8 @@ async def create_deposit(req, user_id: UUID, db: AsyncSession) -> dict:
         crypto_address=getattr(req, "crypto_address", None),
         bank_account_id=bank.id if bank else None,
         status="initiated" if is_automated_crypto else "pending",
+        bonus_code=bonus_code,
+        bonus_status=bonus_status,
     )
     db.add(deposit)
     await db.commit()
@@ -281,6 +290,7 @@ async def create_manual_deposit(
     transaction_id: str,
     file: UploadFile,
     db: AsyncSession,
+    bonus_code: str | None = None,
 ) -> dict:
     from packages.common.src.settings_store import get_bool_setting
     if not await get_bool_setting("allow_deposits", True):
@@ -339,6 +349,7 @@ async def create_manual_deposit(
         logger.exception("manual deposit write failed: %s", out_path)
         raise HTTPException(status_code=503, detail="Could not save file") from e
 
+    _bonus_code_clean = (bonus_code or "").strip().upper() or None
     deposit = Deposit(
         user_id=user_id,
         account_id=account_id if account_id else None,
@@ -348,6 +359,8 @@ async def create_manual_deposit(
         screenshot_url=str(out_path.resolve()),
         bank_account_id=bank.id if bank else None,
         status="pending",
+        bonus_code=_bonus_code_clean,
+        bonus_status=("pending" if _bonus_code_clean else None),
     )
     db.add(deposit)
     await db.commit()
@@ -433,17 +446,20 @@ async def handle_oxapay_webhook(
         ))
 
         # Apply bonus offers (mirrors admin approve_deposit logic)
+        # If trader requested a custom bonus via promo code, skip auto-apply
+        # so admin's manual grant is the only credit path (no double-dip).
         bonus_msg = ""
         applied_bonuses: list[tuple[str, Decimal]] = []
         now = datetime.utcnow()
+        skip_auto_bonus = bool(deposit.bonus_code)
         offers_q = await db.execute(
             select(BonusOffer).where(
                 BonusOffer.is_active == True,
                 BonusOffer.bonus_type.in_(["deposit", "welcome"]),
                 BonusOffer.min_deposit <= deposit.amount,
             )
-        )
-        for offer in offers_q.scalars().all():
+        ) if not skip_auto_bonus else None
+        for offer in (offers_q.scalars().all() if offers_q is not None else []):
             if offer.starts_at and offer.starts_at > now:
                 continue
             if offer.expires_at and offer.expires_at < now:
@@ -509,7 +525,7 @@ async def handle_oxapay_webhook(
                     new_balance=user_row.main_wallet_balance,
                     trader_app_url=(_gs().TRADER_APP_URL or "https://trade.swisdex.com"),
                 )
-                fire_and_forget(send_email(user_row.email, subject, html, text=text))
+                fire_and_forget(send_email(user_row.email, subject, html, text=text, category="account"))
                 _send_bonus_emails_for_user(user_row, applied_bonuses)
         except Exception as _e:
             logger.warning("oxapay deposit email failed: %s", _e)
@@ -545,6 +561,7 @@ async def create_wallet_deposit(
     crypto_currency: str,
     user_id: UUID,
     db: AsyncSession,
+    bonus_code: str | None = None,
 ) -> dict:
     """Create a Deposit row + a NOWPayments direct payment for the
     wallet-connect flow. Returns the address + exact crypto amount the
@@ -563,12 +580,15 @@ async def create_wallet_deposit(
     if amount <= 0:
         raise HTTPException(status_code=400, detail="Invalid amount")
 
+    _bonus_code_clean = (bonus_code or "").strip().upper() or None
     deposit = Deposit(
         user_id=user_id,
         account_id=None,
         amount=amount,
         method="nowpayments",
         status="initiated",
+        bonus_code=_bonus_code_clean,
+        bonus_status=("pending" if _bonus_code_clean else None),
     )
     db.add(deposit)
     await db.commit()
@@ -764,17 +784,20 @@ async def handle_nowpayments_webhook(
 
         # Apply active bonus offers — mirrors the OxaPay path so promo
         # behaviour is identical regardless of provider.
+        # If trader requested a custom bonus via promo code, skip auto-apply
+        # so admin's manual grant is the only credit path (no double-dip).
         bonus_msg = ""
         applied_bonuses: list[tuple[str, Decimal]] = []
         now = datetime.utcnow()
+        skip_auto_bonus = bool(deposit.bonus_code)
         offers_q = await db.execute(
             select(BonusOffer).where(
                 BonusOffer.is_active == True,
                 BonusOffer.bonus_type.in_(["deposit", "welcome"]),
                 BonusOffer.min_deposit <= deposit.amount,
             )
-        )
-        for offer in offers_q.scalars().all():
+        ) if not skip_auto_bonus else None
+        for offer in (offers_q.scalars().all() if offers_q is not None else []):
             if offer.starts_at and offer.starts_at > now:
                 continue
             if offer.expires_at and offer.expires_at < now:
@@ -840,7 +863,7 @@ async def handle_nowpayments_webhook(
                     new_balance=user_row.main_wallet_balance,
                     trader_app_url=(_gs().TRADER_APP_URL or "https://trade.swisdex.com"),
                 )
-                fire_and_forget(send_email(user_row.email, subject, html, text=text))
+                fire_and_forget(send_email(user_row.email, subject, html, text=text, category="account"))
                 _send_bonus_emails_for_user(user_row, applied_bonuses)
         except Exception as _e:
             logger.warning("nowpayments deposit email failed: %s", _e)
@@ -945,7 +968,7 @@ async def create_withdrawal(req, user_id: UUID, db: AsyncSession) -> dict:
                 request_id=str(withdrawal.id),
                 trader_app_url=(_gs().TRADER_APP_URL or "https://trade.swisdex.com"),
             )
-            fire_and_forget(send_email(user_row.email, subject, html, text=text))
+            fire_and_forget(send_email(user_row.email, subject, html, text=text, category="account"))
     except Exception as _e:
         logger.warning("withdrawal-requested email failed: %s", _e)
 
@@ -1529,3 +1552,87 @@ async def charge_insurance_fee(
         description=description,
     ))
     return new_balance
+
+
+# ─── Trader-facing bonus dashboard ───────────────────────────────────────
+# Backs the /wallet#bonus section so the trader can see:
+#   1. Active bonus offers (admin-published; the same rows the auto-apply
+#      loop reads on each approved deposit).
+#   2. Their own UserBonus rows (active / released / expired).
+#   3. Recent deposits where they typed a promo code at deposit time, and
+#      whether admin granted / denied / is still reviewing.
+
+async def get_bonus_overview(*, user_id: UUID, db: AsyncSession) -> dict:
+    now = datetime.utcnow()
+
+    offers_q = await db.execute(
+        select(BonusOffer)
+        .where(BonusOffer.is_active == True)
+        .order_by(BonusOffer.created_at.desc())
+    )
+    active_offers = []
+    for o in offers_q.scalars().all():
+        # Date-window guard — admin can pre-schedule offers.
+        if o.starts_at and o.starts_at > now:
+            continue
+        if o.expires_at and o.expires_at < now:
+            continue
+        active_offers.append({
+            "id": str(o.id),
+            "name": o.name,
+            "bonus_type": o.bonus_type,
+            "percentage": float(o.percentage) if o.percentage is not None else None,
+            "fixed_amount": float(o.fixed_amount) if o.fixed_amount is not None else None,
+            "min_deposit": float(o.min_deposit or 0),
+            "max_bonus": float(o.max_bonus) if o.max_bonus is not None else None,
+            "lots_required": float(o.lots_required or 0),
+            "target_audience": o.target_audience,
+            "starts_at": o.starts_at.isoformat() if o.starts_at else None,
+            "expires_at": o.expires_at.isoformat() if o.expires_at else None,
+        })
+
+    my_q = await db.execute(
+        select(UserBonus, BonusOffer)
+        .join(BonusOffer, UserBonus.offer_id == BonusOffer.id, isouter=True)
+        .where(UserBonus.user_id == user_id)
+        .order_by(UserBonus.created_at.desc())
+        .limit(50)
+    )
+    my_bonuses = []
+    for ub, offer in my_q.all():
+        my_bonuses.append({
+            "id": str(ub.id),
+            "offer_name": offer.name if offer else None,
+            "amount": float(ub.amount or 0),
+            "lots_traded": float(ub.lots_traded or 0),
+            "lots_required": float(ub.lots_required or 0),
+            "status": ub.status,
+            "released_at": ub.released_at.isoformat() if ub.released_at else None,
+            "expires_at": ub.expires_at.isoformat() if ub.expires_at else None,
+            "created_at": ub.created_at.isoformat() if ub.created_at else None,
+        })
+
+    req_q = await db.execute(
+        select(Deposit)
+        .where(Deposit.user_id == user_id, Deposit.bonus_code.isnot(None))
+        .order_by(Deposit.created_at.desc())
+        .limit(10)
+    )
+    recent_requests = []
+    for d in req_q.scalars().all():
+        recent_requests.append({
+            "deposit_id": str(d.id),
+            "deposit_amount": float(d.amount or 0),
+            "deposit_status": d.status,
+            "bonus_code": d.bonus_code,
+            "bonus_status": d.bonus_status,
+            "bonus_amount": float(d.bonus_amount) if d.bonus_amount is not None else None,
+            "decided_at": d.bonus_decided_at.isoformat() if d.bonus_decided_at else None,
+            "created_at": d.created_at.isoformat() if d.created_at else None,
+        })
+
+    return {
+        "active_offers": active_offers,
+        "my_bonuses": my_bonuses,
+        "recent_requests": recent_requests,
+    }

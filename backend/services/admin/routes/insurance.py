@@ -20,6 +20,9 @@ router = APIRouter(prefix="/insurance", tags=["Admin · Trade Insurance"])
 
 INSURANCE_KEYS = (
     "insurance_enabled",
+    "insurance_pricing_mode",
+    "insurance_per_lot_fee",
+    "insurance_per_lot_fee_by_account_group",
     "insurance_base_constant",
     "insurance_tier_multipliers",
     "insurance_coverage_pct",
@@ -73,6 +76,18 @@ async def update_settings(
     for key, value in body.updates.items():
         if key not in INSURANCE_KEYS:
             continue
+        # Validate the pricing_mode early so a typo doesn't silently brick
+        # quotes (the config loader falls back to default on an unknown
+        # value, but we'd rather reject the write up front).
+        if key == "insurance_pricing_mode":
+            v = str(value or "").strip().lower()
+            if v not in ("per_lot", "risk_score"):
+                from fastapi import HTTPException
+                raise HTTPException(
+                    status_code=400,
+                    detail="insurance_pricing_mode must be 'per_lot' or 'risk_score'",
+                )
+            value = v
         existing = (await db.execute(
             select(SystemSetting).where(SystemSetting.key == key)
         )).scalar_one_or_none()

@@ -31,6 +31,10 @@ interface InstrumentConfig {
   spread: { type: string; value: number } | null;
   swap: { long: number; short: number; free: boolean } | null;
   price_impact?: number | null;
+  // Per-instrument leverage cap. Applied as min(account.leverage, this)
+  // during order placement. Default 2000 (effectively no cap) when no
+  // InstrumentConfig row exists yet.
+  leverage_max?: number | null;
 }
 
 interface EditState {
@@ -42,6 +46,7 @@ interface EditState {
   swap_long: string;
   swap_short: string;
   swap_free: boolean;
+  leverage_max: string;
 }
 
 const CONFIG_LINKS = [
@@ -90,6 +95,7 @@ export default function ConfigPage() {
       swap_long: inst.swap?.long != null ? String(inst.swap.long) : '',
       swap_short: inst.swap?.short != null ? String(inst.swap.short) : '',
       swap_free: inst.swap?.free ?? false,
+      leverage_max: inst.leverage_max != null ? String(inst.leverage_max) : '',
     });
   };
 
@@ -113,6 +119,10 @@ export default function ConfigPage() {
         swap_long: parseNum(editState.swap_long),
         swap_short: parseNum(editState.swap_short),
         swap_free: editState.swap_free,
+        leverage_max:
+          editState.leverage_max.trim() === ''
+            ? null
+            : parseInt(editState.leverage_max, 10) || null,
       };
 
       await adminApi.put(`/config/instrument/${inst.id}`, body);
@@ -263,8 +273,8 @@ export default function ConfigPage() {
               <table className="w-full min-w-[1000px]">
                 <thead>
                   <tr className="border-b border-border-primary bg-bg-tertiary/40">
-                    {['Symbol', 'Commission', 'Spread', 'Price Impact', 'Swap Long', 'Swap Short', 'Swap Free', ''].map(c => (
-                      <th key={c} className={cn('text-left px-3 py-2.5 text-xxs font-medium text-text-tertiary uppercase tracking-wide', ['Commission', 'Spread (pips)', 'Swap Long', 'Swap Short'].includes(c) && 'text-center')}>{c}</th>
+                    {['Symbol', 'Commission', 'Spread', 'Price Impact', 'Swap Long', 'Swap Short', 'Swap Free', 'Max Lev (1:N)', ''].map(c => (
+                      <th key={c} className={cn('text-left px-3 py-2.5 text-xxs font-medium text-text-tertiary uppercase tracking-wide', ['Commission', 'Spread (pips)', 'Swap Long', 'Swap Short', 'Max Lev (1:N)'].includes(c) && 'text-center')}>{c}</th>
                     ))}
                   </tr>
                 </thead>
@@ -320,6 +330,18 @@ export default function ConfigPage() {
                                   <span className={cn('absolute top-0.5 w-3 h-3 rounded-full bg-white shadow transition-fast', editState.swap_free ? 'left-[16px]' : 'left-0.5')} />
                                 </button>
                               </td>
+                              <td className="px-3 py-1.5 text-center">
+                                <input
+                                  type="number"
+                                  step="1"
+                                  min="1"
+                                  max="2000"
+                                  placeholder="2000"
+                                  value={editState.leverage_max}
+                                  onChange={(e) => setEditState({ ...editState, leverage_max: e.target.value })}
+                                  className="w-16 px-1.5 py-1 text-xs bg-bg-input border border-border-primary rounded text-center font-mono tabular-nums text-text-primary"
+                                />
+                              </td>
                               <td className="px-3 py-1.5">
                                 <div className="flex items-center gap-1 justify-end">
                                   <button onClick={() => saveEdit(inst)} disabled={isSaving} className="p-1 rounded text-success hover:bg-success/15 transition-fast" title="Save">
@@ -365,6 +387,11 @@ export default function ConfigPage() {
                                 <span className="text-xxs px-1.5 py-0.5 rounded-sm bg-success/15 text-success font-medium">Yes</span>
                               ) : (
                                 <span className="text-xxs text-text-tertiary">No</span>
+                              )}
+                            </td>
+                            <td className="px-3 py-2 text-center font-mono tabular-nums text-xs text-text-secondary">
+                              {inst.leverage_max != null ? `1:${inst.leverage_max}` : (
+                                <span className="text-text-tertiary">—</span>
                               )}
                             </td>
                             <td className="px-3 py-2 text-right">

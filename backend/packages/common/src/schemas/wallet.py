@@ -17,6 +17,10 @@ class DepositRequest(BaseModel):
     crypto_tx_hash: Optional[str] = None
     crypto_address: Optional[str] = None
     crypto_currency: Optional[str] = None  # BTC | ETH | USDT_TRC — used for OxaPay payment creation
+    # Optional promo code at deposit time. When present, the deposit is
+    # marked bonus_status='pending' so admin can review and grant a
+    # bonus manually. Empty / null means no bonus requested.
+    bonus_code: Optional[str] = Field(default=None, max_length=40)
 
 
 class WithdrawalRequest(BaseModel):

@@ -56,6 +56,16 @@ class Deposit(Base):
     rejection_reason = Column(Text)
     approved_by = Column(UUID(as_uuid=True), ForeignKey("users.id"))
     approved_at = Column(DateTime(timezone=True))
+    # Bonus request flow (migration 0054). User types a promo code at
+    # deposit time → bonus_status='pending'. Admin reviews on the deposits
+    # page and either grants (sets bonus_amount + credits wallet) or denies
+    # with a reason. NULL bonus_code = deposit asked for no bonus and the
+    # existing auto-apply BonusOffer loop still runs as before.
+    bonus_code = Column(String(40), nullable=True)
+    bonus_status = Column(String(20), nullable=True)
+    bonus_amount = Column(Numeric(18, 8), nullable=True)
+    bonus_decided_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    bonus_decided_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), default=datetime.utcnow)
 
     user = relationship("User", foreign_keys=[user_id], lazy="selectin")

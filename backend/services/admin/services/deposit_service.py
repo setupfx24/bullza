@@ -1,6 +1,6 @@
 """Admin Finance Service — deposit/withdrawal listing, approval, rejection, screenshots."""
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
 from pathlib import Path
 
@@ -30,6 +30,9 @@ def _deposit_to_out(d: Deposit, user: User = None) -> DepositOut:
         created_at=d.created_at,
         user_email=user.email if user else None,
         user_name=f"{user.first_name or ''} {user.last_name or ''}".strip() if user else None,
+        bonus_code=d.bonus_code,
+        bonus_status=d.bonus_status,
+        bonus_amount=float(d.bonus_amount) if d.bonus_amount is not None else None,
     )
 
 
@@ -167,14 +170,19 @@ async def approve_deposit(
     bonus_msg = ""
     applied_bonuses: list[tuple[str, Decimal]] = []
     now = datetime.utcnow()
+    # If the trader typed a promo code at deposit time (bonus_code), do
+    # NOT auto-apply standing BonusOffers — admin will grant/deny that
+    # request explicitly via /deposits/{id}/grant-bonus. Mixing auto +
+    # manual would let one deposit double-dip.
+    skip_auto_bonus = bool(deposit.bonus_code)
     offers_q = await db.execute(
         select(BonusOffer).where(
             BonusOffer.is_active == True,
             BonusOffer.bonus_type.in_(["deposit", "welcome"]),
             BonusOffer.min_deposit <= deposit.amount,
         )
-    )
-    for offer in offers_q.scalars().all():
+    ) if not skip_auto_bonus else None
+    for offer in (offers_q.scalars().all() if offers_q is not None else []):
         if offer.starts_at and offer.starts_at > now:
             continue
         if offer.expires_at and offer.expires_at < now:
@@ -331,7 +339,7 @@ async def approve_deposit(
                 new_balance=user_row.main_wallet_balance,
                 trader_app_url=app_url,
             )
-            fire_and_forget(send_email(user_row.email, subject, html, text=text))
+            fire_and_forget(send_email(user_row.email, subject, html, text=text, category="account"))
             for offer_name, bonus_amount in applied_bonuses:
                 bsubject, bhtml, btext = render_bonus_credited(
                     first_name=user_row.first_name,
@@ -341,7 +349,10 @@ async def approve_deposit(
                     new_bonus_balance=user_row.main_wallet_balance,
                     trader_app_url=app_url,
                 )
-                fire_and_forget(send_email(user_row.email, bsubject, bhtml, text=btext))
+                # Bonus credit pings come from voucher@, the deposit
+                # confirmation above came from account@ — same approval
+                # but two distinct emails to the user.
+                fire_and_forget(send_email(user_row.email, bsubject, bhtml, text=btext, category="voucher"))
     except Exception as _e:
         # Logger isn't always imported at module top here; deferred lookup.
         import logging as _logging
@@ -488,7 +499,7 @@ async def approve_withdrawal(
                 request_id=str(withdrawal.id),
                 trader_app_url=(_gs().TRADER_APP_URL or "https://trade.swisdex.com"),
             )
-            fire_and_forget(send_email(u.email, subject, html, text=text))
+            fire_and_forget(send_email(u.email, subject, html, text=text, category="account"))
     except Exception as _e:
         import logging as _logging
         _logging.getLogger("admin.withdraw").warning("withdrawal approve email failed: %s", _e)
@@ -545,7 +556,7 @@ async def reject_withdrawal(
                 request_id=str(withdrawal.id),
                 trader_app_url=(_gs().TRADER_APP_URL or "https://trade.swisdex.com"),
             )
-            fire_and_forget(send_email(u.email, subject, html, text=text))
+            fire_and_forget(send_email(u.email, subject, html, text=text, category="account"))
     except Exception as _e:
         import logging as _logging
         _logging.getLogger("admin.withdraw").warning("withdrawal reject email failed: %s", _e)
@@ -577,3 +588,154 @@ async def download_withdrawal_payout_qr(withdrawal_id: uuid.UUID, db: AsyncSessi
     if not p.is_file():
         raise HTTPException(status_code=404, detail="File missing on server")
     return FileResponse(str(p), filename=p.name, media_type="application/octet-stream")
+
+
+# ─── Manual bonus grant / deny on a deposit ──────────────────────────────
+# Trader optionally types a promo code at deposit time (bonus_code).
+# Deposits with a code arrive as bonus_status='pending' and skip the
+# existing auto-apply BonusOffer loop — admin reviews each one here and
+# either credits a custom amount or rejects with a reason.
+
+async def grant_deposit_bonus(
+    deposit_id: uuid.UUID,
+    amount: Decimal,
+    description: str | None,
+    admin_id: uuid.UUID,
+    ip_address: str | None,
+    db: AsyncSession,
+) -> dict:
+    """Credit a custom bonus to the trader's main wallet. Idempotency:
+    a deposit can only be granted once — re-running returns 409 so the
+    admin doesn't double-pay on a refresh / double-click."""
+    if amount is None or Decimal(str(amount)) <= 0:
+        raise HTTPException(status_code=400, detail="Bonus amount must be greater than zero")
+
+    deposit = (await db.execute(
+        select(Deposit).where(Deposit.id == deposit_id)
+    )).scalar_one_or_none()
+    if not deposit:
+        raise HTTPException(status_code=404, detail="Deposit not found")
+    if not deposit.bonus_code:
+        raise HTTPException(
+            status_code=400,
+            detail="This deposit did not request a bonus — no code on file",
+        )
+    if deposit.bonus_status not in ("pending", None):
+        raise HTTPException(
+            status_code=409,
+            detail=f"Bonus already {deposit.bonus_status} for this deposit",
+        )
+
+    user = (await db.execute(
+        select(User).where(User.id == deposit.user_id)
+    )).scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    bonus_amount = Decimal(str(amount))
+    user.main_wallet_balance = (user.main_wallet_balance or Decimal("0")) + bonus_amount
+
+    desc = (description or "").strip() or (
+        f"Bonus credited for deposit {deposit.id} (code {deposit.bonus_code})"
+    )
+    db.add(Transaction(
+        user_id=deposit.user_id,
+        account_id=None,
+        type="bonus",
+        amount=bonus_amount,
+        balance_after=user.main_wallet_balance,
+        reference_id=deposit.id,
+        description=desc,
+    ))
+
+    deposit.bonus_status = "granted"
+    deposit.bonus_amount = bonus_amount
+    deposit.bonus_decided_by = admin_id
+    deposit.bonus_decided_at = datetime.now(timezone.utc)
+
+    try:
+        await create_notification(
+            db, deposit.user_id,
+            title=f"Bonus credited — ${float(bonus_amount):,.2f}",
+            message=(
+                f"Your bonus request with code {deposit.bonus_code} on deposit "
+                f"${float(deposit.amount):,.2f} was approved. ${float(bonus_amount):,.2f} "
+                "has been credited to your main wallet."
+            ),
+            notif_type="bonus", action_url="/wallet",
+        )
+    except Exception:
+        pass
+
+    await write_audit_log(
+        db, admin_id, "grant_deposit_bonus", "deposit", deposit_id,
+        new_values={
+            "bonus_code": deposit.bonus_code,
+            "bonus_amount": float(bonus_amount),
+            "description": desc,
+        },
+        ip_address=ip_address,
+    )
+    await db.commit()
+
+    return {
+        "message": "Bonus granted",
+        "deposit_id": str(deposit_id),
+        "bonus_amount": float(bonus_amount),
+        "main_wallet_balance": float(user.main_wallet_balance),
+    }
+
+
+async def deny_deposit_bonus(
+    deposit_id: uuid.UUID,
+    reason: str | None,
+    admin_id: uuid.UUID,
+    ip_address: str | None,
+    db: AsyncSession,
+) -> dict:
+    """Mark the bonus request denied — no money moves. Sends an in-app
+    notification with the reason; underlying deposit status is untouched
+    so the trader still sees their actual deposit settle separately."""
+    deposit = (await db.execute(
+        select(Deposit).where(Deposit.id == deposit_id)
+    )).scalar_one_or_none()
+    if not deposit:
+        raise HTTPException(status_code=404, detail="Deposit not found")
+    if not deposit.bonus_code:
+        raise HTTPException(
+            status_code=400,
+            detail="This deposit did not request a bonus",
+        )
+    if deposit.bonus_status not in ("pending", None):
+        raise HTTPException(
+            status_code=409,
+            detail=f"Bonus already {deposit.bonus_status} for this deposit",
+        )
+
+    reason_clean = (reason or "").strip()[:500] or "Denied by admin"
+    deposit.bonus_status = "denied"
+    deposit.bonus_amount = None
+    deposit.bonus_decided_by = admin_id
+    deposit.bonus_decided_at = datetime.now(timezone.utc)
+
+    try:
+        await create_notification(
+            db, deposit.user_id,
+            title="Bonus request denied",
+            message=(
+                f"Your bonus request with code {deposit.bonus_code} on deposit "
+                f"${float(deposit.amount):,.2f} was not approved. Reason: {reason_clean}"
+            ),
+            notif_type="bonus", action_url="/wallet",
+        )
+    except Exception:
+        pass
+
+    await write_audit_log(
+        db, admin_id, "deny_deposit_bonus", "deposit", deposit_id,
+        new_values={"bonus_code": deposit.bonus_code, "reason": reason_clean},
+        ip_address=ip_address,
+    )
+    await db.commit()
+
+    return {"message": "Bonus denied", "deposit_id": str(deposit_id), "reason": reason_clean}

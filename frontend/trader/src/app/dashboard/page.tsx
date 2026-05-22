@@ -370,17 +370,28 @@ function TopMoversCard({ movers }: { movers: { symbol: string; pct: number; pric
 
 
 function InviteFriendsCard() {
+  // Personal referral (every user has a code) — NOT the IB program.
+  // The IB version of this card used to point here and confused users
+  // who hadn't applied as an IB; the personal-referral endpoint is the
+  // right one for the dashboard's "Invite friends" CTA.
   const [link, setLink] = useState<string>('');
   const [code, setCode] = useState<string>('');
 
   useEffect(() => {
     let cancelled = false;
     api
-      .get<{ referral_link?: string; referral_code?: string }>('/business/ib/dashboard')
+      .get<{ referral_code?: string | null }>('/business/referral/me')
       .then((d) => {
         if (cancelled) return;
-        setLink(d.referral_link || '');
-        setCode(d.referral_code || '');
+        const c = (d.referral_code || '').trim();
+        setCode(c);
+        if (c && typeof window !== 'undefined') {
+          // Same shape as `${TRADER_APP_URL}/auth/register?ref=CODE` that
+          // /business/company-ib returns server-side. Building on the
+          // client keeps the link on the user's actual origin
+          // (swisdex.com vs trade.swisdex.com vs local dev).
+          setLink(`${window.location.origin}/auth/register?ref=${encodeURIComponent(c)}`);
+        }
       })
       .catch(() => { /* card falls back to the static CTA */ });
     return () => { cancelled = true; };
@@ -443,7 +454,7 @@ function InviteFriendsCard() {
             </>
           ) : (
             <Link
-              href="/business"
+              href="/referral"
               className="inline-flex items-center gap-1.5 mt-3 text-xs font-bold text-[#55a630] hover:underline"
             >
               Get your referral link <ArrowRight size={12} />

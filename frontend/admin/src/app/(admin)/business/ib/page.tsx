@@ -192,7 +192,7 @@ export default function IBPage() {
         attach_unreferred: companyIBAttach,
       });
       setCompanyIB(updated);
-      toast.success(companyIBPicker ? 'Company IB updated' : 'Company IB cleared');
+      toast.success(companyIBPicker ? 'Super IB updated' : 'Super IB cleared');
     } catch (e: any) {
       toast.error(e?.message || 'Save failed');
     } finally {
@@ -525,11 +525,27 @@ export default function IBPage() {
           <div className="bg-bg-secondary border border-accent/30 rounded-md p-4 space-y-3">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
-                <h2 className="text-sm font-semibold text-text-primary">Company / House IB</h2>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h2 className="text-sm font-semibold text-text-primary">Super IB (House Master)</h2>
+                  <span
+                    className={`text-[10px] px-1.5 py-0.5 rounded-sm font-medium uppercase tracking-wide ${
+                      companyIB?.user_id && companyIB?.attach_unreferred
+                        ? 'bg-buy/15 text-buy'
+                        : 'bg-text-tertiary/15 text-text-tertiary'
+                    }`}
+                  >
+                    {companyIB?.user_id && companyIB?.attach_unreferred
+                      ? 'Auto-attach ON'
+                      : !companyIB?.user_id
+                        ? 'Not designated'
+                        : 'Auto-attach OFF'}
+                  </span>
+                </div>
                 <p className="text-xxs text-text-tertiary mt-0.5 max-w-2xl">
-                  Designate one of the approved IBs as the company&apos;s own. Use its
-                  referral link in marketing campaigns; optionally auto-attach all
-                  unreferred signups under it so the house tree captures organic traffic.
+                  Pick one approved IB as the platform&apos;s <strong>Super IB</strong>. When auto-attach is
+                  ON, every new signup that does not enter an IB referral code is parented under the
+                  Super IB. The Super IB earns the same signup bonus + ongoing trade commissions as any
+                  regular IB referral; edit its commission row in the Active IBs tab to tune the rate.
                 </p>
               </div>
               <button
@@ -543,27 +559,34 @@ export default function IBPage() {
 
             <div className="grid sm:grid-cols-[1fr_auto] gap-3 items-start">
               <div className="space-y-2">
-                <label className="text-xxs text-text-tertiary uppercase tracking-wide block">Designated IB</label>
+                <label className="text-xxs text-text-tertiary uppercase tracking-wide block">Designated Super IB</label>
                 <select
                   value={companyIBPicker}
                   onChange={(e) => setCompanyIBPicker(e.target.value)}
                   className="w-full text-xs py-1.5 px-2 bg-bg-input border border-border-primary rounded-md text-text-primary"
                 >
-                  <option value="">— None (not designated) —</option>
+                  <option value="">— None (auto-attach disabled regardless of toggle) —</option>
                   {agents.map((a) => (
                     <option key={a.id} value={a.user_id}>
                       {a.user_name} ({a.user_email}) · {a.referral_code}
                     </option>
                   ))}
                 </select>
-                <label className="flex items-center gap-2 text-xs text-text-secondary cursor-pointer mt-1">
+                <label className="flex items-start gap-2 text-xs text-text-secondary cursor-pointer mt-1 select-none">
                   <input
                     type="checkbox"
                     checked={companyIBAttach}
                     onChange={(e) => setCompanyIBAttach(e.target.checked)}
-                    className="rounded border-border-primary"
+                    className="mt-0.5 rounded border-border-primary"
                   />
-                  <span>Auto-attach unreferred signups under this IB</span>
+                  <span>
+                    <strong>Auto-attach unreferred signups under the Super IB.</strong>
+                    <br />
+                    <span className="text-text-tertiary text-xxs">
+                      ON = every new user who signs up without entering a referral code is parented
+                      under the Super IB at signup. OFF = unreferred users have no IB (orphan).
+                    </span>
+                  </span>
                 </label>
               </div>
               <div className="text-xxs text-text-tertiary space-y-1 min-w-[180px]">
@@ -699,7 +722,35 @@ export default function IBPage() {
                               </div>
                               <p className="text-xxs text-text-tertiary mt-0.5">{agent.user_email}</p>
                             </td>
-                            <td className="px-4 py-2.5 text-xs text-buy font-mono tabular-nums">{agent.referral_code}</td>
+                            <td className="px-4 py-2.5 text-xs text-buy font-mono tabular-nums">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const next = window.prompt(
+                                    `Set custom referral code for ${agent.user_email}\n(3-20 chars, A-Z and 0-9 only)`,
+                                    agent.referral_code,
+                                  );
+                                  if (!next || next.trim() === agent.referral_code) return;
+                                  (async () => {
+                                    try {
+                                      await adminApi.put(
+                                        `/business/ib/agents/${agent.id}/referral-code`,
+                                        { code: next.trim() },
+                                      );
+                                      toast.success('Referral code updated');
+                                      fetchData();
+                                      loadCompanyIB();
+                                    } catch (e: any) {
+                                      toast.error(e?.message || 'Update failed');
+                                    }
+                                  })();
+                                }}
+                                title="Click to set a custom code (e.g. SDASIA)"
+                                className="hover:underline cursor-pointer"
+                              >
+                                {agent.referral_code}
+                              </button>
+                            </td>
                             <td className="px-4 py-2.5 text-xs text-text-primary">L{agent.level}</td>
                             <td className="px-4 py-2.5 text-xs text-text-primary font-mono tabular-nums">{agent.referral_count}</td>
                             <td className="px-4 py-2.5 text-xs text-success text-right font-mono tabular-nums">${formatMoney(agent.total_earned)}</td>

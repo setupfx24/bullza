@@ -59,6 +59,7 @@ const NAV_ITEMS: NavItem[] = [
       { label: 'User Referrals', href: '/business/referral' },
       { label: 'Sub-Broker', href: '/business/sub-broker' },
       { label: 'Copy Masters', href: '/business/masters' },
+      { label: 'MAM', href: '/business/mam' },
       { label: 'MLM Config', href: '/business/mlm' },
     ],
   },

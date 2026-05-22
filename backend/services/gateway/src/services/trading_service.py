@@ -262,7 +262,19 @@ async def place_order(
             commission = Decimal(str(master_override.commission_per_lot_usd)) * Decimal(str(req.lots))
 
         contract_size = instrument.contract_size or Decimal("100000")
-        required_margin = calc_margin(req.lots, fill_price, contract_size, account.leverage)
+        # Effective leverage = min(account.leverage, instrument cap).
+        # The cap layered on top is admin-configurable per instrument via
+        # InstrumentConfig.leverage_max (e.g. crypto symbols at 10×, FX
+        # majors at 500×). Without this clamp, a user on a 1:500 account
+        # could open a 500× BTCUSD position even if admin restricted that
+        # symbol to 1:10. Falls back to account.leverage when no per-
+        # instrument override is set.
+        ic_lev_cap = ic.leverage_max if ic and ic.leverage_max else None
+        effective_leverage = (
+            min(int(account.leverage), int(ic_lev_cap))
+            if ic_lev_cap else int(account.leverage)
+        )
+        required_margin = calc_margin(req.lots, fill_price, contract_size, effective_leverage)
 
         unrealized_pnl = Decimal("0")
         open_pos_result = await db.execute(
@@ -782,6 +794,21 @@ async def close_position(position_id: UUID, req, user_id: UUID, db: AsyncSession
     close_price = Decimal(str(tick["bid"])) if sv == "buy" else Decimal(str(tick["ask"]))
     contract_size = pos.instrument.contract_size if pos.instrument else Decimal("100000")
 
+    # Use the SAME effective leverage formula as the open path so margin
+    # release matches the originally locked margin. If admin changed the
+    # per-instrument cap between open and close, a small drift is
+    # acceptable in practice (current carry-over of trade-time leverage
+    # would require a position-level column, which we don't add here).
+    _ic_row = await db.execute(
+        select(InstrumentConfig).where(InstrumentConfig.instrument_id == pos.instrument_id)
+    )
+    _ic_close = _ic_row.scalar_one_or_none()
+    _ic_lev_cap = _ic_close.leverage_max if _ic_close and _ic_close.leverage_max else None
+    _effective_leverage_close = (
+        min(int(account.leverage), int(_ic_lev_cap))
+        if _ic_lev_cap else int(account.leverage)
+    )
+
     close_lots = Decimal(str(req.lots)) if req.lots and Decimal(str(req.lots)) < pos.lots else pos.lots
     is_partial = close_lots < pos.lots
 
@@ -830,7 +857,7 @@ async def close_position(position_id: UUID, req, user_id: UUID, db: AsyncSession
         db.add(history)
 
         account.balance += partial_profit
-        partial_margin = (close_lots * contract_size * pos.open_price) / Decimal(str(account.leverage))
+        partial_margin = (close_lots * contract_size * pos.open_price) / Decimal(str(_effective_leverage_close))
         account.margin_used = max(Decimal("0"), (account.margin_used or Decimal("0")) - partial_margin)
 
         result_msg = f"Partial close: {close_lots} lots"
@@ -859,7 +886,7 @@ async def close_position(position_id: UUID, req, user_id: UUID, db: AsyncSession
         db.add(history)
 
         account.balance += full_profit
-        margin_release = (pos.lots * contract_size * pos.open_price) / Decimal(str(account.leverage))
+        margin_release = (pos.lots * contract_size * pos.open_price) / Decimal(str(_effective_leverage_close))
         account.margin_used = max(Decimal("0"), (account.margin_used or Decimal("0")) - margin_release)
 
         result_msg = "Position closed"
@@ -992,4 +1019,164 @@ async def close_position(position_id: UUID, req, user_id: UUID, db: AsyncSession
         "lots_closed": float(close_lots),
         "remaining_lots": float(pos.lots) if is_partial else 0,
         "balance": float(account.balance),
+    }
+
+
+# ─── Bulk close (Close All button) ───────────────────────────────────────
+# Before this endpoint, the trader UI fired N parallel POST /close calls.
+# Each call hit the SAME trading_account row and updated balance / margin
+# concurrently — Postgres serialization conflicts (or stale session state)
+# caused "Request failed" on most of them. This bulk path closes
+# sequentially in a single request so there's no concurrency on the same
+# account row, and reports per-position success/failure in one response.
+#
+# `filter_type`:
+#   - "all"     close every open position on the account
+#   - "profit"  close only profitable open positions
+#   - "loss"    close only losing open positions
+#   - "symbol"  close only positions matching one of `symbols` (uppercased)
+
+class BulkCloseError(Exception):
+    """Bubbled per-position close failure so the loop can record it."""
+
+
+async def _bulk_compute_profit(pos: Position, tick: dict) -> Decimal:
+    """Reuse the calc_pnl path with the same FX-quote-to-USD conversion."""
+    sv = side_val(pos.side)
+    close_price = Decimal(str(tick["bid"])) if sv == "buy" else Decimal(str(tick["ask"]))
+    contract_size = pos.instrument.contract_size if pos.instrument else Decimal("100000")
+    return calc_pnl(pos.side, pos.open_price, close_price, pos.lots, contract_size, instrument=pos.instrument)
+
+
+async def bulk_close_positions(
+    *,
+    account_id: UUID,
+    user_id: UUID,
+    filter_type: str,
+    symbols: list[str] | None,
+    db: AsyncSession,
+) -> dict:
+    """Close all (or a filtered subset of) open positions on the account.
+    Returns per-position outcomes and a tally."""
+    # Ownership + active check on the account once, up front, so all
+    # subsequent closes share the same loaded row.
+    acct_result = await db.execute(
+        select(TradingAccount).where(
+            TradingAccount.id == account_id,
+            TradingAccount.user_id == user_id,
+        )
+    )
+    account = acct_result.scalar_one_or_none()
+    if not account:
+        raise HTTPException(status_code=404, detail="Account not found")
+
+    # Pull every open position. Order by oldest first so per-position
+    # commits land deterministically (helpful if the user opens History
+    # right after).
+    pos_q = await db.execute(
+        select(Position)
+        .where(
+            Position.account_id == account_id,
+            Position.status == "open",
+        )
+        .order_by(Position.created_at.asc())
+    )
+    candidates = pos_q.scalars().all()
+
+    # Filter (mirrors the BulkCloseModal options on the trader UI).
+    ft = (filter_type or "all").lower()
+    sym_set = {s.upper() for s in (symbols or []) if s}
+
+    targets: list[Position] = []
+    skipped_no_tick = 0
+    skipped_copy = 0
+    for pos in candidates:
+        if ft == "symbol":
+            if not pos.instrument or pos.instrument.symbol.upper() not in sym_set:
+                continue
+        # MAM follower positions can't be closed by the follower; skip
+        # silently so the user doesn't see a spurious "failed" entry for
+        # rows the platform contractually prevents them from closing.
+        copy_row = (await db.execute(
+            select(CopyTrade).where(CopyTrade.investor_position_id == pos.id)
+        )).scalar_one_or_none()
+        if copy_row:
+            skipped_copy += 1
+            continue
+        targets.append(pos)
+
+    # For profit / loss filter we need each tick — fetch up front in
+    # one mget so we don't hit Redis N times inside the loop.
+    sym_list = list({p.instrument.symbol for p in targets if p.instrument})
+    tick_keys = [PriceChannel.tick_key(s) for s in sym_list]
+    tick_values = await redis_client.mget(tick_keys) if tick_keys else []
+    tick_map: dict[str, dict] = {}
+    for sym, val in zip(sym_list, tick_values):
+        if val:
+            try:
+                tick_map[sym] = json.loads(val)
+            except (json.JSONDecodeError, KeyError):
+                continue
+
+    if ft in ("profit", "loss"):
+        filtered: list[Position] = []
+        for pos in targets:
+            sym = pos.instrument.symbol if pos.instrument else None
+            if not sym or sym not in tick_map:
+                skipped_no_tick += 1
+                continue
+            pnl = await _bulk_compute_profit(pos, tick_map[sym])
+            if ft == "profit" and pnl > 0:
+                filtered.append(pos)
+            elif ft == "loss" and pnl < 0:
+                filtered.append(pos)
+        targets = filtered
+
+    # Build a fake ClosePositionRequest for full-lot closes since
+    # close_position expects req.lots (None → full close).
+    from packages.common.src.schemas import ClosePositionRequest
+    full_req = ClosePositionRequest()
+
+    closed: list[dict] = []
+    failed: list[dict] = []
+    total_profit = Decimal("0")
+    for pos in targets:
+        try:
+            res = await close_position(
+                position_id=pos.id, req=full_req, user_id=user_id, db=db,
+            )
+            closed.append({
+                "position_id": str(pos.id),
+                "symbol": pos.instrument.symbol if pos.instrument else None,
+                "profit": float(res.get("profit") or 0),
+                "close_price": float(res.get("close_price") or 0),
+            })
+            total_profit += Decimal(str(res.get("profit") or 0))
+        except HTTPException as e:
+            failed.append({
+                "position_id": str(pos.id),
+                "symbol": pos.instrument.symbol if pos.instrument else None,
+                "reason": e.detail if isinstance(e.detail, str) else str(e.detail),
+                "status_code": e.status_code,
+            })
+            # close_position commits on success and raises BEFORE commit on
+            # failure, so the session is clean either way. We continue the
+            # loop and try the next position.
+        except Exception as e:
+            logger.error("bulk close: unexpected error on pos=%s: %s", pos.id, e, exc_info=True)
+            failed.append({
+                "position_id": str(pos.id),
+                "symbol": pos.instrument.symbol if pos.instrument else None,
+                "reason": "Internal error closing this position",
+                "status_code": 500,
+            })
+
+    return {
+        "closed_count": len(closed),
+        "failed_count": len(failed),
+        "skipped_no_tick": skipped_no_tick,
+        "skipped_mam_copy": skipped_copy,
+        "total_profit": float(total_profit),
+        "closed": closed,
+        "failed": failed,
     }

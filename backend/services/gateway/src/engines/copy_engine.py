@@ -539,13 +539,26 @@ class CopyTradeEngine:
             symbol=getattr(instrument, "symbol", None),
         )
 
+        # Per-investor admin overrides (migration 0052) — admin can carve
+        # out bespoke perf-fee / broker-cut economics for a specific
+        # investor without touching the master record. NULL = inherit.
+        # We resolve the allocation row up-front so the override is read
+        # from the same in-flight session that already gives us
+        # `alloc.total_profit` later.
+        _alloc_for_fee = await db.get(InvestorAllocation, copy.investor_allocation_id)
+        eff_perf_pct = master.performance_fee_pct or Decimal("0")
+        eff_admin_pct = master.admin_commission_pct or Decimal("0")
+        if _alloc_for_fee is not None:
+            if _alloc_for_fee.performance_fee_pct_override is not None:
+                eff_perf_pct = _alloc_for_fee.performance_fee_pct_override
+            if _alloc_for_fee.admin_commission_pct_override is not None:
+                eff_admin_pct = _alloc_for_fee.admin_commission_pct_override
+
         performance_fee = Decimal("0")
         admin_fee = Decimal("0")
         if gross_profit > 0:
-            perf_pct = master.performance_fee_pct or Decimal("0")
-            performance_fee = gross_profit * perf_pct / Decimal("100")
-            admin_pct = master.admin_commission_pct or Decimal("0")
-            admin_fee = performance_fee * admin_pct / Decimal("100")
+            performance_fee = gross_profit * eff_perf_pct / Decimal("100")
+            admin_fee = performance_fee * eff_admin_pct / Decimal("100")
 
         net_profit = gross_profit - performance_fee
 
@@ -566,7 +579,9 @@ class CopyTradeEngine:
             investor_account.equity = investor_account.balance + (investor_account.credit or Decimal("0"))
             investor_account.free_margin = investor_account.equity - investor_account.margin_used
 
-        alloc = await db.get(InvestorAllocation, copy.investor_allocation_id)
+        # Reuse the allocation row we already fetched for the override
+        # lookup above — saves a redundant DB roundtrip.
+        alloc = _alloc_for_fee
         if alloc:
             alloc.total_profit = (alloc.total_profit or Decimal("0")) + net_profit
 
@@ -597,7 +612,7 @@ class CopyTradeEngine:
                         amount=-performance_fee,
                         balance_after=investor_account.balance,
                         reference_id=investor_pos.id,
-                        description=f"Performance fee ({master.performance_fee_pct}%) on copy trade",
+                        description=f"Performance fee ({eff_perf_pct}%) on copy trade",
                     )
                 )
 
@@ -624,7 +639,7 @@ class CopyTradeEngine:
                 if admin_fee > 0:
                     await credit_admin_fee(
                         db, admin_fee,
-                        description=f"Platform commission ({master.admin_commission_pct}%) from master {master_account.account_number} copy trade",
+                        description=f"Platform commission ({eff_admin_pct}%) from master {master_account.account_number} copy trade",
                         reference_id=investor_pos.id,
                     )
                     # XP_Reward_mechanism slide 6: 50% of the platform's

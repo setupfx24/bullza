@@ -139,7 +139,12 @@ async def send_due_eligibility_nudges(db: AsyncSession) -> int:
                 funded_balance=funded_balance,
                 trader_app_url=app_url,
             )
-            fire_and_forget(send_email(u.email, subject, html, text=text))
+            # Pick the right alias by flavor — pure insurance pitch goes
+            # from insure@, fixed-return pitch from stacking@, mixed/both
+            # goes from info@ since it's the general "you're eligible"
+            # touch.
+            cat = "insure" if flavor == "insurance" else "stacking" if flavor == "fr" else "info"
+            fire_and_forget(send_email(u.email, subject, html, text=text, category=cat))
         except Exception as exc:
             logger.warning("Eligibility nudge render failed for %s: %s", u.email, exc)
             continue

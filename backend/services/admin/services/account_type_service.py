@@ -20,6 +20,7 @@ async def list_account_types(db: AsyncSession) -> dict:
                 name=g.name,
                 description=g.description,
                 leverage_default=g.leverage_default or 100,
+                max_leverage=g.max_leverage,
                 spread_markup_default=g.spread_markup_default or 0,
                 commission_default=g.commission_default or 0,
                 minimum_deposit=g.minimum_deposit or 0,
@@ -39,10 +40,20 @@ async def create_account_type(
     ip_address: str | None,
     db: AsyncSession,
 ) -> dict:
+    # max_leverage validation: must be >= leverage_default when both set
+    # (admin shouldn't be able to set a ceiling below the default — that
+    # would be paradoxical and break new-account creation).
+    if body.max_leverage is not None and body.leverage_default and body.max_leverage < body.leverage_default:
+        raise HTTPException(
+            status_code=400,
+            detail="max_leverage must be >= leverage_default",
+        )
+
     g = AccountGroup(
         name=body.name.strip(),
         description=body.description,
         leverage_default=body.leverage_default,
+        max_leverage=body.max_leverage,
         spread_markup_default=body.spread_markup_default,
         commission_default=body.commission_default,
         minimum_deposit=body.minimum_deposit,
@@ -73,9 +84,16 @@ async def update_account_type(
     if not g:
         raise HTTPException(status_code=404, detail="Account type not found")
 
+    if body.max_leverage is not None and body.leverage_default and body.max_leverage < body.leverage_default:
+        raise HTTPException(
+            status_code=400,
+            detail="max_leverage must be >= leverage_default",
+        )
+
     g.name = body.name.strip()
     g.description = body.description
     g.leverage_default = body.leverage_default
+    g.max_leverage = body.max_leverage
     g.spread_markup_default = body.spread_markup_default
     g.commission_default = body.commission_default
     g.minimum_deposit = body.minimum_deposit

@@ -69,6 +69,16 @@ async def quote(
 
     win_rate = await _user_win_rate(db, current_user["user_id"])
 
+    # Resolve the account's group so per-account-type rate overrides
+    # apply (admin sets these on /admin/insurance for Micro/Standard/Pro
+    # /Elite accounts independently of the global per_lot_fee).
+    acct_group_id = None
+    acct_row = (await db.execute(
+        select(TradingAccount.account_group_id).where(TradingAccount.id == req.account_id)
+    )).first()
+    if acct_row is not None:
+        acct_group_id = acct_row[0]
+
     quotes = await quote_all_tiers(
         cfg=cfg,
         leverage=float(req.leverage),
@@ -80,6 +90,7 @@ async def quote(
         win_rate=win_rate,
         db=db,
         user_id=current_user["user_id"],
+        account_group_id=acct_group_id,
     )
     return quotes
 
@@ -150,6 +161,7 @@ async def activate(
         win_rate=win_rate,
         db=db,
         user_id=user_id,
+        account_group_id=acct.account_group_id,
     )
 
     chosen = next((q for q in quotes if q["tier"] == req.tier), None)

@@ -40,12 +40,14 @@ async def create_manual_deposit(
     amount: Decimal = Form(...),
     transaction_id: str = Form(...),
     file: UploadFile = File(...),
+    bonus_code: Optional[str] = Form(default=None),
 ):
     """Bank / UPI manual deposit: user pays admin bank (see bank-details), uploads proof + reference."""
     return await wallet_service.create_manual_deposit(
         user_id=current_user["user_id"],
         account_id=account_id, amount=amount,
         transaction_id=transaction_id, file=file, db=db,
+        bonus_code=bonus_code,
     )
 
 
@@ -55,6 +57,7 @@ async def create_manual_deposit(
 class WalletDepositRequest(BaseModel):
     amount: Decimal
     crypto_currency: str  # frontend asset id, e.g. "USDT_ERC", "ETH"
+    bonus_code: Optional[str] = None
 
 
 class TxHashSaveRequest(BaseModel):
@@ -78,6 +81,7 @@ async def create_wallet_deposit(
         crypto_currency=req.crypto_currency,
         user_id=current_user["user_id"],
         db=db,
+        bonus_code=req.bonus_code,
     )
 
 
@@ -246,3 +250,20 @@ async def get_bank_info(
     db: AsyncSession = Depends(get_db),
 ):
     return await wallet_service.get_bank_info(amount=amount, db=db)
+
+
+@router.get("/bonus/overview")
+async def get_bonus_overview(
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Trader-facing bonus dashboard data. Returns:
+      - active_offers : BonusOffer rows currently advertisable to anyone
+                        (is_active + within date window).
+      - my_bonuses    : UserBonus rows for the caller across all statuses.
+      - recent_requests : last 10 deposits where the trader typed a bonus
+                          code (with the granted/denied/pending decision).
+    """
+    return await wallet_service.get_bonus_overview(
+        user_id=current_user["user_id"], db=db,
+    )

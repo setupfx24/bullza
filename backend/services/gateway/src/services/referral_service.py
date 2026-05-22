@@ -26,7 +26,7 @@ from packages.common.src.models import (
     User, Deposit, Transaction, IBProfile, Referral, TradeHistory, TradingAccount,
 )
 from packages.common.src.settings_store import (
-    get_float_setting, get_int_setting, get_system_setting,
+    get_float_setting, get_int_setting, get_system_setting, get_bool_setting,
 )
 
 logger = logging.getLogger("referral_service")
@@ -133,6 +133,32 @@ async def maybe_pay_referral_after_trades(
     if user.referral_qualified_at is not None:
         return None  # already paid
 
+    # ── Activation gate #1: KYC verification ──────────────────────────
+    # Marketing copy on /products/referral promises "Your friend ...
+    # completes KYC verification, and funds their account" before any
+    # bounty is paid. Enforce both here so payouts match the public
+    # contract.
+    kyc_required = await get_bool_setting("referral_requires_kyc", True)
+    if kyc_required and (user.kyc_status or "pending").lower() != "approved":
+        return None
+
+    # ── Activation gate #2: at least one approved deposit ─────────────
+    # "Funds their account" = at least one approved / auto_approved
+    # deposit. Demo top-ups don't count — they have no Deposit row.
+    funded_required = await get_bool_setting("referral_requires_funded", True)
+    if funded_required:
+        funded_count = (await db.execute(
+            select(func.count()).select_from(Deposit).where(
+                Deposit.user_id == user_id,
+                Deposit.status.in_(["approved", "auto_approved"]),
+            )
+        )).scalar() or 0
+        if funded_count <= 0:
+            return None
+
+    # ── Qualification gate: minimum N closed trades ───────────────────
+    # Defaults to 3 to match the trader-page promise. Admin can adjust
+    # via system_settings.referral_qualifying_trades without a deploy.
     required = await get_int_setting("referral_qualifying_trades", 3)
     if required <= 0:
         required = 3
@@ -273,6 +299,14 @@ async def get_my_referral_dashboard(db: AsyncSession, user_id: UUID) -> dict:
         )
     )).scalar() or 0
 
+    # Surface the activation gates so the trader page can render
+    # "How a Referral Qualifies" with live admin-controlled rules
+    # instead of hardcoded copy. Flipping the admin flags off (e.g.
+    # disabling the KYC gate for a promo) immediately propagates to
+    # the public marketing card.
+    kyc_required = await get_bool_setting("referral_requires_kyc", True)
+    funded_required = await get_bool_setting("referral_requires_funded", True)
+
     return {
         "referral_code": user.referral_code,
         "referrals": int(referrals),
@@ -282,6 +316,8 @@ async def get_my_referral_dashboard(db: AsyncSession, user_id: UUID) -> dict:
         "amount_per_referral_usd": float(amount_usd),
         "amount_by_account_type": amount_by_type,
         "required_trades": int(required_trades),
+        "requires_kyc": bool(kyc_required),
+        "requires_funded_account": bool(funded_required),
         # Kept for backward compat with any older client build that
         # still reads `commission_pct`. New clients ignore it.
         "commission_pct": 0.0,

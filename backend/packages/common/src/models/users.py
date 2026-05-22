@@ -92,6 +92,10 @@ class User(Base):
     # NULL = never sent; weekly engine runs Mondays, monthly on the 1st.
     weekly_statement_sent_at = Column(DateTime(timezone=True), nullable=True)
     monthly_statement_sent_at = Column(DateTime(timezone=True), nullable=True)
+    # Post-profile-completion welcome email: gateway sets this the first
+    # time it detects profile_complete flip false→true after PUT /profile.
+    # NULL = never sent; gate keeps subsequent profile edits from re-mailing.
+    welcome_email_sent_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), default=datetime.utcnow)
     updated_at = Column(DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow)
 

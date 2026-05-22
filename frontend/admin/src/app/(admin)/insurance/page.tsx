@@ -150,6 +150,11 @@ function fmtUsd(n: number) {
   return n.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 2 });
 }
 
+interface AccountGroup {
+  id: string;
+  name: string;
+}
+
 export default function InsuranceAdminPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -158,16 +163,24 @@ export default function InsuranceAdminPage() {
   const [jsonText, setJsonText] = useState<Record<string, string>>({});
   const [jsonError, setJsonError] = useState<Record<string, string>>({});
   const [stats, setStats] = useState<StatsResponse | null>(null);
+  const [accountGroups, setAccountGroups] = useState<AccountGroup[]>([]);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [settingsRes, statsRes] = await Promise.all([
+      const [settingsRes, statsRes, groupsRes] = await Promise.all([
         adminApi.get<Record<string, SettingsValue>>('/insurance/settings'),
         adminApi.get<StatsResponse>('/insurance/stats').catch(() => null),
+        adminApi
+          .get<{ items?: AccountGroup[] } | AccountGroup[]>('/account-types')
+          .catch(() => [] as AccountGroup[]),
       ]);
       setValues(settingsRes || {});
       if (statsRes) setStats(statsRes);
+      const groups = Array.isArray(groupsRes)
+        ? groupsRes
+        : (groupsRes?.items || []);
+      setAccountGroups(groups);
 
       const jt: Record<string, string> = {};
       for (const k of JSON_KEYS) {
@@ -213,6 +226,46 @@ export default function InsuranceAdminPage() {
       if (v === undefined || v === null || v === '') continue;
       const n = typeof v === 'number' ? v : parseFloat(String(v));
       if (Number.isFinite(n)) updates[k] = n;
+    }
+
+    // Pricing mode + per-tier per-lot rates are handled outside the
+    // NUMERIC/JSON arrays so the admin doesn't have to hand-edit JSON.
+    const mode = String(values.insurance_pricing_mode || 'per_lot').toLowerCase();
+    if (mode === 'per_lot' || mode === 'risk_score') {
+      updates.insurance_pricing_mode = mode;
+    }
+    const perLot = values.insurance_per_lot_fee;
+    if (perLot && typeof perLot === 'object' && !Array.isArray(perLot)) {
+      const cleaned: Record<string, number> = {};
+      for (const tier of ['basic', 'advanced', 'pro', 'elite']) {
+        const raw = (perLot as Record<string, unknown>)[tier];
+        const n = typeof raw === 'number' ? raw : parseFloat(String(raw ?? ''));
+        if (Number.isFinite(n) && n >= 0) cleaned[tier] = n;
+      }
+      if (Object.keys(cleaned).length > 0) {
+        updates.insurance_per_lot_fee = cleaned;
+      }
+    }
+
+    // Per-account-group per-tier overrides — admin can pin specific
+    // $/lot rates for accounts of a given group. Empty cell = inherit
+    // global per_lot_fee for that tier; whole-group empty = drop the
+    // override entirely.
+    const byGroup = values.insurance_per_lot_fee_by_account_group;
+    if (byGroup && typeof byGroup === 'object' && !Array.isArray(byGroup)) {
+      const cleanedByGroup: Record<string, Record<string, number>> = {};
+      for (const [gid, raw] of Object.entries(byGroup as Record<string, unknown>)) {
+        if (!raw || typeof raw !== 'object' || Array.isArray(raw)) continue;
+        const inner: Record<string, number> = {};
+        for (const tier of ['basic', 'advanced', 'pro', 'elite']) {
+          const cell = (raw as Record<string, unknown>)[tier];
+          if (cell === '' || cell == null) continue;
+          const n = typeof cell === 'number' ? cell : parseFloat(String(cell));
+          if (Number.isFinite(n) && n >= 0) inner[tier] = n;
+        }
+        if (Object.keys(inner).length > 0) cleanedByGroup[gid] = inner;
+      }
+      updates.insurance_per_lot_fee_by_account_group = cleanedByGroup;
     }
     for (const k of BOOL_KEYS) {
       const v = values[k];
@@ -351,6 +404,252 @@ export default function InsuranceAdminPage() {
           <span className="text-xs text-text-secondary">{enabled ? 'On' : 'Off'}</span>
         </label>
       </div>
+
+      {/* Pricing mode + per-lot rate table */}
+      {(() => {
+        const mode = String(values.insurance_pricing_mode || 'per_lot').toLowerCase();
+        const isPerLot = mode === 'per_lot';
+        const perLot = (values.insurance_per_lot_fee as Record<string, unknown> | null | undefined) || {};
+        const tiers: Array<{ key: 'basic' | 'advanced' | 'pro' | 'elite'; label: string }> = [
+          { key: 'basic', label: 'Basic' },
+          { key: 'advanced', label: 'Advanced' },
+          { key: 'pro', label: 'Pro' },
+          { key: 'elite', label: 'Elite' },
+        ];
+        const setPerLotTier = (tier: string, raw: string) => {
+          const next = { ...((values.insurance_per_lot_fee as Record<string, unknown>) || {}) };
+          if (raw === '') {
+            next[tier] = '';
+          } else {
+            const n = parseFloat(raw);
+            next[tier] = Number.isFinite(n) ? n : '';
+          }
+          setVal('insurance_per_lot_fee', next as SettingsValue);
+        };
+        return (
+          <div className="bg-bg-secondary border border-border-primary rounded-md">
+            <div className="px-4 py-3 border-b border-border-primary">
+              <h2 className="text-sm font-medium text-text-primary">Pricing mode</h2>
+              <p className="text-xxs text-text-tertiary mt-0.5">
+                <strong>Per-lot</strong> — fee scales linearly with the trade&apos;s lot size
+                (<code className="text-text-secondary">fee = lots × rate × (1 + surcharges)</code>),
+                capped by the per-trade ceilings below. This is the default and matches the
+                &quot;per-lot charge&quot; behaviour traders expect on most MT brokers.
+                <br />
+                <strong>Risk-score (legacy)</strong> — fee uses the leverage × ATR × lot-factor
+                model. A 10-lot trade barely costs more than a 1-lot trade. Keep for
+                installs that already priced policies under this scheme.
+              </p>
+            </div>
+            <div className="p-4 space-y-4">
+              <div className="flex flex-wrap items-center gap-3">
+                <label className="text-xxs text-text-tertiary uppercase tracking-wider">Mode</label>
+                <div className="inline-flex rounded-md border border-border-primary overflow-hidden">
+                  {(['per_lot', 'risk_score'] as const).map((m) => (
+                    <button
+                      key={m}
+                      type="button"
+                      onClick={() => setVal('insurance_pricing_mode', m)}
+                      className={`px-3 py-1.5 text-xs font-medium ${
+                        mode === m
+                          ? 'bg-buy/15 text-buy'
+                          : 'text-text-secondary hover:bg-bg-hover'
+                      }`}
+                    >
+                      {m === 'per_lot' ? 'Per-lot' : 'Risk-score'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className={isPerLot ? '' : 'opacity-50 pointer-events-none'}>
+                <p className="text-xxs text-text-tertiary mb-2">
+                  USD charged per lot, per tier. Surcharges (high-leverage, no-SL, low win-rate,
+                  copy-trade) still multiply. Daily caps and per-trade ceilings still apply.
+                </p>
+                <div className="grid sm:grid-cols-4 gap-3">
+                  {tiers.map((t) => {
+                    const raw = (perLot as Record<string, unknown>)[t.key];
+                    const v = raw === '' || raw == null ? '' : String(raw);
+                    return (
+                      <div key={t.key} className="flex flex-col gap-1">
+                        <label className="text-xxs text-text-tertiary uppercase tracking-wider">
+                          {t.label} ($/lot)
+                        </label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={v}
+                          onChange={(e) => setPerLotTier(t.key, e.target.value)}
+                          className="text-xs py-1.5 px-2 bg-bg-input border border-border-primary rounded-md font-mono tabular-nums text-text-primary"
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
+                <p className="text-[10px] text-text-tertiary mt-2">
+                  Default rack rates: Basic $0.50 · Advanced $1.00 · Pro $1.50 · Elite $2.00.
+                  Example: 5-lot trade on Pro = $7.50 before surcharges, capped at the per-trade
+                  ceiling below.
+                </p>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Per-account-type override table */}
+      {(() => {
+        const mode = String(values.insurance_pricing_mode || 'per_lot').toLowerCase();
+        const isPerLot = mode === 'per_lot';
+        const byGroup =
+          (values.insurance_per_lot_fee_by_account_group as Record<string, Record<string, unknown>>) || {};
+        const globalRates =
+          (values.insurance_per_lot_fee as Record<string, unknown>) || {};
+        const tiers: Array<'basic' | 'advanced' | 'pro' | 'elite'> = ['basic', 'advanced', 'pro', 'elite'];
+
+        const setCell = (groupId: string, tier: string, raw: string) => {
+          const next: Record<string, Record<string, unknown>> = {
+            ...(byGroup as Record<string, Record<string, unknown>>),
+          };
+          const inner: Record<string, unknown> = { ...(next[groupId] || {}) };
+          if (raw === '') {
+            delete inner[tier];
+          } else {
+            const n = parseFloat(raw);
+            inner[tier] = Number.isFinite(n) ? n : '';
+          }
+          if (Object.keys(inner).length === 0) {
+            delete next[groupId];
+          } else {
+            next[groupId] = inner;
+          }
+          setVal('insurance_per_lot_fee_by_account_group', next as SettingsValue);
+        };
+
+        const clearGroup = (groupId: string) => {
+          const next: Record<string, Record<string, unknown>> = {
+            ...(byGroup as Record<string, Record<string, unknown>>),
+          };
+          delete next[groupId];
+          setVal('insurance_per_lot_fee_by_account_group', next as SettingsValue);
+        };
+
+        const cellValue = (groupId: string, tier: string): string => {
+          const v = (byGroup[groupId] as Record<string, unknown> | undefined)?.[tier];
+          if (v === '' || v == null) return '';
+          return String(v);
+        };
+
+        const globalForTier = (tier: string): string => {
+          const v = (globalRates as Record<string, unknown>)[tier];
+          if (v == null) return '—';
+          const n = typeof v === 'number' ? v : parseFloat(String(v));
+          return Number.isFinite(n) ? `$${n.toFixed(2)}` : '—';
+        };
+
+        return (
+          <div className="bg-bg-secondary border border-border-primary rounded-md">
+            <div className="px-4 py-3 border-b border-border-primary">
+              <h2 className="text-sm font-medium text-text-primary">Per-account-type rate override</h2>
+              <p className="text-xxs text-text-tertiary mt-0.5">
+                Set a per-tier $/lot rate for each account type. <strong>Empty cell = inherit the
+                global rate</strong> shown in the column header. Used only when pricing mode is
+                <strong> Per-lot</strong>.
+              </p>
+            </div>
+
+            {!isPerLot && (
+              <div className="px-4 py-3 text-xxs text-text-tertiary">
+                Pricing mode is currently <strong>Risk-score</strong>. Per-account-type rates
+                only apply in Per-lot mode.
+              </div>
+            )}
+
+            {accountGroups.length === 0 ? (
+              <div className="px-4 py-6 text-xs text-text-tertiary text-center">
+                No account types found. Create some in{' '}
+                <a href="/account-types" className="text-buy underline">Account types</a>.
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[680px]">
+                  <thead>
+                    <tr className="border-b border-border-primary bg-bg-tertiary/40">
+                      <th className="text-left px-4 py-2.5 text-xxs font-medium text-text-tertiary uppercase">
+                        Account type
+                      </th>
+                      {tiers.map((t) => (
+                        <th
+                          key={t}
+                          className="text-right px-3 py-2.5 text-xxs font-medium text-text-tertiary uppercase"
+                        >
+                          {t}
+                          <div className="text-[10px] text-text-tertiary/70 font-normal normal-case mt-0.5">
+                            global {globalForTier(t)}
+                          </div>
+                        </th>
+                      ))}
+                      <th className="text-right px-3 py-2.5 text-xxs font-medium text-text-tertiary uppercase">
+                        Actions
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {accountGroups.map((g) => {
+                      const hasAny = byGroup[g.id] && Object.keys(byGroup[g.id]).length > 0;
+                      return (
+                        <tr key={g.id} className="border-b border-border-primary/40 hover:bg-bg-hover/30">
+                          <td className="px-4 py-2 text-xs text-text-primary font-medium">
+                            {g.name}
+                            {hasAny && (
+                              <span className="ml-2 text-[10px] text-buy">override active</span>
+                            )}
+                          </td>
+                          {tiers.map((t) => (
+                            <td key={t} className="px-3 py-1.5 text-right">
+                              <input
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                placeholder="inherit"
+                                disabled={!isPerLot}
+                                value={cellValue(g.id, t)}
+                                onChange={(e) => setCell(g.id, t, e.target.value)}
+                                className="w-20 text-xs py-1 px-2 bg-bg-input border border-border-primary rounded-md font-mono tabular-nums text-text-primary text-right disabled:opacity-50"
+                              />
+                            </td>
+                          ))}
+                          <td className="px-3 py-1.5 text-right">
+                            {hasAny ? (
+                              <button
+                                type="button"
+                                onClick={() => clearGroup(g.id)}
+                                disabled={!isPerLot}
+                                className="text-xxs text-text-tertiary hover:text-sell disabled:opacity-50"
+                                title="Clear all overrides for this account type"
+                              >
+                                Reset
+                              </button>
+                            ) : (
+                              <span className="text-xxs text-text-tertiary/40">—</span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+                <p className="text-[10px] text-text-tertiary px-4 py-2 border-t border-border-primary">
+                  Example: Standard account on Pro tier with $0.40 here = $0.40 × 5 lots = $2.00
+                  before surcharges. Other tiers for Standard still use the global rate unless you fill them in too.
+                </p>
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       {/* Numeric tunables */}
       <div className="bg-bg-secondary border border-border-primary rounded-md">
