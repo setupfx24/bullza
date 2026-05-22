@@ -10,7 +10,7 @@ import {
   Settings, Sliders, BarChart3, Gift, Image, HeadphonesIcon,
   UserCog, ChevronDown, ChevronRight, Network, Share2,
   DollarSign, Percent, ArrowLeftRight, PanelLeftClose, PanelLeft,
-  Receipt, Layers, ShieldCheck, ScrollText, BookOpen, Sparkles, Package,
+  Receipt, Layers, ShieldCheck, ScrollText, BookOpen, Sparkles, Package, Megaphone,
 } from 'lucide-react';
 
 interface NavItem {
@@ -65,10 +65,12 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Analytics', href: '/analytics', icon: BarChart3, perm: 'analytics.view' },
   { label: 'Audit logs', href: '/audit-logs', icon: ScrollText, perm: 'audit_logs.view' },
   { label: 'Bonus', href: '/bonus', icon: Gift, perm: 'bonus.view' },
+  { label: 'Trade Insurance', href: '/insurance', icon: ShieldCheck, perm: '*' },
   { label: 'Play Zone', href: '/play-zone', icon: Sparkles, perm: '*' },
   { label: 'Lifestyle Queue', href: '/lifestyle', icon: Package, perm: '*' },
   { label: 'Banners', href: '/banners', icon: Image, perm: 'banners.view' },
   { label: 'Support', href: '/support', icon: HeadphonesIcon, perm: 'tickets.view' },
+  { label: 'Broadcast', href: '/broadcast', icon: Megaphone, perm: '_super_admin' },
   { label: 'Employees', href: '/employees', icon: UserCog, perm: '_super_admin' },
   { label: 'Settings', href: '/settings', icon: Settings, perm: '_super_admin' },
 ];

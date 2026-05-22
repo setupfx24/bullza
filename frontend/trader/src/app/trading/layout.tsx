@@ -34,6 +34,9 @@ function mapApiAccount(a: Record<string, unknown>): TradingAccount {
           minimum_deposit: Number(g.minimum_deposit) || 0,
           swap_free: Boolean(g.swap_free),
           leverage_default: Number(g.leverage_default) || 100,
+          max_leverage: g.max_leverage != null ? Number(g.max_leverage) : undefined,
+          effective_max_leverage:
+            g.effective_max_leverage != null ? Number(g.effective_max_leverage) : undefined,
         }
       : null,
   };

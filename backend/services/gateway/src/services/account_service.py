@@ -244,6 +244,13 @@ async def list_accounts(user_id: UUID, db: AsyncSession) -> dict:
     )
     accounts = result.scalars().unique().all()
 
+    # The leverage picker needs effective_max_leverage (smaller of the group
+    # ceiling and the per-user KYC cap). Resolve the User once and reuse it
+    # for every account_group below instead of re-fetching in a loop.
+    user_row = (await db.execute(
+        select(User).where(User.id == user_id)
+    )).scalar_one_or_none()
+
     items = []
     for a in accounts:
         unrealized_pnl = Decimal("0")
@@ -278,6 +285,16 @@ async def list_accounts(user_id: UUID, db: AsyncSession) -> dict:
         g = a.account_group
         group_payload = None
         if g:
+            # Per-user effective ceiling = min(group hard cap, KYC gate). The
+            # picker needs this — without it the dropdown maxes out at
+            # leverage_default and the user can't reach values they're
+            # entitled to, which read as "leverage not working" in the UI.
+            effective_cap = int(g.max_leverage or g.leverage_default or 100)
+            if user_row is not None:
+                try:
+                    effective_cap, _hints = await _user_effective_leverage_cap(db, user_row, g)
+                except Exception:
+                    pass
             group_payload = {
                 "id": str(g.id),
                 "name": g.name,
@@ -288,6 +305,7 @@ async def list_accounts(user_id: UUID, db: AsyncSession) -> dict:
                 "swap_free": bool(g.swap_free),
                 "leverage_default": int(g.leverage_default or 100),
                 "max_leverage": int(g.max_leverage or g.leverage_default or 100),
+                "effective_max_leverage": int(effective_cap),
             }
 
         items.append({

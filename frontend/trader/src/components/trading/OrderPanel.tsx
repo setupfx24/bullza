@@ -744,9 +744,10 @@ export default function OrderPanel() {
 }
 
 /**
- * Dropdown that lets the trader lower their leverage to any preset value up to
- * the admin-set `account_group.leverage_default` ceiling. Persists the change
- * via PATCH /accounts/:id/leverage.
+ * Dropdown that lets the trader change leverage up to the per-user effective
+ * cap. Reads account_group.effective_max_leverage (smaller of group ceiling
+ * and KYC gate), falling back to max_leverage, then leverage_default for
+ * legacy responses. Persists via PATCH /accounts/:id/leverage.
  */
 function LeveragePicker({
   account,
@@ -759,7 +760,14 @@ function LeveragePicker({
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
-  const maxLev = account.account_group?.leverage_default ?? account.leverage;
+  // leverage_default is the headline value shown in marketing; the real cap
+  // is effective_max_leverage. Falling back through max_leverage covers
+  // older /accounts payloads that haven't been redeployed yet.
+  const maxLev =
+    account.account_group?.effective_max_leverage
+    ?? account.account_group?.max_leverage
+    ?? account.account_group?.leverage_default
+    ?? account.leverage;
   const presets = useMemo(() => {
     const base = [1, 10, 25, 50, 100, 200, 300, 400, 500, 1000];
     const filtered = base.filter((v) => v <= maxLev);

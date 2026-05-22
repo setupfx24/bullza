@@ -51,6 +51,11 @@ export interface AccountGroupInfo {
   minimum_deposit: number;
   swap_free: boolean;
   leverage_default: number;
+  /** Hard ceiling from migration 0020; falls back to leverage_default for legacy rows. */
+  max_leverage?: number;
+  /** Smaller of max_leverage and the per-user KYC cap (50 for non-KYC). Use this
+   *  to clamp the leverage picker — leverage_default is just a UI hint, not the cap. */
+  effective_max_leverage?: number;
 }
 
 export interface TradingAccount {

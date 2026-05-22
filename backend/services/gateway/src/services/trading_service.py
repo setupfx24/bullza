@@ -15,6 +15,7 @@ from packages.common.src.models import (
     Order, OrderType, OrderSide, OrderStatus, Position, PositionStatus,
     TradingAccount, Instrument, InstrumentConfig,
     TradeHistory, Transaction, CopyTrade, UserAuditLog, User,
+    MasterAccount,
 )
 from packages.common.src.instrument_pricing import resolve_commission
 from packages.common.src.insurance.claims import maybe_pay as insurance_maybe_pay
@@ -221,6 +222,21 @@ async def place_order(
     if req.order_type == "market":
         fill_price = ask if req.side == "buy" else bid
 
+        # PAMM / MAM per-master trade-cost overrides. If this account is the
+        # pool account behind a master and admin set spread_markup_pips, layer
+        # the additional pips into fill_price (BUY pays more, SELL receives
+        # less). NULL = fall through to the standard SpreadConfig resolver.
+        master_override = (await db.execute(
+            select(MasterAccount).where(MasterAccount.account_id == account.id)
+        )).scalar_one_or_none()
+        if master_override and master_override.spread_markup_pips:
+            pip_size = instrument.pip_size or Decimal("0.0001")
+            markup = Decimal(str(master_override.spread_markup_pips)) * pip_size
+            if req.side == "buy":
+                fill_price = fill_price + markup
+            else:
+                fill_price = fill_price - markup
+
         if req.stop_loss:
             if req.side == "buy" and req.stop_loss >= fill_price:
                 raise HTTPException(status_code=400, detail="BUY SL must be below entry price")
@@ -240,6 +256,10 @@ async def place_order(
             user_id=user_id,
             account_group_id=account.account_group_id,
         )
+
+        # Per-master flat USD-per-lot commission REPLACES resolved commission.
+        if master_override and master_override.commission_per_lot_usd:
+            commission = Decimal(str(master_override.commission_per_lot_usd)) * Decimal(str(req.lots))
 
         contract_size = instrument.contract_size or Decimal("100000")
         required_margin = calc_margin(req.lots, fill_price, contract_size, account.leverage)

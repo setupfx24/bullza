@@ -113,10 +113,40 @@ function RegisterContent() {
   // so consent is affirmative, not pre-ticked.
   const [agreedToTerms, setAgreedToTerms] = useState(false);
 
+  // Company / 'House' IB referral code, fetched once on mount. Powers the
+  // 'Apply' shortcut on the referral input so an unreferred signup can
+  // still claim the welcome bonus via the broker's own IB code.
+  const [companyIbCode, setCompanyIbCode] = useState<string | null>(null);
+
   useEffect(() => {
     const ref = searchParams.get('ref');
     if (ref) setForm((prev) => ({ ...prev, referral_code: ref }));
   }, [searchParams]);
+
+  useEffect(() => {
+    // Same-origin call to the public endpoint — no auth header needed.
+    // Silent failure: a missing/disabled company IB just leaves the
+    // Apply button as a no-op, the input still works for typed codes.
+    (async () => {
+      try {
+        const res = await fetch('/api/v1/auth/company-ib-code', { credentials: 'omit' });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data && typeof data.referral_code === 'string') {
+          setCompanyIbCode(data.referral_code);
+        }
+      } catch { /* offline / blocked — fall through */ }
+    })();
+  }, []);
+
+  const applyCompanyIb = () => {
+    if (!companyIbCode) {
+      toast.error('No house referral code is configured. Ask support for a code.');
+      return;
+    }
+    setForm((prev) => ({ ...prev, referral_code: companyIbCode }));
+    toast.success(`Applied ${companyIbCode} — claim your 100% first-deposit bonus.`);
+  };
 
   const update = (field: string, value: string) => {
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -306,12 +336,61 @@ function RegisterContent() {
                   </motion.div>
 
                   <motion.div {...fadeUp(0.56)}>
-                    <AuthInput
-                      label="Referral Code (optional)"
-                      placeholder="Enter code"
-                      value={form.referral_code}
-                      onChange={(e) => update('referral_code', e.target.value)}
-                    />
+                    {/*
+                     * Referral input + Apply shortcut. Apply pulls the
+                     * company / house IB code so an unreferred user can
+                     * still claim the welcome bonus. If they arrived via
+                     * ?ref=<friend-code>, that's already pre-filled by
+                     * the useEffect above and Apply is unnecessary.
+                     */}
+                    <div className="auth-field">
+                      <label className="auth-field__label">
+                        Referral Code (optional)
+                      </label>
+                      <div className="auth-field__wrap" style={{ display: 'flex', gap: '0.5rem' }}>
+                        <input
+                          className="auth-field__input"
+                          type="text"
+                          placeholder="Enter code"
+                          value={form.referral_code}
+                          onChange={(e) => update('referral_code', e.target.value)}
+                          style={{ flex: 1 }}
+                        />
+                        <button
+                          type="button"
+                          onClick={applyCompanyIb}
+                          disabled={!companyIbCode && !form.referral_code}
+                          className="auth-field__icon"
+                          style={{
+                            position: 'static',
+                            transform: 'none',
+                            padding: '0 0.9rem',
+                            height: 'auto',
+                            background: 'rgba(85,166,48,0.18)',
+                            color: '#55a630',
+                            border: '1px solid rgba(85,166,48,0.45)',
+                            borderRadius: '8px',
+                            fontWeight: 600,
+                            fontSize: '0.78rem',
+                            letterSpacing: '0.04em',
+                            textTransform: 'uppercase',
+                            cursor: companyIbCode ? 'pointer' : 'not-allowed',
+                            opacity: companyIbCode ? 1 : 0.4,
+                          }}
+                          title={
+                            companyIbCode
+                              ? 'Apply the platform welcome code to claim a 100% bonus on your first deposit'
+                              : 'No house code configured'
+                          }
+                        >
+                          Apply
+                        </button>
+                      </div>
+                      <span className="auth-field__helper">
+                        Apply to get <strong style={{ color: '#55a630' }}>100% bonus on your first deposit</strong>.
+                        Already from a friend&apos;s link? Their code is filled in for you.
+                      </span>
+                    </div>
                   </motion.div>
 
                   <motion.div {...fadeUp(0.62)}>

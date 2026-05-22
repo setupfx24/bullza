@@ -967,6 +967,13 @@ async def list_masters(page: int, per_page: int, db: AsyncSession) -> dict:
             "total_aum": total_aum,
             "total_return_pct": float(master.total_return_pct or 0),
             "performance_fee_pct": float(master.performance_fee_pct or 0),
+            "management_fee_pct": float(master.management_fee_pct or 0),
+            "admin_commission_pct": float(master.admin_commission_pct or 0),
+            "min_investment": float(master.min_investment or 0),
+            "max_investors": master.max_investors or 0,
+            "description": master.description,
+            "spread_markup_pips": float(master.spread_markup_pips) if master.spread_markup_pips is not None else None,
+            "commission_per_lot_usd": float(master.commission_per_lot_usd) if master.commission_per_lot_usd is not None else None,
             "created_at": master.created_at.isoformat() if master.created_at else None,
         })
 
@@ -1129,3 +1136,155 @@ async def delete_master(
         "followers_refunded": follower_count,
         "total_refunded_to_followers": float(total_refunded),
     }
+
+
+def _gen_pool_account_number(prefix: str) -> str:
+    import secrets
+    return f"{prefix}{secrets.randbelow(90000000) + 10000000}"
+
+
+async def create_master(
+    user_id_str: str,
+    master_type: str,
+    performance_fee_pct: float,
+    management_fee_pct: float,
+    admin_commission_pct: float,
+    min_investment: float,
+    max_investors: int,
+    description: str | None,
+    spread_markup_pips: float | None,
+    commission_per_lot_usd: float | None,
+    admin_id: uuid.UUID,
+    ip_address: str | None,
+    db: AsyncSession,
+) -> dict:
+    """Admin-direct master creation. Bypasses the user 'become_provider' →
+    'pending' → 'approved' flow. Creates the master row + dedicated pool
+    trading account in one call and marks it 'approved' immediately."""
+    try:
+        target_uid = uuid.UUID(user_id_str.strip())
+    except (ValueError, AttributeError):
+        raise HTTPException(status_code=400, detail="Invalid user_id")
+
+    user = (await db.execute(select(User).where(User.id == target_uid))).scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    normalized_type = master_type if master_type in ("signal_provider", "pamm", "mamm") else "signal_provider"
+
+    # Reject duplicate active master of same type for this user.
+    dup = (await db.execute(
+        select(MasterAccount).where(
+            MasterAccount.user_id == target_uid,
+            MasterAccount.master_type == normalized_type,
+            MasterAccount.status.in_(["pending", "approved", "active"]),
+        )
+    )).scalar_one_or_none()
+    if dup:
+        raise HTTPException(status_code=400, detail=f"User already has an active {normalized_type} master")
+
+    prefix = "PM" if normalized_type == "pamm" else ("MM" if normalized_type == "mamm" else "CT")
+    pool_account = TradingAccount(
+        user_id=target_uid,
+        account_number=_gen_pool_account_number(prefix),
+        balance=Decimal("0"),
+        equity=Decimal("0"),
+        free_margin=Decimal("0"),
+        margin_used=Decimal("0"),
+        leverage=500,
+        currency="USD",
+        is_demo=False,
+        is_active=True,
+    )
+    db.add(pool_account)
+    await db.flush()
+
+    master = MasterAccount(
+        user_id=target_uid,
+        account_id=pool_account.id,
+        status="approved",
+        master_type=normalized_type,
+        performance_fee_pct=Decimal(str(performance_fee_pct)),
+        management_fee_pct=Decimal(str(management_fee_pct)),
+        admin_commission_pct=Decimal(str(admin_commission_pct)),
+        min_investment=Decimal(str(min_investment)),
+        max_investors=max_investors,
+        description=description,
+        spread_markup_pips=Decimal(str(spread_markup_pips)) if spread_markup_pips is not None else None,
+        commission_per_lot_usd=Decimal(str(commission_per_lot_usd)) if commission_per_lot_usd is not None else None,
+    )
+    db.add(master)
+
+    if user.role != "master_trader":
+        user.role = "master_trader"
+
+    await db.flush()
+
+    await write_audit_log(
+        db, admin_id, "create_master", "master_account", master.id,
+        new_values={
+            "user_email": user.email,
+            "master_type": normalized_type,
+            "pool_account_number": pool_account.account_number,
+            "performance_fee_pct": performance_fee_pct,
+            "admin_commission_pct": admin_commission_pct,
+            "spread_markup_pips": spread_markup_pips,
+            "commission_per_lot_usd": commission_per_lot_usd,
+        },
+        ip_address=ip_address,
+    )
+    await db.commit()
+
+    return {
+        "id": str(master.id),
+        "pool_account_id": str(pool_account.id),
+        "pool_account_number": pool_account.account_number,
+        "message": "Master created and approved",
+    }
+
+
+async def update_master(
+    master_id: uuid.UUID,
+    patch: dict,
+    admin_id: uuid.UUID,
+    ip_address: str | None,
+    db: AsyncSession,
+) -> dict:
+    """Admin patch on master_accounts. Only allowed fields are honored;
+    null on spread_markup_pips / commission_per_lot_usd clears the override
+    so the global SpreadConfig / ChargeConfig resolver kicks back in."""
+    master = (await db.execute(
+        select(MasterAccount).where(MasterAccount.id == master_id)
+    )).scalar_one_or_none()
+    if not master:
+        raise HTTPException(status_code=404, detail="Master not found")
+
+    decimal_fields = (
+        "performance_fee_pct", "management_fee_pct", "admin_commission_pct",
+        "min_investment", "spread_markup_pips", "commission_per_lot_usd",
+    )
+    int_fields = ("max_investors",)
+    str_fields = ("description", "master_type", "status")
+
+    changed: dict = {}
+    for f in decimal_fields:
+        if f in patch:
+            v = patch[f]
+            new_val = None if v is None or v == "" else Decimal(str(v))
+            setattr(master, f, new_val)
+            changed[f] = float(new_val) if new_val is not None else None
+    for f in int_fields:
+        if f in patch and patch[f] is not None:
+            setattr(master, f, int(patch[f]))
+            changed[f] = int(patch[f])
+    for f in str_fields:
+        if f in patch:
+            setattr(master, f, patch[f])
+            changed[f] = patch[f]
+
+    await write_audit_log(
+        db, admin_id, "update_master", "master_account", master_id,
+        new_values=changed, ip_address=ip_address,
+    )
+    await db.commit()
+    return {"message": "Master updated", "changed": changed}

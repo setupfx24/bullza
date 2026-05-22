@@ -84,6 +84,14 @@ class User(Base):
     # (default 3) and the referrer's flat-amount payout was credited.
     # NULL until the threshold is hit; once set we never re-pay.
     referral_qualified_at = Column(DateTime(timezone=True), nullable=True)
+    # Eligibility-nudge engine: when the user crossed the funded-account
+    # threshold and we educated them about Fixed Return + Trade Insurance.
+    # NULL = never nudged; we re-nudge ~quarterly while still eligible.
+    fr_insurance_nudge_sent_at = Column(DateTime(timezone=True), nullable=True)
+    # Statement digest engine: last weekly / monthly digest send timestamps.
+    # NULL = never sent; weekly engine runs Mondays, monthly on the 1st.
+    weekly_statement_sent_at = Column(DateTime(timezone=True), nullable=True)
+    monthly_statement_sent_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), default=datetime.utcnow)
     updated_at = Column(DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow)
 

@@ -60,6 +60,7 @@ async def list_charges(db: AsyncSession) -> list:
             segment_id=str(c.segment_id) if c.segment_id else None,
             instrument_id=str(c.instrument_id) if c.instrument_id else None,
             user_id=str(c.user_id) if c.user_id else None,
+            account_group_id=str(c.account_group_id) if c.account_group_id else None,
             charge_type=c.charge_type,
             value=float(c.value or 0),
             is_enabled=c.is_enabled,
@@ -83,6 +84,10 @@ async def update_charges(
             segment_id=uuid.UUID(cfg.segment_id) if cfg.segment_id else None,
             instrument_id=uuid.UUID(cfg.instrument_id) if cfg.instrument_id else None,
             user_id=uuid.UUID(cfg.user_id) if cfg.user_id else None,
+            account_group_id=(
+                uuid.UUID(cfg.account_group_id)
+                if getattr(cfg, "account_group_id", None) else None
+            ),
             charge_type=cfg.charge_type,
             value=Decimal(str(cfg.value)),
             is_enabled=cfg.is_enabled,
@@ -107,6 +112,7 @@ async def list_spreads(db: AsyncSession) -> list:
             segment_id=str(c.segment_id) if c.segment_id else None,
             instrument_id=str(c.instrument_id) if c.instrument_id else None,
             user_id=str(c.user_id) if c.user_id else None,
+            account_group_id=str(c.account_group_id) if c.account_group_id else None,
             spread_type=c.spread_type,
             value=float(c.value or 0),
             is_enabled=c.is_enabled,
@@ -130,6 +136,13 @@ async def update_spreads(
             segment_id=uuid.UUID(cfg.segment_id) if cfg.segment_id else None,
             instrument_id=uuid.UUID(cfg.instrument_id) if cfg.instrument_id else None,
             user_id=uuid.UUID(cfg.user_id) if cfg.user_id else None,
+            # NULL account_group_id = wildcard (matches any account type).
+            # When set, the resolver prefers this row over wildcards at
+            # the same scope.
+            account_group_id=(
+                uuid.UUID(cfg.account_group_id)
+                if getattr(cfg, "account_group_id", None) else None
+            ),
             spread_type=cfg.spread_type,
             value=Decimal(str(cfg.value)),
             is_enabled=cfg.is_enabled,

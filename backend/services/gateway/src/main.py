@@ -32,6 +32,8 @@ from .engines.overnight_fee_engine import overnight_fee_engine
 from .engines.verification_reminder_engine import verification_reminder_engine
 from .engines.deposit_reminder_engine import deposit_reminder_engine
 from .engines.fixed_return_engine import fixed_return_engine
+from .engines.eligibility_nudge_engine import eligibility_nudge_engine
+from .engines.statement_engine import statement_engine
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)-5s [%(name)s] %(message)s")
 logger = logging.getLogger("gateway")
@@ -91,7 +93,11 @@ async def lifespan(app: FastAPI):
     await verification_reminder_engine.start()
     await deposit_reminder_engine.start()
     await fixed_return_engine.start()
+    await eligibility_nudge_engine.start()
+    await statement_engine.start()
     yield
+    await statement_engine.stop()
+    await eligibility_nudge_engine.stop()
     await fixed_return_engine.stop()
     await deposit_reminder_engine.stop()
     await verification_reminder_engine.stop()

@@ -7,12 +7,16 @@ import toast from 'react-hot-toast';
 import { ChevronDown, Loader2, Plus, Save, Search, Trash2, X } from 'lucide-react';
 
 interface Instrument { id: string; symbol: string; display_name: string; segment: string; segment_id: string | null; }
+interface AccountGroup { id: string; name: string }
 interface ChargeRow {
   _key: string;
   scope: string;
   instrument_id: string | null;
   segment_id: string | null;
   user_id: string | null;
+  /** NULL = applies to every account type. Set to filter the rule to
+      one type (Standard / ECN / VIP). */
+  account_group_id: string | null;
   charge_type: string;
   value: number;
   is_enabled: boolean;
@@ -29,6 +33,7 @@ const CHARGE_TYPES = [
 
 export default function ChargesPage() {
   const [instruments, setInstruments] = useState<Instrument[]>([]);
+  const [accountGroups, setAccountGroups] = useState<AccountGroup[]>([]);
   const [rows, setRows] = useState<ChargeRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -41,17 +46,24 @@ export default function ChargesPage() {
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const [instRes, chargeRes] = await Promise.all([
+      const [instRes, chargeRes, groupRes] = await Promise.all([
         adminApi.get<{ items: Instrument[] }>('/config/instruments'),
         adminApi.get<any[]>('/config/charges'),
+        adminApi.get<{ items: AccountGroup[] } | AccountGroup[]>('/account-types').catch(() => ({ items: [] as AccountGroup[] })),
       ]);
       setInstruments(instRes.items || []);
+      const groupsRaw: any = groupRes;
+      const groupsList: AccountGroup[] = Array.isArray(groupsRaw)
+        ? groupsRaw
+        : (groupsRaw?.items || []);
+      setAccountGroups(groupsList);
       setRows((chargeRes || []).map((c: any) => ({
         _key: newKey(),
         scope: c.scope,
         instrument_id: c.instrument_id,
         segment_id: c.segment_id,
         user_id: c.user_id,
+        account_group_id: c.account_group_id ?? null,
         charge_type: c.charge_type,
         value: c.value,
         is_enabled: c.is_enabled,
@@ -70,6 +82,7 @@ export default function ChargesPage() {
     setRows(prev => [...prev, {
       _key: newKey(),
       scope, instrument_id: null, segment_id: null, user_id: null,
+      account_group_id: null,
       charge_type: 'commission_per_lot', value: 7, is_enabled: true,
     }]);
   };
@@ -107,7 +120,8 @@ export default function ChargesPage() {
       await adminApi.put('/config/charges', {
         configs: cleaned.map(r => ({
           scope: r.scope, instrument_id: r.instrument_id, segment_id: r.segment_id,
-          user_id: r.user_id, charge_type: r.charge_type, value: r.value, is_enabled: r.is_enabled,
+          user_id: r.user_id, account_group_id: r.account_group_id,
+          charge_type: r.charge_type, value: r.value, is_enabled: r.is_enabled,
         })),
       });
       toast.success('Rule removed');
@@ -148,7 +162,8 @@ export default function ChargesPage() {
       await adminApi.put('/config/charges', {
         configs: cleaned.map(r => ({
           scope: r.scope, instrument_id: r.instrument_id, segment_id: r.segment_id,
-          user_id: r.user_id, charge_type: r.charge_type, value: r.value, is_enabled: r.is_enabled,
+          user_id: r.user_id, account_group_id: r.account_group_id,
+          charge_type: r.charge_type, value: r.value, is_enabled: r.is_enabled,
         })),
       });
       toast.success('Charges saved');
@@ -174,14 +189,14 @@ export default function ChargesPage() {
           <table className="w-full">
             <thead>
               <tr className="border-b border-border-primary bg-bg-tertiary/40">
-                {(scopeType === 'instrument' ? ['Instrument'] : scopeType === 'user' ? ['User', 'Instrument'] : []).concat(['Charge Type', 'Value', 'On', '']).map(c => (
+                {(scopeType === 'instrument' ? ['Instrument'] : scopeType === 'user' ? ['User', 'Instrument'] : []).concat(['Account type', 'Charge Type', 'Value', 'On', '']).map(c => (
                   <th key={c} className="text-left px-3 py-2 text-xxs font-medium text-text-tertiary uppercase tracking-wide">{c}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {items.length === 0 ? (
-                <tr><td colSpan={6} className="px-4 py-6 text-center text-xxs text-text-tertiary">No rules. Click Add.</td></tr>
+                <tr><td colSpan={7} className="px-4 py-6 text-center text-xxs text-text-tertiary">No rules. Click Add.</td></tr>
               ) : items.map((r) => {
                 const k = r._key;
                 return (
@@ -217,6 +232,17 @@ export default function ChargesPage() {
                         </select>
                       </td>
                     )}
+                    <td className="px-3 py-2">
+                      <select
+                        value={r.account_group_id || ''}
+                        onChange={e => updateRow(k, 'account_group_id', e.target.value || null)}
+                        className="text-xs py-1 pl-2 pr-6 appearance-none bg-bg-input border border-border-primary rounded text-text-primary w-28"
+                        title="Account types this rule applies to. 'Any' = wildcard."
+                      >
+                        <option value="">Any</option>
+                        {accountGroups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
+                      </select>
+                    </td>
                     <td className="px-3 py-2">
                       <select value={r.charge_type} onChange={e => updateRow(k, 'charge_type', e.target.value)} className="text-xs py-1 pl-2 pr-6 appearance-none bg-bg-input border border-border-primary rounded text-text-primary w-32">
                         {CHARGE_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}

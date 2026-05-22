@@ -359,3 +359,75 @@ async def delete_master(
         master_id=master_id, admin_id=admin.id,
         ip_address=request.client.host if request.client else None, db=db,
     )
+
+
+class MasterCreateIn(BaseModel):
+    user_id: str
+    master_type: str = "signal_provider"  # signal_provider | pamm | mamm
+    performance_fee_pct: float = 20
+    management_fee_pct: float = 0
+    admin_commission_pct: float = 0
+    min_investment: float = 100
+    max_investors: int = 100
+    description: str | None = None
+    spread_markup_pips: float | None = None
+    commission_per_lot_usd: float | None = None
+
+
+@router.post("/masters")
+async def create_master(
+    body: MasterCreateIn,
+    request: Request,
+    admin: User = Depends(require_permission("ib.manage")),
+    db: AsyncSession = Depends(get_db),
+):
+    """Admin-direct master creation. Picks a user, auto-creates the pool
+    trading account (CT/PM/MM prefix), and marks the master 'approved' in
+    one call — skipping the user-side 'become_provider' application flow."""
+    return await business_service.create_master(
+        user_id_str=body.user_id,
+        master_type=body.master_type,
+        performance_fee_pct=body.performance_fee_pct,
+        management_fee_pct=body.management_fee_pct,
+        admin_commission_pct=body.admin_commission_pct,
+        min_investment=body.min_investment,
+        max_investors=body.max_investors,
+        description=body.description,
+        spread_markup_pips=body.spread_markup_pips,
+        commission_per_lot_usd=body.commission_per_lot_usd,
+        admin_id=admin.id,
+        ip_address=request.client.host if request.client else None,
+        db=db,
+    )
+
+
+class MasterUpdateIn(BaseModel):
+    performance_fee_pct: float | None = None
+    management_fee_pct: float | None = None
+    admin_commission_pct: float | None = None
+    min_investment: float | None = None
+    max_investors: int | None = None
+    description: str | None = None
+    master_type: str | None = None
+    status: str | None = None
+    # Explicit null clears the override and falls through to the global
+    # SpreadConfig / ChargeConfig resolver for this master's pool fills.
+    spread_markup_pips: float | None = None
+    commission_per_lot_usd: float | None = None
+
+
+@router.put("/masters/{master_id}")
+async def update_master(
+    master_id: uuid.UUID,
+    body: MasterUpdateIn,
+    request: Request,
+    admin: User = Depends(require_permission("ib.manage")),
+    db: AsyncSession = Depends(get_db),
+):
+    """Patch master fields. Only fields explicitly present in the request
+    body are applied — exclude_unset keeps absent fields untouched."""
+    patch = body.model_dump(exclude_unset=True)
+    return await business_service.update_master(
+        master_id=master_id, patch=patch, admin_id=admin.id,
+        ip_address=request.client.host if request.client else None, db=db,
+    )

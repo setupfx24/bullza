@@ -106,6 +106,13 @@ class ChargeConfig(Base):
     segment_id = Column(UUID(as_uuid=True), ForeignKey("instrument_segments.id"))
     instrument_id = Column(UUID(as_uuid=True), ForeignKey("instruments.id"))
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"))
+    # When set, this rule applies ONLY to fills on accounts in this
+    # group (Standard / ECN / VIP). NULL = wildcard (matches any
+    # account type). resolve_commission prefers a rule with the
+    # matching account_group_id over the NULL fallback at every
+    # scope level, so admins can override per-type without
+    # duplicating per-instrument rows.
+    account_group_id = Column(UUID(as_uuid=True), ForeignKey("account_groups.id"), nullable=True)
     charge_type = Column(String(30), nullable=False)
     value = Column(Numeric(18, 8), nullable=False)
     is_enabled = Column(Boolean, default=True)
@@ -121,6 +128,10 @@ class SpreadConfig(Base):
     segment_id = Column(UUID(as_uuid=True), ForeignKey("instrument_segments.id"))
     instrument_id = Column(UUID(as_uuid=True), ForeignKey("instruments.id"))
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"))
+    # See ChargeConfig.account_group_id — same semantics. NULL =
+    # wildcard; resolve_spread_config prefers an account-group match
+    # over NULL at every scope.
+    account_group_id = Column(UUID(as_uuid=True), ForeignKey("account_groups.id"), nullable=True)
     spread_type = Column(String(20), nullable=False)
     value = Column(Numeric(18, 8), nullable=False)
     is_enabled = Column(Boolean, default=True)

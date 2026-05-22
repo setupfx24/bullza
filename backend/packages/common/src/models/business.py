@@ -100,6 +100,15 @@ class MasterAccount(Base):
     performance_fee_pct = Column(Numeric(5, 2), default=20)
     management_fee_pct = Column(Numeric(5, 2), default=0)
     admin_commission_pct = Column(Numeric(5, 2), default=0)
+    # Per-fill TRADE COSTS for this master's pool account. NULL = fall
+    # through to the global SpreadConfig / ChargeConfig resolver.
+    # spread_markup_pips ADDS to the resolved spread (additive override
+    # so admin can layer per-master on top of per-account-type rules).
+    # commission_per_lot_usd REPLACES the resolved commission with this
+    # flat USD-per-lot rate so admin can carve out PAMM/MAM economics
+    # without touching the broader per-instrument commission ladder.
+    spread_markup_pips = Column(Numeric(10, 5), nullable=True)
+    commission_per_lot_usd = Column(Numeric(10, 5), nullable=True)
     max_investors = Column(Integer, default=100)
     description = Column(Text)
     strategy_info = Column(JSONB, default=None)
