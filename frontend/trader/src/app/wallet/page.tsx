@@ -565,11 +565,16 @@ function WalletPageContent() {
         // at checkout time. The picker only surfaces coins that are
         // enabled in the NOWPayments dashboard, so the operator controls
         // which networks are offered without touching this code.
+        // Forward the promo code to the gateway so the deposit row is
+        // stamped with bonus_code + bonus_status='pending'. Admin reviews
+        // and grants on the deposits page after the IPN confirms.
+        const _bonus = depositBonusCode.trim().toUpperCase();
         const resp = await api.post<{ id: string; status: string; payment_url?: string }>(
           '/wallet/deposit',
           {
             amount: amt,
             method: CRYPTO_DEPOSIT_METHOD,
+            ...(_bonus ? { bonus_code: _bonus } : {}),
           },
         );
         if (resp.payment_url) {
@@ -1045,6 +1050,27 @@ function WalletPageContent() {
                       <div className="rounded-xl border border-accent/20 bg-accent/5 px-4 py-3">
                         <p className="text-xs text-text-secondary leading-relaxed">
                           You&apos;ll be redirected to NOWPayments. Choose the coin and network you want to pay with there (USDT on BSC / TRC-20, USDC, BNB, etc.), then send the amount from your wallet (MetaMask, Trust, Binance, etc.). Once the transaction confirms on-chain, your wallet balance is credited automatically.
+                        </p>
+                      </div>
+
+                      {/* Promo / bonus code — mirrors the field on the Manual
+                          tab. Backend already accepts `bonus_code` on
+                          /wallet/deposit (admin reviews + grants on approval),
+                          this just surfaces it to crypto-paying users too. */}
+                      <div className="space-y-1 min-w-0">
+                        <label className="text-xs text-text-secondary">
+                          Bonus / promo code <span className="text-text-tertiary text-[10px]">(optional)</span>
+                        </label>
+                        <input
+                          type="text"
+                          value={depositBonusCode}
+                          onChange={(e) => setDepositBonusCode(e.target.value.toUpperCase())}
+                          placeholder="e.g. SD100"
+                          maxLength={40}
+                          className="w-full px-4 py-3 rounded-xl border border-border-primary bg-bg-secondary text-text-primary placeholder:text-text-tertiary outline-none focus:border-accent/50 font-mono text-sm"
+                        />
+                        <p className="text-[10px] text-text-tertiary mt-1">
+                          Have a promo code? Type it here. Admin will review your request and credit the bonus separately to your main wallet once the deposit confirms.
                         </p>
                       </div>
 
