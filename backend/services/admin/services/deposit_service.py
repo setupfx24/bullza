@@ -170,11 +170,27 @@ async def approve_deposit(
     bonus_msg = ""
     applied_bonuses: list[tuple[str, Decimal]] = []
     now = datetime.utcnow()
-    # If the trader typed a promo code at deposit time (bonus_code), do
-    # NOT auto-apply standing BonusOffers — admin will grant/deny that
-    # request explicitly via /deposits/{id}/grant-bonus. Mixing auto +
-    # manual would let one deposit double-dip.
-    skip_auto_bonus = bool(deposit.bonus_code)
+    # Three gates (migration 0056 contract):
+    #   - bonus_code typed at deposit? → skip auto (admin's manual grant
+    #     handles it, no double-dip)
+    #   - user already had a prior approved deposit? → skip (first deposit only)
+    #   - user already had a withdrawal approved? → skip (bonus_forfeited_at
+    #     prevents farming via withdraw+redeposit cycles)
+    # Gate is duplicated inline here (not imported from gateway) so the
+    # admin service stays independent of the gateway service tree.
+    from packages.common.src.models import Deposit as _Deposit
+    prior_approved = (await db.execute(
+        select(func.count()).select_from(_Deposit).where(
+            _Deposit.user_id == deposit.user_id,
+            _Deposit.status.in_(["approved", "auto_approved"]),
+            _Deposit.id != deposit.id,
+        )
+    )).scalar() or 0
+    skip_auto_bonus = (
+        bool(deposit.bonus_code)
+        or prior_approved > 0
+        or user_row.bonus_forfeited_at is not None
+    )
     offers_q = await db.execute(
         select(BonusOffer).where(
             BonusOffer.is_active == True,
@@ -198,14 +214,17 @@ async def approve_deposit(
         if offer.max_bonus and bonus_amount > offer.max_bonus:
             bonus_amount = offer.max_bonus
 
-        user_row.main_wallet_balance = (user_row.main_wallet_balance or Decimal("0")) + bonus_amount
+        # Bonus → main_wallet_bonus (NOT main_wallet_balance). Withdrawals
+        # only see main_wallet_balance, so bonus is tradeable (via the
+        # transfer-to-trading sweep) but never withdrawable.
+        user_row.main_wallet_bonus = (user_row.main_wallet_bonus or Decimal("0")) + bonus_amount
         db.add(
             Transaction(
                 user_id=deposit.user_id,
                 account_id=None,
                 type="bonus",
                 amount=bonus_amount,
-                balance_after=user_row.main_wallet_balance,
+                balance_after=user_row.main_wallet_bonus,
                 description=f"Bonus: {offer.name} ({offer.percentage or 0}%)",
                 created_by=admin_id,
             )
@@ -454,6 +473,47 @@ async def approve_withdrawal(
     withdrawal.status = "approved"
     withdrawal.approved_by = admin_id
     withdrawal.approved_at = datetime.utcnow()
+
+    # ── Bonus forfeiture (migration 0056 contract) ─────────────────────
+    # First approved withdrawal for this user wipes ALL bonus credit
+    # everywhere: users.main_wallet_bonus AND every trading_accounts
+    # .credit row owned by the user. Sets users.bonus_forfeited_at so
+    # future deposits don't re-grant a welcome bonus (no farming via
+    # withdraw-then-redeposit cycles).
+    forfeit_user = await db.get(User, withdrawal.user_id)
+    if forfeit_user is not None and forfeit_user.bonus_forfeited_at is None:
+        forfeited_main = Decimal(str(forfeit_user.main_wallet_bonus or 0))
+        # Collect every live trading account's credit balance and zero it.
+        accts_q = await db.execute(
+            select(TradingAccount).where(TradingAccount.user_id == withdrawal.user_id)
+        )
+        forfeited_account_credit = Decimal("0")
+        for acc in accts_q.scalars().all():
+            credit = Decimal(str(acc.credit or 0))
+            if credit > 0:
+                forfeited_account_credit += credit
+                acc.credit = Decimal("0")
+                acc.equity = (acc.balance or Decimal("0"))
+                acc.free_margin = acc.equity - (acc.margin_used or Decimal("0"))
+
+        total_forfeit = forfeited_main + forfeited_account_credit
+        if total_forfeit > 0:
+            db.add(Transaction(
+                user_id=withdrawal.user_id,
+                account_id=None,
+                type="bonus_forfeited",
+                amount=-total_forfeit,
+                balance_after=forfeit_user.main_wallet_balance,
+                reference_id=withdrawal.id,
+                description=(
+                    "Welcome bonus forfeited on first withdrawal "
+                    f"(main wallet bonus ${float(forfeited_main):.2f} + "
+                    f"account credit ${float(forfeited_account_credit):.2f})"
+                ),
+                created_by=admin_id,
+            ))
+        forfeit_user.main_wallet_bonus = Decimal("0")
+        forfeit_user.bonus_forfeited_at = datetime.utcnow()
 
     await write_audit_log(
         db, admin_id, "approve_withdrawal", "withdrawal", withdrawal_id,

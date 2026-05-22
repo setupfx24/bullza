@@ -40,6 +40,39 @@ METHOD_MAP = {
 }
 
 
+# ─── First-deposit bonus eligibility ───────────────────────────────────────
+
+
+async def is_first_deposit_bonus_eligible(
+    db: AsyncSession, user_id: UUID, this_deposit_id: UUID | None,
+) -> bool:
+    """True when the user qualifies for the welcome bonus on `this_deposit`.
+
+    Rules (migration 0056 contract):
+      1. User has NO prior approved/auto_approved deposit other than the
+         one we are currently approving. This makes the bonus strictly a
+         FIRST-deposit perk — second / third / Nth deposits get nothing.
+      2. The user has never had a withdrawal approved before. Once admin
+         approves any withdrawal we stamp `bonus_forfeited_at` and zero
+         the existing bonus — that flag also blocks future grants so the
+         user can't farm the welcome bonus by withdrawing then redepositing.
+    """
+    from packages.common.src.models import User as _User  # local — avoid cycles
+    user = (await db.execute(select(_User).where(_User.id == user_id))).scalar_one_or_none()
+    if user is None:
+        return False
+    if user.bonus_forfeited_at is not None:
+        return False
+    q = select(func.count()).select_from(Deposit).where(
+        Deposit.user_id == user_id,
+        Deposit.status.in_(["approved", "auto_approved"]),
+    )
+    if this_deposit_id is not None:
+        q = q.where(Deposit.id != this_deposit_id)
+    prior_count = (await db.execute(q)).scalar() or 0
+    return prior_count == 0
+
+
 # ─── Email helpers (best-effort, fire-and-forget) ─────────────────────────
 
 
@@ -446,12 +479,17 @@ async def handle_oxapay_webhook(
         ))
 
         # Apply bonus offers (mirrors admin approve_deposit logic)
-        # If trader requested a custom bonus via promo code, skip auto-apply
-        # so admin's manual grant is the only credit path (no double-dip).
+        # Three gates stack here (migration 0056 contract):
+        #   - bonus_code present? → skip auto (admin's manual grant wins)
+        #   - already had a prior approved deposit? → skip (first-deposit only)
+        #   - already had a withdrawal approved? → skip (bonus_forfeited_at)
         bonus_msg = ""
         applied_bonuses: list[tuple[str, Decimal]] = []
         now = datetime.utcnow()
-        skip_auto_bonus = bool(deposit.bonus_code)
+        skip_auto_bonus = (
+            bool(deposit.bonus_code)
+            or not await is_first_deposit_bonus_eligible(db, deposit.user_id, deposit.id)
+        )
         offers_q = await db.execute(
             select(BonusOffer).where(
                 BonusOffer.is_active == True,
@@ -473,13 +511,17 @@ async def handle_oxapay_webhook(
             if offer.max_bonus and bonus_amount > offer.max_bonus:
                 bonus_amount = offer.max_bonus
 
-            user_row.main_wallet_balance = (user_row.main_wallet_balance or Decimal("0")) + bonus_amount
+            # Bonus goes to main_wallet_BONUS (not main_wallet_balance) so
+            # the withdrawal validator never sees it. The transfer-to-
+            # trading path sweeps this column to account.credit for the
+            # user to actually trade with.
+            user_row.main_wallet_bonus = (user_row.main_wallet_bonus or Decimal("0")) + bonus_amount
             db.add(Transaction(
                 user_id=deposit.user_id,
                 account_id=None,
                 type="bonus",
                 amount=bonus_amount,
-                balance_after=user_row.main_wallet_balance,
+                balance_after=user_row.main_wallet_bonus,
                 description=f"Bonus: {offer.name} ({offer.percentage or 0}%)",
             ))
             bonus_msg = f" + ${float(bonus_amount):.2f} bonus ({offer.name})"
@@ -783,13 +825,15 @@ async def handle_nowpayments_webhook(
         ))
 
         # Apply active bonus offers — mirrors the OxaPay path so promo
-        # behaviour is identical regardless of provider.
-        # If trader requested a custom bonus via promo code, skip auto-apply
-        # so admin's manual grant is the only credit path (no double-dip).
+        # behaviour is identical regardless of provider. See the OxaPay
+        # branch above for the three-gate explanation; same contract here.
         bonus_msg = ""
         applied_bonuses: list[tuple[str, Decimal]] = []
         now = datetime.utcnow()
-        skip_auto_bonus = bool(deposit.bonus_code)
+        skip_auto_bonus = (
+            bool(deposit.bonus_code)
+            or not await is_first_deposit_bonus_eligible(db, deposit.user_id, deposit.id)
+        )
         offers_q = await db.execute(
             select(BonusOffer).where(
                 BonusOffer.is_active == True,
@@ -811,13 +855,13 @@ async def handle_nowpayments_webhook(
             if offer.max_bonus and bonus_amount > offer.max_bonus:
                 bonus_amount = offer.max_bonus
 
-            user_row.main_wallet_balance = (user_row.main_wallet_balance or Decimal("0")) + bonus_amount
+            user_row.main_wallet_bonus = (user_row.main_wallet_bonus or Decimal("0")) + bonus_amount
             db.add(Transaction(
                 user_id=deposit.user_id,
                 account_id=None,
                 type="bonus",
                 amount=bonus_amount,
-                balance_after=user_row.main_wallet_balance,
+                balance_after=user_row.main_wallet_bonus,
                 description=f"Bonus: {offer.name} ({offer.percentage or 0}%)",
             ))
             bonus_msg = f" + ${float(bonus_amount):.2f} bonus ({offer.name})"
@@ -1214,6 +1258,21 @@ async def transfer_main_to_trading(req, user_id: UUID, db: AsyncSession) -> dict
 
     user_row.main_wallet_balance = main_bal - amt
     account.balance = (account.balance or Decimal("0")) + amt
+
+    # Sweep any pending main_wallet_bonus onto this account's credit so
+    # the user can actually trade with the bonus (migration 0056). Bonus
+    # contributes to equity / free margin but is NOT part of balance, so
+    # it stays out of the withdrawable amount and gets wiped on the first
+    # approved withdrawal. We move the FULL bonus (not proportional) on
+    # the first transfer that runs while it's > 0 — simpler model, and
+    # avoids stranding small bonus dust in main_wallet_bonus.
+    bonus_swept = Decimal("0")
+    pending_bonus = user_row.main_wallet_bonus or Decimal("0")
+    if pending_bonus > 0:
+        bonus_swept = pending_bonus
+        account.credit = (account.credit or Decimal("0")) + bonus_swept
+        user_row.main_wallet_bonus = Decimal("0")
+
     account.equity = account.balance + (account.credit or Decimal("0"))
     account.free_margin = account.equity - (account.margin_used or Decimal("0"))
 
@@ -1227,12 +1286,22 @@ async def transfer_main_to_trading(req, user_id: UUID, db: AsyncSession) -> dict
         amount=amt, balance_after=account.balance,
         description="Transfer from main wallet",
     ))
+    if bonus_swept > 0:
+        db.add(Transaction(
+            user_id=user_id, account_id=account.id, type="bonus",
+            amount=bonus_swept, balance_after=account.balance,
+            description=(
+                f"Bonus credit moved from main wallet "
+                f"(tradeable; not withdrawable; cleared on first withdrawal)"
+            ),
+        ))
     await db.commit()
 
     return {
         "message": "Funds moved to trading account.",
         "main_wallet_balance": float(user_row.main_wallet_balance),
         "trading_balance": float(account.balance),
+        "bonus_credit_moved": float(bonus_swept) if bonus_swept > 0 else 0,
     }
 
 
@@ -1404,9 +1473,17 @@ async def wallet_summary(user_id: UUID, account_id: UUID | None, db: AsyncSessio
     ]
     total_live_balance = sum(float(a.balance or 0) for a in live_list)
 
+    main_wallet_bonus = float(
+        getattr(user, "main_wallet_bonus", None) or 0
+    )
+    bonus_forfeited_at = getattr(user, "bonus_forfeited_at", None)
+    bonus_forfeited_iso = bonus_forfeited_at.isoformat() if bonus_forfeited_at else None
+
     if not live_list:
         return {
             "main_wallet_balance": main_wallet_balance,
+            "main_wallet_bonus": main_wallet_bonus,
+            "bonus_forfeited_at": bonus_forfeited_iso,
             "balance": 0, "credit": 0, "equity": 0, "margin_used": 0, "free_margin": 0,
             "total_deposited": total_deposited, "total_withdrawn": total_withdrawn,
             "total_live_balance": 0, "live_accounts": [],
@@ -1437,6 +1514,8 @@ async def wallet_summary(user_id: UUID, account_id: UUID | None, db: AsyncSessio
 
     return {
         "main_wallet_balance": main_wallet_balance,
+        "main_wallet_bonus": main_wallet_bonus,
+        "bonus_forfeited_at": bonus_forfeited_iso,
         "balance": primary_balance,
         "credit": float(total_credit),
         "equity": float(total_equity),

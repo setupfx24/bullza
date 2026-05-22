@@ -21,6 +21,7 @@ import {
   ArrowUpFromLine,
   TrendingUp,
   X,
+  AlertTriangle,
 } from 'lucide-react';
 
 interface AccountItem {
@@ -44,6 +45,14 @@ interface WalletData {
   balance: number;
   currency: string;
   main_wallet_balance: number;
+  /** Welcome-bonus credit. Tradeable (sweeps to account.credit on the
+   *  next main→trading transfer) but NOT withdrawable. Wiped on the
+   *  user's first approved withdrawal. */
+  main_wallet_bonus: number;
+  /** ISO timestamp when admin first approved a withdrawal — once set,
+   *  any leftover bonus has been forfeited and future deposits will
+   *  not grant a new welcome bonus. */
+  bonus_forfeited_at: string | null;
   total_deposited: number;
   total_withdrawn: number;
   pending_withdrawals: number;
@@ -55,6 +64,8 @@ interface WalletSummaryResponse {
   credit?: number;
   equity?: number;
   main_wallet_balance?: number;
+  main_wallet_bonus?: number;
+  bonus_forfeited_at?: string | null;
   total_deposited?: number;
   total_withdrawn?: number;
   total_live_balance?: number;
@@ -233,6 +244,8 @@ function WalletPageContent() {
         let currency = 'USD';
         let balance = 0;
         let mainWalletBalance = 0;
+        let mainWalletBonus = 0;
+        let bonusForfeitedAt: string | null = null;
         let totalDeposited = 0;
         let totalWithdrawn = 0;
         let totalLiveBalance: number | undefined;
@@ -242,6 +255,8 @@ function WalletPageContent() {
           const live = s.live_accounts || [];
           setLiveAccounts(live);
           mainWalletBalance = Number(s.main_wallet_balance) || 0;
+          mainWalletBonus = Number(s.main_wallet_bonus) || 0;
+          bonusForfeitedAt = s.bonus_forfeited_at ?? null;
           totalDeposited = Number(s.total_deposited) || 0;
           totalWithdrawn = Number(s.total_withdrawn) || 0;
           totalLiveBalance =
@@ -294,6 +309,8 @@ function WalletPageContent() {
           balance,
           currency,
           main_wallet_balance: mainWalletBalance,
+          main_wallet_bonus: mainWalletBonus,
+          bonus_forfeited_at: bonusForfeitedAt,
           total_deposited: totalDeposited,
           total_withdrawn: totalWithdrawn,
           pending_withdrawals: pendingWd,
@@ -309,6 +326,8 @@ function WalletPageContent() {
           balance: 0,
           currency: 'USD',
           main_wallet_balance: 0,
+          main_wallet_bonus: 0,
+          bonus_forfeited_at: null,
           total_deposited: 0,
           total_withdrawn: 0,
           pending_withdrawals: 0,
@@ -811,6 +830,28 @@ function WalletPageContent() {
                     <p className="text-sm sm:text-lg md:text-xl font-bold tabular-nums font-mono text-text-primary truncate">
                       {fmt(wallet?.main_wallet_balance ?? 0)}
                     </p>
+                    {/* Bonus credit lives next to the cash balance so the
+                        user understands at a glance which portion is
+                        withdrawable. Bonus is tradeable but cleared on
+                        the first withdrawal (migration 0056). */}
+                    {(wallet?.main_wallet_bonus ?? 0) > 0 && (
+                      <div className="mt-1.5 pt-1.5 border-t border-[#55a630]/10">
+                        <p className="text-[8px] sm:text-[9px] font-bold uppercase tracking-widest text-amber-400/70 mb-0.5">
+                          Bonus credit
+                        </p>
+                        <p className="text-xs sm:text-sm font-bold tabular-nums font-mono text-amber-400 truncate">
+                          {fmt(wallet?.main_wallet_bonus ?? 0)}
+                        </p>
+                        <p className="text-[8px] sm:text-[9px] text-text-tertiary mt-0.5 leading-tight">
+                          Tradeable, not withdrawable. Cleared on first withdrawal.
+                        </p>
+                      </div>
+                    )}
+                    {wallet?.bonus_forfeited_at && (wallet?.main_wallet_bonus ?? 0) === 0 && (
+                      <p className="mt-1.5 pt-1.5 border-t border-text-tertiary/10 text-[8px] sm:text-[9px] text-text-tertiary leading-tight">
+                        Welcome-bonus eligibility used (forfeited on first withdrawal).
+                      </p>
+                    )}
                   </div>
                   {liveAccounts.length > 0 && (
                     <button
@@ -1276,6 +1317,26 @@ function WalletPageContent() {
                     Withdrawals are sent from your <span className="text-text-primary font-medium">main wallet</span> only. Ensure the amount
                     you need is available on the main wallet before requesting a payout.
                   </p>
+
+                  {/* First-withdrawal forfeiture warning — the welcome
+                      bonus disappears on first approved withdrawal. Only
+                      shown when the user actually has pending bonus
+                      (main wallet OR any account credit) and hasn't
+                      already forfeited it. */}
+                  {!wallet?.bonus_forfeited_at &&
+                    ((wallet?.main_wallet_bonus ?? 0) > 0 ||
+                      liveAccounts.some((a) => Number(a.credit) > 0)) && (
+                      <div className="rounded-xl border border-amber-500/40 bg-amber-500/[0.07] p-3 flex gap-2.5">
+                        <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                        <div className="text-[11px] text-amber-200/90 leading-relaxed">
+                          <span className="font-bold text-amber-300">Heads-up — bonus forfeiture.</span>{' '}
+                          You currently have a welcome bonus credit. Submitting your
+                          first withdrawal clears it immediately (both main-wallet bonus
+                          and any bonus credit currently on a trading account). Trading
+                          profits already in your account balance are unaffected.
+                        </div>
+                      </div>
+                    )}
 
                   {/* Payment method sub-tabs */}
                   <div className="flex gap-1 p-1 rounded-xl bg-bg-secondary border border-border-secondary">

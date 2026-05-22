@@ -52,6 +52,16 @@ class User(Base):
     book_type = Column(String(1), default="B", server_default="B")  # 'A' (LP routed) or 'B' (internal)
     trading_blocked_until = Column(DateTime(timezone=True))
     main_wallet_balance = Column(Numeric(18, 8), nullable=False, default=0)
+    # Bonus credit auto-granted on the first approved deposit only. Lives
+    # separately from main_wallet_balance so the withdrawal calculation
+    # never sees it (bonus is tradeable, not withdrawable). On the first
+    # approved withdrawal we zero this column AND every trading_account
+    # .credit row for the user, and stamp bonus_forfeited_at so future
+    # deposits don't re-grant a bonus. Migration 0056.
+    main_wallet_bonus = Column(
+        Numeric(18, 8), nullable=False, default=0, server_default="0",
+    )
+    bonus_forfeited_at = Column(DateTime(timezone=True), nullable=True)
     # Email verification — gate sign-in until the user clicks the verify
     # link once. Migration 0038 backfills TRUE for existing users so the
     # deploy doesn't lock anyone out; register_user explicitly sets FALSE
