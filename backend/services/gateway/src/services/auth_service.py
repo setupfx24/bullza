@@ -577,11 +577,16 @@ async def issue_auth_json_response(
             pass
 
     display_token = token if st.JWT_INCLUDE_LEGACY_JSON_TOKEN else ""
+    # Mobile clients need the refresh token in the response body — they
+    # can't read the HttpOnly pt_refresh cookie. Gated behind a flag so
+    # web-only deployments keep the refresh token cookie-only (lower
+    # exposure surface).
     body = TokenResponse(
         access_token=display_token,
         user_id=str(user.id),
         role=user.role,
         expires_at=expires,
+        refresh_token=(raw_refresh if st.JWT_INCLUDE_REFRESH_IN_JSON else None),
     )
     resp = JSONResponse(content=body.model_dump(mode="json"), status_code=status_code)
     attach_auth_cookies(
@@ -992,10 +997,17 @@ async def google_oauth(
 
 # ─── Token refresh ────────────────────────────────────────────────────────
 
-async def refresh_token(request: Request, db: AsyncSession) -> JSONResponse:
+async def refresh_token(
+    request: Request,
+    db: AsyncSession,
+    body_refresh_token: str | None = None,
+) -> JSONResponse:
     await rate_limit_http(request, "auth-refresh", 60, 60.0)
     st = get_settings()
-    raw = request.cookies.get(st.REFRESH_TOKEN_COOKIE_NAME)
+    # Mobile clients pass the refresh token in the JSON body; web sends an
+    # empty body and we fall back to the HttpOnly pt_refresh cookie. The
+    # cookie path is unchanged.
+    raw = (body_refresh_token or "").strip() or request.cookies.get(st.REFRESH_TOKEN_COOKIE_NAME)
     if not raw or not raw.strip():
         raise AuthServiceError("Not authenticated", 401)
     th = hash_token(raw.strip())

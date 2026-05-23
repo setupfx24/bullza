@@ -36,6 +36,12 @@ class Settings(BaseSettings):
     JWT_REFRESH_SESSION_COOKIE: bool = True
     # Still return access_token in login/register JSON (phase out when all clients use cookies only).
     JWT_INCLUDE_LEGACY_JSON_TOKEN: bool = True
+    # Include the raw refresh token in the JSON body of /auth/login,
+    # /auth/google, /auth/wallet/verify, /auth/refresh, etc. Required
+    # for mobile clients (which cannot use HttpOnly cookies). Web does
+    # not need this — it reads pt_refresh from the cookie. Default
+    # false in production; flip to true in .env when mobile is deployed.
+    JWT_INCLUDE_REFRESH_IN_JSON: bool = False
 
     # HttpOnly auth cookies (trader web). Secure derived from request HTTPS unless overridden.
     ACCESS_TOKEN_COOKIE_NAME: str = "pt_access"

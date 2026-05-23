@@ -493,7 +493,15 @@ async def handle_oxapay_webhook(
         offers_q = await db.execute(
             select(BonusOffer).where(
                 BonusOffer.is_active == True,
-                BonusOffer.bonus_type.in_(["deposit", "welcome"]),
+                # bonus_type is a free-form label after migration 0057;
+                # we trigger auto-apply for any deposit-style category so
+                # admin can pick `welcome`, `deposit`, `percentage`, or
+                # `fixed` from the UI and the engine fires for all of
+                # them. `no_deposit` deliberately excluded — by definition
+                # that flow doesn't gate on deposit.
+                BonusOffer.bonus_type.in_(
+                    ["deposit", "welcome", "percentage", "fixed"]
+                ),
                 BonusOffer.min_deposit <= deposit.amount,
             )
         ) if not skip_auto_bonus else None
@@ -837,7 +845,15 @@ async def handle_nowpayments_webhook(
         offers_q = await db.execute(
             select(BonusOffer).where(
                 BonusOffer.is_active == True,
-                BonusOffer.bonus_type.in_(["deposit", "welcome"]),
+                # bonus_type is a free-form label after migration 0057;
+                # we trigger auto-apply for any deposit-style category so
+                # admin can pick `welcome`, `deposit`, `percentage`, or
+                # `fixed` from the UI and the engine fires for all of
+                # them. `no_deposit` deliberately excluded — by definition
+                # that flow doesn't gate on deposit.
+                BonusOffer.bonus_type.in_(
+                    ["deposit", "welcome", "percentage", "fixed"]
+                ),
                 BonusOffer.min_deposit <= deposit.amount,
             )
         ) if not skip_auto_bonus else None

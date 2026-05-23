@@ -194,7 +194,13 @@ async def approve_deposit(
     offers_q = await db.execute(
         select(BonusOffer).where(
             BonusOffer.is_active == True,
-            BonusOffer.bonus_type.in_(["deposit", "welcome"]),
+            # Matches the broader set wallet_service uses since migration
+            # 0057 dropped the legacy bonus_type CHECK constraint; admin
+            # can now pick percentage/fixed in the UI and the engine
+            # treats them as deposit-time bonuses too.
+            BonusOffer.bonus_type.in_(
+                ["deposit", "welcome", "percentage", "fixed"]
+            ),
             BonusOffer.min_deposit <= deposit.amount,
         )
     ) if not skip_auto_bonus else None

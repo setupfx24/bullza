@@ -1,4 +1,5 @@
 """Authentication API — Register, Login, 2FA, Password Change, Demo login, Password reset."""
+import json
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException, status, Request
@@ -238,8 +239,26 @@ async def wallet_verify(
 
 @router.post("/refresh")
 async def auth_refresh(request: Request, db: AsyncSession = Depends(get_db)):
+    # Mobile path: refresh_token is provided in the JSON body (mobile cannot
+    # use HttpOnly cookies). Web path: the body is empty and the service
+    # reads the token from the pt_refresh cookie — byte-identical to the
+    # pre-patch behaviour. Hand-parse the body so FastAPI's optional-body
+    # behaviour stays out of the cookie path.
+    body_refresh: str | None = None
     try:
-        return await _refresh_token(request=request, db=db)
+        raw = await request.body()
+        if raw:
+            data = json.loads(raw)
+            if isinstance(data, dict):
+                v = data.get("refresh_token")
+                if isinstance(v, str) and v.strip():
+                    body_refresh = v.strip()
+    except (ValueError, json.JSONDecodeError):
+        # Malformed body — fall through to the cookie path; the service
+        # will 401 if no usable refresh token can be found.
+        pass
+    try:
+        return await _refresh_token(request=request, body_refresh_token=body_refresh, db=db)
     except AuthServiceError as e:
         raise HTTPException(status_code=e.status_code, detail=e.detail)
 

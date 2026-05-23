@@ -44,6 +44,16 @@ class BootstrapSessionRequest(BaseModel):
     access_token: str = Field(min_length=20, max_length=4096)
 
 
+class RefreshTokenRequest(BaseModel):
+    """Optional body for POST /auth/refresh. Mobile clients send the
+    refresh token captured at login (the JSON body field is populated
+    only when JWT_INCLUDE_REFRESH_IN_JSON is true). Web omits this body
+    entirely and the endpoint falls back to the pt_refresh HttpOnly
+    cookie — that path is byte-identical to the pre-patch behaviour."""
+
+    refresh_token: Optional[str] = None
+
+
 class GoogleAuthRequest(BaseModel):
     """Sign in or sign up with Google. id_token is the JWT returned by Google Sign-In on the client."""
 
@@ -103,6 +113,9 @@ class TokenResponse(BaseModel):
     user_id: str
     role: str
     expires_at: datetime
+    # Populated only when JWT_INCLUDE_REFRESH_IN_JSON=true (mobile clients).
+    # Web reads the refresh token from the pt_refresh HttpOnly cookie.
+    refresh_token: Optional[str] = None
 
 
 class UserResponse(BaseModel):
