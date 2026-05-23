@@ -48,16 +48,29 @@ async def compute_welcome_bonus(
 ) -> tuple[Decimal, str]:
     """Compute the admin-configured welcome bonus for ONE deposit.
 
-    Reads a single simple rule from system_settings (no tier matrix):
-      welcome_bonus_enabled   bool   — master switch
-      welcome_bonus_type      str    — 'percentage' or 'fixed'
-      welcome_bonus_value     float  — % rate or fixed USD amount
-      welcome_bonus_cap_usd   float  — optional max USD; 0 = no cap
+    Reads two settings from system_settings:
+      welcome_bonus_enabled    bool   — master switch
+      welcome_bonus_brackets   list[dict] — admin's range table:
+          [
+            {"min_deposit":100,  "max_deposit":499,   "type":"percentage", "value":100, "cap_usd":100},
+            {"min_deposit":500,  "max_deposit":999,   "type":"percentage", "value":60,  "cap_usd":300},
+            {"min_deposit":1000, "max_deposit":null,  "type":"percentage", "value":100, "cap_usd":1000},
+            ...
+          ]
+
+    Matching: the first bracket where min_deposit ≤ deposit_amount AND
+    (max_deposit is null OR deposit_amount ≤ max_deposit) wins. cap_usd
+    null/0 means no cap.
 
     Returns (bonus_amount, description). bonus_amount = 0 means the
     caller should skip applying any bonus. This is the single source of
     truth used by every auto-apply call site (oxapay / nowpayments /
     admin manual approve) so behaviour stays consistent.
+
+    Backwards-compat shim: if `welcome_bonus_brackets` isn't set but the
+    legacy single-value keys (welcome_bonus_type / welcome_bonus_value /
+    welcome_bonus_cap_usd) are set, we synthesise a one-bracket list
+    covering the full range so old configs keep working.
     """
     from packages.common.src.settings_store import (
         get_bool_setting, get_float_setting, get_system_setting,
@@ -67,26 +80,85 @@ async def compute_welcome_bonus(
     if not enabled:
         return Decimal("0"), ""
 
-    btype_raw = await get_system_setting("welcome_bonus_type", "percentage")
-    btype = (str(btype_raw or "percentage")).strip().lower()
-    value = Decimal(str(await get_float_setting("welcome_bonus_value", 0.0)))
-    cap = Decimal(str(await get_float_setting("welcome_bonus_cap_usd", 0.0)))
+    raw_brackets = await get_system_setting("welcome_bonus_brackets", None)
+    brackets: list[dict] = []
+    if isinstance(raw_brackets, list):
+        brackets = raw_brackets
+    else:
+        # Legacy single-rule fallback — wraps the old keys into one bracket
+        # spanning $0..∞ so previously-configured tenants don't break on
+        # upgrade. Removed automatically once admin saves the new UI form.
+        legacy_value = float(await get_float_setting("welcome_bonus_value", 0.0))
+        if legacy_value > 0:
+            legacy_type = (str(await get_system_setting(
+                "welcome_bonus_type", "percentage"
+            ) or "percentage")).strip().lower()
+            legacy_cap = float(await get_float_setting("welcome_bonus_cap_usd", 0.0))
+            brackets = [{
+                "min_deposit": 0,
+                "max_deposit": None,
+                "type": legacy_type,
+                "value": legacy_value,
+                "cap_usd": legacy_cap,
+            }]
 
-    if value <= 0:
+    if not brackets:
         return Decimal("0"), ""
 
-    if btype == "percentage":
-        amount = (deposit_amount * value / Decimal("100")).quantize(Decimal("0.01"))
-        label = f"Welcome bonus ({value}% of deposit)"
-    else:
-        amount = value.quantize(Decimal("0.01"))
-        label = f"Welcome bonus (flat ${value})"
+    # Find the first matching bracket. We don't pre-sort — admin defines
+    # the order they want; the first match wins. Empty / malformed rows
+    # are skipped silently.
+    for row in brackets:
+        try:
+            min_d = Decimal(str(row.get("min_deposit") or 0))
+        except (TypeError, ValueError):
+            continue
+        max_raw = row.get("max_deposit")
+        try:
+            max_d = (
+                None if max_raw is None or max_raw == ""
+                else Decimal(str(max_raw))
+            )
+        except (TypeError, ValueError):
+            max_d = None
+        if deposit_amount < min_d:
+            continue
+        if max_d is not None and deposit_amount > max_d:
+            continue
 
-    if cap > 0 and amount > cap:
-        amount = cap
-        label += f" — capped at ${cap}"
+        try:
+            value = Decimal(str(row.get("value") or 0))
+        except (TypeError, ValueError):
+            continue
+        if value <= 0:
+            continue
+        btype = (str(row.get("type") or "percentage")).strip().lower()
+        try:
+            cap = Decimal(str(row.get("cap_usd") or 0))
+        except (TypeError, ValueError):
+            cap = Decimal("0")
 
-    return amount, label
+        if btype == "percentage":
+            amount = (deposit_amount * value / Decimal("100")).quantize(Decimal("0.01"))
+            range_label = (
+                f"${min_d}+" if max_d is None else f"${min_d} – ${max_d}"
+            )
+            label = f"Welcome bonus {range_label} ({value}% of deposit)"
+        else:
+            amount = value.quantize(Decimal("0.01"))
+            range_label = (
+                f"${min_d}+" if max_d is None else f"${min_d} – ${max_d}"
+            )
+            label = f"Welcome bonus {range_label} (flat ${value})"
+
+        if cap > 0 and amount > cap:
+            amount = cap
+            label += f" — capped at ${cap}"
+
+        return amount, label
+
+    # No bracket matched — deposit fell outside every configured range.
+    return Decimal("0"), ""
 
 
 async def is_first_deposit_bonus_eligible(

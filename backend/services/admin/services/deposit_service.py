@@ -192,53 +192,102 @@ async def approve_deposit(
         or user_row.bonus_forfeited_at is not None
     )
 
-    # Simple admin welcome_bonus_* setting — wins over the tier matrix
-    # when enabled. Same gates above apply (first deposit, no promo
-    # code, not forfeited).
+    # Welcome bonus brackets — admin's range table. Bracket-walk logic is
+    # inlined here (not imported from gateway) so the admin service stays
+    # decoupled from gateway internals. Kept in lockstep with
+    # wallet_service.compute_welcome_bonus by convention.
     if not skip_auto_bonus:
         from packages.common.src.settings_store import (
             get_bool_setting, get_float_setting, get_system_setting,
         )
         welcome_enabled = await get_bool_setting("welcome_bonus_enabled", False)
         if welcome_enabled:
-            btype = (str(await get_system_setting(
-                "welcome_bonus_type", "percentage"
-            ) or "percentage")).strip().lower()
-            value = Decimal(str(
-                await get_float_setting("welcome_bonus_value", 0.0)
-            ))
-            cap = Decimal(str(
-                await get_float_setting("welcome_bonus_cap_usd", 0.0)
-            ))
-            if value > 0:
+            raw_brackets = await get_system_setting("welcome_bonus_brackets", None)
+            brackets: list[dict] = (
+                raw_brackets if isinstance(raw_brackets, list) else []
+            )
+            # Legacy single-rule fallback for any tenant still on the
+            # pre-brackets config — synthesise a $0+ catch-all bracket
+            # from the old keys so they don't suddenly stop getting
+            # bonuses after deploy.
+            if not brackets:
+                legacy_value = float(
+                    await get_float_setting("welcome_bonus_value", 0.0)
+                )
+                if legacy_value > 0:
+                    brackets = [{
+                        "min_deposit": 0,
+                        "max_deposit": None,
+                        "type": (str(await get_system_setting(
+                            "welcome_bonus_type", "percentage"
+                        ) or "percentage")).strip().lower(),
+                        "value": legacy_value,
+                        "cap_usd": float(
+                            await get_float_setting("welcome_bonus_cap_usd", 0.0)
+                        ),
+                    }]
+
+            simple_amount = Decimal("0")
+            simple_label = ""
+            for row in brackets:
+                try:
+                    min_d = Decimal(str(row.get("min_deposit") or 0))
+                except (TypeError, ValueError):
+                    continue
+                max_raw = row.get("max_deposit")
+                try:
+                    max_d = (
+                        None if max_raw is None or max_raw == ""
+                        else Decimal(str(max_raw))
+                    )
+                except (TypeError, ValueError):
+                    max_d = None
+                if deposit.amount < min_d:
+                    continue
+                if max_d is not None and deposit.amount > max_d:
+                    continue
+                try:
+                    value = Decimal(str(row.get("value") or 0))
+                except (TypeError, ValueError):
+                    continue
+                if value <= 0:
+                    continue
+                btype = (str(row.get("type") or "percentage")).strip().lower()
+                try:
+                    cap = Decimal(str(row.get("cap_usd") or 0))
+                except (TypeError, ValueError):
+                    cap = Decimal("0")
                 if btype == "percentage":
                     simple_amount = (
                         deposit.amount * value / Decimal("100")
                     ).quantize(Decimal("0.01"))
-                    simple_label = f"Welcome bonus ({value}% of deposit)"
+                    range_label = f"${min_d}+" if max_d is None else f"${min_d} – ${max_d}"
+                    simple_label = f"Welcome bonus {range_label} ({value}% of deposit)"
                 else:
                     simple_amount = value.quantize(Decimal("0.01"))
-                    simple_label = f"Welcome bonus (flat ${value})"
+                    range_label = f"${min_d}+" if max_d is None else f"${min_d} – ${max_d}"
+                    simple_label = f"Welcome bonus {range_label} (flat ${value})"
                 if cap > 0 and simple_amount > cap:
                     simple_amount = cap
                     simple_label += f" — capped at ${cap}"
+                break  # first matching bracket wins
 
-                if simple_amount > 0:
-                    user_row.main_wallet_bonus = (
-                        user_row.main_wallet_bonus or Decimal("0")
-                    ) + simple_amount
-                    db.add(Transaction(
-                        user_id=deposit.user_id,
-                        account_id=None,
-                        type="bonus",
-                        amount=simple_amount,
-                        balance_after=user_row.main_wallet_bonus,
-                        description=simple_label,
-                        created_by=admin_id,
-                    ))
-                    bonus_msg = f" + ${float(simple_amount):.2f} bonus"
-                    applied_bonuses.append(("Welcome bonus", simple_amount))
-                    skip_auto_bonus = True  # block tier fallback below
+            if simple_amount > 0:
+                user_row.main_wallet_bonus = (
+                    user_row.main_wallet_bonus or Decimal("0")
+                ) + simple_amount
+                db.add(Transaction(
+                    user_id=deposit.user_id,
+                    account_id=None,
+                    type="bonus",
+                    amount=simple_amount,
+                    balance_after=user_row.main_wallet_bonus,
+                    description=simple_label,
+                    created_by=admin_id,
+                ))
+                bonus_msg = f" + ${float(simple_amount):.2f} bonus"
+                applied_bonuses.append(("Welcome bonus", simple_amount))
+                skip_auto_bonus = True  # block tier fallback below
 
     offers_q = await db.execute(
         select(BonusOffer).where(

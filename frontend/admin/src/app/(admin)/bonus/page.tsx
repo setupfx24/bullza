@@ -72,20 +72,40 @@ const EMPTY_FORM = {
   tagline: '',
 };
 
-/** Simple welcome-bonus rule state — one number, no tiers.
- *  Persisted as four system_settings keys via PUT /admin/settings. */
-interface WelcomeBonusSettings {
-  enabled: boolean;
+/** A single bracket row in the admin's welcome-bonus range table.
+ *  Strings (not numbers) so the input fields keep the typed decimals
+ *  while admin edits; converted to numbers on save. */
+interface WelcomeBracket {
+  min_deposit: string;
+  max_deposit: string;       // empty = no upper bound for this row
   type: 'percentage' | 'fixed';
-  value: string;     // string so the input keeps the user's typed decimals
-  cap_usd: string;   // 0 / empty = no cap
+  value: string;
+  cap_usd: string;           // empty / 0 = no cap
 }
 
-const EMPTY_WELCOME: WelcomeBonusSettings = {
-  enabled: false,
+const EMPTY_BRACKET: WelcomeBracket = {
+  min_deposit: '',
+  max_deposit: '',
   type: 'percentage',
   value: '',
   cap_usd: '',
+};
+
+interface WelcomeBonusSettings {
+  enabled: boolean;
+  brackets: WelcomeBracket[];
+}
+
+const DEFAULT_WELCOME_BRACKETS: WelcomeBracket[] = [
+  // Reasonable starter rows — admin can change everything before saving.
+  { min_deposit: '100', max_deposit: '499',  type: 'percentage', value: '100', cap_usd: '100' },
+  { min_deposit: '500', max_deposit: '999',  type: 'percentage', value: '60',  cap_usd: '300' },
+  { min_deposit: '1000', max_deposit: '',    type: 'percentage', value: '100', cap_usd: '1000' },
+];
+
+const EMPTY_WELCOME: WelcomeBonusSettings = {
+  enabled: false,
+  brackets: [],
 };
 
 export default function BonusPage() {
@@ -104,25 +124,50 @@ export default function BonusPage() {
   const [form, setForm] = useState({ ...EMPTY_FORM });
   const [submitting, setSubmitting] = useState(false);
 
-  /** Read the four welcome-bonus settings from /admin/settings (single GET).
-   *  Settings endpoint returns an array of {key, value}; we hydrate the
-   *  WelcomeBonusSettings state from it. Defaults match what
-   *  compute_welcome_bonus uses on the backend when keys are absent. */
+  /** Pull welcome-bonus state from /admin/settings.
+   *
+   *  Reads two keys:
+   *    welcome_bonus_enabled   bool
+   *    welcome_bonus_brackets  list[dict]  — the range table
+   *
+   *  Backward-compat: if `welcome_bonus_brackets` isn't set but the legacy
+   *  single-value keys exist, we synthesise one $0+ bracket from them so
+   *  the admin sees their old config in the new UI and can save it as
+   *  brackets next click. */
   const loadWelcome = useCallback(async () => {
     try {
       const rows = await adminApi.get<{ key: string; value: any }[]>('/settings');
       const list = Array.isArray(rows) ? rows : [];
       const get = (k: string) => list.find((r) => r.key === k)?.value;
       const enabled = Boolean(get('welcome_bonus_enabled'));
-      const type = (String(get('welcome_bonus_type') || 'percentage')) as 'percentage' | 'fixed';
-      const value = get('welcome_bonus_value');
-      const cap = get('welcome_bonus_cap_usd');
-      setWelcome({
-        enabled,
-        type: type === 'fixed' ? 'fixed' : 'percentage',
-        value: value == null || value === '' ? '' : String(value),
-        cap_usd: cap == null || cap === '' || Number(cap) === 0 ? '' : String(cap),
-      });
+      const rawBrackets = get('welcome_bonus_brackets');
+      let brackets: WelcomeBracket[] = [];
+      if (Array.isArray(rawBrackets) && rawBrackets.length > 0) {
+        brackets = rawBrackets.map((r: any): WelcomeBracket => ({
+          min_deposit: r.min_deposit == null ? '' : String(r.min_deposit),
+          max_deposit: r.max_deposit == null ? '' : String(r.max_deposit),
+          type: (String(r.type || 'percentage')) === 'fixed' ? 'fixed' : 'percentage',
+          value: r.value == null ? '' : String(r.value),
+          cap_usd:
+            r.cap_usd == null || Number(r.cap_usd) === 0 ? '' : String(r.cap_usd),
+        }));
+      } else {
+        // Legacy single-rule fallback — show it as one bracket.
+        const legacyVal = get('welcome_bonus_value');
+        if (legacyVal != null && Number(legacyVal) > 0) {
+          brackets = [{
+            min_deposit: '0',
+            max_deposit: '',
+            type: (String(get('welcome_bonus_type') || 'percentage')) === 'fixed' ? 'fixed' : 'percentage',
+            value: String(legacyVal),
+            cap_usd: (() => {
+              const c = get('welcome_bonus_cap_usd');
+              return c == null || Number(c) === 0 ? '' : String(c);
+            })(),
+          }];
+        }
+      }
+      setWelcome({ enabled, brackets });
     } catch {
       /* keep defaults silently — admin can still save and overwrite */
     }
@@ -130,26 +175,60 @@ export default function BonusPage() {
 
   useEffect(() => { void loadWelcome(); }, [loadWelcome]);
 
+  const addBracket = () =>
+    setWelcome((w) => ({ ...w, brackets: [...w.brackets, { ...EMPTY_BRACKET }] }));
+
+  const removeBracket = (idx: number) =>
+    setWelcome((w) => ({ ...w, brackets: w.brackets.filter((_, i) => i !== idx) }));
+
+  const updateBracket = (idx: number, patch: Partial<WelcomeBracket>) =>
+    setWelcome((w) => ({
+      ...w,
+      brackets: w.brackets.map((b, i) => (i === idx ? { ...b, ...patch } : b)),
+    }));
+
   const saveWelcome = async () => {
-    const numVal = parseFloat(welcome.value);
-    if (welcome.enabled && (!Number.isFinite(numVal) || numVal <= 0)) {
-      toast.error('Enter a positive bonus value');
-      return;
+    // Validate brackets only when admin has enabled the rule. Disabled
+    // state can be saved with any (or no) brackets — engine short-circuits
+    // on enabled=false.
+    if (welcome.enabled) {
+      if (welcome.brackets.length === 0) {
+        toast.error('Add at least one bracket — or disable the rule');
+        return;
+      }
+      for (let i = 0; i < welcome.brackets.length; i++) {
+        const b = welcome.brackets[i];
+        const minOk = b.min_deposit.trim() !== '' && Number.isFinite(parseFloat(b.min_deposit));
+        const valOk = b.value.trim() !== '' && parseFloat(b.value) > 0;
+        if (!minOk) { toast.error(`Bracket #${i + 1}: invalid min deposit`); return; }
+        if (!valOk) { toast.error(`Bracket #${i + 1}: enter a positive value`); return; }
+        if (b.max_deposit.trim() !== '') {
+          const mn = parseFloat(b.min_deposit);
+          const mx = parseFloat(b.max_deposit);
+          if (!Number.isFinite(mx) || mx < mn) {
+            toast.error(`Bracket #${i + 1}: max must be ≥ min`);
+            return;
+          }
+        }
+      }
     }
     setWelcomeSaving(true);
     try {
-      // 0 cap means "no cap"; we still send 0 explicitly so admin can
-      // clear a previously-set cap by emptying the field + saving.
-      const cap = welcome.cap_usd.trim() === '' ? 0 : parseFloat(welcome.cap_usd) || 0;
+      // Normalise to numbers for the API (server stores as JSON anyway).
+      const payload = welcome.brackets.map((b) => ({
+        min_deposit: parseFloat(b.min_deposit) || 0,
+        max_deposit: b.max_deposit.trim() === '' ? null : parseFloat(b.max_deposit),
+        type: b.type,
+        value: parseFloat(b.value) || 0,
+        cap_usd: b.cap_usd.trim() === '' ? 0 : parseFloat(b.cap_usd) || 0,
+      }));
       await adminApi.put('/settings', {
         settings: {
           welcome_bonus_enabled: welcome.enabled,
-          welcome_bonus_type: welcome.type,
-          welcome_bonus_value: Number.isFinite(numVal) ? numVal : 0,
-          welcome_bonus_cap_usd: cap,
+          welcome_bonus_brackets: payload,
         },
       });
-      toast.success(welcome.enabled ? 'Welcome bonus enabled' : 'Welcome bonus disabled');
+      toast.success(welcome.enabled ? 'Welcome bonus saved' : 'Welcome bonus disabled');
     } catch (e: any) {
       toast.error(e?.message || 'Could not save');
     } finally {
@@ -282,17 +361,18 @@ export default function BonusPage() {
           </div>
         </div>
 
-        {/* ── Simple welcome-bonus rule ───────────────────────────────
-            One number, no tiers. When enabled, this rule WINS over the
-            tier matrix below — every first deposit gets exactly this
-            bonus credited to main_wallet_bonus. Same first-deposit /
-            not-withdrawable / forfeit-on-first-withdraw rules apply. */}
+        {/* ── Welcome Bonus brackets ──────────────────────────────────
+            Multi-row range table. Admin defines: "deposit between X and
+            Y → give Z bonus (cap C)". First matching bracket wins. When
+            enabled, this overrides the multi-tier marketing offers
+            below. Bonus credits main_wallet_bonus (tradeable, not
+            withdrawable, cleared on first withdrawal). */}
         <div className="bg-bg-secondary border border-border-primary rounded-md p-4 space-y-3">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <h2 className="text-sm font-semibold text-text-primary">Welcome Bonus — Simple Rule</h2>
+              <h2 className="text-sm font-semibold text-text-primary">Welcome Bonus — Deposit Brackets</h2>
               <p className="text-xxs text-text-tertiary mt-0.5 leading-relaxed">
-                One global setting that applies to <span className="text-text-secondary">every user&apos;s first approved deposit</span>.
+                Set the bonus per deposit range. First row that matches the user&apos;s deposit wins.
                 When enabled, this overrides the multi-tier offers below. Bonus credits the user&apos;s
                 <span className="text-text-secondary"> main wallet bonus</span> (tradeable, not withdrawable, cleared on first withdrawal).
               </p>
@@ -310,57 +390,121 @@ export default function BonusPage() {
             </label>
           </div>
 
-          <div className={cn('grid grid-cols-1 sm:grid-cols-3 gap-3 transition-opacity', !welcome.enabled && 'opacity-50')}>
-            <div>
-              <label className="block text-xxs text-text-tertiary mb-1">Type</label>
-              <select
-                value={welcome.type}
-                disabled={!welcome.enabled}
-                onChange={(e) => setWelcome((w) => ({ ...w, type: e.target.value === 'fixed' ? 'fixed' : 'percentage' }))}
-                className="w-full text-xs py-1.5 px-2 bg-bg-input border border-border-primary rounded-md disabled:cursor-not-allowed"
-              >
-                <option value="percentage">% of deposit</option>
-                <option value="fixed">Flat $ amount</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-xxs text-text-tertiary mb-1">
-                Value {welcome.type === 'percentage' ? '(%)' : '($)'}
-              </label>
-              <input
-                type="number"
-                step="0.01"
-                min="0"
-                disabled={!welcome.enabled}
-                value={welcome.value}
-                onChange={(e) => setWelcome((w) => ({ ...w, value: e.target.value }))}
-                placeholder={welcome.type === 'percentage' ? 'e.g. 100' : 'e.g. 50'}
-                className="w-full text-xs py-1.5 px-2 bg-bg-input border border-border-primary rounded-md font-mono disabled:cursor-not-allowed"
-              />
-            </div>
-            <div>
-              <label className="block text-xxs text-text-tertiary mb-1">
-                Cap ($) <span className="text-text-tertiary">— blank = no cap</span>
-              </label>
-              <input
-                type="number"
-                step="0.01"
-                min="0"
-                disabled={!welcome.enabled}
-                value={welcome.cap_usd}
-                onChange={(e) => setWelcome((w) => ({ ...w, cap_usd: e.target.value }))}
-                placeholder="e.g. 500"
-                className="w-full text-xs py-1.5 px-2 bg-bg-input border border-border-primary rounded-md font-mono disabled:cursor-not-allowed"
-              />
-            </div>
+          <div className={cn('rounded-md border border-border-primary/60 overflow-hidden transition-opacity', !welcome.enabled && 'opacity-50')}>
+            <table className="w-full">
+              <thead>
+                <tr className="bg-bg-tertiary/40 border-b border-border-primary">
+                  {['#', 'Min Deposit ($)', 'Max Deposit ($)', 'Type', 'Value', 'Cap ($)', ''].map((h, i) => (
+                    <th
+                      key={i}
+                      className="px-2 py-1.5 text-xxs font-medium text-text-tertiary uppercase tracking-wide text-left"
+                    >
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {welcome.brackets.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="px-3 py-4 text-center text-xxs text-text-tertiary">
+                      No brackets configured.
+                      <button
+                        type="button"
+                        onClick={() => setWelcome((w) => ({ ...w, brackets: DEFAULT_WELCOME_BRACKETS.map((b) => ({ ...b })) }))}
+                        className="ml-2 text-buy underline"
+                      >
+                        Load starter brackets
+                      </button>
+                    </td>
+                  </tr>
+                ) : (
+                  welcome.brackets.map((b, idx) => (
+                    <tr key={idx} className="border-b border-border-primary/30 last:border-0">
+                      <td className="px-2 py-1 text-xxs text-text-tertiary tabular-nums">{idx + 1}</td>
+                      <td className="px-2 py-1">
+                        <input
+                          type="number" step="0.01" min="0"
+                          value={b.min_deposit}
+                          disabled={!welcome.enabled}
+                          onChange={(e) => updateBracket(idx, { min_deposit: e.target.value })}
+                          placeholder="e.g. 100"
+                          className="w-full text-xs py-1 px-1.5 bg-bg-input border border-border-primary rounded font-mono disabled:cursor-not-allowed"
+                        />
+                      </td>
+                      <td className="px-2 py-1">
+                        <input
+                          type="number" step="0.01" min="0"
+                          value={b.max_deposit}
+                          disabled={!welcome.enabled}
+                          onChange={(e) => updateBracket(idx, { max_deposit: e.target.value })}
+                          placeholder="∞ (blank)"
+                          className="w-full text-xs py-1 px-1.5 bg-bg-input border border-border-primary rounded font-mono disabled:cursor-not-allowed"
+                        />
+                      </td>
+                      <td className="px-2 py-1">
+                        <select
+                          value={b.type}
+                          disabled={!welcome.enabled}
+                          onChange={(e) => updateBracket(idx, { type: e.target.value === 'fixed' ? 'fixed' : 'percentage' })}
+                          className="w-full text-xs py-1 px-1.5 bg-bg-input border border-border-primary rounded disabled:cursor-not-allowed"
+                        >
+                          <option value="percentage">%</option>
+                          <option value="fixed">$ flat</option>
+                        </select>
+                      </td>
+                      <td className="px-2 py-1">
+                        <input
+                          type="number" step="0.01" min="0"
+                          value={b.value}
+                          disabled={!welcome.enabled}
+                          onChange={(e) => updateBracket(idx, { value: e.target.value })}
+                          placeholder={b.type === 'percentage' ? '100' : '50'}
+                          className="w-full text-xs py-1 px-1.5 bg-bg-input border border-border-primary rounded font-mono disabled:cursor-not-allowed"
+                        />
+                      </td>
+                      <td className="px-2 py-1">
+                        <input
+                          type="number" step="0.01" min="0"
+                          value={b.cap_usd}
+                          disabled={!welcome.enabled}
+                          onChange={(e) => updateBracket(idx, { cap_usd: e.target.value })}
+                          placeholder="no cap"
+                          className="w-full text-xs py-1 px-1.5 bg-bg-input border border-border-primary rounded font-mono disabled:cursor-not-allowed"
+                        />
+                      </td>
+                      <td className="px-2 py-1 text-right">
+                        <button
+                          type="button"
+                          onClick={() => removeBracket(idx)}
+                          disabled={!welcome.enabled}
+                          title="Remove this bracket"
+                          className="text-text-tertiary hover:text-danger transition-fast disabled:opacity-30 disabled:cursor-not-allowed text-xs px-2"
+                        >
+                          ✕
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
           </div>
 
-          <div className="flex items-center justify-between pt-1 border-t border-border-primary/40">
-            <p className="text-xxs text-text-tertiary">
+          <div className="flex items-center justify-between pt-1 gap-2 flex-wrap">
+            <button
+              type="button"
+              onClick={addBracket}
+              disabled={!welcome.enabled}
+              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-medium border border-border-primary text-text-secondary hover:bg-bg-hover disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <Plus size={12} /> Add Bracket
+            </button>
+            <p className="text-xxs text-text-tertiary flex-1 text-center min-w-0">
               {welcome.enabled
-                ? welcome.type === 'percentage'
-                  ? `Every first deposit will get ${welcome.value || '—'}% bonus${welcome.cap_usd ? ` (capped at $${welcome.cap_usd})` : ''}.`
-                  : `Every first deposit will get a flat $${welcome.value || '—'} bonus.`
+                ? welcome.brackets.length === 0
+                  ? 'No brackets — no bonus will fire. Add at least one row.'
+                  : `${welcome.brackets.length} bracket${welcome.brackets.length === 1 ? '' : 's'} configured. First match wins.`
                 : 'Rule is OFF — multi-tier offers below will apply instead.'}
             </p>
             <button
