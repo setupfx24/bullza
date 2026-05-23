@@ -4,7 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import {
   ArrowUpRight, BookOpen, Video, FileText, Users, Award, GraduationCap,
-  PlayCircle, Layers, ChevronDown,
+  Layers, ChevronDown,
 } from 'lucide-react';
 import { BannerPlaceholder } from '@/swisdex/components/BannerPlaceholder';
 
@@ -73,9 +73,6 @@ export default function EducationPage() {
           ))}
         </div>
         <div className="mt-8 flex flex-wrap justify-center gap-3">
-          <Link href="/academy/videos" className="inline-flex items-center gap-2 rounded-full liquid-glass px-5 py-2.5 text-sm font-semibold uppercase tracking-wider hover:bg-foreground/10">
-            <PlayCircle className="size-4 text-primary" /> Videos
-          </Link>
           <Link href="/academy/pdfs" className="inline-flex items-center gap-2 rounded-full liquid-glass px-5 py-2.5 text-sm font-semibold uppercase tracking-wider hover:bg-foreground/10">
             <FileText className="size-4 text-primary" /> PDFs
           </Link>

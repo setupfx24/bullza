@@ -23,7 +23,6 @@ const columns = {
     { name: 'Demo',     path: '/accounts/demo' },
   ],
   Academy: [
-    { name: 'Videos', path: '/academy/videos' },
     { name: 'PDFs',   path: '/academy/pdfs' },
     { name: 'Blogs',  path: '/academy/blogs' },
   ],
