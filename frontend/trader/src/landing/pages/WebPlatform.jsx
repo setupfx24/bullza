@@ -103,7 +103,7 @@ const WebPlatform = () => {
             <ScrollReveal variant="fadeRight" delay={0.2}>
               <div className="glass-card overflow-hidden">
                 <div className="aspect-video rounded-t-lg overflow-hidden">
-                  <img src="/images/logo.png" alt="SwisDex Web Platform" className="w-full h-full object-contain p-16 bg-gradient-to-br from-primary-bg to-primary-secondary" />
+                  <img src="/images/swisdex_png5.png" alt="SwisDex Web Platform" className="w-full h-full object-contain p-16 bg-gradient-to-br from-primary-bg to-primary-secondary" />
                 </div>
                 <div className="p-8">
                   <h3 className="text-2xl font-bold text-white mb-4">Access Anywhere</h3>

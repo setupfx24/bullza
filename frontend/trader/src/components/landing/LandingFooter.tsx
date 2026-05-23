@@ -8,7 +8,7 @@ export default function LandingFooter() {
       <div className="max-w-7xl mx-auto px-6 lg:px-8">
         <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-10 mb-10">
           <div className="lg:col-span-2">
-            <img src="/images/logo.png" alt="SwisDex" className="h-9 w-auto mb-4" />
+            <img src="/images/swisdex_png5.png" alt="SwisDex" className="h-9 w-auto mb-4" />
             <p className="text-gray-500 text-sm leading-relaxed mb-3 max-w-sm">
               Professional multi-asset trading platform. Licensed under Investment Dealer Licence No. MAK21098161, St. Lucia.
             </p>

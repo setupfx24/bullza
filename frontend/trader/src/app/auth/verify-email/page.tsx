@@ -61,7 +61,7 @@ function VerifyEmailContent() {
           <div className="auth-right" style={{ width: '100%' }}>
             <div style={{ width: '100%', maxWidth: 380, textAlign: 'center', padding: '40px 20px' }}>
               <img
-                src="/images/logo.png"
+                src="/images/swisdex_png5.png"
                 alt="SwisDex"
                 style={{ width: 64, height: 64, objectFit: 'contain', margin: '0 auto 24px' }}
               />

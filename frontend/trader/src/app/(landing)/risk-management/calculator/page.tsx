@@ -123,19 +123,63 @@ export default function CalculatorPage() {
             </Field>
 
             <Field label={`Risk per Trade (${riskPct}%)`}>
-              <input
-                type="range"
-                min={0.1}
-                max={5}
-                step={0.1}
-                value={riskPct}
-                onChange={(e) => setRiskPct(Number(e.target.value))}
-                className="w-full accent-primary"
-                aria-valuemin={0.1}
-                aria-valuemax={5}
-                aria-valuenow={riskPct}
-              />
-              <div className="flex justify-between text-[10px] text-foreground/45 mt-1">
+              {/* Brand-green slider with a visible thumb. We compute the
+                  fill width manually so the track shows the brand colour
+                  on every browser (Tailwind's accent-* doesn't reach the
+                  full filled portion in Webkit). */}
+              <div className="relative h-6 flex items-center">
+                <div
+                  aria-hidden
+                  className="absolute inset-x-0 h-1.5 rounded-full bg-foreground/15"
+                />
+                <div
+                  aria-hidden
+                  className="absolute h-1.5 rounded-full bg-primary"
+                  style={{ width: `${((riskPct - 0.1) / (5 - 0.1)) * 100}%` }}
+                />
+                <input
+                  type="range"
+                  min={0.1}
+                  max={5}
+                  step={0.1}
+                  value={riskPct}
+                  onChange={(e) => setRiskPct(Number(e.target.value))}
+                  aria-valuemin={0.1}
+                  aria-valuemax={5}
+                  aria-valuenow={riskPct}
+                  className="risk-slider absolute inset-0 w-full h-6 appearance-none bg-transparent cursor-pointer"
+                />
+              </div>
+              <style jsx>{`
+                .risk-slider::-webkit-slider-thumb {
+                  -webkit-appearance: none;
+                  appearance: none;
+                  width: 20px;
+                  height: 20px;
+                  border-radius: 9999px;
+                  background: #55a630;
+                  border: 2px solid #ffffff;
+                  box-shadow: 0 2px 8px rgba(85, 166, 48, 0.45);
+                  cursor: grab;
+                }
+                .risk-slider::-webkit-slider-thumb:active { cursor: grabbing; }
+                .risk-slider::-moz-range-thumb {
+                  width: 20px;
+                  height: 20px;
+                  border-radius: 9999px;
+                  background: #55a630;
+                  border: 2px solid #ffffff;
+                  box-shadow: 0 2px 8px rgba(85, 166, 48, 0.45);
+                  cursor: grab;
+                }
+                .risk-slider::-moz-range-track { background: transparent; }
+                .risk-slider:focus { outline: none; }
+                .risk-slider:focus::-webkit-slider-thumb {
+                  box-shadow: 0 0 0 4px rgba(85, 166, 48, 0.25),
+                              0 2px 8px rgba(85, 166, 48, 0.45);
+                }
+              `}</style>
+              <div className="flex justify-between text-[10px] text-foreground/45 mt-2">
                 <span>0.1%</span><span>1%</span><span>2%</span><span>5%</span>
               </div>
             </Field>

@@ -167,35 +167,25 @@ export default function BonusPage() {
 
       {/* Intro callout */}
       <section className="mx-auto max-w-[1200px] px-[var(--gutter)] py-10 sm:py-14">
-        <div className="liquid-glass-strong rounded-3xl p-6 sm:p-10 grid lg:grid-cols-[1.2fr_1fr] gap-8 items-center">
-          <div>
-            <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/25 text-primary text-[11px] uppercase tracking-[0.18em] font-semibold">
-              <Sparkles className="size-3" /> Limited-Time Welcome Offer
-            </span>
-            <h2 className="mt-5 font-display uppercase text-2xl sm:text-3xl md:text-4xl tracking-tight">
-              Deposit more. <span className="text-primary">Trade with more.</span>
-            </h2>
-            <p className="mt-4 text-foreground/70 text-sm sm:text-base leading-relaxed max-w-xl">
-              SwisDex matches your first deposit with bonus equity that lands in your account within minutes.
-              The bigger the tier you hit, the larger the matched amount — up to a full <span className="text-primary font-semibold">$1,000</span> credited on a $1,000 deposit.
-            </p>
-            <div className="mt-7 flex flex-wrap gap-3">
-              <Link href={SIGNUP_HREF} className="inline-flex items-center gap-2 rounded-full bg-primary text-white px-6 py-3 text-sm font-semibold uppercase tracking-wider hover:opacity-90">
-                Claim Bonus <ArrowUpRight className="size-4" />
-              </Link>
-              <Link href="#tiers" className="inline-flex items-center gap-2 rounded-full liquid-glass px-6 py-3 text-sm font-semibold uppercase tracking-wider hover:bg-foreground/10">
-                See Tiers
-              </Link>
-            </div>
+        <div className="liquid-glass-strong rounded-3xl p-6 sm:p-10">
+          <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/25 text-primary text-[11px] uppercase tracking-[0.18em] font-semibold">
+            <Sparkles className="size-3" /> Limited-Time Welcome Offer
+          </span>
+          <h2 className="mt-5 font-display uppercase text-2xl sm:text-3xl md:text-4xl tracking-tight">
+            Deposit more. <span className="text-primary">Trade with more.</span>
+          </h2>
+          <p className="mt-4 text-foreground/70 text-sm sm:text-base leading-relaxed max-w-xl">
+            SwisDex matches your first deposit with bonus equity that lands in your account within minutes.
+            The bigger the tier you hit, the larger the matched amount — up to a full <span className="text-primary font-semibold">$1,000</span> credited on a $1,000 deposit.
+          </p>
+          <div className="mt-7 flex flex-wrap gap-3">
+            <Link href={SIGNUP_HREF} className="inline-flex items-center gap-2 rounded-full bg-primary text-white px-6 py-3 text-sm font-semibold uppercase tracking-wider hover:opacity-90">
+              Claim Bonus <ArrowUpRight className="size-4" />
+            </Link>
+            <Link href="#tiers" className="inline-flex items-center gap-2 rounded-full liquid-glass px-6 py-3 text-sm font-semibold uppercase tracking-wider hover:bg-foreground/10">
+              See Tiers
+            </Link>
           </div>
-          {/* Bonus illustration — branded artwork dropped by the client. */}
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src="/images/bonus_details.png"
-            alt="Welcome bonus illustration"
-            className="rounded-2xl w-full min-h-[260px] max-h-[340px] object-cover"
-            style={{ border: '1px solid hsl(99 55% 42% / 0.35)' }}
-          />
         </div>
       </section>
 

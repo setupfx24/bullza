@@ -75,7 +75,7 @@ export default function Navbar() {
           {/* Logo */}
           <Link href="/" className="flex items-center flex-shrink-0 group" aria-label="SwisDex home">
             <img
-              src="/images/logo.png"
+              src="/images/swisdex_png5.png"
               alt="SwisDex"
               className="h-10 md:h-11 w-auto object-contain transition-transform duration-300 group-hover:scale-[1.03]"
             />

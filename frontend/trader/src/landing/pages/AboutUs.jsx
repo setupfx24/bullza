@@ -16,7 +16,7 @@ const ACCOUNT_TYPES = [
   {
     icon: Zap,
     name: 'ECN',
-    min: '$100',
+    min: '$200',
     tagline: 'Raw spreads for serious traders',
     popular: true,
     points: ['Raw spreads from 0.0 pips', 'Direct liquidity access', 'Ultra-low commission per lot', 'Scalping and algo trading allowed'],

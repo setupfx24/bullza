@@ -20,32 +20,42 @@ const TIERS: Tier[] = [
     name: 'Standard',
     href: '/accounts/standard',
     badge: 'Start Here',
-    deposit: '$100',
-    spread: 'From 1.5 pips',
+    deposit: '$50',
+    spread: 'From 1.2 pips',
     commission: 'None',
-    desc: 'The perfect starting point. Simple pricing, full platform access, and everything you need to learn and grow as a trader.',
-    features: ['No commission', 'Full platform access', '24/7 support', 'Demo available'],
+    desc: 'Designed for new traders. Competitive spreads, zero commission, full platform access, and 24/7 multilingual support.',
+    features: ['Competitive spreads from 1.2 pips', 'Zero commission', 'Full platform access', '24/7 multilingual support'],
   },
   {
-    name: 'Pro',
-    href: '/accounts/pro',
+    name: 'ECN',
+    href: '/accounts/standard',
     badge: 'Most Popular',
-    deposit: '$5,000',
-    spread: 'Ultra-tight',
-    commission: 'Reduced rates',
-    desc: 'For serious traders demanding the best conditions. Tightest pricing, priority queue, and dedicated account support.',
-    features: ['Tightest spreads available', 'Advanced analytics', 'Dedicated manager', 'Priority fills'],
+    deposit: '$200',
+    spread: 'From 0.0 pips',
+    commission: 'Ultra-low per lot',
+    desc: 'Raw spreads for serious traders. Direct liquidity access with the tightest pricing — scalping and algo trading welcome.',
+    features: ['Raw spreads from 0.0 pips', 'Direct liquidity access', 'Ultra-low commission per lot', 'Scalping and algo trading allowed'],
     highlight: true,
+  },
+  {
+    name: 'IB',
+    href: '/products/ib-referral',
+    badge: 'Partner',
+    deposit: '$500',
+    spread: 'Lifetime commissions',
+    commission: 'Multi-tier earnings',
+    desc: 'For partners and introducing brokers. Lifetime per-lot commissions, multi-tier earnings, and a dedicated partner manager.',
+    features: ['Lifetime per-lot commissions', 'Multi-tier earnings', 'Marketing kit and dashboard', 'Dedicated partner manager'],
   },
   {
     name: 'Demo',
     href: '/accounts/demo',
     badge: 'Risk-Free',
-    deposit: '$0',
+    deposit: '$100,000 virtual',
     spread: 'Live spreads',
     commission: 'None',
-    desc: 'Practice with $10,000 virtual funds and identical execution conditions to a live account. No commitment.',
-    features: ['$10,000 virtual balance', 'Real market spreads', 'Full platform access', 'Unlimited duration'],
+    desc: 'Practise risk-free with identical live conditions. Real market spreads, no KYC, and one-click switch to live trading.',
+    features: ['Identical execution to live', 'Real market spreads', 'No KYC required', 'Switch to live in one click'],
   },
 ];
 
@@ -74,7 +84,7 @@ export default function AccountTypesPage() {
       </section>
 
       <section className="mx-auto max-w-[1200px] px-[var(--gutter)] pb-24">
-        <div className="grid md:grid-cols-3 gap-5">
+        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
           {TIERS.map((t) => (
             <div
               key={t.name}
@@ -127,20 +137,21 @@ export default function AccountTypesPage() {
 
 const COLUMN_HEADERS = [
   { name: 'Standard', gradient: 'linear-gradient(180deg, #1f2937 0%, #0a0a0a 100%)' }, // neutral slate
-  { name: 'Pro',      gradient: 'linear-gradient(180deg, #55a630 0%, #1a3210 100%)' }, // brand green
-  { name: 'ECN',      gradient: 'linear-gradient(180deg, #d00000 0%, #3d0000 100%)' }, // brand red
+  { name: 'ECN',      gradient: 'linear-gradient(180deg, #55a630 0%, #1a3210 100%)' }, // brand green (popular)
+  { name: 'IB',       gradient: 'linear-gradient(180deg, #2c3e50 0%, #0e1418 100%)' }, // partner navy
+  { name: 'Demo',     gradient: 'linear-gradient(180deg, #d00000 0%, #3d0000 100%)' }, // brand red
 ];
 
 const INSTRUMENTS = ['Forex', 'Metal', 'Crypto', 'Energies', 'Stocks', 'Indices'];
 
 const FEATURE_ROWS: Array<{ label: string; values: React.ReactNode[] }> = [
-  { label: 'Minimum Deposit', values: ['$100', '$5,000', '$5,000'] },
-  { label: 'Spread',          values: ['From 1.5 pips', 'Ultra-tight', 'From 0.0 pips'] },
-  { label: 'Commission',      values: ['No Commission', 'No Commission', 'Up to $3.50 each side per lot'] },
-  { label: 'Maximum Leverage', values: ['1:500', '1:500', '1:500'] },
+  { label: 'Minimum Deposit', values: ['$50', '$200', '$500', '$100,000 virtual'] },
+  { label: 'Spread',          values: ['From 1.2 pips', 'From 0.0 pips', 'Pass-through', 'Live spreads'] },
+  { label: 'Commission',      values: ['No Commission', 'Ultra-low per lot', 'Lifetime per-lot earnings', 'No Commission'] },
+  { label: 'Maximum Leverage', values: ['1:500', '1:500', '1:500', '1:500'] },
   {
     label: 'Instruments',
-    values: [0, 1, 2].map((i) => (
+    values: [0, 1, 2, 3].map((i) => (
       <div key={i} className="flex flex-wrap justify-center gap-1.5 max-w-[220px] mx-auto">
         {INSTRUMENTS.map((inst) => (
           <span key={inst} className="text-[11px] px-2.5 py-0.5 rounded-full liquid-glass text-foreground/85">
@@ -150,10 +161,10 @@ const FEATURE_ROWS: Array<{ label: string; values: React.ReactNode[] }> = [
       </div>
     )),
   },
-  { label: 'Minimum lot size',          values: ['0.01', '0.01', '0.01'] },
+  { label: 'Minimum lot size',          values: ['0.01', '0.01', '0.01', '0.01'] },
   {
     label: 'Maximum lot size',
-    values: Array(3).fill(
+    values: Array(4).fill(
       <span className="block text-[13px] leading-snug">
         200 (7:00 – 20:59 GMT +0),
         <br />
@@ -161,21 +172,22 @@ const FEATURE_ROWS: Array<{ label: string; values: React.ReactNode[] }> = [
       </span>
     ),
   },
-  { label: 'Maximum Number of positions', values: ['Unlimited', 'Unlimited', 'Unlimited'] },
-  { label: 'Hedged Margin',                values: ['0%', '0%', '0%'] },
-  { label: 'Margin call',                  values: ['30%', '30%', '30%'] },
-  { label: 'Stop out',                     values: ['0% (See details about stocks)', '0% (See details about stocks)', '0% (See details about stocks)'] },
+  { label: 'Maximum Number of positions', values: ['Unlimited', 'Unlimited', 'Unlimited', 'Unlimited'] },
+  { label: 'Hedged Margin',                values: ['0%', '0%', '0%', '0%'] },
+  { label: 'Margin call',                  values: ['30%', '30%', '30%', '30%'] },
+  { label: 'Stop out',                     values: ['0% (See details about stocks)', '0% (See details about stocks)', '0% (See details about stocks)', '0% (See details about stocks)'] },
   {
     label: 'Order execution',
     values: [
       'Market',
-      <span key="pro" className="block text-[13px] leading-snug">
+      <span key="ecn" className="block text-[13px] leading-snug">
         Instant (Forex, metals, energies, stocks, indices), market (crypto)
       </span>,
       'Market',
+      'Market',
     ],
   },
-  { label: 'Swap-Free', values: ['Available', 'Available', 'Available'] },
+  { label: 'Swap-Free', values: ['Available', 'Available', 'Available', 'Available'] },
 ];
 
 function FeatureComparison() {

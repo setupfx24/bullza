@@ -11,7 +11,7 @@ export const SIGNUP_HREF = '/auth/register';
 export const BRAND = {
   name: 'SwisDex',
   tagline: 'Trade Smarter. Grow Faster. Invest with Confidence.',
-  logo: '/images/logo.png',
+  logo: '/images/swisdex_png5.png',
 };
 
 // Nav targets all resolve to public landing routes. /markets and
@@ -30,9 +30,8 @@ export const NAV_ITEMS: NavItem[] = [
   { label: 'Accounts',     href: '/account-types' },
   {
     label: 'Academy',
-    href: '/academy/videos',
+    href: '/academy/pdfs',
     children: [
-      { label: 'Videos', href: '/academy/videos' },
       { label: 'PDFs',   href: '/academy/pdfs' },
       { label: 'Blogs',  href: '/academy/blogs' },
     ],
