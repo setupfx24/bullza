@@ -43,6 +43,52 @@ METHOD_MAP = {
 # ─── First-deposit bonus eligibility ───────────────────────────────────────
 
 
+async def compute_welcome_bonus(
+    deposit_amount: Decimal,
+) -> tuple[Decimal, str]:
+    """Compute the admin-configured welcome bonus for ONE deposit.
+
+    Reads a single simple rule from system_settings (no tier matrix):
+      welcome_bonus_enabled   bool   — master switch
+      welcome_bonus_type      str    — 'percentage' or 'fixed'
+      welcome_bonus_value     float  — % rate or fixed USD amount
+      welcome_bonus_cap_usd   float  — optional max USD; 0 = no cap
+
+    Returns (bonus_amount, description). bonus_amount = 0 means the
+    caller should skip applying any bonus. This is the single source of
+    truth used by every auto-apply call site (oxapay / nowpayments /
+    admin manual approve) so behaviour stays consistent.
+    """
+    from packages.common.src.settings_store import (
+        get_bool_setting, get_float_setting, get_system_setting,
+    )
+
+    enabled = await get_bool_setting("welcome_bonus_enabled", False)
+    if not enabled:
+        return Decimal("0"), ""
+
+    btype_raw = await get_system_setting("welcome_bonus_type", "percentage")
+    btype = (str(btype_raw or "percentage")).strip().lower()
+    value = Decimal(str(await get_float_setting("welcome_bonus_value", 0.0)))
+    cap = Decimal(str(await get_float_setting("welcome_bonus_cap_usd", 0.0)))
+
+    if value <= 0:
+        return Decimal("0"), ""
+
+    if btype == "percentage":
+        amount = (deposit_amount * value / Decimal("100")).quantize(Decimal("0.01"))
+        label = f"Welcome bonus ({value}% of deposit)"
+    else:
+        amount = value.quantize(Decimal("0.01"))
+        label = f"Welcome bonus (flat ${value})"
+
+    if cap > 0 and amount > cap:
+        amount = cap
+        label += f" — capped at ${cap}"
+
+    return amount, label
+
+
 async def is_first_deposit_bonus_eligible(
     db: AsyncSession, user_id: UUID, this_deposit_id: UUID | None,
 ) -> bool:
@@ -478,11 +524,17 @@ async def handle_oxapay_webhook(
             description=f"Deposit to main wallet - oxapay (auto)",
         ))
 
-        # Apply bonus offers (mirrors admin approve_deposit logic)
-        # Three gates stack here (migration 0056 contract):
+        # ── Bonus auto-apply ───────────────────────────────────────────
+        # Same three gates stack here (migration 0056 contract):
         #   - bonus_code present? → skip auto (admin's manual grant wins)
         #   - already had a prior approved deposit? → skip (first-deposit only)
         #   - already had a withdrawal approved? → skip (bonus_forfeited_at)
+        #
+        # When the gates pass, we consult the SIMPLE admin setting
+        # (welcome_bonus_*) FIRST. If admin has enabled it, that single
+        # rule wins — no tier-matrix loop. If it's disabled, we fall
+        # through to the legacy multi-tier bonus_offers flow so existing
+        # tier configurations keep working.
         bonus_msg = ""
         applied_bonuses: list[tuple[str, Decimal]] = []
         now = datetime.utcnow()
@@ -490,6 +542,25 @@ async def handle_oxapay_webhook(
             bool(deposit.bonus_code)
             or not await is_first_deposit_bonus_eligible(db, deposit.user_id, deposit.id)
         )
+
+        if not skip_auto_bonus:
+            simple_amount, simple_label = await compute_welcome_bonus(deposit.amount)
+            if simple_amount > 0:
+                user_row.main_wallet_bonus = (
+                    user_row.main_wallet_bonus or Decimal("0")
+                ) + simple_amount
+                db.add(Transaction(
+                    user_id=deposit.user_id,
+                    account_id=None,
+                    type="bonus",
+                    amount=simple_amount,
+                    balance_after=user_row.main_wallet_bonus,
+                    description=simple_label,
+                ))
+                bonus_msg = f" + ${float(simple_amount):.2f} bonus"
+                applied_bonuses.append(("Welcome bonus", simple_amount))
+                skip_auto_bonus = True  # block the tier fallback below
+
         offers_q = await db.execute(
             select(BonusOffer).where(
                 BonusOffer.is_active == True,
@@ -835,6 +906,7 @@ async def handle_nowpayments_webhook(
         # Apply active bonus offers — mirrors the OxaPay path so promo
         # behaviour is identical regardless of provider. See the OxaPay
         # branch above for the three-gate explanation; same contract here.
+        # Simple admin welcome_bonus_* settings win over the tier matrix.
         bonus_msg = ""
         applied_bonuses: list[tuple[str, Decimal]] = []
         now = datetime.utcnow()
@@ -842,6 +914,25 @@ async def handle_nowpayments_webhook(
             bool(deposit.bonus_code)
             or not await is_first_deposit_bonus_eligible(db, deposit.user_id, deposit.id)
         )
+
+        if not skip_auto_bonus:
+            simple_amount, simple_label = await compute_welcome_bonus(deposit.amount)
+            if simple_amount > 0:
+                user_row.main_wallet_bonus = (
+                    user_row.main_wallet_bonus or Decimal("0")
+                ) + simple_amount
+                db.add(Transaction(
+                    user_id=deposit.user_id,
+                    account_id=None,
+                    type="bonus",
+                    amount=simple_amount,
+                    balance_after=user_row.main_wallet_bonus,
+                    description=simple_label,
+                ))
+                bonus_msg = f" + ${float(simple_amount):.2f} bonus"
+                applied_bonuses.append(("Welcome bonus", simple_amount))
+                skip_auto_bonus = True
+
         offers_q = await db.execute(
             select(BonusOffer).where(
                 BonusOffer.is_active == True,

@@ -191,6 +191,55 @@ async def approve_deposit(
         or prior_approved > 0
         or user_row.bonus_forfeited_at is not None
     )
+
+    # Simple admin welcome_bonus_* setting — wins over the tier matrix
+    # when enabled. Same gates above apply (first deposit, no promo
+    # code, not forfeited).
+    if not skip_auto_bonus:
+        from packages.common.src.settings_store import (
+            get_bool_setting, get_float_setting, get_system_setting,
+        )
+        welcome_enabled = await get_bool_setting("welcome_bonus_enabled", False)
+        if welcome_enabled:
+            btype = (str(await get_system_setting(
+                "welcome_bonus_type", "percentage"
+            ) or "percentage")).strip().lower()
+            value = Decimal(str(
+                await get_float_setting("welcome_bonus_value", 0.0)
+            ))
+            cap = Decimal(str(
+                await get_float_setting("welcome_bonus_cap_usd", 0.0)
+            ))
+            if value > 0:
+                if btype == "percentage":
+                    simple_amount = (
+                        deposit.amount * value / Decimal("100")
+                    ).quantize(Decimal("0.01"))
+                    simple_label = f"Welcome bonus ({value}% of deposit)"
+                else:
+                    simple_amount = value.quantize(Decimal("0.01"))
+                    simple_label = f"Welcome bonus (flat ${value})"
+                if cap > 0 and simple_amount > cap:
+                    simple_amount = cap
+                    simple_label += f" — capped at ${cap}"
+
+                if simple_amount > 0:
+                    user_row.main_wallet_bonus = (
+                        user_row.main_wallet_bonus or Decimal("0")
+                    ) + simple_amount
+                    db.add(Transaction(
+                        user_id=deposit.user_id,
+                        account_id=None,
+                        type="bonus",
+                        amount=simple_amount,
+                        balance_after=user_row.main_wallet_bonus,
+                        description=simple_label,
+                        created_by=admin_id,
+                    ))
+                    bonus_msg = f" + ${float(simple_amount):.2f} bonus"
+                    applied_bonuses.append(("Welcome bonus", simple_amount))
+                    skip_auto_bonus = True  # block tier fallback below
+
     offers_q = await db.execute(
         select(BonusOffer).where(
             BonusOffer.is_active == True,

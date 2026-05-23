@@ -72,8 +72,30 @@ const EMPTY_FORM = {
   tagline: '',
 };
 
+/** Simple welcome-bonus rule state — one number, no tiers.
+ *  Persisted as four system_settings keys via PUT /admin/settings. */
+interface WelcomeBonusSettings {
+  enabled: boolean;
+  type: 'percentage' | 'fixed';
+  value: string;     // string so the input keeps the user's typed decimals
+  cap_usd: string;   // 0 / empty = no cap
+}
+
+const EMPTY_WELCOME: WelcomeBonusSettings = {
+  enabled: false,
+  type: 'percentage',
+  value: '',
+  cap_usd: '',
+};
+
 export default function BonusPage() {
   const [tab, setTab] = useState<Tab>('offers');
+  // ── Simple welcome bonus rule (admin's quick-config) ──────────────
+  // Lives next to the tier list because conceptually it's another
+  // way to grant the same bonus. When enabled it WINS over the tier
+  // matrix on first deposits — see wallet_service.compute_welcome_bonus.
+  const [welcome, setWelcome] = useState<WelcomeBonusSettings>(EMPTY_WELCOME);
+  const [welcomeSaving, setWelcomeSaving] = useState(false);
   const [offers, setOffers] = useState<BonusOffer[]>([]);
   const [allocations, setAllocations] = useState<BonusAllocation[]>([]);
   const [loading, setLoading] = useState(true);
@@ -81,6 +103,59 @@ export default function BonusPage() {
   const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState({ ...EMPTY_FORM });
   const [submitting, setSubmitting] = useState(false);
+
+  /** Read the four welcome-bonus settings from /admin/settings (single GET).
+   *  Settings endpoint returns an array of {key, value}; we hydrate the
+   *  WelcomeBonusSettings state from it. Defaults match what
+   *  compute_welcome_bonus uses on the backend when keys are absent. */
+  const loadWelcome = useCallback(async () => {
+    try {
+      const rows = await adminApi.get<{ key: string; value: any }[]>('/settings');
+      const list = Array.isArray(rows) ? rows : [];
+      const get = (k: string) => list.find((r) => r.key === k)?.value;
+      const enabled = Boolean(get('welcome_bonus_enabled'));
+      const type = (String(get('welcome_bonus_type') || 'percentage')) as 'percentage' | 'fixed';
+      const value = get('welcome_bonus_value');
+      const cap = get('welcome_bonus_cap_usd');
+      setWelcome({
+        enabled,
+        type: type === 'fixed' ? 'fixed' : 'percentage',
+        value: value == null || value === '' ? '' : String(value),
+        cap_usd: cap == null || cap === '' || Number(cap) === 0 ? '' : String(cap),
+      });
+    } catch {
+      /* keep defaults silently — admin can still save and overwrite */
+    }
+  }, []);
+
+  useEffect(() => { void loadWelcome(); }, [loadWelcome]);
+
+  const saveWelcome = async () => {
+    const numVal = parseFloat(welcome.value);
+    if (welcome.enabled && (!Number.isFinite(numVal) || numVal <= 0)) {
+      toast.error('Enter a positive bonus value');
+      return;
+    }
+    setWelcomeSaving(true);
+    try {
+      // 0 cap means "no cap"; we still send 0 explicitly so admin can
+      // clear a previously-set cap by emptying the field + saving.
+      const cap = welcome.cap_usd.trim() === '' ? 0 : parseFloat(welcome.cap_usd) || 0;
+      await adminApi.put('/settings', {
+        settings: {
+          welcome_bonus_enabled: welcome.enabled,
+          welcome_bonus_type: welcome.type,
+          welcome_bonus_value: Number.isFinite(numVal) ? numVal : 0,
+          welcome_bonus_cap_usd: cap,
+        },
+      });
+      toast.success(welcome.enabled ? 'Welcome bonus enabled' : 'Welcome bonus disabled');
+    } catch (e: any) {
+      toast.error(e?.message || 'Could not save');
+    } finally {
+      setWelcomeSaving(false);
+    }
+  };
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -203,6 +278,97 @@ export default function BonusPage() {
             )}
             <button onClick={fetchData} className="p-1.5 rounded-md border border-border-primary text-text-secondary hover:bg-bg-hover transition-fast">
               <RefreshCw size={14} />
+            </button>
+          </div>
+        </div>
+
+        {/* ── Simple welcome-bonus rule ───────────────────────────────
+            One number, no tiers. When enabled, this rule WINS over the
+            tier matrix below — every first deposit gets exactly this
+            bonus credited to main_wallet_bonus. Same first-deposit /
+            not-withdrawable / forfeit-on-first-withdraw rules apply. */}
+        <div className="bg-bg-secondary border border-border-primary rounded-md p-4 space-y-3">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h2 className="text-sm font-semibold text-text-primary">Welcome Bonus — Simple Rule</h2>
+              <p className="text-xxs text-text-tertiary mt-0.5 leading-relaxed">
+                One global setting that applies to <span className="text-text-secondary">every user&apos;s first approved deposit</span>.
+                When enabled, this overrides the multi-tier offers below. Bonus credits the user&apos;s
+                <span className="text-text-secondary"> main wallet bonus</span> (tradeable, not withdrawable, cleared on first withdrawal).
+              </p>
+            </div>
+            <label className="flex items-center gap-2 text-xs text-text-secondary cursor-pointer shrink-0">
+              <input
+                type="checkbox"
+                checked={welcome.enabled}
+                onChange={(e) => setWelcome((w) => ({ ...w, enabled: e.target.checked }))}
+                className="w-3.5 h-3.5"
+              />
+              <span className={welcome.enabled ? 'text-success font-medium' : ''}>
+                {welcome.enabled ? 'Enabled' : 'Disabled'}
+              </span>
+            </label>
+          </div>
+
+          <div className={cn('grid grid-cols-1 sm:grid-cols-3 gap-3 transition-opacity', !welcome.enabled && 'opacity-50')}>
+            <div>
+              <label className="block text-xxs text-text-tertiary mb-1">Type</label>
+              <select
+                value={welcome.type}
+                disabled={!welcome.enabled}
+                onChange={(e) => setWelcome((w) => ({ ...w, type: e.target.value === 'fixed' ? 'fixed' : 'percentage' }))}
+                className="w-full text-xs py-1.5 px-2 bg-bg-input border border-border-primary rounded-md disabled:cursor-not-allowed"
+              >
+                <option value="percentage">% of deposit</option>
+                <option value="fixed">Flat $ amount</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-xxs text-text-tertiary mb-1">
+                Value {welcome.type === 'percentage' ? '(%)' : '($)'}
+              </label>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                disabled={!welcome.enabled}
+                value={welcome.value}
+                onChange={(e) => setWelcome((w) => ({ ...w, value: e.target.value }))}
+                placeholder={welcome.type === 'percentage' ? 'e.g. 100' : 'e.g. 50'}
+                className="w-full text-xs py-1.5 px-2 bg-bg-input border border-border-primary rounded-md font-mono disabled:cursor-not-allowed"
+              />
+            </div>
+            <div>
+              <label className="block text-xxs text-text-tertiary mb-1">
+                Cap ($) <span className="text-text-tertiary">— blank = no cap</span>
+              </label>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                disabled={!welcome.enabled}
+                value={welcome.cap_usd}
+                onChange={(e) => setWelcome((w) => ({ ...w, cap_usd: e.target.value }))}
+                placeholder="e.g. 500"
+                className="w-full text-xs py-1.5 px-2 bg-bg-input border border-border-primary rounded-md font-mono disabled:cursor-not-allowed"
+              />
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between pt-1 border-t border-border-primary/40">
+            <p className="text-xxs text-text-tertiary">
+              {welcome.enabled
+                ? welcome.type === 'percentage'
+                  ? `Every first deposit will get ${welcome.value || '—'}% bonus${welcome.cap_usd ? ` (capped at $${welcome.cap_usd})` : ''}.`
+                  : `Every first deposit will get a flat $${welcome.value || '—'} bonus.`
+                : 'Rule is OFF — multi-tier offers below will apply instead.'}
+            </p>
+            <button
+              onClick={() => void saveWelcome()}
+              disabled={welcomeSaving}
+              className="px-3 py-1.5 rounded-md text-xs font-medium bg-buy/15 text-buy border border-buy/30 hover:bg-buy/25 transition-fast disabled:opacity-50"
+            >
+              {welcomeSaving ? 'Saving…' : 'Save'}
             </button>
           </div>
         </div>
