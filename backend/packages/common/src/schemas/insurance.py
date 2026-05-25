@@ -27,8 +27,11 @@ class InsuranceTierQuote(BaseModel):
 
 
 class InsuranceActivateRequest(BaseModel):
+    # Tier is the admin-defined label string (e.g. "50%", "70%"). The
+    # legacy 4-tier regex (basic/advanced/pro/elite) was dropped during
+    # the 2026-05-25 cleanup — any non-empty label up to 32 chars is OK.
     position_id: UUID
-    tier: str = Field(..., pattern="^(basic|advanced|pro|elite)$")
+    tier: str = Field(..., min_length=1, max_length=32)
 
 
 class InsuranceActivateResponse(BaseModel):

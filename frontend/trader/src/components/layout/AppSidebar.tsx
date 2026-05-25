@@ -105,16 +105,12 @@ export default function AppSidebar() {
         )}
       >
         <div className="flex items-center justify-between px-4 pt-4 pb-3 gap-2">
-          <Link href="/dashboard" className="flex items-center gap-2 min-w-0">
+          <Link href="/dashboard" className="flex items-center min-w-0">
             <img
               src="/images/swisdex_png5.png"
               alt="SwisDex"
-              className="w-7 h-7 object-contain shrink-0"
+              className="h-9 w-auto object-contain shrink-0"
             />
-            <span className="inline-flex items-baseline font-bold italic tracking-tight text-xl select-none">
-              <span className="text-text-primary">Swis</span>
-              <span className="text-[#55a630]">Dex</span>
-            </span>
           </Link>
           <button
             type="button"

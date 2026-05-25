@@ -98,7 +98,7 @@ export default function LoginPage() {
           <div className="auth-right">
             <form className="auth-form" onSubmit={handleSubmit} noValidate>
               <div className="flex justify-center mb-2">
-                <img src="/images/swisdex_fevicon1.png" alt="SwisDex" className="w-16 h-16 object-contain" />
+                <img src="/images/feb.png" alt="SwisDex" className="w-16 h-16 object-contain" />
               </div>
               <div>
                 <h2 className="auth-form__title">SwisDex Admin</h2>
