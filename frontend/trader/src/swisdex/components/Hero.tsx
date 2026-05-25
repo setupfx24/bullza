@@ -54,7 +54,7 @@ export function Hero() {
             transition={{ delay: 0.15, duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
             className="pointer-events-auto"
           >
-            <h1 className="font-display uppercase text-[clamp(18px,5.2vw,52px)] leading-[1.05] tracking-[-0.02em] text-foreground font-bold px-2 mx-auto whitespace-nowrap">
+            <h1 className="font-display uppercase text-[clamp(21px,5.8vw,60px)] leading-[1.05] tracking-[-0.02em] text-foreground font-bold px-2 mx-auto whitespace-nowrap">
               <BubbleText text="Trade Smarter Grow Faster" as="span" />
             </h1>
           </motion.div>
@@ -63,7 +63,7 @@ export function Hero() {
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.55, duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
-            className="mt-4 font-display uppercase tracking-[0.18em] text-xs sm:text-base md:text-lg text-foreground/85 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 pointer-events-auto"
+            className="mt-4 font-display uppercase tracking-[0.18em] text-sm sm:text-lg md:text-xl text-foreground/85 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 pointer-events-auto"
           >
             <span>Decentralized Exchange</span>
             <span aria-hidden className="text-primary">:</span>
@@ -79,7 +79,7 @@ export function Hero() {
             eraseDuration={2.5}
             pauseDuration={1.5}
             startDelay={0.9}
-            className="mt-6 font-body text-xs sm:text-sm md:text-lg text-foreground/70 max-w-2xl leading-relaxed min-h-[3em]"
+            className="mt-6 font-body text-sm sm:text-base md:text-xl text-foreground/70 max-w-2xl leading-relaxed min-h-[3em]"
           />
 
           {/* Secondary CTA — primary "Details" button removed per client

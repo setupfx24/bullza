@@ -76,8 +76,8 @@ const Contact = () => {
     {
       icon: WhatsAppIcon,
       title: 'WhatsApp',
-      content: '+44 7737119979',
-      link: 'https://wa.me/447737119979'
+      content: '+44 7737119978',
+      link: 'https://wa.me/447737119978'
     },
     {
       icon: MapPin,
@@ -199,7 +199,7 @@ const Contact = () => {
                   </p>
                   <div className="space-y-2">
                     <p className="text-text-secondary">
-                      <span className="text-white font-semibold">WhatsApp:</span> +44 7737119979
+                      <span className="text-white font-semibold">WhatsApp:</span> +44 7737119978
                     </p>
                     <p className="text-text-secondary">
                       <span className="text-white font-semibold">Email:</span> info@swisdex.com
