@@ -1653,9 +1653,9 @@ async def wallet_summary(user_id: UUID, account_id: UUID | None, db: AsyncSessio
     total_live_balance = sum(float(a.balance or 0) for a in live_list)
 
     main_wallet_bonus = float(
-        getattr(user, "main_wallet_bonus", None) or 0
+        getattr(user_row, "main_wallet_bonus", None) or 0
     )
-    bonus_forfeited_at = getattr(user, "bonus_forfeited_at", None)
+    bonus_forfeited_at = getattr(user_row, "bonus_forfeited_at", None)
     bonus_forfeited_iso = bonus_forfeited_at.isoformat() if bonus_forfeited_at else None
 
     if not live_list:
