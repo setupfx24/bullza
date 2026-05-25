@@ -84,12 +84,15 @@ _DEFAULTS = InsuranceConfig(
     daily_claim_limit=2,
     daily_payout_limit=2000,
     cooldown_hours=12,
+    # Surcharges default to 0 — client spec is pure linear per-lot pricing
+    # ($1 per 0.01 lot at 50%, $3 per 0.01 lot at 70%). Admin can re-enable
+    # any of these surcharges from /insurance if risk-based pricing is wanted.
     high_lev_threshold=200,
-    high_lev_surcharge=0.20,
-    no_sl_surcharge=0.15,
+    high_lev_surcharge=0.0,
+    no_sl_surcharge=0.0,
     winrate_threshold=0.65,
-    winrate_surcharge=0.15,
-    copy_trade_surcharge=0.10,
+    winrate_surcharge=0.0,
+    copy_trade_surcharge=0.0,
     atr_floor=0.0001,
     atr_ceiling=None,
     frequent_claim_count=4,
