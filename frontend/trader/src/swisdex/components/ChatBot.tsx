@@ -131,7 +131,7 @@ const RULES: { keys: string[]; reply: string; cta?: { label: string; href: strin
   {
     keys: ['fees', 'spread', 'commission', 'charges'],
     reply:
-      'Standard accounts: zero commission, spreads from 1.2 pips. ECN: raw spreads from 0.0 pips + low per-lot commission. All deposits are 100% fee-free. Withdrawal fees are network/processor pass-through only.',
+      'Standard accounts: zero commission, spreads from 1.1 pips. ECN: raw spreads from 0.0 pips + low per-lot commission. All deposits are 100% fee-free. Withdrawal fees are network/processor pass-through only.',
   },
   {
     keys: ['kyc', 'verification', 'verify', 'document'],

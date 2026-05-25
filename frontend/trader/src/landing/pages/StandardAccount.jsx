@@ -18,7 +18,7 @@ const StandardAccount = () => {
 
   const comparison = [
     { feature: 'Minimum Deposit', standard: '$100', pro: '$5,000', demo: '$0' },
-    { feature: 'Spreads From', standard: '1.2 pips', pro: '0.0 pips', demo: 'Live spreads' },
+    { feature: 'Spreads From', standard: '1.1 pips', pro: '0.0 pips', demo: 'Live spreads' },
     { feature: 'Leverage', standard: 'Up to 1:500', pro: 'Up to 1:200', demo: 'Up to 1:500' },
     { feature: 'Commission', standard: 'None', pro: '$3.5/lot', demo: 'None' },
     { feature: 'Platforms', standard: 'Web, Copy Trading', pro: 'Web, Copy Trading', demo: 'Web, Copy Trading' },
@@ -56,7 +56,7 @@ const StandardAccount = () => {
             <ScrollRevealItem>
               <Card className="text-center">
                 <div className="text-sm text-text-secondary mb-2">Spreads From</div>
-                <div className="text-3xl font-bold gradient-text">1.2 pips</div>
+                <div className="text-3xl font-bold gradient-text">1.1 pips</div>
               </Card>
             </ScrollRevealItem>
             <ScrollRevealItem>
