@@ -385,6 +385,193 @@ export default function InsuranceAdminPage() {
         </div>
       </div>
 
+      {/* ── SIMPLE MODE — primary control surface ──────────────────────
+          Client uses simple mode: two tiers (50% / 70%), per-lot fee
+          and per-lot max cap that scale linearly with lots. Editing
+          here writes to system_settings.insurance_simple_tiers; engine
+          picks it up on the next quote with no restart. */}
+      {(() => {
+        const rawSimple = values['insurance_simple_tiers'];
+        const simpleTiers: Array<{
+          label: string;
+          coverage_pct: number;
+          fee_per_lot: number;
+          max_cap_per_lot: number;
+        }> = Array.isArray(rawSimple)
+          ? rawSimple.map((r: any) => ({
+              label: String(r?.label ?? ''),
+              coverage_pct: Number(r?.coverage_pct ?? 0) || 0,
+              fee_per_lot: Number(r?.fee_per_lot ?? 0) || 0,
+              max_cap_per_lot: Number(r?.max_cap_per_lot ?? 0) || 0,
+            }))
+          : [];
+        const updateSimpleTier = (idx: number, patch: any) => {
+          const next = simpleTiers.map((t, i) => (i === idx ? { ...t, ...patch } : t));
+          setVal('insurance_simple_tiers', next as any);
+        };
+        const addSimpleTier = () => {
+          setVal('insurance_simple_tiers', [
+            ...simpleTiers,
+            { label: '', coverage_pct: 50, fee_per_lot: 100, max_cap_per_lot: 500 },
+          ] as any);
+        };
+        const removeSimpleTier = (idx: number) => {
+          setVal(
+            'insurance_simple_tiers',
+            simpleTiers.filter((_, i) => i !== idx) as any,
+          );
+        };
+        const loadDefaults = () => {
+          setVal('insurance_simple_tiers', [
+            { label: '50%', coverage_pct: 50, fee_per_lot: 100, max_cap_per_lot: 500 },
+            { label: '70%', coverage_pct: 70, fee_per_lot: 300, max_cap_per_lot: 1000 },
+          ] as any);
+        };
+        const previewLots = [0.01, 0.02, 0.05, 0.1];
+
+        return (
+          <div className="bg-bg-secondary border border-buy/40 rounded-md p-4 space-y-3">
+            <div>
+              <h2 className="text-sm font-semibold text-text-primary flex items-center gap-2">
+                <ShieldCheck size={14} className="text-buy" /> Simple Mode — Tier Editor
+              </h2>
+              <p className="text-xxs text-text-tertiary mt-0.5 leading-relaxed max-w-3xl">
+                Two tiers (e.g. 50% / 70%) with per-lot pricing that scales linearly. Fee at 0.01 lot = fee_per_lot ÷ 100.
+                When this list is non-empty it <span className="text-buy font-medium">overrides</span> the legacy 4-tier ladder and the lot-brackets table below.
+                Clear the list to fall back to advanced mode.
+              </p>
+            </div>
+
+            <div className="rounded-md border border-border-primary/60 overflow-hidden">
+              <table className="w-full">
+                <thead>
+                  <tr className="bg-bg-tertiary/40 border-b border-border-primary">
+                    {['#', 'Label', 'Coverage %', 'Fee per lot ($)', 'Max cap per lot ($)', ''].map((h, i) => (
+                      <th key={i} className="px-2 py-1.5 text-xxs font-medium text-text-tertiary uppercase tracking-wide text-left">
+                        {h}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {simpleTiers.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="px-3 py-4 text-center text-xxs text-text-tertiary">
+                        No simple tiers configured.
+                        <button
+                          type="button"
+                          onClick={loadDefaults}
+                          className="ml-2 text-buy underline"
+                        >
+                          Load 50% / 70% defaults
+                        </button>
+                      </td>
+                    </tr>
+                  ) : (
+                    simpleTiers.map((t, idx) => (
+                      <tr key={idx} className="border-b border-border-primary/30 last:border-0">
+                        <td className="px-2 py-1 text-xxs text-text-tertiary tabular-nums">{idx + 1}</td>
+                        <td className="px-2 py-1">
+                          <input
+                            value={t.label}
+                            onChange={(e) => updateSimpleTier(idx, { label: e.target.value })}
+                            placeholder="50%"
+                            className="w-full text-xs py-1 px-1.5 bg-bg-input border border-border-primary rounded"
+                          />
+                        </td>
+                        <td className="px-2 py-1">
+                          <input
+                            type="number" step="0.1" min="0" max="100"
+                            value={t.coverage_pct}
+                            onChange={(e) => updateSimpleTier(idx, { coverage_pct: parseFloat(e.target.value) || 0 })}
+                            placeholder="50"
+                            className="w-full text-xs py-1 px-1.5 bg-bg-input border border-border-primary rounded font-mono"
+                          />
+                        </td>
+                        <td className="px-2 py-1">
+                          <input
+                            type="number" step="0.01" min="0"
+                            value={t.fee_per_lot}
+                            onChange={(e) => updateSimpleTier(idx, { fee_per_lot: parseFloat(e.target.value) || 0 })}
+                            placeholder="100"
+                            className="w-full text-xs py-1 px-1.5 bg-bg-input border border-border-primary rounded font-mono"
+                          />
+                        </td>
+                        <td className="px-2 py-1">
+                          <input
+                            type="number" step="0.01" min="0"
+                            value={t.max_cap_per_lot}
+                            onChange={(e) => updateSimpleTier(idx, { max_cap_per_lot: parseFloat(e.target.value) || 0 })}
+                            placeholder="500"
+                            className="w-full text-xs py-1 px-1.5 bg-bg-input border border-border-primary rounded font-mono"
+                          />
+                        </td>
+                        <td className="px-2 py-1 text-right">
+                          <button
+                            type="button"
+                            onClick={() => removeSimpleTier(idx)}
+                            title="Remove tier"
+                            className="text-text-tertiary hover:text-danger text-xs px-2"
+                          >
+                            ✕
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {simpleTiers.length > 0 && (
+              <div className="rounded-md bg-bg-tertiary/40 border border-border-primary/40 p-3">
+                <p className="text-xxs font-semibold text-text-secondary uppercase tracking-wide mb-1.5">
+                  Live preview — what the trader will see
+                </p>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xxs">
+                    <thead>
+                      <tr className="text-text-tertiary border-b border-border-primary/30">
+                        <th className="text-left py-1 pr-3">Lots</th>
+                        {simpleTiers.map((t, i) => (
+                          <th key={i} className="text-left py-1 pr-3">{t.label || `Tier ${i + 1}`}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {previewLots.map((lots) => (
+                        <tr key={lots} className="border-b border-border-primary/20 last:border-0">
+                          <td className="py-1 pr-3 font-mono">{lots}</td>
+                          {simpleTiers.map((t, i) => (
+                            <td key={i} className="py-1 pr-3 font-mono">
+                              fee <span className="text-buy font-semibold">${(lots * t.fee_per_lot).toFixed(2)}</span>{' '}
+                              · max <span className="text-text-secondary">${(lots * t.max_cap_per_lot).toFixed(2)}</span>
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            <div className="flex items-center justify-between pt-1">
+              <button
+                type="button"
+                onClick={addSimpleTier}
+                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-medium border border-border-primary text-text-secondary hover:bg-bg-hover"
+              >
+                + Add tier
+              </button>
+              <p className="text-xxs text-text-tertiary">
+                Save the page (top-right button) to apply.
+              </p>
+            </div>
+          </div>
+        );
+      })()}
+
       {/* Stats row */}
       {stats && (
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">

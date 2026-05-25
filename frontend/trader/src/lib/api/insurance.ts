@@ -4,7 +4,11 @@
  */
 import api from './client';
 
-export type InsuranceTier = 'basic' | 'advanced' | 'pro' | 'elite';
+// Backend returns the admin-defined tier label verbatim. Legacy mode
+// returns one of basic/advanced/pro/elite; simple mode returns whatever
+// admin typed (e.g. "50%", "70%"). UI must render it as-is — never key
+// off a fixed enum.
+export type InsuranceTier = string;
 
 export interface TierQuote {
   tier: InsuranceTier;

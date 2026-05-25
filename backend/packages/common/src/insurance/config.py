@@ -91,6 +91,18 @@ class InsuranceConfig:
     #   ]
     # First-match wins. Empty = legacy tier system stays in effect.
     lot_brackets: list[dict]
+    # Simple two-tier mode — overrides EVERYTHING above (brackets +
+    # legacy 4-tier) when non-empty. Each tier defines its own fee and
+    # cap PER LOT; the engine scales LINEARLY with the user's lot size:
+    #   fee     = lots × fee_per_lot
+    #   max_cap = lots × max_cap_per_lot
+    # Client spec example:
+    #   0.01 lot @ 50% = $1 fee / $5 cap   (fee_per_lot=100, max_cap_per_lot=500)
+    #   0.01 lot @ 70% = $3 fee / $10 cap  (fee_per_lot=300, max_cap_per_lot=1000)
+    #   0.02 lot @ 50% = $2 fee / $10 cap  (doubles automatically)
+    # Non-empty list = simple mode active. Empty = fall through to
+    # lot_brackets, then to legacy 4-tier ladder.
+    simple_tiers: list[dict]
     # When True, the claim payout is credited to the account's `credit`
     # column (tradable equity, NOT withdrawable). When False, classic
     # `balance` credit (withdrawable). Default True per client request.
@@ -144,6 +156,12 @@ _DEFAULTS = InsuranceConfig(
     max_lots_insurable=0.05,
     lot_brackets=[],
     payout_to_credit=True,
+    # Client's spec exactly — 50% @ $100/lot ($1 per 0.01 lot, $5 cap per 0.01)
+    # and 70% @ $300/lot ($3 per 0.01 lot, $10 cap per 0.01).
+    simple_tiers=[
+        {"label": "50%", "coverage_pct": 50, "fee_per_lot": 100, "max_cap_per_lot": 500},
+        {"label": "70%", "coverage_pct": 70, "fee_per_lot": 300, "max_cap_per_lot": 1000},
+    ],
 )
 
 
@@ -224,5 +242,8 @@ async def load_config() -> InsuranceConfig:
         ),
         payout_to_credit=bool(
             await _get("insurance_payout_to_credit", _DEFAULTS.payout_to_credit)
+        ),
+        simple_tiers=list(
+            await _get("insurance_simple_tiers", _DEFAULTS.simple_tiers)
         ),
     )

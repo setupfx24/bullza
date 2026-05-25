@@ -50,6 +50,7 @@ INSURANCE_KEYS = (
     "insurance_max_lots_insurable",
     "insurance_lot_brackets",
     "insurance_payout_to_credit",
+    "insurance_simple_tiers",
 )
 
 

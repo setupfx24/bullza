@@ -152,7 +152,43 @@ async def quote_all_tiers(
                 except (TypeError, ValueError):
                     continue
 
-    # ── Lot-size bracket pricing (client spec) ───────────────────────
+    # ── SIMPLE-MODE pricing (highest precedence, client's preferred shape) ──
+    # 2 tiers (50% / 70% by default). fee + max_cap scale LINEARLY with
+    # lots, so 0.01 lot at fee_per_lot=$100 → $1, 0.02 lot → $2, etc.
+    # Returns IMMEDIATELY — bypasses lot_brackets and legacy 4-tier ladder.
+    # Surcharges still multiply on fee so risk-based pricing isn't lost.
+    if cfg.simple_tiers:
+        quotes: list[TierQuote] = []
+        for tier_row in cfg.simple_tiers:
+            try:
+                label = str(tier_row.get("label") or "").strip() or "tier"
+                fee_per_lot = float(tier_row.get("fee_per_lot") or 0)
+                max_cap_per_lot = float(tier_row.get("max_cap_per_lot") or 0)
+                cov_raw = float(tier_row.get("coverage_pct") or 0)
+            except (TypeError, ValueError):
+                continue
+            final_fee = lots * fee_per_lot * (1 + surcharge)
+            max_cap = lots * max_cap_per_lot
+            coverage = cov_raw * coverage_multiplier
+            est_refund = _estimated_refund(
+                coverage_pct=coverage,
+                sl_distance=sl_distance,
+                position_value_usd=trade_size_usd,
+            )
+            # Keep the label exactly as admin set it (e.g. "50%", "70%")
+            # so the trader UI doesn't need to know about percentages —
+            # it just renders whatever string comes back.
+            quotes.append({
+                "tier": label,
+                "fee": round(final_fee, 2),
+                "coverage_pct": round(coverage, 2),
+                "max_cap": round(max_cap, 2),
+                "estimated_refund": round(est_refund, 2),
+                "risk_score": round(rs, 4),
+            })
+        return quotes
+
+    # ── Lot-size bracket pricing (advanced — multi-range admin tables) ──
     # When admin has configured lot_brackets, the matching bracket's
     # tier list REPLACES the legacy 4-tier ladder. Each bracket-tier
     # has its own (fee, coverage_pct, max_cap) — no risk-score math,

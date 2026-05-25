@@ -15,12 +15,17 @@ interface Props {
   onSelect: (selection: { tier: InsuranceTier; fee: number } | null) => void;
 }
 
-const TIER_LABELS: Record<InsuranceTier, string> = {
-  basic: 'Basic',
-  advanced: 'Advanced',
-  pro: 'Pro',
-  elite: 'Elite',
-};
+/** Render a tier label sent by the backend. Legacy mode sends
+ *  'basic'/'advanced'/'pro'/'elite' which we capitalise; simple mode
+ *  sends '50%'/'70%' verbatim. We just respect whatever admin set. */
+function formatTierLabel(raw: string): string {
+  const s = (raw || '').trim();
+  if (!s) return 'Tier';
+  // % already? show as-is.
+  if (s.includes('%')) return s;
+  // Capitalise legacy names so 'basic' → 'Basic'.
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
 
 export default function InsuranceTierPicker(props: Props) {
   const { accountId, symbol, side, lots, leverage, stopLoss, takeProfit, onSelect } = props;
@@ -139,7 +144,7 @@ export default function InsuranceTierPicker(props: Props) {
                       boxShadow: active ? '0 0 0 2px rgba(85,166,48,0.2)' : 'none',
                     }}
                   >
-                    <p className="text-[10px] uppercase tracking-wider text-text-tertiary">{TIER_LABELS[q.tier]}</p>
+                    <p className="text-[10px] uppercase tracking-wider text-text-tertiary">{formatTierLabel(q.tier)}</p>
                     <p className="mt-1 text-sm font-bold tabular-nums" style={{ color: 'var(--text-primary)' }}>
                       ${q.fee.toFixed(2)}
                     </p>
