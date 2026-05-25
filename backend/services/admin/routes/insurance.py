@@ -20,37 +20,36 @@ router = APIRouter(prefix="/insurance", tags=["Admin · Trade Insurance"])
 
 INSURANCE_KEYS = (
     "insurance_enabled",
-    "insurance_pricing_mode",
-    "insurance_per_lot_fee",
-    "insurance_per_lot_fee_by_account_group",
-    "insurance_base_constant",
-    "insurance_tier_multipliers",
-    "insurance_coverage_pct",
-    "insurance_fee_cap",
-    "insurance_fee_cap_high_volume",
-    "insurance_high_volume_lots",
-    "insurance_max_cap_rules",
+    # ── Pricing — the only model after 2026-05-25 cleanup ─────────
+    "insurance_simple_tiers",
+    # ── Anti-abuse / duration ─────────────────────────────────────
     "insurance_min_trade_duration_seconds",
     "insurance_anti_abuse_daily_claims",
     "insurance_anti_abuse_daily_payout",
     "insurance_anti_abuse_cooldown_hours",
+    # ── Risk-based surcharges (still multiply on tier fee) ────────
     "insurance_dynamic_high_lev_threshold",
     "insurance_dynamic_high_lev_surcharge",
     "insurance_dynamic_no_sl_surcharge",
     "insurance_dynamic_winrate_threshold",
     "insurance_dynamic_winrate_surcharge",
+    "insurance_copy_trade_surcharge",
+    # ── Volatility kill switches ──────────────────────────────────
     "insurance_disable_atr_floor",
+    "insurance_disable_atr_ceiling",
+    # ── Frequent-claim coverage reduction ─────────────────────────
+    "insurance_frequent_claim_count",
+    "insurance_frequent_claim_window_days",
+    "insurance_frequent_claim_coverage_reduction_pct",
+    # ── News blackout (manual emergency pause) ────────────────────
     "insurance_news_blackout_until",
-    # ── Client-spec rules (2026-05-23) ────────────────────────────────
-    # See packages/common/src/insurance/config.py for the engine side.
+    # ── Client-spec rules ─────────────────────────────────────────
     "insurance_policy_validity_seconds",
     "insurance_max_policies_per_day",
     "insurance_blackout_hour_start",
     "insurance_blackout_hour_end",
     "insurance_max_lots_insurable",
-    "insurance_lot_brackets",
     "insurance_payout_to_credit",
-    "insurance_simple_tiers",
 )
 
 
@@ -86,18 +85,6 @@ async def update_settings(
     for key, value in body.updates.items():
         if key not in INSURANCE_KEYS:
             continue
-        # Validate the pricing_mode early so a typo doesn't silently brick
-        # quotes (the config loader falls back to default on an unknown
-        # value, but we'd rather reject the write up front).
-        if key == "insurance_pricing_mode":
-            v = str(value or "").strip().lower()
-            if v not in ("per_lot", "risk_score"):
-                from fastapi import HTTPException
-                raise HTTPException(
-                    status_code=400,
-                    detail="insurance_pricing_mode must be 'per_lot' or 'risk_score'",
-                )
-            value = v
         existing = (await db.execute(
             select(SystemSetting).where(SystemSetting.key == key)
         )).scalar_one_or_none()
