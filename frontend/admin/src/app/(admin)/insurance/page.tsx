@@ -311,6 +311,25 @@ export default function InsuranceAdminPage() {
       const v = values[k];
       if (typeof v === 'boolean') updates[k] = v;
     }
+
+    // Simple-mode tiers — structured form (not JSON textarea), so we
+    // pass the array directly. Empty array means admin intentionally
+    // cleared it; we still send it so the backend overwrites the
+    // existing rows with [].
+    if (Array.isArray(values.insurance_simple_tiers)) {
+      const cleaned = (values.insurance_simple_tiers as Array<Record<string, unknown>>)
+        .map((row) => ({
+          label: String(row.label ?? '').trim(),
+          coverage_pct: Number(row.coverage_pct) || 0,
+          fee_per_lot: Number(row.fee_per_lot) || 0,
+          max_cap_per_lot: Number(row.max_cap_per_lot) || 0,
+        }))
+        // Drop completely-empty rows so admin doesn't accidentally
+        // ship a placeholder bracket.
+        .filter((r) => r.label !== '' || r.coverage_pct > 0 || r.fee_per_lot > 0 || r.max_cap_per_lot > 0);
+      updates.insurance_simple_tiers = cleaned;
+    }
+
     for (const k of JSON_KEYS) {
       const raw = (jsonText[k] || '').trim();
       if (raw === '') {
@@ -631,6 +650,226 @@ export default function InsuranceAdminPage() {
           <span className="text-xs text-text-secondary">{enabled ? 'On' : 'Off'}</span>
         </label>
       </div>
+
+      {/* ── Simple Pricing card (client's preferred model) ───────────
+          2 tiers, per-lot fee + per-lot max cap, scales linearly with
+          lot size. When this table has rows, it overrides every legacy
+          section below. */}
+      {(() => {
+        const tiers = (
+          Array.isArray(values.insurance_simple_tiers)
+            ? (values.insurance_simple_tiers as Array<Record<string, unknown>>)
+            : []
+        );
+        const setTier = (idx: number, patch: Record<string, unknown>) => {
+          const next = tiers.map((row, i) => (i === idx ? { ...row, ...patch } : row));
+          setVal('insurance_simple_tiers', next as SettingsValue);
+        };
+        const addRow = () => {
+          const next = [
+            ...tiers,
+            { label: '', coverage_pct: 0, fee_per_lot: 0, max_cap_per_lot: 0 },
+          ];
+          setVal('insurance_simple_tiers', next as SettingsValue);
+        };
+        const delRow = (idx: number) => {
+          setVal(
+            'insurance_simple_tiers',
+            tiers.filter((_, i) => i !== idx) as SettingsValue,
+          );
+        };
+        const loadDefaults = () => {
+          setVal('insurance_simple_tiers', [
+            { label: '50%', coverage_pct: 50, fee_per_lot: 100, max_cap_per_lot: 500 },
+            { label: '70%', coverage_pct: 70, fee_per_lot: 300, max_cap_per_lot: 1000 },
+          ] as SettingsValue);
+        };
+        const sampleLots = [0.01, 0.05, 0.1, 1];
+        return (
+          <div className="bg-bg-secondary border border-buy/40 rounded-md">
+            <div className="px-4 py-3 border-b border-border-primary flex items-start justify-between gap-3">
+              <div>
+                <h2 className="text-sm font-semibold text-buy">
+                  Simple Pricing — 50% / 70% Tiers
+                </h2>
+                <p className="text-xxs text-text-tertiary mt-0.5 max-w-2xl">
+                  When this table has any rows, it overrides every legacy section below.
+                  Fee + max-cap scale <strong>linearly with lot size</strong>:
+                  &nbsp;<code className="bg-bg-tertiary/60 px-1 rounded">fee = lots × fee_per_lot</code>.
+                  E.g. 0.01 lot at fee_per_lot=$100 → $1 fee. 0.02 lot → $2.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={loadDefaults}
+                className="text-xxs text-buy underline whitespace-nowrap shrink-0"
+              >
+                Load client defaults
+              </button>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="bg-bg-tertiary/30 border-b border-border-primary">
+                    <th className="px-3 py-2 text-xxs font-medium text-text-tertiary uppercase tracking-wide text-left">#</th>
+                    <th className="px-3 py-2 text-xxs font-medium text-text-tertiary uppercase tracking-wide text-left">Label</th>
+                    <th className="px-3 py-2 text-xxs font-medium text-text-tertiary uppercase tracking-wide text-left">Coverage %</th>
+                    <th className="px-3 py-2 text-xxs font-medium text-text-tertiary uppercase tracking-wide text-left">Fee / lot ($)</th>
+                    <th className="px-3 py-2 text-xxs font-medium text-text-tertiary uppercase tracking-wide text-left">Max cap / lot ($)</th>
+                    <th className="px-3 py-2"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {tiers.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="px-3 py-4 text-center text-xxs text-text-tertiary">
+                        No simple tiers configured —
+                        <button type="button" onClick={loadDefaults} className="ml-2 text-buy underline">
+                          load defaults
+                        </button>
+                        &nbsp;or
+                        <button type="button" onClick={addRow} className="ml-2 text-buy underline">
+                          add a row manually
+                        </button>.
+                      </td>
+                    </tr>
+                  ) : (
+                    tiers.map((row, idx) => (
+                      <tr key={idx} className="border-b border-border-primary/30 last:border-0">
+                        <td className="px-3 py-2 text-xxs text-text-tertiary tabular-nums">{idx + 1}</td>
+                        <td className="px-3 py-2">
+                          <input
+                            type="text"
+                            value={String(row.label ?? '')}
+                            onChange={(e) => setTier(idx, { label: e.target.value })}
+                            placeholder="e.g. 50%"
+                            className="w-24 text-xs py-1 px-2 bg-bg-input border border-border-primary rounded"
+                          />
+                        </td>
+                        <td className="px-3 py-2">
+                          <input
+                            type="number" step="0.01" min="0" max="100"
+                            value={row.coverage_pct == null ? '' : String(row.coverage_pct)}
+                            onChange={(e) => setTier(idx, {
+                              coverage_pct: e.target.value === '' ? 0 : parseFloat(e.target.value) || 0,
+                            })}
+                            placeholder="50"
+                            className="w-20 text-xs py-1 px-2 bg-bg-input border border-border-primary rounded font-mono"
+                          />
+                        </td>
+                        <td className="px-3 py-2">
+                          <input
+                            type="number" step="0.01" min="0"
+                            value={row.fee_per_lot == null ? '' : String(row.fee_per_lot)}
+                            onChange={(e) => setTier(idx, {
+                              fee_per_lot: e.target.value === '' ? 0 : parseFloat(e.target.value) || 0,
+                            })}
+                            placeholder="100"
+                            className="w-24 text-xs py-1 px-2 bg-bg-input border border-border-primary rounded font-mono"
+                          />
+                        </td>
+                        <td className="px-3 py-2">
+                          <input
+                            type="number" step="0.01" min="0"
+                            value={row.max_cap_per_lot == null ? '' : String(row.max_cap_per_lot)}
+                            onChange={(e) => setTier(idx, {
+                              max_cap_per_lot: e.target.value === '' ? 0 : parseFloat(e.target.value) || 0,
+                            })}
+                            placeholder="500"
+                            className="w-24 text-xs py-1 px-2 bg-bg-input border border-border-primary rounded font-mono"
+                          />
+                        </td>
+                        <td className="px-3 py-2 text-right">
+                          <button
+                            type="button"
+                            onClick={() => delRow(idx)}
+                            title="Remove this tier"
+                            className="text-text-tertiary hover:text-danger text-xs px-2"
+                          >
+                            ✕
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="px-4 py-2 border-t border-border-primary flex items-center justify-between gap-2">
+              <button
+                type="button"
+                onClick={addRow}
+                className="inline-flex items-center gap-1 px-2.5 py-1 rounded text-xxs text-text-secondary border border-border-primary hover:bg-bg-hover"
+              >
+                + Add tier
+              </button>
+              <p className="text-xxs text-text-tertiary">
+                Click the Save button at top to persist.
+              </p>
+            </div>
+
+            {/* Live preview at sample lot sizes — admin sanity-checks the
+                linear scaling visually before saving. */}
+            {tiers.length > 0 && (
+              <div className="px-4 py-3 border-t border-border-primary bg-bg-tertiary/30">
+                <p className="text-xxs font-medium text-text-tertiary uppercase tracking-wide mb-2">
+                  Preview — user fee + max payout at sample lot sizes
+                </p>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr>
+                        <th className="px-2 py-1 text-left text-xxs text-text-tertiary">Tier</th>
+                        {sampleLots.map((l) => (
+                          <th key={l} className="px-2 py-1 text-right text-xxs text-text-tertiary">
+                            {l} lot
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {tiers.map((row, idx) => {
+                        const fpl = Number(row.fee_per_lot) || 0;
+                        return (
+                          <tr key={`fee-${idx}`} className="border-t border-border-primary/30">
+                            <td className="px-2 py-1 text-text-secondary">
+                              {String(row.label || '—')}{' '}
+                              <span className="text-text-tertiary">fee</span>
+                            </td>
+                            {sampleLots.map((l) => (
+                              <td key={l} className="px-2 py-1 text-right font-mono text-text-primary">
+                                ${(l * fpl).toFixed(2)}
+                              </td>
+                            ))}
+                          </tr>
+                        );
+                      })}
+                      {tiers.map((row, idx) => {
+                        const cap = Number(row.max_cap_per_lot) || 0;
+                        return (
+                          <tr key={`cap-${idx}`} className="border-t border-border-primary/30">
+                            <td className="px-2 py-1 text-text-secondary">
+                              {String(row.label || '—')}{' '}
+                              <span className="text-text-tertiary">max</span>
+                            </td>
+                            {sampleLots.map((l) => (
+                              <td key={l} className="px-2 py-1 text-right font-mono text-buy">
+                                ${(l * cap).toFixed(2)}
+                              </td>
+                            ))}
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       {/* Pricing mode + per-lot rate table */}
       {(() => {
