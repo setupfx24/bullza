@@ -64,6 +64,37 @@ class InsuranceConfig:
     # when caller marks the quote as a copy-trade context.
     copy_trade_surcharge: float
     news_blackout_until: Optional[datetime]
+    # ── Client-requested rules ────────────────────────────────────────
+    # Insurance auto-expires this many seconds after activation. Trades
+    # closed after the window are denied with reason "policy_expired".
+    # 0 / None = no auto-expiry (legacy unlimited behaviour).
+    policy_validity_seconds: int
+    # Max insurance policies a user can ACTIVATE in a rolling 24h window.
+    # Counted at activation, not at claim time. 0 = unlimited.
+    max_policies_per_day: int
+    # Hour-of-day blackout window in UTC (inclusive start, exclusive end).
+    # E.g. start=10, end=11 → no insurance during 10:00–10:59 UTC.
+    # Both 0 / None = window disabled. Wraps midnight if start > end.
+    blackout_hour_start: Optional[int]
+    blackout_hour_end: Optional[int]
+    # Hard ceiling on lots an insurance policy can cover. 0 = no cap.
+    max_lots_insurable: float
+    # Lot-size bracket pricing. When non-empty, REPLACES the global
+    # per_lot_fee + coverage_pct + max_cap_rules — admin defines per
+    # lot-range what each tier costs / covers / max payout.
+    #   [
+    #     {"min_lots":0.01, "max_lots":0.04, "tiers":[
+    #       {"label":"50%", "coverage_pct":50, "fee":1.0,  "max_cap":5.0},
+    #       {"label":"70%", "coverage_pct":70, "fee":3.0,  "max_cap":10.0}
+    #     ]},
+    #     {"min_lots":0.05, "max_lots":0.10, "tiers":[...]}
+    #   ]
+    # First-match wins. Empty = legacy tier system stays in effect.
+    lot_brackets: list[dict]
+    # When True, the claim payout is credited to the account's `credit`
+    # column (tradable equity, NOT withdrawable). When False, classic
+    # `balance` credit (withdrawable). Default True per client request.
+    payout_to_credit: bool
 
 
 _DEFAULTS = InsuranceConfig(
@@ -104,6 +135,15 @@ _DEFAULTS = InsuranceConfig(
     frequent_claim_coverage_reduction_pct=0.25,  # 25% off coverage
     copy_trade_surcharge=0.10,                   # +10% fee on copy trades
     news_blackout_until=None,
+    # Defaults match the client's example numbers in the spec —
+    # 10-min validity, 3 policies/day, no hour-blackout, 0.05 lot cap.
+    policy_validity_seconds=600,
+    max_policies_per_day=3,
+    blackout_hour_start=None,
+    blackout_hour_end=None,
+    max_lots_insurable=0.05,
+    lot_brackets=[],
+    payout_to_credit=True,
 )
 
 
@@ -160,4 +200,29 @@ async def load_config() -> InsuranceConfig:
         frequent_claim_coverage_reduction_pct=float(await _get("insurance_frequent_claim_coverage_reduction_pct", _DEFAULTS.frequent_claim_coverage_reduction_pct)),
         copy_trade_surcharge=float(await _get("insurance_copy_trade_surcharge", _DEFAULTS.copy_trade_surcharge)),
         news_blackout_until=blackout,
+        policy_validity_seconds=int(
+            await _get("insurance_policy_validity_seconds", _DEFAULTS.policy_validity_seconds)
+        ),
+        max_policies_per_day=int(
+            await _get("insurance_max_policies_per_day", _DEFAULTS.max_policies_per_day)
+        ),
+        blackout_hour_start=(
+            int(await _get("insurance_blackout_hour_start", None))
+            if (await _get("insurance_blackout_hour_start", None)) is not None
+            else None
+        ),
+        blackout_hour_end=(
+            int(await _get("insurance_blackout_hour_end", None))
+            if (await _get("insurance_blackout_hour_end", None)) is not None
+            else None
+        ),
+        max_lots_insurable=float(
+            await _get("insurance_max_lots_insurable", _DEFAULTS.max_lots_insurable)
+        ),
+        lot_brackets=list(
+            await _get("insurance_lot_brackets", _DEFAULTS.lot_brackets)
+        ),
+        payout_to_credit=bool(
+            await _get("insurance_payout_to_credit", _DEFAULTS.payout_to_credit)
+        ),
     )

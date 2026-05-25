@@ -111,6 +111,17 @@ async def evaluate_claim(
     if policy.status != "active":
         return False, Decimal("0"), f"policy_{policy.status}"
 
+    # ── Client gate: policy auto-expires N seconds after activation ─
+    # Trades closed after the validity window don't claim.
+    if cfg.policy_validity_seconds and cfg.policy_validity_seconds > 0:
+        activated = policy.activated_at
+        if activated is not None:
+            if activated.tzinfo is None:
+                activated = activated.replace(tzinfo=timezone.utc)
+            age = (datetime.now(timezone.utc) - activated).total_seconds()
+            if age > float(cfg.policy_validity_seconds):
+                return False, Decimal("0"), "policy_expired"
+
     profit = Decimal(str(history.profit or 0))
     if profit >= 0:
         return False, Decimal("0"), "not_a_loss"
@@ -223,20 +234,40 @@ async def maybe_pay(
             )
             return None
 
-        # Credit the trading account that took the loss — the same pool
-        # the fee was debited from at activation, so the user sees the
-        # claim land back where they expect (their trading balance).
+        # Credit the trading account that took the loss. The destination
+        # column depends on cfg.payout_to_credit:
+        #   True (default, per client request) → account.credit
+        #     The claim is tradable equity (counts toward margin and free
+        #     margin via equity = balance + credit) but is NOT withdrawable.
+        #     This also means it joins the same forfeit-on-first-withdrawal
+        #     pool as the welcome bonus.
+        #   False (legacy) → account.balance
+        #     Classic real-cash payout, fully withdrawable.
         account_q = await db.execute(
             select(TradingAccount).where(TradingAccount.id == policy.account_id).with_for_update()
         )
         account = account_q.scalar_one_or_none()
         if account is None:
             return None
-        prev = Decimal(str(account.balance or 0))
-        new_balance = prev + claim_amount
-        account.balance = new_balance
-        if account.equity is not None:
-            account.equity = Decimal(str(account.equity)) + claim_amount
+        payout_to_credit = bool(getattr(cfg, "payout_to_credit", True))
+        if payout_to_credit:
+            prev_credit = Decimal(str(account.credit or 0))
+            account.credit = prev_credit + claim_amount
+            # Equity = balance + credit + unrealized_pnl; refresh free margin.
+            if account.equity is not None:
+                account.equity = Decimal(str(account.equity)) + claim_amount
+            balance_after_for_tx = Decimal(str(account.balance or 0))
+            description_suffix = (
+                " — credited to trading credit (tradable, not withdrawable)"
+            )
+        else:
+            prev = Decimal(str(account.balance or 0))
+            new_balance = prev + claim_amount
+            account.balance = new_balance
+            if account.equity is not None:
+                account.equity = Decimal(str(account.equity)) + claim_amount
+            balance_after_for_tx = new_balance
+            description_suffix = ""
 
         tx = Transaction(
             id=uuid.uuid4(),
@@ -244,11 +275,12 @@ async def maybe_pay(
             account_id=policy.account_id,
             type="insurance_payout",
             amount=claim_amount,
-            balance_after=new_balance,
+            balance_after=balance_after_for_tx,
             reference_id=policy.id,
             description=(
                 f"Trade insurance payout — {policy.tier.title()} tier "
                 f"({float(policy.coverage_pct):.0f}% of ${float(-history.profit):.2f} loss)"
+                f"{description_suffix}"
             ),
         )
         db.add(tx)

@@ -5,7 +5,7 @@ at the repo root and `packages/common/src/insurance/` for the engine.
 """
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from uuid import UUID
 
@@ -108,6 +108,17 @@ async def activate(
         raise HTTPException(status_code=409, detail="news_blackout")
 
     user_id = current_user["user_id"]
+    now_utc = datetime.now(timezone.utc)
+
+    # ── Client gate #1: hour-of-day blackout ──────────────────────
+    # E.g. admin says "no insurance between 10:00–11:00 UTC".
+    # When start > end, treats it as a window that wraps midnight.
+    if cfg.blackout_hour_start is not None and cfg.blackout_hour_end is not None:
+        hr = now_utc.hour
+        s, e = int(cfg.blackout_hour_start), int(cfg.blackout_hour_end)
+        in_window = (s <= hr < e) if s <= e else (hr >= s or hr < e)
+        if in_window:
+            raise HTTPException(status_code=409, detail="hour_blackout")
 
     pos = (await db.execute(
         select(Position).where(Position.id == req.position_id)
@@ -116,6 +127,14 @@ async def activate(
         raise HTTPException(status_code=404, detail="position_not_found")
     if pos.status != "open":
         raise HTTPException(status_code=409, detail="position_not_open")
+
+    # ── Client gate #2: max lots insurable ────────────────────────
+    if cfg.max_lots_insurable and cfg.max_lots_insurable > 0:
+        if float(pos.lots or 0) > float(cfg.max_lots_insurable):
+            raise HTTPException(
+                status_code=409,
+                detail=f"max_lots_exceeded:{cfg.max_lots_insurable}",
+            )
 
     # Position belongs to user?
     acct = (await db.execute(
@@ -130,6 +149,23 @@ async def activate(
     )).scalar_one_or_none()
     if existing is not None:
         raise HTTPException(status_code=409, detail="policy_already_exists")
+
+    # ── Client gate #3: max policies per rolling 24h window ───────
+    if cfg.max_policies_per_day and cfg.max_policies_per_day > 0:
+        since = now_utc - timedelta(days=1)
+        cnt = (await db.execute(
+            select(func.count())
+            .select_from(InsurancePolicy)
+            .where(
+                InsurancePolicy.user_id == user_id,
+                InsurancePolicy.activated_at >= since,
+            )
+        )).scalar() or 0
+        if int(cnt) >= int(cfg.max_policies_per_day):
+            raise HTTPException(
+                status_code=409,
+                detail=f"daily_policy_limit:{cfg.max_policies_per_day}",
+            )
 
     inst = (await db.execute(
         select(Instrument).where(Instrument.id == pos.instrument_id)
