@@ -69,6 +69,25 @@ def _estimated_refund(
     return float(sl_distance * position_value_usd * (coverage_pct / 100.0))
 
 
+def _match_lot_bracket(cfg: InsuranceConfig, lots: float) -> Optional[dict]:
+    """Return the first lot-bracket whose [min_lots, max_lots] contains
+    `lots`. None if brackets are empty or no row matches — caller falls
+    back to the legacy fixed-tier pricing."""
+    for row in cfg.lot_brackets or []:
+        try:
+            lo = float(row.get("min_lots") or 0)
+            hi_raw = row.get("max_lots")
+            hi = None if hi_raw is None or hi_raw == "" else float(hi_raw)
+        except (TypeError, ValueError):
+            continue
+        if lots < lo:
+            continue
+        if hi is not None and lots > hi:
+            continue
+        return row
+    return None
+
+
 async def quote_all_tiers(
     *,
     cfg: InsuranceConfig,
@@ -132,6 +151,40 @@ async def quote_all_tiers(
                     group_overrides[str(k).lower()] = float(v)
                 except (TypeError, ValueError):
                     continue
+
+    # ── Lot-size bracket pricing (client spec) ───────────────────────
+    # When admin has configured lot_brackets, the matching bracket's
+    # tier list REPLACES the legacy 4-tier ladder. Each bracket-tier
+    # has its own (fee, coverage_pct, max_cap) — no risk-score math,
+    # no fee_cap (admin already chose absolute numbers), surcharges
+    # still apply on top of `fee` so dynamic risk pricing still works.
+    bracket = _match_lot_bracket(cfg, lots)
+    if bracket is not None:
+        quotes: list[TierQuote] = []
+        for tier_row in (bracket.get("tiers") or []):
+            try:
+                label = str(tier_row.get("label") or "").strip().lower() or "basic"
+                fee = float(tier_row.get("fee") or 0)
+                cov_raw = float(tier_row.get("coverage_pct") or 0)
+                max_cap = float(tier_row.get("max_cap") or 0)
+            except (TypeError, ValueError):
+                continue
+            final_fee = fee * (1 + surcharge)
+            coverage = cov_raw * coverage_multiplier
+            est_refund = _estimated_refund(
+                coverage_pct=coverage,
+                sl_distance=sl_distance,
+                position_value_usd=trade_size_usd,
+            )
+            quotes.append({
+                "tier": label,
+                "fee": round(final_fee, 2),
+                "coverage_pct": round(coverage, 2),
+                "max_cap": round(max_cap, 2),
+                "estimated_refund": round(est_refund, 2),
+                "risk_score": round(rs, 4),
+            })
+        return quotes
 
     quotes: list[TierQuote] = []
     for tier in TIERS:
