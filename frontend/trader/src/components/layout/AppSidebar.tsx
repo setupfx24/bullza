@@ -107,7 +107,7 @@ export default function AppSidebar() {
         <div className="flex items-center justify-between px-4 pt-4 pb-3 gap-2">
           <Link href="/dashboard" className="flex items-center gap-2 min-w-0">
             <img
-              src="/images/feb.png"
+              src="/images/swisdex_png5.png"
               alt="SwisDex"
               className="w-7 h-7 object-contain shrink-0"
             />

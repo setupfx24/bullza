@@ -11,7 +11,7 @@ const ACCOUNT_TYPES = [
     name: 'Standard',
     min: '$50',
     tagline: 'Designed for new traders',
-    points: ['Competitive spreads from 1.2 pips', 'Zero commission', 'Full platform access', '24/7 multilingual support'],
+    points: ['Competitive spreads from 1.1 pips', 'Zero commission', 'Full platform access', '24/7 multilingual support'],
   },
   {
     icon: Zap,

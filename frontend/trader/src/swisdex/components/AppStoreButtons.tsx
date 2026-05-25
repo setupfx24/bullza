@@ -20,13 +20,18 @@ export function AppStoreButtons() {
       className="relative pt-12 sm:pt-16 pb-2"
     >
       <div
-        className="mx-auto flex flex-wrap items-center justify-center gap-3 sm:gap-4"
+        className="mx-auto"
         style={{
           maxWidth: 'var(--max)',
           paddingLeft: 'var(--gutter)',
           paddingRight: 'var(--gutter)',
         }}
       >
+        {/* Section eyebrow — matches the "Trusted By" label styling below */}
+        <p className="text-center text-[11px] uppercase tracking-[0.24em] text-foreground/55 mb-7 font-semibold">
+          Download Now
+        </p>
+        <div className="flex flex-wrap items-center justify-center gap-3 sm:gap-4">
         {STORES.map(({ Icon, top, bottom, href }) => (
           <a
             key={bottom}
@@ -46,6 +51,7 @@ export function AppStoreButtons() {
             </div>
           </a>
         ))}
+        </div>
       </div>
     </section>
   );

@@ -21,10 +21,10 @@ const TIERS: Tier[] = [
     href: '/accounts/standard',
     badge: 'Start Here',
     deposit: '$50',
-    spread: 'From 1.2 pips',
+    spread: 'From 1.1 pips',
     commission: 'None',
     desc: 'Designed for new traders. Competitive spreads, zero commission, full platform access, and 24/7 multilingual support.',
-    features: ['Competitive spreads from 1.2 pips', 'Zero commission', 'Full platform access', '24/7 multilingual support'],
+    features: ['Competitive spreads from 1.1 pips', 'Zero commission', 'Full platform access', '24/7 multilingual support'],
   },
   {
     name: 'ECN',
@@ -146,7 +146,7 @@ const INSTRUMENTS = ['Forex', 'Metal', 'Crypto', 'Energies', 'Stocks', 'Indices'
 
 const FEATURE_ROWS: Array<{ label: string; values: React.ReactNode[] }> = [
   { label: 'Minimum Deposit', values: ['$50', '$200', '$500', '$100,000 virtual'] },
-  { label: 'Spread',          values: ['From 1.2 pips', 'From 0.0 pips', 'Pass-through', 'Live spreads'] },
+  { label: 'Spread',          values: ['From 1.1 pips', 'From 0.0 pips', 'Pass-through', 'Live spreads'] },
   { label: 'Commission',      values: ['No Commission', 'Ultra-low per lot', 'Lifetime per-lot earnings', 'No Commission'] },
   { label: 'Maximum Leverage', values: ['1:500', '1:500', '1:500', '1:500'] },
   {
