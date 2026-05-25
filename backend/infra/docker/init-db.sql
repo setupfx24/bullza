@@ -463,7 +463,10 @@ CREATE TABLE transactions (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID REFERENCES users(id),
     account_id UUID REFERENCES trading_accounts(id),
-    type VARCHAR(30) NOT NULL CHECK (type IN ('deposit', 'withdrawal', 'commission', 'swap', 'bonus', 'credit', 'adjustment', 'ib_commission', 'profit', 'loss', 'transfer', 'admin_commission', 'performance_fee', 'master_commission', 'refund')),
+    -- type vocabulary owned by the application (insurance_fee /
+    -- insurance_payout / staking_reward / etc. are added over time).
+    -- Migration 0059 drops this CHECK on existing databases.
+    type VARCHAR(30) NOT NULL,
     amount DECIMAL(18,8) NOT NULL,
     balance_after DECIMAL(18,8),
     reference_id UUID,
