@@ -9,7 +9,7 @@
 type Badge = { label: string; sub: string; logo?: string };
 
 const BADGES: Badge[] = [
-  { label: 'Crypto Payments', sub: 'BTC · ETH · USDT',    logo: '/images/b1.png' },
+  { label: 'Crypto Payments', sub: 'BTC · ETH · USDT',    logo: '/images/bit_icon.png' },
   { label: 'NOW Payments',    sub: 'Secure Gateway',      logo: '/images/b2.png' },
   { label: 'Trading View',    sub: 'Live Charts',         logo: '/images/b3.png' },
   { label: 'SSL Secured',     sub: '256-bit Encryption',  logo: '/images/b4.png' },

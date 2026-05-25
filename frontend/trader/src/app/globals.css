@@ -302,6 +302,82 @@ html, body {
 
 .tabular-nums { font-variant-numeric: tabular-nums; }
 
+/* ──────────────────────────────────────────────────────────────────────
+   Splash / loading screen — shown on every full page load + refresh.
+   See src/components/SplashScreen.tsx (mounted in the root layout).
+   ────────────────────────────────────────────────────────────────────── */
+.swisdex-splash {
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #08090b;
+  overflow: hidden;
+  transition: opacity 0.6s ease, visibility 0.6s ease;
+}
+.swisdex-splash--hidden {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+/* Background aura — soft, blurred, low-opacity logo glow */
+.swisdex-splash__bg {
+  position: absolute;
+  width: min(640px, 120vw);
+  height: auto;
+  object-fit: contain;
+  opacity: 0.10;
+  filter: blur(36px) saturate(1.2);
+  animation: swisdex-splash-aura 3s ease-in-out infinite;
+  pointer-events: none;
+}
+.swisdex-splash__inner {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 28px;
+}
+.swisdex-splash__logo {
+  width: min(240px, 60vw);
+  height: auto;
+  animation:
+    swisdex-splash-pop 1s cubic-bezier(0.22, 1, 0.36, 1) both,
+    swisdex-splash-breathe 2.2s ease-in-out 1s infinite;
+}
+.swisdex-splash__ring {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 3px solid rgba(85, 166, 48, 0.22);
+  border-top-color: #55a630;
+  animation: swisdex-splash-spin 0.8s linear infinite;
+}
+@keyframes swisdex-splash-pop {
+  0%   { opacity: 0; transform: scale(0.82); filter: blur(10px); }
+  100% { opacity: 1; transform: scale(1);    filter: blur(0); }
+}
+@keyframes swisdex-splash-breathe {
+  0%, 100% { transform: scale(1); }
+  50%      { transform: scale(1.04); }
+}
+@keyframes swisdex-splash-spin {
+  to { transform: rotate(360deg); }
+}
+@keyframes swisdex-splash-aura {
+  0%, 100% { opacity: 0.08; transform: scale(1); }
+  50%      { opacity: 0.16; transform: scale(1.08); }
+}
+/* Respect reduced-motion: skip the spin/breathe, keep a simple fade. */
+@media (prefers-reduced-motion: reduce) {
+  .swisdex-splash__logo,
+  .swisdex-splash__ring,
+  .swisdex-splash__bg { animation: none !important; }
+}
+
 /* Google Translate Element — hide all default UI (we drive it via our
    own LanguageSwitcher component). Aggressive rules so neither the top
    banner nor the floating "Show original" tooltip ever shows up, AND
