@@ -13,8 +13,9 @@ from ..database import Base
 class InsurancePolicy(Base):
     """Per-trade micro-insurance policy. Activated at order placement, settled on close."""
     __tablename__ = "insurance_policies"
+    # Tier check dropped in migration 0058 — tier is now an admin-defined
+    # label (e.g. "50%", "70%") instead of the legacy 4-value enum.
     __table_args__ = (
-        CheckConstraint("tier IN ('basic','advanced','pro','elite')", name="insurance_policies_tier_check"),
         CheckConstraint(
             "status IN ('active','claimed','expired','denied')",
             name="insurance_policies_status_check",
