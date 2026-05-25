@@ -41,6 +41,15 @@ INSURANCE_KEYS = (
     "insurance_dynamic_winrate_surcharge",
     "insurance_disable_atr_floor",
     "insurance_news_blackout_until",
+    # ── Client-spec rules (2026-05-23) ────────────────────────────────
+    # See packages/common/src/insurance/config.py for the engine side.
+    "insurance_policy_validity_seconds",
+    "insurance_max_policies_per_day",
+    "insurance_blackout_hour_start",
+    "insurance_blackout_hour_end",
+    "insurance_max_lots_insurable",
+    "insurance_lot_brackets",
+    "insurance_payout_to_credit",
 )
 
 

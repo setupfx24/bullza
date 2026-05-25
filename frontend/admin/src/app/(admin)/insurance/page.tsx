@@ -35,11 +35,20 @@ const NUMERIC_KEYS = [
   'insurance_dynamic_no_sl_surcharge',
   'insurance_dynamic_winrate_threshold',
   'insurance_dynamic_winrate_surcharge',
+  // ── Client-spec rules ────────────────────────────────────────────
+  'insurance_policy_validity_seconds',
+  'insurance_max_policies_per_day',
+  'insurance_blackout_hour_start',
+  'insurance_blackout_hour_end',
+  'insurance_max_lots_insurable',
 ] as const;
 
 const BOOL_KEYS = [
   'insurance_enabled',
   'insurance_disable_atr_floor',
+  // Client-spec: claim payout goes to account.credit (tradable, not
+  // withdrawable) when ON. OFF restores classic balance credit.
+  'insurance_payout_to_credit',
 ] as const;
 
 // JSON-shaped keys — kept as <textarea> blobs and parsed on save so admin
@@ -48,6 +57,8 @@ const JSON_KEYS = [
   'insurance_tier_multipliers',
   'insurance_max_cap_rules',
   'insurance_news_blackout_until',
+  // Client-spec lot brackets — per lot-range tier pricing table.
+  'insurance_lot_brackets',
 ] as const;
 
 const KEY_LABELS: Record<string, { label: string; hint: string }> = {
@@ -126,6 +137,35 @@ const KEY_LABELS: Record<string, { label: string; hint: string }> = {
   insurance_news_blackout_until: {
     label: 'News blackout (JSON)',
     hint: 'ISO timestamp string OR null. While set, no policies can be opened (e.g. major-news embargo).',
+  },
+  // ── Client-spec rules ────────────────────────────────────────────
+  insurance_policy_validity_seconds: {
+    label: 'Policy validity (seconds)',
+    hint: 'Insurance auto-expires this many seconds AFTER activation. Trades closed after the window are denied with reason "policy_expired". 600 = 10 min. 0 = no expiry.',
+  },
+  insurance_max_policies_per_day: {
+    label: 'Max policies per user / 24h',
+    hint: 'Hard cap on how many insurance policies a single user can activate in any rolling 24-hour window. 0 = unlimited.',
+  },
+  insurance_blackout_hour_start: {
+    label: 'Hour blackout — start (UTC hour 0-23)',
+    hint: 'Inclusive. Together with the end hour below, blocks new activations during this window. Wraps midnight (e.g. start=22, end=6 = no insurance 22:00–05:59 UTC). Leave blank to disable.',
+  },
+  insurance_blackout_hour_end: {
+    label: 'Hour blackout — end (UTC hour 0-23)',
+    hint: 'Exclusive. E.g. start=10, end=11 = no insurance 10:00–10:59 UTC. Both must be set or both blank.',
+  },
+  insurance_max_lots_insurable: {
+    label: 'Max insurable lot size',
+    hint: 'Positions larger than this cannot be insured (returns 409 max_lots_exceeded). 0 = no cap. Default 0.05.',
+  },
+  insurance_payout_to_credit: {
+    label: 'Claim payout → tradable credit',
+    hint: 'When ON: claim amount is credited to account.credit (counts toward equity/margin, NOT withdrawable; cleared on user\'s first approved withdrawal). When OFF: classic real-cash credit to account.balance.',
+  },
+  insurance_lot_brackets: {
+    label: 'Lot-size bracket pricing (JSON)',
+    hint: 'When set, this REPLACES the legacy 4-tier ladder per matching lot size. Example: [{"min_lots":0.01,"max_lots":0.04,"tiers":[{"label":"50%","coverage_pct":50,"fee":1.0,"max_cap":5.0},{"label":"70%","coverage_pct":70,"fee":3.0,"max_cap":10.0}]}]. Empty array = use legacy tiers.',
   },
 };
 
