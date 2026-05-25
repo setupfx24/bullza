@@ -120,11 +120,8 @@ export default function AdminSidebar() {
         {collapsed ? (
           <img src="/images/feb.png" alt="SwisDex" className="w-7 h-7 object-contain mx-auto" />
         ) : (
-          <Link href="/" className="flex items-center gap-2 min-w-0">
-            <img src="/images/feb.png" alt="SwisDex" className="w-7 h-7 object-contain shrink-0" />
-            <span className="font-bold tracking-tight text-sm select-none">
-              <span className="text-text-primary">Swis</span><span className="text-[#55a630]">Dex</span>
-            </span>
+          <Link href="/" className="flex items-center min-w-0">
+            <img src="/images/swisdex_png5.png" alt="SwisDex" className="h-8 w-auto object-contain shrink-0" />
           </Link>
         )}
         <button

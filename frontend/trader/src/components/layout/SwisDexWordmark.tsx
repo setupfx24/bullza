@@ -35,19 +35,18 @@ export function SwisDexWordmark({
     );
   }
 
+  // Text wordmark removed per brand decision — the raster logo already
+  // contains the "SwisDex" lettering, so rendering it twice was noisy.
+  // `textClassName` is kept in the prop signature for callers that still
+  // pass it; it's a no-op now.
+  void textClassName;
   const mark = (
-    <span className={cn('inline-flex items-center gap-2 select-none', className)}>
-      <img src="/images/swisdex_png5.png" alt="SwisDex" className="w-8 h-8 object-contain shrink-0" />
-      <span
-        className={cn(
-          'inline-flex items-baseline font-bold italic tracking-tight',
-          'text-xl sm:text-2xl drop-shadow-[0_0_20px_rgba(85,166,48,0.12)]',
-          textClassName,
-        )}
-      >
-        <span className="text-text-primary">Swis</span>
-        <span className="text-[#55a630]">Dex</span>
-      </span>
+    <span className={cn('inline-flex items-center select-none', className)}>
+      <img
+        src="/images/swisdex_png5.png"
+        alt="SwisDex"
+        className="h-9 sm:h-10 w-auto object-contain shrink-0"
+      />
     </span>
   );
 
