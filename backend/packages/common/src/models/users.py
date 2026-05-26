@@ -91,9 +91,22 @@ class User(Base):
     # sends this once.
     deposit_nudge_sent_at = Column(DateTime(timezone=True), nullable=True)
     # Set when this referred user crossed the qualifying trade count
-    # (default 3) and the referrer's flat-amount payout was credited.
-    # NULL until the threshold is hit; once set we never re-pay.
+    # (default 3) + KYC + funded gates. After 2026-05-26 the engine
+    # NO LONGER auto-credits the referrer; this stamp only marks the
+    # row as eligible to claim. The referrer presses Claim from the
+    # /referral page to actually move the bounty into their
+    # referral_commission_balance.
     referral_qualified_at = Column(DateTime(timezone=True), nullable=True)
+    # Set on the REFERRED user's row when the referrer claimed this
+    # specific referral's bounty. NULL = still claimable; non-NULL =
+    # already swept into the referrer's referral_commission_balance.
+    referral_claimed_at = Column(DateTime(timezone=True), nullable=True)
+    # Per-user pool of claimed-but-not-yet-withdrawn referral bounties.
+    # Lives on the REFERRER row. Withdraw to Main Wallet moves this
+    # into main_wallet_balance and records a Transaction. Migration 0061.
+    referral_commission_balance = Column(
+        Numeric(18, 8), nullable=False, default=0, server_default="0",
+    )
     # Eligibility-nudge engine: when the user crossed the funded-account
     # threshold and we educated them about Fixed Return + Trade Insurance.
     # NULL = never nudged; we re-nudge ~quarterly while still eligible.

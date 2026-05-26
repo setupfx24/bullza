@@ -111,14 +111,16 @@ async def maybe_pay_referral_on_first_deposit(
 async def maybe_pay_referral_after_trades(
     db: AsyncSession, user_id: UUID
 ) -> Optional[dict]:
-    """Pay the referrer a FLAT USD amount when this user crosses the
-    qualifying trade count (admin setting, default 3). Two gates make
-    sure we never double-pay:
+    """Mark a referred user as claimable when they cross the gates
+    (KYC + funded + qualifying trade count). After 2026-05-26 this no
+    longer credits the referrer's wallet directly — the referrer must
+    press Claim on the /referral page (see `claim_referral_bounty`
+    below). This function only stamps `referral_qualified_at` so the
+    dashboard can render the row as a "Claim" entry.
 
-      1. ``users.referral_qualified_at`` must still be NULL — once we
-         pay, we stamp it and never re-check.
-      2. The user must have a referrer set (User.referred_by_user_id),
-         which is populated by ``attach_referrer_by_code`` at signup.
+    Two gates make sure we never double-mark:
+      1. ``users.referral_qualified_at`` must still be NULL.
+      2. The user must have a referrer set (`referred_by_user_id`).
 
     Caller writes a TradeHistory row first (this helper counts
     history rows to decide), then invokes this. Best-effort: any
@@ -175,119 +177,203 @@ async def maybe_pay_referral_after_trades(
     if trade_count < required:
         return None
 
-    # Resolve the bounty for THIS payout. Priority order:
-    #   1. Tiered bounty by referrer's current count of qualified
-    #      referrals  (admin /config/ib-tiers — `ib_commission_tiers`).
-    #      e.g. 1-20 → $5, 21-100 → $7, 100+ → $10.
-    #   2. Per-account-type bounty for the referred user's primary
-    #      account (`referral_commission_amounts_usd`).
-    #   3. Flat legacy bounty (`referral_commission_amount_usd`),
-    #      defaults to $5.
-    # The first that resolves to a positive number wins.
-    from packages.common.src.models import AccountGroup
-    from packages.common.src.settings_store import get_system_setting
-
-    amount_usd: float | None = None
-
-    # ── (1) Tiered bounty by referrer's qualified-referral count ──────
-    # We include THIS qualification in the count so the 20th referral
-    # still gets the 1-20 tier rate, not the 21+ rate.
-    tiers_raw = await get_system_setting("ib_commission_tiers", None)
-    if isinstance(tiers_raw, list) and tiers_raw:
-        already_qualified = (await db.execute(
-            select(func.count()).select_from(User).where(
-                User.referred_by_user_id == user.referred_by_user_id,
-                User.referral_qualified_at.is_not(None),
-            )
-        )).scalar() or 0
-        # +1 because the current user is about to flip to qualified.
-        position = int(already_qualified) + 1
-        chosen_bounty: float | None = None
-        for row in tiers_raw:
-            if not isinstance(row, dict):
-                continue
-            try:
-                lo = int(float(row.get("min_referrals") or 0))
-            except (TypeError, ValueError):
-                lo = 0
-            hi_raw = row.get("max_referrals")
-            if hi_raw in (None, "", "null"):
-                hi = None
-            else:
-                try:
-                    hi = int(float(hi_raw))
-                except (TypeError, ValueError):
-                    hi = None
-            try:
-                bounty = float(row.get("per_referral_bounty") or 0)
-            except (TypeError, ValueError):
-                bounty = 0.0
-            if position >= lo and (hi is None or position <= hi) and bounty > 0:
-                chosen_bounty = bounty
-                break
-        if chosen_bounty is not None:
-            amount_usd = chosen_bounty
-
-    # ── (2) Per-account-type bounty (legacy fallback) ─────────────────
-    if amount_usd is None:
-        acct_type_row = (await db.execute(
-            select(AccountGroup.name)
-            .select_from(TradingAccount)
-            .join(AccountGroup, AccountGroup.id == TradingAccount.account_group_id)
-            .where(
-                TradingAccount.user_id == user_id,
-                TradingAccount.is_demo.is_(False),
-            )
-            .order_by(TradingAccount.created_at.asc())
-            .limit(1)
-        )).first()
-        acct_type_key = (acct_type_row[0] if acct_type_row else "").strip().lower()
-        type_map_raw = await get_system_setting("referral_commission_amounts_usd", None)
-        type_map = type_map_raw if isinstance(type_map_raw, dict) else {}
-        if acct_type_key:
-            v = type_map.get(acct_type_key)
-            if v not in (None, ""):
-                try:
-                    amount_usd = float(v)
-                except (TypeError, ValueError):
-                    amount_usd = None
-
-    # ── (3) Flat legacy bounty (last resort) ──────────────────────────
-    if amount_usd is None:
-        amount_usd = await get_float_setting("referral_commission_amount_usd", 5.0)
-
-    if amount_usd <= 0:
-        return None
-    amount = Decimal(str(amount_usd)).quantize(Decimal("0.01"))
-
-    referrer = (await db.execute(
-        select(User).where(User.id == user.referred_by_user_id).with_for_update()
-    )).scalar_one_or_none()
-    if referrer is None:
-        return None
-
-    referrer.main_wallet_balance = (
-        Decimal(str(referrer.main_wallet_balance or 0)) + amount
-    )
+    # Manual-claim flow: just mark the row claimable. No wallet credit
+    # here — the referrer presses Claim on /referral to sweep the
+    # bounty into their referral_commission_balance.
     user.referral_qualified_at = datetime.now(timezone.utc)
 
-    db.add(Transaction(
-        user_id=referrer.id,
-        type="referral_commission",
-        amount=amount,
-        balance_after=referrer.main_wallet_balance,
-        reference_id=user_id,
-        description=(
-            f"Referral payout — {user.email or user_id} qualified "
-            f"({trade_count} trades)"
-        ),
-    ))
-
     return {
-        "referrer_id": str(referrer.id),
+        "referrer_id": str(user.referred_by_user_id),
         "user_id": str(user_id),
         "trades": int(trade_count),
-        "amount": float(amount),
+        "status": "claimable",
+    }
+
+
+def _resolve_tier_bounty(tiers_raw, position: int) -> Optional[float]:
+    """Pick the bounty for a referrer's Nth qualified referral.
+    `position` is 1-indexed (the 1st qualified referral). Returns None
+    if no tier matches OR the matched tier's bounty isn't positive."""
+    if not isinstance(tiers_raw, list) or not tiers_raw:
+        return None
+    for row in tiers_raw:
+        if not isinstance(row, dict):
+            continue
+        try:
+            lo = int(float(row.get("min_referrals") or 0))
+        except (TypeError, ValueError):
+            lo = 0
+        hi_raw = row.get("max_referrals")
+        if hi_raw in (None, "", "null"):
+            hi = None
+        else:
+            try:
+                hi = int(float(hi_raw))
+            except (TypeError, ValueError):
+                hi = None
+        try:
+            bounty = float(row.get("per_referral_bounty") or 0)
+        except (TypeError, ValueError):
+            bounty = 0.0
+        if position >= lo and (hi is None or position <= hi) and bounty > 0:
+            return bounty
+    return None
+
+
+async def _bounty_for_next_claim(
+    db: AsyncSession, referrer_id: UUID,
+) -> Decimal:
+    """Compute the bounty this referrer would earn for claiming ONE
+    more referral right now. Walks the tier ladder by counting how
+    many referrals they've already CLAIMED (+1 for the new one).
+    Falls back to the legacy flat amount if tiers aren't configured."""
+    tiers_raw = await get_system_setting("ib_commission_tiers", None)
+    if isinstance(tiers_raw, list) and tiers_raw:
+        claimed_count = (await db.execute(
+            select(func.count()).select_from(User).where(
+                User.referred_by_user_id == referrer_id,
+                User.referral_claimed_at.is_not(None),
+            )
+        )).scalar() or 0
+        position = int(claimed_count) + 1
+        b = _resolve_tier_bounty(tiers_raw, position)
+        if b is not None:
+            return Decimal(str(b)).quantize(Decimal("0.01"))
+    flat = await get_float_setting("referral_commission_amount_usd", 5.0)
+    return Decimal(str(max(flat, 0))).quantize(Decimal("0.01"))
+
+
+async def claim_referral_bounty(
+    db: AsyncSession, *, referrer_id: UUID, referred_user_id: UUID,
+) -> tuple[Optional[Decimal], Optional[str]]:
+    """Referrer presses Claim against a specific referred user. Checks
+    ownership + state, computes the tier-aware bounty, adds it to the
+    referrer's referral_commission_balance, and stamps
+    referral_claimed_at on the referred row. Returns (amount, error)."""
+    referred = (await db.execute(
+        select(User).where(User.id == referred_user_id).with_for_update()
+    )).scalar_one_or_none()
+    if referred is None:
+        return None, "not_found"
+    if referred.referred_by_user_id != referrer_id:
+        return None, "not_found"
+    if referred.referral_qualified_at is None:
+        return None, "not_eligible"
+    if referred.referral_claimed_at is not None:
+        return None, "already_claimed"
+
+    amount = await _bounty_for_next_claim(db, referrer_id)
+    if amount <= 0:
+        return None, "zero_bounty"
+
+    referrer = (await db.execute(
+        select(User).where(User.id == referrer_id).with_for_update()
+    )).scalar_one_or_none()
+    if referrer is None:
+        return None, "referrer_missing"
+
+    referrer.referral_commission_balance = (
+        Decimal(str(referrer.referral_commission_balance or 0)) + amount
+    )
+    referred.referral_claimed_at = datetime.now(timezone.utc)
+    return amount, None
+
+
+async def withdraw_referral_commission(
+    db: AsyncSession, *, user_id: UUID,
+) -> tuple[Optional[Decimal], Optional[str]]:
+    """Sweep the referrer's referral_commission_balance into their
+    main_wallet_balance. Records a Transaction row + queues a
+    notification. Returns (amount_moved, error)."""
+    user = (await db.execute(
+        select(User).where(User.id == user_id).with_for_update()
+    )).scalar_one_or_none()
+    if user is None:
+        return None, "user_missing"
+    balance = Decimal(str(user.referral_commission_balance or 0))
+    if balance <= 0:
+        return None, "zero_balance"
+
+    user.referral_commission_balance = Decimal("0")
+    user.main_wallet_balance = (
+        Decimal(str(user.main_wallet_balance or 0)) + balance
+    )
+    db.add(Transaction(
+        user_id=user.id,
+        type="referral_commission",
+        amount=balance,
+        balance_after=user.main_wallet_balance,
+        description=(
+            f"Referral commission withdrawn to main wallet "
+            f"(${float(balance):.2f})"
+        ),
+    ))
+    return balance, None
+
+
+async def list_my_referrals(db: AsyncSession, user_id: UUID) -> dict:
+    """Per-friend rows for the trader /referral page. Each row carries:
+        - referred user's display name + email + trades_count
+        - status: pending  (gates not met yet)
+                  claimable (qualified, claim button enabled)
+                  claimed   (already swept into commission_balance)
+        - qualified_at / claimed_at timestamps
+    Plus the top-of-page summary fields the dashboard renders:
+        - commission_balance: claimed-but-not-yet-withdrawn pool
+        - next_bounty: what the user would earn for their NEXT claim
+        - required_trades / requires_kyc / requires_funded: gate copy
+    """
+    me = (await db.execute(
+        select(User).where(User.id == user_id)
+    )).scalar_one_or_none()
+    if me is None:
+        return {"items": [], "commission_balance": 0.0, "next_bounty": 0.0}
+
+    rows = (await db.execute(
+        select(User).where(User.referred_by_user_id == user_id)
+        .order_by(User.created_at.desc())
+    )).scalars().all()
+
+    items = []
+    for r in rows:
+        trade_count = (await db.execute(
+            select(func.count())
+            .select_from(TradeHistory)
+            .join(TradingAccount, TradingAccount.id == TradeHistory.account_id)
+            .where(TradingAccount.user_id == r.id)
+        )).scalar() or 0
+        if r.referral_claimed_at is not None:
+            status = "claimed"
+        elif r.referral_qualified_at is not None:
+            status = "claimable"
+        else:
+            status = "pending"
+        name = " ".join(filter(None, [r.first_name, r.last_name])).strip() or None
+        items.append({
+            "user_id": str(r.id),
+            "name": name,
+            "email": r.email,
+            "trades": int(trade_count),
+            "status": status,
+            "kyc_status": r.kyc_status,
+            "qualified_at": r.referral_qualified_at.isoformat() if r.referral_qualified_at else None,
+            "claimed_at": r.referral_claimed_at.isoformat() if r.referral_claimed_at else None,
+        })
+
+    next_bounty = await _bounty_for_next_claim(db, user_id)
+    required_trades = await get_int_setting("referral_qualifying_trades", 3)
+    if required_trades <= 0:
+        required_trades = 3
+    requires_kyc = await get_bool_setting("referral_requires_kyc", True)
+    requires_funded = await get_bool_setting("referral_requires_funded", True)
+
+    return {
+        "items": items,
+        "commission_balance": float(me.referral_commission_balance or 0),
+        "next_bounty": float(next_bounty),
+        "required_trades": int(required_trades),
+        "requires_kyc": bool(requires_kyc),
+        "requires_funded": bool(requires_funded),
     }
 
 
