@@ -5,7 +5,7 @@ import DashboardShell from '@/components/layout/DashboardShell';
 import { ShieldCheck, Loader2, HelpCircle, Wallet, CheckCircle2 } from 'lucide-react';
 import { insuranceApi, type PolicyOut, type ClaimOut } from '@/lib/api/insurance';
 import InsuranceOnboardingModal from '@/components/insurance/InsuranceOnboardingModal';
-import { toast } from 'sonner';
+import toast from 'react-hot-toast';
 
 const STATUS_COLOR: Record<PolicyOut['status'], string> = {
   active: '#55a630',
