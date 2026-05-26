@@ -227,7 +227,7 @@ export const useTradingStore = create<TradingState>()((set, get) => ({
           side: o.side,
           status: String(o.status),
           lots: Number(o.lots) || 0,
-          price: o.price != null ? Number(o.price) : undefined,
+          price: Number(o.price) || 0,
           stop_loss: o.stop_loss != null ? Number(o.stop_loss) : undefined,
           take_profit: o.take_profit != null ? Number(o.take_profit) : undefined,
           created_at: String(o.created_at ?? ''),
