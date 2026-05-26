@@ -364,8 +364,15 @@ export default function PositionsPanel({ variant = 'default' }: PositionsPanelPr
     return a?.account_number ?? accountId.slice(0, 8);
   };
 
+  // Depend on activeAccount.id (a stable string), NOT the activeAccount
+  // object — the Zustand store rebuilds the object reference on every
+  // WS tick (balance/equity/profit refresh), so depending on the whole
+  // object made loadHistory's identity change every second and the
+  // useEffect below kept re-firing → "Loading history…" blinked on
+  // forever for users sitting on the Closed Positions tab.
+  const activeAccountId = activeAccount?.id ?? null;
   const loadHistory = useCallback(async () => {
-    if (!activeAccount) {
+    if (!activeAccountId) {
       setHistoryTrades([]);
       return;
     }
@@ -376,7 +383,7 @@ export default function PositionsPanel({ variant = 'default' }: PositionsPanelPr
       // account's history together, which is jarring when a brand-new
       // account inherits decades of trades from a sibling.
       const res = await api.get<{ items?: ClosedTrade[] } | ClosedTrade[]>('/portfolio/trades', {
-        account_id: activeAccount.id,
+        account_id: activeAccountId,
         page: '1',
         per_page: '200',
       });
@@ -387,7 +394,7 @@ export default function PositionsPanel({ variant = 'default' }: PositionsPanelPr
       setHistoryTrades([]);
     }
     setHistoryLoading(false);
-  }, [activeAccount]);
+  }, [activeAccountId]);
 
   useEffect(() => {
     if (activeTab === 'history') void loadHistory();
