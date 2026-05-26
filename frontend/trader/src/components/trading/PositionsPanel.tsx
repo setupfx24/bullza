@@ -1025,9 +1025,13 @@ export default function PositionsPanel({ variant = 'default' }: PositionsPanelPr
                   ) : (
                     positions.map((pos) => {
                       const d = getDigits(pos.symbol);
+                      // pos.profit is already the unrealized P&L from price
+                      // movement. Commission was debited from balance at open
+                      // and swap accrues continuously into balance — neither
+                      // should be subtracted from the floating P&L again,
+                      // otherwise the per-row number won't match the header
+                      // "Floating P&L" which sums pos.profit directly.
                       const pnl = pos.profit || 0;
-                      const charges = pos.commission || 0;
-                      const net = pnl - charges;
                       return (
                         <div key={pos.id} className="rounded-xl border border-border-glass bg-bg-secondary/40 p-3 space-y-2">
                           <div className="flex items-center justify-between">
@@ -1038,8 +1042,8 @@ export default function PositionsPanel({ variant = 'default' }: PositionsPanelPr
                                 {pos.trade_type === 'copy_trade' ? 'Copy' : 'Real'}
                               </span>
                             </div>
-                            <span className="font-mono text-sm font-bold tabular-nums" style={{ color: net >= 0 ? '#2962FF' : '#FF2440' }}>
-                              {net >= 0 ? '+' : ''}${net.toFixed(2)}
+                            <span className="font-mono text-sm font-bold tabular-nums" style={{ color: pnl >= 0 ? '#2962FF' : '#FF2440' }}>
+                              {pnl >= 0 ? '+' : ''}${pnl.toFixed(2)}
                             </span>
                           </div>
                           <div className="grid grid-cols-3 gap-x-3 gap-y-1 text-[11px]">
@@ -1117,9 +1121,10 @@ export default function PositionsPanel({ variant = 'default' }: PositionsPanelPr
                     <tbody>
                       {positions.map((pos) => {
                         const d = getDigits(pos.symbol);
+                        // See mobile-card comment above — pos.profit is the
+                        // unrealised P&L; commission/swap are already booked
+                        // against balance and must not be subtracted twice.
                         const pnl = pos.profit || 0;
-                        const charges = pos.commission || 0;
-                        const net = pnl - charges;
                         return (
                           <tr key={pos.id} className={tbodyRowClass}>
                             <td className={td}>{accountLabel(pos.account_id)}</td>
@@ -1144,8 +1149,8 @@ export default function PositionsPanel({ variant = 'default' }: PositionsPanelPr
                             <td className={clsx(td, 'font-mono')}>
                               {pos.current_price != null ? pos.current_price.toFixed(d) : '—'}
                             </td>
-                            <td className={clsx(td, 'font-mono font-bold tabular-nums')} style={{ color: net >= 0 ? '#2962FF' : '#FF2440' }}>
-                              {net >= 0 ? '+' : ''}${net.toFixed(2)}
+                            <td className={clsx(td, 'font-mono font-bold tabular-nums')} style={{ color: pnl >= 0 ? '#2962FF' : '#FF2440' }}>
+                              {pnl >= 0 ? '+' : ''}${pnl.toFixed(2)}
                             </td>
                             <td className={clsx(td, 'text-[10px]')}>
                               {sltpEdit && sltpEdit.positionId === pos.id ? (
