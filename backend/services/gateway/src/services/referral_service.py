@@ -175,40 +175,85 @@ async def maybe_pay_referral_after_trades(
     if trade_count < required:
         return None
 
-    # Per-account-type payout. We look up the referred user's PRIMARY
-    # account type and use the per-type bounty; fall back to the flat
-    # legacy amount if either the map or the type is missing. The
-    # primary account = their first non-demo trading account (matches
-    # what the trader-side picker shows them).
+    # Resolve the bounty for THIS payout. Priority order:
+    #   1. Tiered bounty by referrer's current count of qualified
+    #      referrals  (admin /config/ib-tiers — `ib_commission_tiers`).
+    #      e.g. 1-20 → $5, 21-100 → $7, 100+ → $10.
+    #   2. Per-account-type bounty for the referred user's primary
+    #      account (`referral_commission_amounts_usd`).
+    #   3. Flat legacy bounty (`referral_commission_amount_usd`),
+    #      defaults to $5.
+    # The first that resolves to a positive number wins.
     from packages.common.src.models import AccountGroup
     from packages.common.src.settings_store import get_system_setting
 
-    acct_type_row = (await db.execute(
-        select(AccountGroup.name)
-        .select_from(TradingAccount)
-        .join(AccountGroup, AccountGroup.id == TradingAccount.account_group_id)
-        .where(
-            TradingAccount.user_id == user_id,
-            TradingAccount.is_demo.is_(False),
-        )
-        .order_by(TradingAccount.created_at.asc())
-        .limit(1)
-    )).first()
-    acct_type_key = (acct_type_row[0] if acct_type_row else "").strip().lower()
+    amount_usd: float | None = None
 
-    type_map_raw = await get_system_setting("referral_commission_amounts_usd", None)
-    type_map = type_map_raw if isinstance(type_map_raw, dict) else {}
-    amount_usd = None
-    if acct_type_key:
-        v = type_map.get(acct_type_key)
-        if v not in (None, ""):
+    # ── (1) Tiered bounty by referrer's qualified-referral count ──────
+    # We include THIS qualification in the count so the 20th referral
+    # still gets the 1-20 tier rate, not the 21+ rate.
+    tiers_raw = await get_system_setting("ib_commission_tiers", None)
+    if isinstance(tiers_raw, list) and tiers_raw:
+        already_qualified = (await db.execute(
+            select(func.count()).select_from(User).where(
+                User.referred_by_user_id == user.referred_by_user_id,
+                User.referral_qualified_at.is_not(None),
+            )
+        )).scalar() or 0
+        # +1 because the current user is about to flip to qualified.
+        position = int(already_qualified) + 1
+        chosen_bounty: float | None = None
+        for row in tiers_raw:
+            if not isinstance(row, dict):
+                continue
             try:
-                amount_usd = float(v)
+                lo = int(float(row.get("min_referrals") or 0))
             except (TypeError, ValueError):
-                amount_usd = None
+                lo = 0
+            hi_raw = row.get("max_referrals")
+            if hi_raw in (None, "", "null"):
+                hi = None
+            else:
+                try:
+                    hi = int(float(hi_raw))
+                except (TypeError, ValueError):
+                    hi = None
+            try:
+                bounty = float(row.get("per_referral_bounty") or 0)
+            except (TypeError, ValueError):
+                bounty = 0.0
+            if position >= lo and (hi is None or position <= hi) and bounty > 0:
+                chosen_bounty = bounty
+                break
+        if chosen_bounty is not None:
+            amount_usd = chosen_bounty
+
+    # ── (2) Per-account-type bounty (legacy fallback) ─────────────────
     if amount_usd is None:
-        # Fall through to the flat legacy setting so a missing per-type
-        # row never silently zeroes the payout.
+        acct_type_row = (await db.execute(
+            select(AccountGroup.name)
+            .select_from(TradingAccount)
+            .join(AccountGroup, AccountGroup.id == TradingAccount.account_group_id)
+            .where(
+                TradingAccount.user_id == user_id,
+                TradingAccount.is_demo.is_(False),
+            )
+            .order_by(TradingAccount.created_at.asc())
+            .limit(1)
+        )).first()
+        acct_type_key = (acct_type_row[0] if acct_type_row else "").strip().lower()
+        type_map_raw = await get_system_setting("referral_commission_amounts_usd", None)
+        type_map = type_map_raw if isinstance(type_map_raw, dict) else {}
+        if acct_type_key:
+            v = type_map.get(acct_type_key)
+            if v not in (None, ""):
+                try:
+                    amount_usd = float(v)
+                except (TypeError, ValueError):
+                    amount_usd = None
+
+    # ── (3) Flat legacy bounty (last resort) ──────────────────────────
+    if amount_usd is None:
         amount_usd = await get_float_setting("referral_commission_amount_usd", 5.0)
 
     if amount_usd <= 0:
