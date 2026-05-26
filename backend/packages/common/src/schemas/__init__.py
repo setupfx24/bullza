@@ -29,7 +29,7 @@ from .common import PaginationParams, PaginatedResponse
 from .insurance import (
     InsuranceQuoteRequest, InsuranceTierQuote,
     InsuranceActivateRequest, InsuranceActivateResponse,
-    InsurancePolicyOut, InsuranceClaimOut,
+    InsurancePolicyOut, InsuranceClaimOut, InsuranceClaimPayResponse,
 )
 
 
@@ -58,5 +58,5 @@ __all__ = [
     # insurance
     "InsuranceQuoteRequest", "InsuranceTierQuote",
     "InsuranceActivateRequest", "InsuranceActivateResponse",
-    "InsurancePolicyOut", "InsuranceClaimOut",
+    "InsurancePolicyOut", "InsuranceClaimOut", "InsuranceClaimPayResponse",
 ]

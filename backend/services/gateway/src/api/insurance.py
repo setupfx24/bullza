@@ -21,10 +21,11 @@ from packages.common.src.models import (
 )
 from packages.common.src.schemas import (
     InsuranceActivateRequest, InsuranceActivateResponse,
-    InsuranceClaimOut, InsurancePolicyOut,
+    InsuranceClaimOut, InsuranceClaimPayResponse, InsurancePolicyOut,
     InsuranceQuoteRequest, InsuranceTierQuote,
 )
 from packages.common.src.insurance import quote_all_tiers, load_config
+from packages.common.src.insurance.claims import pay_claim
 from packages.common.src.insurance.volatility import get_atr
 from packages.common.src.insurance.pricing import fee_to_decimal
 
@@ -262,25 +263,73 @@ async def list_policies(
 @router.get("/claims", response_model=list[InsuranceClaimOut])
 async def list_claims(
     limit: int = 50,
+    status: str | None = None,
     current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    rows = (await db.execute(
-        select(InsuranceClaim)
+    """All eligible claims for the trader. `status=pending` filters to
+    claimable rows (the dashboard "Claim" list); `status=paid` filters
+    to history. No filter → both. Pending rows surface first because
+    they sort by paid_at DESC with NULLS FIRST (Postgres default).
+    """
+    stmt = (
+        select(InsuranceClaim, InsurancePolicy, Instrument.symbol)
+        .join(InsurancePolicy, InsurancePolicy.id == InsuranceClaim.policy_id)
+        .join(Instrument, Instrument.id == InsurancePolicy.instrument_id)
         .where(InsuranceClaim.user_id == current_user["user_id"])
-        .order_by(desc(InsuranceClaim.paid_at))
+        .order_by(desc(InsuranceClaim.paid_at), desc(InsuranceClaim.id))
         .limit(max(1, min(limit, 200)))
-    )).scalars().all()
+    )
+    if status in ("pending", "paid"):
+        stmt = stmt.where(InsuranceClaim.status == status)
+    rows = (await db.execute(stmt)).all()
     return [
         InsuranceClaimOut(
             id=c.id,
             policy_id=c.policy_id,
             loss_amount=c.loss_amount,
             claim_amount=c.claim_amount,
+            status=c.status,
             paid_at=c.paid_at,
+            claimed_at=c.claimed_at,
+            instrument_symbol=sym,
+            tier=pol.tier,
         )
-        for c in rows
+        for c, pol, sym in rows
     ]
+
+
+@router.post("/claims/{claim_id}/claim", response_model=InsuranceClaimPayResponse)
+async def claim_payout(
+    claim_id: UUID,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Trader pressed Claim on a pending row. Credits the policy's
+    account.credit (or balance if admin disabled payout_to_credit) and
+    flips the claim to 'paid'.
+    """
+    claim, err = await pay_claim(
+        db=db, claim_id=claim_id, user_id=current_user["user_id"],
+    )
+    if err == "not_found":
+        raise HTTPException(404, "Claim not found")
+    if err == "already_claimed":
+        raise HTTPException(409, "This claim has already been paid")
+    if err == "policy_missing" or err == "account_missing":
+        raise HTTPException(500, "Linked policy/account missing — contact support")
+    if claim is None:
+        raise HTTPException(500, "Claim payout failed")
+
+    await db.commit()
+
+    cfg = await load_config()
+    return InsuranceClaimPayResponse(
+        claim_id=claim.id,
+        amount=Decimal(str(claim.claim_amount)),
+        credited_to="credit" if cfg.payout_to_credit else "balance",
+        status="paid",
+    )
 
 
 # ─────────────────────────────────────────────────────────────────────

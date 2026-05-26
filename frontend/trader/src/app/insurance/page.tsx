@@ -1,10 +1,11 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import DashboardShell from '@/components/layout/DashboardShell';
-import { ShieldCheck, Loader2, HelpCircle } from 'lucide-react';
+import { ShieldCheck, Loader2, HelpCircle, Wallet, CheckCircle2 } from 'lucide-react';
 import { insuranceApi, type PolicyOut, type ClaimOut } from '@/lib/api/insurance';
 import InsuranceOnboardingModal from '@/components/insurance/InsuranceOnboardingModal';
+import { toast } from 'sonner';
 
 const STATUS_COLOR: Record<PolicyOut['status'], string> = {
   active: '#55a630',
@@ -13,35 +14,62 @@ const STATUS_COLOR: Record<PolicyOut['status'], string> = {
   denied: '#ef4444',
 };
 
-const TIER_LABEL: Record<PolicyOut['tier'], string> = {
-  basic: 'Basic',
-  advanced: 'Advanced',
-  pro: 'Pro',
-  elite: 'Elite',
-};
+// Tier labels are now admin-defined free-form strings (e.g. "50%", "70%").
+// Render verbatim; only capitalise the legacy lowercase enum values for
+// backwards compat with rows created before the 2026-05-25 cleanup.
+function formatTier(t: string | null | undefined): string {
+  if (!t) return '—';
+  const lower = t.toLowerCase();
+  if (lower === 'basic' || lower === 'advanced' || lower === 'pro' || lower === 'elite') {
+    return t.charAt(0).toUpperCase() + t.slice(1).toLowerCase();
+  }
+  return t;
+}
 
 export default function InsurancePage() {
   const [policies, setPolicies] = useState<PolicyOut[] | null>(null);
   const [claims, setClaims] = useState<ClaimOut[] | null>(null);
   const [loading, setLoading] = useState(true);
+  const [claimingId, setClaimingId] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    const [p, c] = await Promise.all([
+      insuranceApi.policies(100),
+      insuranceApi.claims(100),
+    ]);
+    setPolicies(p);
+    setClaims(c);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        const [p, c] = await Promise.all([
-          insuranceApi.policies(100),
-          insuranceApi.claims(100),
-        ]);
-        if (cancelled) return;
-        setPolicies(p);
-        setClaims(c);
+        await load();
       } finally {
         if (!cancelled) setLoading(false);
       }
     })();
     return () => { cancelled = true; };
-  }, []);
+  }, [load]);
+
+  const handleClaim = async (claimId: string, amount: string) => {
+    setClaimingId(claimId);
+    try {
+      const res = await insuranceApi.claimPayout(claimId);
+      const dest = res.credited_to === 'credit' ? 'trading credit (tradable)' : 'main balance';
+      toast.success(`$${Number(amount).toFixed(2)} credited to your ${dest}.`);
+      await load();
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Could not claim payout. Try again.';
+      toast.error(msg);
+    } finally {
+      setClaimingId(null);
+    }
+  };
+
+  const pendingClaims = (claims || []).filter((c) => c.status === 'pending');
+  const paidClaims = (claims || []).filter((c) => c.status === 'paid');
 
   return (
     <DashboardShell>
@@ -72,6 +100,69 @@ export default function InsurancePage() {
           </div>
         ) : (
           <>
+            {/* Claimable — trader presses Claim to credit account.credit */}
+            <Card
+              title={`Claimable${pendingClaims.length ? ` (${pendingClaims.length})` : ''}`}
+              accent={pendingClaims.length > 0}
+            >
+              {pendingClaims.length === 0 ? (
+                <Empty msg="No payouts waiting. When an insured trade closes in eligible loss, the payout appears here for you to claim." />
+              ) : (
+                <ul className="divide-y divide-border-primary">
+                  {pendingClaims.map((c) => (
+                    <li key={c.id} className="py-3 flex items-center gap-3 flex-wrap">
+                      <span
+                        className="text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-full"
+                        style={{
+                          color: '#55a630',
+                          background: '#55a6301f',
+                          border: '1px solid #55a63055',
+                        }}
+                      >
+                        pending
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-semibold text-text-primary truncate">
+                          {c.instrument_symbol || '—'}{' '}
+                          <span className="text-text-tertiary">·</span>{' '}
+                          <span className="text-[#55a630]">{formatTier(c.tier)}</span>
+                        </p>
+                        <p className="text-[10px] text-text-tertiary">
+                          Loss ${Number(c.loss_amount).toFixed(2)}
+                        </p>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <p className="text-base font-bold text-green-500 font-mono tabular-nums">
+                          ${Number(c.claim_amount).toFixed(2)}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleClaim(c.id, c.claim_amount)}
+                        disabled={claimingId === c.id}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-semibold bg-[#55a630] hover:bg-[#4a9329] text-black disabled:opacity-60 disabled:cursor-wait transition-colors"
+                      >
+                        {claimingId === c.id ? (
+                          <>
+                            <Loader2 size={13} className="animate-spin" /> Claiming…
+                          </>
+                        ) : (
+                          <>
+                            <Wallet size={13} /> Claim
+                          </>
+                        )}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {pendingClaims.length > 0 && (
+                <p className="text-[11px] text-text-tertiary mt-3">
+                  Claimed funds are credited to your <span className="text-text-secondary font-medium">trading credit</span> — tradable, not withdrawable.
+                </p>
+              )}
+            </Card>
+
             <Card title="Policies">
               {!policies || policies.length === 0 ? (
                 <Empty msg="You have no insurance policies yet. Activate insurance from the order ticket on the trading terminal." />
@@ -91,7 +182,7 @@ export default function InsurancePage() {
                       </span>
                       <span className="text-sm font-semibold text-text-primary truncate flex-1">
                         {p.instrument_symbol || '—'} <span className="text-text-tertiary">·</span>{' '}
-                        <span className="text-[#55a630]">{TIER_LABEL[p.tier]}</span>
+                        <span className="text-[#55a630]">{formatTier(p.tier)}</span>
                       </span>
                       <div className="text-right shrink-0">
                         <p className="text-xs font-mono tabular-nums text-text-primary">
@@ -108,20 +199,24 @@ export default function InsurancePage() {
             </Card>
 
             <Card title="Claim history">
-              {!claims || claims.length === 0 ? (
-                <Empty msg="No claims yet. When an insured trade closes in loss, the eligible payout shows here." />
+              {paidClaims.length === 0 ? (
+                <Empty msg="No claims yet. When you press Claim above, the payout will appear here." />
               ) : (
                 <ul className="divide-y divide-border-primary">
-                  {claims.map((c) => (
+                  {paidClaims.map((c) => (
                     <li key={c.id} className="py-3 flex items-center gap-3">
-                      <span className="w-2 h-2 rounded-full bg-green-500" />
+                      <CheckCircle2 size={14} className="text-green-500 shrink-0" />
                       <div className="min-w-0 flex-1">
                         <p className="text-sm text-text-primary">
+                          {c.instrument_symbol || '—'}{' '}
+                          <span className="text-text-tertiary">·</span>{' '}
+                          <span className="text-[#55a630]">{formatTier(c.tier)}</span>
+                          <span className="text-text-tertiary"> · </span>
                           Loss ${Number(c.loss_amount).toFixed(2)} → payout{' '}
                           <span className="font-bold text-green-500">${Number(c.claim_amount).toFixed(2)}</span>
                         </p>
                         <p className="text-[10px] text-text-tertiary">
-                          {new Date(c.paid_at).toLocaleString()}
+                          {c.paid_at ? new Date(c.paid_at).toLocaleString() : '—'}
                         </p>
                       </div>
                     </li>
@@ -136,13 +231,14 @@ export default function InsurancePage() {
   );
 }
 
-function Card({ title, children }: { title: string; children: React.ReactNode }) {
+function Card({ title, children, accent = false }: { title: string; children: React.ReactNode; accent?: boolean }) {
   return (
     <div
       className="rounded-2xl p-4 md:p-5"
       style={{
         background: 'var(--bg-card)',
-        border: '1px solid var(--border-primary)',
+        border: accent ? '1px solid #55a63080' : '1px solid var(--border-primary)',
+        boxShadow: accent ? '0 0 0 1px #55a63022 inset' : undefined,
       }}
     >
       <h2 className="text-base font-bold text-text-primary mb-3">{title}</h2>

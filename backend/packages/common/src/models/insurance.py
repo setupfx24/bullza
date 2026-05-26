@@ -40,10 +40,14 @@ class InsurancePolicy(Base):
 
 
 class InsuranceClaim(Base):
-    """Payout record when an insured trade closes in loss + passes anti-abuse gates."""
+    """Eligible-claim record. After 2026-05-25 manual-claim flow:
+    rows are created with status='pending' at trade close and flip to
+    'paid' only when the trader presses Claim in the dashboard.
+    """
     __tablename__ = "insurance_claims"
     __table_args__ = (
         Index("ix_ins_clm_user_paid_at", "user_id", "paid_at"),
+        Index("ix_ins_clm_user_status", "user_id", "status"),
     )
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -52,4 +56,10 @@ class InsuranceClaim(Base):
     loss_amount = Column(Numeric(18, 8), nullable=False)   # absolute, positive
     claim_amount = Column(Numeric(18, 8), nullable=False)  # credited to wallet
     transaction_id = Column(UUID(as_uuid=True), ForeignKey("transactions.id"))
-    paid_at = Column(DateTime(timezone=True), nullable=False, default=datetime.utcnow)
+    # 'pending' = eligible but not yet claimed by user.
+    # 'paid'    = user pressed Claim and credit landed in account.credit.
+    status = Column(String(16), nullable=False, default="pending", server_default="pending")
+    # claimed_at is set when status flips to 'paid'. paid_at carries the
+    # same value once paid (kept for backward compat with history queries).
+    claimed_at = Column(DateTime(timezone=True))
+    paid_at = Column(DateTime(timezone=True))
