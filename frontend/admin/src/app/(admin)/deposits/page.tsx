@@ -540,59 +540,14 @@ export default function DepositsPage() {
                                       <> · ${formatMoney(d.bonus_amount)}</>
                                     )}
                                   </span>
-                                  {d.bonus_status === 'pending' && (
-                                    <div className="flex items-center gap-1 mt-1">
-                                      <button
-                                        type="button"
-                                        onClick={async () => {
-                                          const amt = window.prompt(
-                                            `Grant bonus for code ${d.bonus_code}\nDeposit: $${formatMoney(d.amount)}\nUser: ${d.user_email}\n\nEnter bonus amount (USD):`,
-                                          );
-                                          if (!amt) return;
-                                          const n = parseFloat(amt);
-                                          if (!Number.isFinite(n) || n <= 0) {
-                                            toast.error('Invalid amount');
-                                            return;
-                                          }
-                                          try {
-                                            await adminApi.post(
-                                              `/finance/deposits/${d.id}/grant-bonus`,
-                                              { amount: n },
-                                            );
-                                            toast.success(`$${n.toFixed(2)} bonus granted`);
-                                            fetchDeposits();
-                                          } catch (e: any) {
-                                            toast.error(e?.message || 'Grant failed');
-                                          }
-                                        }}
-                                        className="px-1.5 py-0.5 rounded-sm text-[10px] font-medium bg-success/15 text-success border border-success/30 hover:bg-success/25"
-                                      >
-                                        Grant
-                                      </button>
-                                      <button
-                                        type="button"
-                                        onClick={async () => {
-                                          const reason = window.prompt(
-                                            `Deny bonus for code ${d.bonus_code}\n\nReason (sent to user):`,
-                                          );
-                                          if (reason === null) return;
-                                          try {
-                                            await adminApi.post(
-                                              `/finance/deposits/${d.id}/deny-bonus`,
-                                              { reason: reason.trim() || 'Denied by admin' },
-                                            );
-                                            toast.success('Bonus denied');
-                                            fetchDeposits();
-                                          } catch (e: any) {
-                                            toast.error(e?.message || 'Deny failed');
-                                          }
-                                        }}
-                                        className="px-1.5 py-0.5 rounded-sm text-[10px] font-medium bg-danger/15 text-danger border border-danger/30 hover:bg-danger/25"
-                                      >
-                                        Deny
-                                      </button>
-                                    </div>
-                                  )}
+                                  {/* Grant/Deny inline buttons removed —
+                                      two action pairs in the same row
+                                      (Grant/Deny + Approve/Reject) were
+                                      confusing for ops. The bonus pill
+                                      stays so admin still sees the code +
+                                      pending state; the deposit Approve /
+                                      Reject column below now drives both
+                                      decisions. */}
                                 </div>
                               ) : (
                                 <span className="text-xxs text-text-tertiary">—</span>
