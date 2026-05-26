@@ -376,9 +376,15 @@ async def accrue_due_payouts(db: AsyncSession) -> int:
                 lock.next_payout_at = None
                 continue
 
+            # Rate matrix cell is a PER-MONTH percentage (client spec
+            # 2026-05-26). Tenure decides cadence; each payout bundles
+            # `months_per_cycle` months of accrual into a single credit.
+            # Example: $1000 quarterly at 2% → 2% × 3 months = $60.
+            months_per_cycle = _tenure_to_months(int(lock.tenure_days or 0))
             interest = (
                 Decimal(str(lock.principal or 0))
                 * Decimal(str(lock.rate_pct or 0))
+                * Decimal(str(months_per_cycle))
                 / Decimal("100")
             ).quantize(Decimal("0.01"))
             if interest <= 0:
@@ -447,16 +453,14 @@ def _serialize_lock(r: FixedReturnLock) -> dict:
     principal = Decimal(str(r.principal or 0))
     rate_pct = Decimal(str(r.rate_pct or 0))
     interest_paid = Decimal(str(r.total_interest_paid or 0))
-    # Projected total interest assumes the lock runs to maturity. Used
-    # by the trader UI calculator.
+    # Projection: rate_pct is per-MONTH (client spec 2026-05-26), so
+    # the user receives `principal * rate_pct% * lock_months` total
+    # interest if the lock runs to maturity. Cadence (Month / Quarter /
+    # etc.) only changes when the money lands, not how much.
     lock_months = int(r.lock_months_at_creation or 24)
-    cycles_total = max(
-        1,
-        int((Decimal(lock_months) * DAYS_PER_MONTH_APPROX) // Decimal(max(1, r.tenure_days or 1))),
-    )
-    projected_interest = (principal * rate_pct / Decimal("100") * Decimal(cycles_total)).quantize(
-        Decimal("0.01")
-    )
+    projected_interest = (
+        principal * rate_pct * Decimal(lock_months) / Decimal("100")
+    ).quantize(Decimal("0.01"))
 
     return {
         "id": str(r.id),
