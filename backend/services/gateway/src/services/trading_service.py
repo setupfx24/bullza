@@ -130,16 +130,11 @@ async def place_order(
     # --- Sequential DB queries (AsyncSession doesn't support concurrent queries) ---
     account = await validate_account(req.account_id, user_id, db)
 
-    if not account.is_demo and account.account_group:
-        min_bal = account.account_group.minimum_deposit or Decimal("0")
-        if min_bal > 0 and (account.balance or Decimal("0")) < min_bal:
-            raise HTTPException(
-                status_code=400,
-                detail=(
-                    f"Account balance must be at least ${float(min_bal):.2f} for this account type "
-                    "before you can trade. Please deposit funds."
-                ),
-            )
+    # NOTE: account_group.minimum_deposit is a CREATION threshold (set in
+    # the account-opening flow). Once an account exists, trading is gated
+    # on tradable margin, not on the original deposit minimum — the
+    # margin check below + per-order margin requirement enforces that.
+    # Don't re-block trading here on balance < minimum_deposit.
 
     instrument = await get_instrument(req.symbol, db)
 

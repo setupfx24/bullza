@@ -365,9 +365,18 @@ export default function PositionsPanel({ variant = 'default' }: PositionsPanelPr
   };
 
   const loadHistory = useCallback(async () => {
+    if (!activeAccount) {
+      setHistoryTrades([]);
+      return;
+    }
     setHistoryLoading(true);
     try {
+      // Scope closed-positions list to the account the trader has
+      // currently selected. Without this filter the panel pools every
+      // account's history together, which is jarring when a brand-new
+      // account inherits decades of trades from a sibling.
       const res = await api.get<{ items?: ClosedTrade[] } | ClosedTrade[]>('/portfolio/trades', {
+        account_id: activeAccount.id,
         page: '1',
         per_page: '200',
       });
@@ -378,7 +387,7 @@ export default function PositionsPanel({ variant = 'default' }: PositionsPanelPr
       setHistoryTrades([]);
     }
     setHistoryLoading(false);
-  }, []);
+  }, [activeAccount]);
 
   useEffect(() => {
     if (activeTab === 'history') void loadHistory();
