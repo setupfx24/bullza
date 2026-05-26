@@ -112,6 +112,7 @@ function DesktopNavLink({ item, pathname }: { item: NavItem; pathname: string })
         onMouseLeave={scheduleClose}
         onFocus={() => { cancelClose(); setOpen(true); }}
         onClick={() => setOpen((v) => !v)}
+        suppressHydrationWarning
         className={`relative inline-flex items-center gap-1 px-2.5 py-1.5 text-[13px] font-semibold whitespace-nowrap transition-colors font-body rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
           active ? 'text-foreground' : 'text-foreground/75 hover:text-foreground'
         }`}
@@ -253,12 +254,13 @@ export function Navbar() {
         animate={{ y: 0, opacity: 1 }}
         transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
       >
-        <div className="relative mx-auto w-full max-w-[1440px] flex items-center justify-center gap-3">
+        <div className="relative mx-auto w-full max-w-[1440px] flex items-center justify-center gap-3" suppressHydrationWarning>
           <nav
             className={`liquid-glass rounded-full w-full max-w-[1320px] px-2 py-2 flex items-center justify-between gap-3 transition-[backdrop-filter] ${
               scrolled ? '[backdrop-filter:blur(28px)]' : ''
             }`}
             aria-label="Primary"
+            suppressHydrationWarning
           >
             <Link href="/" className="flex items-center gap-2 pl-3 group shrink-0" aria-label={`${BRAND.name} home`}>
               <img
