@@ -147,7 +147,7 @@ function ContactBox({ team, email }: { team: string; email: string }) {
     <div className="bg-gray-50 border border-gray-200 rounded-xl p-6 mt-4 text-sm space-y-1">
       <p className="font-semibold text-gray-900">SwisDex {team}</p>
       <p className="text-gray-500">Email: {email}</p>
-      <p className="text-gray-500">Phone: +44 7737119979</p>
+      <p className="text-gray-500">Phone: +44 7737119978</p>
       <p className="text-gray-500">Address: SwisDex Office 23US, 18 Young St, UNIT LGE 1/1, Edinburgh EH2 4JB, Scotland</p>
     </div>
   )
