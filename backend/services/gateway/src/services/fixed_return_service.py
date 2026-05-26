@@ -196,7 +196,16 @@ async def create_lock(
 
     now = datetime.now(timezone.utc)
     matures_at = _add_months(now, lock_months)
-    next_payout_at = now + timedelta(days=tenure_days)
+    # Snap interest payouts to a fixed day-of-month window (25th by
+    # default) so users always see their interest land in the 25-30 of
+    # the month, regardless of lock day. Calendar-month cadence (1 / 3 /
+    # 6 / 12 / 24 months) keeps the day stable across cycles.
+    payout_dom = await get_int_setting("fixed_return_payout_day_of_month", 25)
+    cycle_months = _tenure_to_months(tenure_days)
+    cycle_end = _add_months(now, cycle_months)
+    next_payout_at = _snap_to_payout_window(
+        cycle_end, payout_day=payout_dom, advance_if_before=True,
+    )
     # If the first cycle would land past maturity (e.g. 2-Year tenure
     # in a 24-month lock), clamp to maturity so the user receives
     # exactly one cycle at the end.
@@ -384,9 +393,11 @@ async def accrue_due_payouts(db: AsyncSession) -> int:
             )
             lock.payouts_count = int(lock.payouts_count or 0) + 1
 
-            # Advance the schedule. If the next cycle would land past
-            # maturity we mark the schedule as done (next = NULL) — the
-            # principal will be returned when the user calls withdraw
+            # Advance the schedule by exactly one calendar cycle so the
+            # day-of-month stays stable across cycles (always lands on
+            # the configured 25-30 window). If the next cycle would
+            # land past maturity we mark the schedule done (next = NULL)
+            # — the principal is returned when the user calls withdraw
             # after matures_at.
             matures_at = lock.matures_at
             if matures_at and matures_at.tzinfo is None:
@@ -394,7 +405,18 @@ async def accrue_due_payouts(db: AsyncSession) -> int:
             nxt = (lock.next_payout_at or now)
             if nxt.tzinfo is None:
                 nxt = nxt.replace(tzinfo=timezone.utc)
-            advanced = nxt + timedelta(days=int(lock.tenure_days or 0))
+            cycle_months = _tenure_to_months(int(lock.tenure_days or 0))
+            advanced = _add_months(nxt, cycle_months)
+            # Re-snap to the payout day-of-month — _add_months keeps the
+            # original day (already 25), so this is a no-op for normal
+            # cycles, but it self-heals if the row was created before
+            # this fix shipped.
+            payout_dom = await get_int_setting(
+                "fixed_return_payout_day_of_month", 25
+            )
+            advanced = _snap_to_payout_window(
+                advanced, payout_day=payout_dom, advance_if_before=False,
+            )
             if matures_at and advanced >= matures_at:
                 lock.next_payout_at = None
             else:
