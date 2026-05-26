@@ -64,6 +64,10 @@ export default function ApprovalsPage() {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [rejectFor, setRejectFor] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState('');
+  // Custom confirmation modal — replaces the native window.confirm so
+  // the dialog matches the rest of the admin UI (responsive, themed)
+  // instead of falling back to the browser-default popup.
+  const [confirmRow, setConfirmRow] = useState<ApprovalRow | null>(null);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -79,8 +83,12 @@ export default function ApprovalsPage() {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
-  const onApprove = async (row: ApprovalRow) => {
-    if (!confirm(`Approve ${ACTION_LABEL[row.action] || row.action} of ${formatPayload(row.payload)}?`)) return;
+  const onApprove = (row: ApprovalRow) => {
+    setConfirmRow(row);
+  };
+
+  const doApprove = async (row: ApprovalRow) => {
+    setConfirmRow(null);
     setBusyId(row.id);
     try {
       await adminApi.post(`/approvals/${row.id}/approve`, {});
@@ -243,6 +251,58 @@ export default function ApprovalsPage() {
           </div>
         )}
       </div>
+
+      {/* Custom approval-confirmation modal — replaces native confirm() */}
+      {confirmRow && (
+        <div
+          className="fixed inset-0 z-[80] flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-3"
+          onClick={() => setConfirmRow(null)}
+        >
+          <div
+            className="w-full max-w-sm rounded-2xl border border-border-primary bg-bg-secondary shadow-2xl overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="px-5 pt-5 pb-3 border-b border-border-primary/50">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-success/15 text-success">
+                  <ShieldCheck size={14} />
+                </span>
+                <h2 className="text-sm font-semibold text-text-primary">
+                  Confirm approval
+                </h2>
+              </div>
+              <p className="text-xs text-text-secondary leading-relaxed">
+                You&apos;re approving{' '}
+                <strong className="text-text-primary">
+                  {ACTION_LABEL[confirmRow.action] || confirmRow.action}
+                </strong>{' '}
+                of{' '}
+                <strong className="text-text-primary font-mono">
+                  {formatPayload(confirmRow.payload)}
+                </strong>
+                . The original admin will then need to re-invoke the action to actually
+                move the funds.
+              </p>
+            </div>
+            <div className="px-5 py-4 flex flex-col-reverse sm:flex-row gap-2 sm:justify-end">
+              <button
+                type="button"
+                onClick={() => setConfirmRow(null)}
+                className="px-4 py-2 rounded-md text-xs font-medium text-text-secondary border border-border-primary hover:bg-bg-hover transition-fast"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => doApprove(confirmRow)}
+                className="inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-md text-xs font-semibold bg-success text-black hover:bg-success/90 transition-fast"
+              >
+                <Check size={13} /> Approve
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
