@@ -242,9 +242,12 @@ export default function ReferralPage() {
             <div className="overflow-x-auto -mx-4 sm:-mx-5">
               <table className="w-full min-w-[640px] text-sm">
                 <thead>
+                  {/* KYC column intentionally omitted — exposing a
+                      referred friend's KYC state to the referrer is a
+                      privacy leak the friend never consented to. Bounty
+                      eligibility still enforces KYC server-side. */}
                   <tr className="text-left text-[10px] uppercase tracking-wider text-text-tertiary border-b border-border-primary">
                     <th className="px-4 sm:px-5 py-2">Friend</th>
-                    <th className="px-3 py-2">KYC</th>
                     <th className="px-3 py-2 text-right">Trades</th>
                     <th className="px-3 py-2">Status</th>
                     <th className="px-3 py-2 sm:pr-5 text-right">Action</th>
@@ -254,7 +257,6 @@ export default function ReferralPage() {
                   {rows.map((r) => {
                     const badge = STATUS_BADGE[r.status];
                     const tradesNeeded = list?.required_trades ?? 3;
-                    const kycLabel = (r.kyc_status || 'pending').toLowerCase();
                     return (
                       <tr key={r.user_id} className="border-b border-border-primary/50 last:border-b-0">
                         <td className="px-4 sm:px-5 py-2.5">
@@ -262,17 +264,6 @@ export default function ReferralPage() {
                             {r.name || '—'}
                           </p>
                           <p className="text-[11px] text-text-tertiary truncate max-w-[200px]">{r.email}</p>
-                        </td>
-                        <td className="px-3 py-2.5">
-                          <span
-                            className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-sm"
-                            style={{
-                              color: kycLabel === 'approved' ? '#55a630' : '#9ca3af',
-                              background: kycLabel === 'approved' ? '#55a63022' : '#2e2e2e',
-                            }}
-                          >
-                            {kycLabel}
-                          </span>
                         </td>
                         <td className="px-3 py-2.5 text-right font-mono tabular-nums">
                           <span className={r.trades >= tradesNeeded ? 'text-buy font-semibold' : 'text-text-primary'}>
