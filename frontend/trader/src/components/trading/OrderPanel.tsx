@@ -38,6 +38,7 @@ export default function OrderPanel() {
     positions,
     setPositions,
     refreshPositions,
+    refreshPendingOrders,
     refreshAccount,
     orderFormCloneDraft,
     setOrderFormCloneDraft,
@@ -256,8 +257,10 @@ export default function OrderPanel() {
       }
       // Reset the picker so the next order starts fresh.
       setInsuranceSelection(null);
-      // Reconcile with server-authoritative state (replaces the optimistic row).
-      Promise.all([refreshPositions(), refreshAccount()]).catch(() => {});
+      // Reconcile with server-authoritative state. Pending orders also
+      // need a refresh because a placed limit/stop never produces a
+      // position; the optimistic-position path only covers market.
+      Promise.all([refreshPositions(), refreshPendingOrders(), refreshAccount()]).catch(() => {});
     }).catch((e: any) => {
       if (rollback) rollback();
       toast.error(e.message || 'Order failed');

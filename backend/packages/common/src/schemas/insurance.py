@@ -58,4 +58,17 @@ class InsuranceClaimOut(BaseModel):
     policy_id: UUID
     loss_amount: Decimal
     claim_amount: Decimal
-    paid_at: datetime
+    # 'pending' = trader hasn't pressed Claim yet, 'paid' = credited.
+    status: str
+    # Pending claims have no paid_at / claimed_at yet.
+    paid_at: Optional[datetime] = None
+    claimed_at: Optional[datetime] = None
+    instrument_symbol: Optional[str] = None
+    tier: Optional[str] = None
+
+
+class InsuranceClaimPayResponse(BaseModel):
+    claim_id: UUID
+    amount: Decimal
+    credited_to: str  # 'credit' or 'balance' (depends on payout_to_credit cfg)
+    status: str       # 'paid'

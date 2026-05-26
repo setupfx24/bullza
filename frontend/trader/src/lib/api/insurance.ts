@@ -48,12 +48,25 @@ export interface PolicyOut {
   settled_at: string | null;
 }
 
+export type ClaimStatus = 'pending' | 'paid';
+
 export interface ClaimOut {
   id: string;
   policy_id: string;
   loss_amount: string;
   claim_amount: string;
-  paid_at: string;
+  status: ClaimStatus;
+  paid_at: string | null;
+  claimed_at: string | null;
+  instrument_symbol: string | null;
+  tier: InsuranceTier | null;
+}
+
+export interface ClaimPayResponse {
+  claim_id: string;
+  amount: string;
+  credited_to: 'credit' | 'balance';
+  status: 'paid';
 }
 
 export const insuranceApi = {
@@ -62,5 +75,11 @@ export const insuranceApi = {
     api.post<ActivateResponse>('/insurance/activate', { position_id, tier }),
   active: () => api.get<PolicyOut[]>('/insurance/active'),
   policies: (limit = 50) => api.get<PolicyOut[]>(`/insurance/policies?limit=${limit}`),
-  claims: (limit = 50) => api.get<ClaimOut[]>(`/insurance/claims?limit=${limit}`),
+  claims: (limit = 50, status?: ClaimStatus) => {
+    const params = new URLSearchParams({ limit: String(limit) });
+    if (status) params.set('status', status);
+    return api.get<ClaimOut[]>(`/insurance/claims?${params.toString()}`);
+  },
+  claimPayout: (claimId: string) =>
+    api.post<ClaimPayResponse>(`/insurance/claims/${claimId}/claim`, {}),
 };

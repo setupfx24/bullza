@@ -126,10 +126,20 @@ async def evaluate_claim(
     if profit >= 0:
         return False, Decimal("0"), "not_a_loss"
 
-    # Trade duration ≥ min seconds
+    # Trade duration ≥ min seconds.
+    # trading_service.close_position writes history.closed_at as a naive
+    # datetime.utcnow(), while history.opened_at comes from the DB column
+    # as timezone-aware — subtracting them directly crashes with
+    # "can't subtract offset-naive and offset-aware datetimes" and the
+    # whole maybe_pay flow returns None silently (no claim recorded, no
+    # policy status update). Normalise both to UTC before comparing.
     opened = history.opened_at
     closed = history.closed_at
     if opened and closed:
+        if opened.tzinfo is None:
+            opened = opened.replace(tzinfo=timezone.utc)
+        if closed.tzinfo is None:
+            closed = closed.replace(tzinfo=timezone.utc)
         if (closed - opened).total_seconds() < cfg.min_trade_duration_seconds:
             return False, Decimal("0"), "min_duration"
 
@@ -198,16 +208,19 @@ async def maybe_pay(
     history: TradeHistory,
 ) -> Optional[InsuranceClaim]:
     """Look up the active policy for `position` and, if eligible, record a
-    claim + credit the user's main wallet. Designed to be called inside
-    the same transaction as the position close, immediately before commit.
+    PENDING claim. No wallet credit happens here — the trader must press
+    Claim in the dashboard (see `pay_claim` below) for the funds to land
+    in account.credit. Designed to be called inside the same transaction
+    as the position close, immediately before commit.
 
-    Any unhandled exception is caught and logged — the close itself must
-    still complete even if the payout fails.
+    Function name kept (`maybe_pay`) for caller compatibility, but the
+    semantics changed to manual-claim on 2026-05-25 at the client's
+    request. Any unhandled exception is caught and logged — the close
+    itself must still complete even if recording fails.
     """
     try:
         cfg = await load_config()
 
-        # Try lock the policy row inside the same transaction.
         pol_q = await db.execute(
             select(InsurancePolicy)
             .where(InsurancePolicy.position_id == position.id)
@@ -229,85 +242,45 @@ async def maybe_pay(
             ) else "expired"
             policy.settled_at = datetime.now(timezone.utc)
             logger.info(
-                "Insurance claim denied for policy=%s reason=%s",
+                "Insurance claim denied policy=%s reason=%s",
                 policy.id, reason,
             )
             return None
 
-        # Credit the trading account that took the loss. The destination
-        # column depends on cfg.payout_to_credit:
-        #   True (default, per client request) → account.credit
-        #     The claim is tradable equity (counts toward margin and free
-        #     margin via equity = balance + credit) but is NOT withdrawable.
-        #     This also means it joins the same forfeit-on-first-withdrawal
-        #     pool as the welcome bonus.
-        #   False (legacy) → account.balance
-        #     Classic real-cash payout, fully withdrawable.
-        account_q = await db.execute(
-            select(TradingAccount).where(TradingAccount.id == policy.account_id).with_for_update()
+        # Recompute paid_so_far to decide if this claim exhausts the policy
+        # cap (and therefore should mark the policy as 'claimed' now).
+        paid_so_far_q = await db.execute(
+            select(func.coalesce(func.sum(InsuranceClaim.claim_amount), 0))
+            .where(InsuranceClaim.policy_id == policy.id)
         )
-        account = account_q.scalar_one_or_none()
-        if account is None:
-            return None
-        payout_to_credit = bool(getattr(cfg, "payout_to_credit", True))
-        if payout_to_credit:
-            prev_credit = Decimal(str(account.credit or 0))
-            account.credit = prev_credit + claim_amount
-            # Equity = balance + credit + unrealized_pnl; refresh free margin.
-            if account.equity is not None:
-                account.equity = Decimal(str(account.equity)) + claim_amount
-            balance_after_for_tx = Decimal(str(account.balance or 0))
-            description_suffix = (
-                " — credited to trading credit (tradable, not withdrawable)"
-            )
-        else:
-            prev = Decimal(str(account.balance or 0))
-            new_balance = prev + claim_amount
-            account.balance = new_balance
-            if account.equity is not None:
-                account.equity = Decimal(str(account.equity)) + claim_amount
-            balance_after_for_tx = new_balance
-            description_suffix = ""
+        paid_so_far = Decimal(str(paid_so_far_q.scalar_one() or 0))
 
-        tx = Transaction(
-            id=uuid.uuid4(),
-            user_id=policy.user_id,
-            account_id=policy.account_id,
-            type="insurance_payout",
-            amount=claim_amount,
-            balance_after=balance_after_for_tx,
-            reference_id=policy.id,
-            description=(
-                f"Trade insurance payout — {policy.tier.title()} tier "
-                f"({float(policy.coverage_pct):.0f}% of ${float(-history.profit):.2f} loss)"
-                f"{description_suffix}"
-            ),
-        )
-        db.add(tx)
-        await db.flush()  # tx.id available
-
+        # Pending claim — no transaction, no credit, no paid_at. Just
+        # bookkeeping so the trader's dashboard can render a "Claim
+        # $X.XX" row.
         claim = InsuranceClaim(
             id=uuid.uuid4(),
             policy_id=policy.id,
             user_id=policy.user_id,
             loss_amount=-Decimal(str(history.profit)),
             claim_amount=claim_amount,
-            transaction_id=tx.id,
-            paid_at=datetime.now(timezone.utc),
+            status="pending",
         )
         db.add(claim)
 
-        # Mark "claimed" only when the underlying position is fully closed
-        # OR the policy's coverage cap is now exhausted. Otherwise the policy
-        # stays active to absorb subsequent partial closes.
+        # Mark the policy 'claimed' when the position is fully closed or
+        # the cap is reached — even though no money has moved yet, no
+        # further claims can spawn against this policy. (If the trader
+        # never presses Claim, the row will just sit as 'pending'
+        # indefinitely; admin can audit via the policies view.)
         position_done = position.status == "closed"
         cap_exhausted = (Decimal(str(policy.max_cap)) - paid_so_far - claim_amount) <= 0
         if position_done or cap_exhausted:
             policy.status = "claimed"
-            policy.settled_at = claim.paid_at
+            policy.settled_at = datetime.now(timezone.utc)
 
         logger.info(
-            "Insurance claim paid policy=%s user=%s amount=%s position_done=%s",
+            "Insurance claim pending policy=%s user=%s amount=%s position_done=%s",
             policy.id, policy.user_id, claim_amount, position_done,
         )
         return claim
@@ -315,3 +288,103 @@ async def maybe_pay(
     except Exception as exc:  # never break the close
         logger.exception("maybe_pay failed: %s", exc)
         return None
+
+
+async def pay_claim(
+    *,
+    db: AsyncSession,
+    claim_id: uuid.UUID,
+    user_id: uuid.UUID,
+) -> tuple[Optional[InsuranceClaim], Optional[str]]:
+    """Trader pressed Claim on a pending row. Verifies ownership + state,
+    credits account.credit (or account.balance if admin disabled
+    payout_to_credit), writes the insurance_payout transaction, and
+    flips the claim to 'paid'. Returns (claim, error_reason). `error_reason`
+    is None on success.
+
+    The caller (the FastAPI route) owns the db.commit() — this function
+    only mutates rows inside the active session.
+    """
+    cfg = await load_config()
+
+    claim_q = await db.execute(
+        select(InsuranceClaim)
+        .where(InsuranceClaim.id == claim_id)
+        .with_for_update()
+    )
+    claim = claim_q.scalar_one_or_none()
+    if claim is None:
+        return None, "not_found"
+    if claim.user_id != user_id:
+        # Don't leak existence — same error as not_found.
+        return None, "not_found"
+    if claim.status != "pending":
+        return None, "already_claimed"
+
+    policy_q = await db.execute(
+        select(InsurancePolicy)
+        .where(InsurancePolicy.id == claim.policy_id)
+        .with_for_update()
+    )
+    policy = policy_q.scalar_one_or_none()
+    if policy is None:
+        return None, "policy_missing"
+
+    account_q = await db.execute(
+        select(TradingAccount)
+        .where(TradingAccount.id == policy.account_id)
+        .with_for_update()
+    )
+    account = account_q.scalar_one_or_none()
+    if account is None:
+        return None, "account_missing"
+
+    claim_amount = Decimal(str(claim.claim_amount))
+    payout_to_credit = bool(getattr(cfg, "payout_to_credit", True))
+    if payout_to_credit:
+        prev_credit = Decimal(str(account.credit or 0))
+        account.credit = prev_credit + claim_amount
+        if account.equity is not None:
+            account.equity = Decimal(str(account.equity)) + claim_amount
+        balance_after_for_tx = Decimal(str(account.balance or 0))
+        description_suffix = (
+            " — credited to trading credit (tradable, not withdrawable)"
+        )
+    else:
+        prev = Decimal(str(account.balance or 0))
+        new_balance = prev + claim_amount
+        account.balance = new_balance
+        if account.equity is not None:
+            account.equity = Decimal(str(account.equity)) + claim_amount
+        balance_after_for_tx = new_balance
+        description_suffix = ""
+
+    tx = Transaction(
+        id=uuid.uuid4(),
+        user_id=policy.user_id,
+        account_id=policy.account_id,
+        type="insurance_payout",
+        amount=claim_amount,
+        balance_after=balance_after_for_tx,
+        reference_id=policy.id,
+        description=(
+            f"Trade insurance payout — {policy.tier} tier "
+            f"({float(policy.coverage_pct):.0f}% of "
+            f"${float(claim.loss_amount):.2f} loss)"
+            f"{description_suffix}"
+        ),
+    )
+    db.add(tx)
+    await db.flush()
+
+    now = datetime.now(timezone.utc)
+    claim.status = "paid"
+    claim.claimed_at = now
+    claim.paid_at = now
+    claim.transaction_id = tx.id
+
+    logger.info(
+        "Insurance claim paid claim=%s policy=%s user=%s amount=%s",
+        claim.id, policy.id, policy.user_id, claim_amount,
+    )
+    return claim, None

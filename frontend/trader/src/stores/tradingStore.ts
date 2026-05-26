@@ -119,6 +119,7 @@ interface TradingState {
   removePosition: (id: string) => void;
   removeAccount: (id: string) => void;
   refreshPositions: () => Promise<void>;
+  refreshPendingOrders: () => Promise<void>;
   refreshAccount: () => Promise<void>;
   placeOrder: (data: {
     account_id: string;
@@ -206,6 +207,30 @@ export const useTradingStore = create<TradingState>()((set, get) => ({
           profit: Number(p.profit) || 0,
           trade_type: p.trade_type,
           created_at: p.created_at,
+        })),
+      });
+    } catch {}
+  },
+
+  refreshPendingOrders: async () => {
+    const account = get().activeAccount;
+    if (!account) return;
+    try {
+      const orders = await api.get<any[]>(`/orders/`, { account_id: account.id, status: 'pending' });
+      const list = Array.isArray(orders) ? orders : [];
+      set({
+        pendingOrders: list.map((o: any) => ({
+          id: String(o.id),
+          account_id: String(o.account_id),
+          symbol: String(o.symbol || (o.instrument as { symbol?: string })?.symbol || ''),
+          order_type: String(o.order_type),
+          side: o.side,
+          status: String(o.status),
+          lots: Number(o.lots) || 0,
+          price: Number(o.price) || 0,
+          stop_loss: o.stop_loss != null ? Number(o.stop_loss) : undefined,
+          take_profit: o.take_profit != null ? Number(o.take_profit) : undefined,
+          created_at: String(o.created_at ?? ''),
         })),
       });
     } catch {}
