@@ -30,6 +30,13 @@ export function middleware(req: NextRequest) {
   const marketingHost = process.env.NEXT_PUBLIC_MARKETING_HOST;
   const tradeHost = process.env.NEXT_PUBLIC_TRADE_HOST;
   if (!marketingHost || !tradeHost) return NextResponse.next();
+  // Misconfiguration guard: if both env vars resolve to the same host
+  // the split makes no sense — and the `onTrade && !trade` branch below
+  // would redirect every non-terminal request back to itself, producing
+  // an infinite 308 loop. No-op out of the middleware instead.
+  if (marketingHost.toLowerCase() === tradeHost.toLowerCase()) {
+    return NextResponse.next();
+  }
 
   const host = req.headers.get('host')?.toLowerCase().split(':')[0] ?? '';
   const onMarketing = host === marketingHost.toLowerCase();
