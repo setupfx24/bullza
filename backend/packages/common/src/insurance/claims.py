@@ -126,10 +126,20 @@ async def evaluate_claim(
     if profit >= 0:
         return False, Decimal("0"), "not_a_loss"
 
-    # Trade duration ≥ min seconds
+    # Trade duration ≥ min seconds.
+    # trading_service.close_position writes history.closed_at as a naive
+    # datetime.utcnow(), while history.opened_at comes from the DB column
+    # as timezone-aware — subtracting them directly crashes with
+    # "can't subtract offset-naive and offset-aware datetimes" and the
+    # whole maybe_pay flow returns None silently (no claim recorded, no
+    # policy status update). Normalise both to UTC before comparing.
     opened = history.opened_at
     closed = history.closed_at
     if opened and closed:
+        if opened.tzinfo is None:
+            opened = opened.replace(tzinfo=timezone.utc)
+        if closed.tzinfo is None:
+            closed = closed.replace(tzinfo=timezone.utc)
         if (closed - opened).total_seconds() < cfg.min_trade_duration_seconds:
             return False, Decimal("0"), "min_duration"
 
