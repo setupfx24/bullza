@@ -42,6 +42,10 @@ export default function FixedReturnConfigPage() {
   const [cfg, setCfg] = useState<RateConfig>(FALLBACK);
   const [feePct, setFeePct] = useState<number>(5);
   const [lockMonths, setLockMonths] = useState<number>(24);
+  // Day-of-month payout window. Defaults match the client's banking
+  // cycle (25th → 30th). Setting both to 1/31 disables the gate.
+  const [payoutDayStart, setPayoutDayStart] = useState<number>(25);
+  const [payoutDayEnd, setPayoutDayEnd] = useState<number>(30);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -53,6 +57,8 @@ export default function FixedReturnConfigPage() {
       const rates = list.find((s) => s.key === 'fixed_return_rates')?.value;
       const fee = list.find((s) => s.key === 'fixed_return_early_withdrawal_fee_pct')?.value;
       const lock = list.find((s) => s.key === 'fixed_return_lock_months')?.value;
+      const dayStart = list.find((s) => s.key === 'fixed_return_payout_day_start')?.value;
+      const dayEnd = list.find((s) => s.key === 'fixed_return_payout_day_end')?.value;
       if (rates && Array.isArray(rates.tiers)) {
         setCfg(normalize(rates));
       }
@@ -63,6 +69,14 @@ export default function FixedReturnConfigPage() {
       if (lock != null) {
         const n = Number(lock);
         if (Number.isFinite(n) && n > 0) setLockMonths(Math.floor(n));
+      }
+      if (dayStart != null) {
+        const n = Number(dayStart);
+        if (Number.isFinite(n) && n >= 1 && n <= 31) setPayoutDayStart(Math.floor(n));
+      }
+      if (dayEnd != null) {
+        const n = Number(dayEnd);
+        if (Number.isFinite(n) && n >= 1 && n <= 31) setPayoutDayEnd(Math.floor(n));
       }
     } catch (e: any) {
       toast.error(e?.message || 'Failed to load Fixed Return config');
@@ -173,6 +187,14 @@ export default function FixedReturnConfigPage() {
       toast.error('Lock period must be between 1 and 120 months');
       return;
     }
+    if (payoutDayStart < 1 || payoutDayStart > 31 || payoutDayEnd < 1 || payoutDayEnd > 31) {
+      toast.error('Payout window days must be between 1 and 31');
+      return;
+    }
+    if (payoutDayStart > payoutDayEnd) {
+      toast.error('Payout window start day must be ≤ end day');
+      return;
+    }
     setSaving(true);
     try {
       await adminApi.put('/settings', {
@@ -180,6 +202,8 @@ export default function FixedReturnConfigPage() {
           fixed_return_rates: cfg,
           fixed_return_early_withdrawal_fee_pct: feePct,
           fixed_return_lock_months: lockMonths,
+          fixed_return_payout_day_start: payoutDayStart,
+          fixed_return_payout_day_end: payoutDayEnd,
         },
       });
       toast.success('Fixed Return config saved');
@@ -260,6 +284,39 @@ export default function FixedReturnConfigPage() {
           <p className="text-[10px] text-text-tertiary max-w-xs">
             On early withdrawal: <strong>principal × (1 − fee%) − interest paid so far</strong>.
             Interest payments to date claw back from the returned principal.
+          </p>
+        </div>
+
+        <div className="flex flex-col gap-1">
+          <label className="text-xs font-medium text-text-secondary">
+            Payout window (day of month)
+          </label>
+          <div className="flex items-center gap-2">
+            <input
+              type="number"
+              min={1}
+              max={31}
+              step={1}
+              value={payoutDayStart}
+              onChange={(e) => setPayoutDayStart(Math.min(31, Math.max(1, parseInt(e.target.value) || 1)))}
+              className="w-16 px-2 py-1 text-xs bg-bg-input border border-border-primary rounded font-mono tabular-nums text-text-primary"
+            />
+            <span className="text-xxs text-text-tertiary">to</span>
+            <input
+              type="number"
+              min={1}
+              max={31}
+              step={1}
+              value={payoutDayEnd}
+              onChange={(e) => setPayoutDayEnd(Math.min(31, Math.max(1, parseInt(e.target.value) || 1)))}
+              className="w-16 px-2 py-1 text-xs bg-bg-input border border-border-primary rounded font-mono tabular-nums text-text-primary"
+            />
+          </div>
+          <p className="text-[10px] text-text-tertiary max-w-xs">
+            Interest cycles only credit between these dates each month
+            (default 25 → 30). Outside the window, due interest sits as
+            a pending payout and lands the moment the window opens. Set
+            both to 1 / 31 to disable the gate.
           </p>
         </div>
       </div>

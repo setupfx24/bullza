@@ -105,6 +105,44 @@ def _add_months(dt: datetime, months: int) -> datetime:
     return dt.replace(year=year, month=month, day=day)
 
 
+def _tenure_to_months(tenure_days: int) -> int:
+    """Map the configured tenure_days bucket to whole calendar months so
+    payouts always land on the same day-of-month (the configured payout
+    day-of-month gate, 25 by default). The buckets follow the admin
+    Fixed Return matrix: 30 → 1, 90 → 3, 180 → 6, 365 → 12, 730 → 24."""
+    if tenure_days >= 700:
+        return 24
+    if tenure_days >= 350:
+        return 12
+    if tenure_days >= 170:
+        return 6
+    if tenure_days >= 80:
+        return 3
+    return 1
+
+
+def _snap_to_payout_window(
+    dt: datetime, *, payout_day: int = 25, advance_if_before: bool = False
+) -> datetime:
+    """Snap a datetime to the admin-configured payout day-of-month.
+
+    Client spec: every interest cycle must land between the 25th and 30th
+    of the month. We canonicalize on the 25th (admin-tunable via
+    `fixed_return_payout_day_of_month`) and zero out the time so payouts
+    drop reliably at 00:00 UTC of that day.
+
+    If `advance_if_before` is True and `dt.day > payout_day`, jump to the
+    payout day of the NEXT month instead — useful when the natural cycle
+    end-date already passed this month's window.
+    """
+    payout_day = max(25, min(28, int(payout_day or 25)))
+    if advance_if_before and dt.day > payout_day:
+        dt = _add_months(dt, 1)
+    return dt.replace(
+        day=payout_day, hour=0, minute=0, second=0, microsecond=0,
+    )
+
+
 # ─── Lock flow ───────────────────────────────────────────────────────
 
 async def create_lock(
@@ -291,8 +329,26 @@ async def accrue_due_payouts(db: AsyncSession) -> int:
 
     Idempotency: we only credit cycles whose next_payout_at is already
     in the past — engine ticks repeatedly with no state change.
+
+    Payout window: cycles whose next_payout_at has elapsed only credit
+    when today's day-of-month is inside the admin-set range (default
+    25–30, matching the client's banking-cycle spec). Outside the
+    window the engine returns 0 — interest sits as a pending payout
+    and lands the next time the engine ticks inside the window.
     """
     now = datetime.now(timezone.utc)
+
+    window_start = await get_int_setting("fixed_return_payout_day_start", 25)
+    window_end = await get_int_setting("fixed_return_payout_day_end", 30)
+    if window_start < 1:
+        window_start = 1
+    if window_end > 31:
+        window_end = 31
+    if window_start > window_end:
+        window_start, window_end = window_end, window_start
+    if not (window_start <= now.day <= window_end):
+        return 0
+
     rows = (await db.execute(
         select(FixedReturnLock).where(
             FixedReturnLock.state == "active",
