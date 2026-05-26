@@ -29,14 +29,6 @@ export const NAV_ITEMS: NavItem[] = [
   { label: 'Markets',      href: '/markets' },
   { label: 'Accounts',     href: '/account-types' },
   {
-    label: 'Academy',
-    href: '/academy/pdfs',
-    children: [
-      { label: 'PDFs',   href: '/academy/pdfs' },
-      { label: 'Blogs',  href: '/academy/blogs' },
-    ],
-  },
-  {
     label: 'Risk Management',
     href: '/risk-management/calculator',
     children: [
