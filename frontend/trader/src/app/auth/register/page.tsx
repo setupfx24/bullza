@@ -107,6 +107,12 @@ function RegisterContent() {
   // emits '' when no NEXT_PUBLIC_CLOUDFLARE_TURNSTILE_SITE_KEY is set
   // (dev mode) so the form keeps working without keys.
   const [turnstileToken, setTurnstileToken] = useState('');
+  // Bumped on captcha-related submit failures so the TurnstileWidget
+  // remounts and Cloudflare issues a fresh challenge. Combined with the
+  // widget's own expired/error auto-reset it covers both the
+  // user-took-too-long and the click-immediately-after-expiry timing
+  // windows without forcing a page reload.
+  const [turnstileNonce, setTurnstileNonce] = useState(0);
   // Terms & Conditions / Privacy / Risk Disclaimer agreement. Required
   // before the Sign Up button can submit — gives the user an explicit
   // opt-in for the legal pages they're agreeing to. Unchecked by default
@@ -202,7 +208,14 @@ function RegisterContent() {
       toast.success('Account created — check your email to verify and sign in.');
       router.push(`/auth/check-email?email=${encodeURIComponent(form.email)}`);
     } catch (err: any) {
-      toast.error(err.message || 'Registration failed');
+      const msg = err?.message || 'Registration failed';
+      toast.error(msg);
+      // If the rejection mentions CAPTCHA, force a fresh widget so
+      // the user can re-submit without reloading the entire form.
+      if (/captcha/i.test(msg)) {
+        setTurnstileToken('');
+        setTurnstileNonce((n) => n + 1);
+      }
     } finally {
       setLoading(false);
     }
@@ -463,7 +476,7 @@ function RegisterContent() {
                       time without any UI). Renders nothing if no site key
                       is configured in env. */}
                   <motion.div {...fadeUp(0.7)} style={{ marginTop: 4 }}>
-                    <TurnstileWidget onToken={setTurnstileToken} />
+                    <TurnstileWidget key={turnstileNonce} onToken={setTurnstileToken} />
                   </motion.div>
 
                   {/* Terms & Conditions / Privacy consent. Required —

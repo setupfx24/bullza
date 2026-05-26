@@ -100,10 +100,28 @@ export default function TurnstileWidget({ onToken, className }: Props) {
             if (!cancelled) onToken(token);
           },
           'error-callback': () => {
-            if (!cancelled) onToken('');
+            // Network / challenge failed — drop the old token and ask
+            // Cloudflare for a fresh challenge so the user doesn't have
+            // to reload the page.
+            if (cancelled) return;
+            onToken('');
+            const wid = widgetIdRef.current;
+            if (wid && window.turnstile) {
+              try { window.turnstile.reset(wid); } catch { /* ignore */ }
+            }
           },
           'expired-callback': () => {
-            if (!cancelled) onToken('');
+            // Turnstile tokens are only valid for ~5 minutes. If the
+            // user took longer to fill the form, the previous token is
+            // useless — reset to issue a new one before they hit
+            // Submit, otherwise they see a misleading
+            // "CAPTCHA verification failed" toast and have to reload.
+            if (cancelled) return;
+            onToken('');
+            const wid = widgetIdRef.current;
+            if (wid && window.turnstile) {
+              try { window.turnstile.reset(wid); } catch { /* ignore */ }
+            }
           },
         });
       } catch {
