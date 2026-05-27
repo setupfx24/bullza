@@ -25,7 +25,9 @@ interface ReferralRow {
   email: string;
   trades: number;
   status: 'pending' | 'claimable' | 'claimed';
-  kyc_status: string | null;
+  // Human-readable reason from the server when status === 'pending'.
+  // Doesn't leak the friend's raw KYC state — generic phrases only.
+  pending_reason: string | null;
   qualified_at: string | null;
   claimed_at: string | null;
 }
@@ -298,8 +300,12 @@ export default function ReferralPage() {
                           ) : r.status === 'claimed' ? (
                             <span className="text-[11px] text-text-tertiary">paid</span>
                           ) : (
-                            <span className="text-[11px] text-text-tertiary">
-                              {Math.max(0, tradesNeeded - r.trades)} trade{tradesNeeded - r.trades === 1 ? '' : 's'} to go
+                            // Pending — server tells us which gate is
+                            // blocking the row (KYC not done, no first
+                            // deposit, N trades to go, etc.).
+                            <span className="text-[11px] text-text-tertiary text-right inline-block max-w-[180px]">
+                              {r.pending_reason
+                                || `${Math.max(0, tradesNeeded - r.trades)} trade${tradesNeeded - r.trades === 1 ? '' : 's'} to go`}
                             </span>
                           )}
                         </td>

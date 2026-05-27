@@ -335,6 +335,15 @@ async def list_my_referrals(db: AsyncSession, user_id: UUID) -> dict:
     )).scalars().all()
 
     items = []
+    # Pull the active gate config ONCE — used both to decide per-row
+    # pending reason AND surfaced on the response so the trader page can
+    # render an explainer footer.
+    required_trades = await get_int_setting("referral_qualifying_trades", 3)
+    if required_trades <= 0:
+        required_trades = 3
+    requires_kyc = await get_bool_setting("referral_requires_kyc", True)
+    requires_funded = await get_bool_setting("referral_requires_funded", True)
+
     for r in rows:
         trade_count = (await db.execute(
             select(func.count())
@@ -342,12 +351,54 @@ async def list_my_referrals(db: AsyncSession, user_id: UUID) -> dict:
             .join(TradingAccount, TradingAccount.id == TradeHistory.account_id)
             .where(TradingAccount.user_id == r.id)
         )).scalar() or 0
+
+        kyc_ok = (r.kyc_status or "pending").lower() == "approved"
+
+        # Treat the friend as funded if they have at least one approved
+        # deposit — same gate `maybe_pay_referral_after_trades` uses
+        # before stamping referral_qualified_at.
+        from packages.common.src.models import Deposit
+        funded_count = (await db.execute(
+            select(func.count()).select_from(Deposit).where(
+                Deposit.user_id == r.id,
+                Deposit.status.in_(["approved", "auto_approved"]),
+            )
+        )).scalar() or 0
+        funded_ok = funded_count > 0
+
+        trades_ok = int(trade_count) >= int(required_trades)
+
         if r.referral_claimed_at is not None:
             status = "claimed"
         elif r.referral_qualified_at is not None:
             status = "claimable"
         else:
             status = "pending"
+
+        # Reason text the UI shows in the ACTION column when status is
+        # still `pending`. Priority matches the order the engine checks
+        # gates so the user is told the FIRST missing thing, not all
+        # of them at once. Privacy-safe — generic phrases that don't
+        # expose internal flags (we drop "kyc_status" from the payload
+        # for the same reason).
+        if status == "pending":
+            if requires_kyc and not kyc_ok:
+                pending_reason = "Friend hasn't completed KYC yet"
+            elif requires_funded and not funded_ok:
+                pending_reason = "Friend hasn't made their first deposit yet"
+            elif not trades_ok:
+                remaining = max(0, int(required_trades) - int(trade_count))
+                pending_reason = (
+                    f"{remaining} trade{'s' if remaining != 1 else ''} to go"
+                )
+            else:
+                # All gates effectively passed — the qualification
+                # stamp is just delayed (engine hasn't run yet on a
+                # post-trade close). Tell the user to wait.
+                pending_reason = "Finalising — refresh shortly"
+        else:
+            pending_reason = None
+
         name = " ".join(filter(None, [r.first_name, r.last_name])).strip() or None
         items.append({
             "user_id": str(r.id),
@@ -355,17 +406,12 @@ async def list_my_referrals(db: AsyncSession, user_id: UUID) -> dict:
             "email": r.email,
             "trades": int(trade_count),
             "status": status,
-            "kyc_status": r.kyc_status,
+            # Per-row pending reason for the UI — no raw KYC field is
+            # surfaced (client privacy: removed the KYC column earlier).
+            "pending_reason": pending_reason,
             "qualified_at": r.referral_qualified_at.isoformat() if r.referral_qualified_at else None,
             "claimed_at": r.referral_claimed_at.isoformat() if r.referral_claimed_at else None,
         })
-
-    next_bounty = await _bounty_for_next_claim(db, user_id)
-    required_trades = await get_int_setting("referral_qualifying_trades", 3)
-    if required_trades <= 0:
-        required_trades = 3
-    requires_kyc = await get_bool_setting("referral_requires_kyc", True)
-    requires_funded = await get_bool_setting("referral_requires_funded", True)
 
     return {
         "items": items,
