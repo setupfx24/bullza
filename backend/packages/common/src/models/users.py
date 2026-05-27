@@ -107,6 +107,14 @@ class User(Base):
     referral_commission_balance = Column(
         Numeric(18, 8), nullable=False, default=0, server_default="0",
     )
+    # Per-IB pool of accumulated trade commissions from the MLM chain.
+    # Lives on the IB's user row. Increments inside the IB engine on
+    # each qualifying trade; "Transfer to Main Wallet" on /business
+    # moves this into main_wallet_balance and writes a Transaction.
+    # Migration 0062.
+    ib_commission_balance = Column(
+        Numeric(18, 8), nullable=False, default=0, server_default="0",
+    )
     # Eligibility-nudge engine: when the user crossed the funded-account
     # threshold and we educated them about Fixed Return + Trade Insurance.
     # NULL = never nudged; we re-nudge ~quarterly while still eligible.

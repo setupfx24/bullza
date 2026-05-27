@@ -137,6 +137,18 @@ async def ib_dashboard(
     return await business_service.ib_dashboard(user_id=current_user["user_id"], db=db)
 
 
+@router.post("/ib/transfer")
+async def transfer_ib_commission(
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Sweep the IB's accumulated commission pool into their main
+    wallet. Writes a Transaction + notification."""
+    return await business_service.transfer_ib_commission_to_main_wallet(
+        user_id=current_user["user_id"], db=db,
+    )
+
+
 @router.get("/ib/referrals")
 async def ib_referrals(
     page: int = Query(1, ge=1),

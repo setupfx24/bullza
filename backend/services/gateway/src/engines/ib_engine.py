@@ -16,7 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from packages.common.src.models import (
     Referral, IBProfile, IBCommission, IBCommissionPlan,
-    TradingAccount, Transaction, SystemSetting,
+    TradingAccount, Transaction, SystemSetting, User,
 )
 
 logger = logging.getLogger("ib-engine")
@@ -275,27 +275,21 @@ async def distribute_ib_commission(
 
         current_ib.total_earned = (current_ib.total_earned or Decimal("0")) + share
 
-        ib_account_q = await db.execute(
-            select(TradingAccount).where(
-                TradingAccount.user_id == current_ib.user_id,
-                TradingAccount.is_demo == False,
-                TradingAccount.is_active == True,
-            ).limit(1)
-        )
-        ib_account = ib_account_q.scalar_one_or_none()
-        if ib_account:
-            ib_account.balance = (ib_account.balance or Decimal("0")) + share
-            ib_account.equity = ib_account.balance + (ib_account.credit or Decimal("0"))
-            ib_account.free_margin = ib_account.equity - (ib_account.margin_used or Decimal("0"))
-
-            db.add(Transaction(
-                user_id=current_ib.user_id,
-                account_id=ib_account.id,
-                type="ib_commission",
-                amount=share,
-                balance_after=ib_account.balance,
-                description=f"IB commission L{level}: {instrument_symbol} {lots} lots",
-            ))
+        # 2026-05-26 client change: commissions now accumulate in a
+        # separate `users.ib_commission_balance` pool on the IB's user
+        # row, not directly into their trading account. The IB sees
+        # the pool on /business and presses "Transfer to Main Wallet"
+        # to move it into main_wallet_balance (which the existing
+        # withdraw flow already drains). No Transaction is written at
+        # accrual time — one row lands at transfer time covering the
+        # whole sweep, matching the referral_commission_balance flow.
+        ib_user = (await db.execute(
+            select(User).where(User.id == current_ib.user_id).with_for_update()
+        )).scalar_one_or_none()
+        if ib_user is not None:
+            ib_user.ib_commission_balance = (
+                Decimal(str(ib_user.ib_commission_balance or 0)) + share
+            )
 
         logger.info(f"IB commission L{level}: ${share:.2f} to {current_ib.referral_code} ({instrument_symbol} {lots} lots)")
 

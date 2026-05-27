@@ -219,6 +219,15 @@ function IBTab() {
 
 
 
+  // Exposed so the Transfer-to-Main-Wallet click can refresh the
+  // commission_balance + earnings_by_user lists in place.
+  const fetchDashboard = async () => {
+    try {
+      const d = await api.get<any>('/business/ib/dashboard');
+      setDashboard(d);
+    } catch { /* ignore */ }
+  };
+
   useEffect(() => {
 
     (async () => {
@@ -546,9 +555,121 @@ function IBTab() {
 
       )}
 
+      {/* Commission pool + Transfer-to-Main-Wallet (2026-05-26 client
+          spec). Commissions accumulate per trade in a separate balance;
+          IB presses Transfer to move the pool into the main wallet,
+          then withdraws from there. Card hides itself if the pool is
+          empty AND there's no history of past transfers. */}
+
+      <div className="rounded-xl border border-success/30 bg-success/[0.06] p-4 flex flex-wrap items-center justify-between gap-3">
+
+        <div className="min-w-0">
+
+          <p className="text-xxs uppercase tracking-wider text-text-tertiary">Available commission</p>
+
+          <p className="text-2xl font-bold text-success font-mono tabular-nums mt-0.5">${fmt(dashboard?.commission_balance || 0)}</p>
+
+          <p className="text-[11px] text-text-tertiary mt-0.5">
+
+            Transfer moves the amount into your main wallet — Transactions + notification fire on transfer.
+
+          </p>
+
+        </div>
+
+        <button
+
+          type="button"
+
+          onClick={async () => {
+
+            try {
+
+              const res = await api.post<{ transferred: number }>('/business/ib/transfer', {});
+
+              toast.success(`$${fmt(res.transferred)} moved to main wallet`);
+
+              await fetchDashboard();
+
+            } catch (e: any) {
+
+              toast.error(e?.message || 'Transfer failed');
+
+            }
+
+          }}
+
+          disabled={!(dashboard?.commission_balance > 0)}
+
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-success hover:bg-success/90 text-black font-semibold text-sm disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+
+        >
+
+          Transfer to Main Wallet
+
+        </button>
+
+      </div>
+
+      {/* Per-trader earnings — "kis user se kitna earn kiya" view */}
+
+      {Array.isArray(dashboard?.earnings_by_user) && dashboard.earnings_by_user.length > 0 && (
+
+        <div className="rounded-xl border border-border-primary bg-card noise-texture overflow-hidden">
+
+          <div className="px-4 py-3 border-b border-border-primary">
+
+            <h3 className="text-xs font-semibold text-text-primary">Earnings by Trader</h3>
+
+            <p className="text-[11px] text-text-tertiary mt-0.5">Lifetime commission attributed to each of your referred users.</p>
+
+          </div>
+
+          <table className="w-full text-xs">
+
+            <thead><tr className="border-b border-border-primary text-xxs text-text-tertiary">
+
+              <th className="px-4 py-2 text-left">Trader</th>
+
+              <th className="px-4 py-2 text-right">Trades</th>
+
+              <th className="px-4 py-2 text-right">Earned</th>
+
+            </tr></thead>
+
+            <tbody>
+
+              {dashboard.earnings_by_user.map((r: any) => (
+
+                <tr key={r.user_id} className="border-b border-border-primary/50 last:border-b-0 hover:bg-bg-hover/30">
+
+                  <td className="px-4 py-2.5">
+
+                    <p className="text-text-primary font-semibold truncate max-w-[200px]">{r.name || '—'}</p>
+
+                    <p className="text-[10px] text-text-tertiary truncate max-w-[200px]">{r.email}</p>
+
+                  </td>
+
+                  <td className="px-4 py-2.5 text-right font-mono text-text-secondary tabular-nums">{r.trades_attributed}</td>
+
+                  <td className="px-4 py-2.5 text-right font-mono font-bold text-success tabular-nums">${fmt(r.total_commission || 0)}</td>
+
+                </tr>
+
+              ))}
+
+            </tbody>
+
+          </table>
+
+        </div>
+
+      )}
+
       <div className="rounded-xl border border-accent/25 bg-accent/[0.04] p-3 text-xs text-text-secondary leading-relaxed">
 
-        IB earnings auto-credit to your main wallet as commissions are settled. You can <span className="text-text-primary font-semibold">withdraw them</span> from the Wallet page or <span className="text-text-primary font-semibold">use them to trade</span> by transferring into any trading account — no separate IB wallet to manage.
+        IB commissions accumulate as your referred users trade. Press <span className="text-text-primary font-semibold">Transfer to Main Wallet</span> above to move the pool into withdrawable balance, then <span className="text-text-primary font-semibold">withdraw</span> from the Wallet page.
 
       </div>
 
