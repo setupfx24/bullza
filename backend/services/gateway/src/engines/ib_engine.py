@@ -129,13 +129,49 @@ async def distribute_ib_commission(
     lots: Decimal,
     instrument_symbol: str,
 ):
-    """Called after a market order is filled. Distributes commission to IB chain."""
+    """Called after a market order is filled. Distributes commission to IB chain.
+
+    Eligibility gates (2026-05-26 client request, mirrors the user
+    referral flow):
+      • The trader's KYC must be approved (toggle: ib_commission_requires_kyc).
+      • The trader must have closed at least N trades (default 3, toggle:
+        ib_commission_min_trades). The current order doesn't count yet —
+        we count rows in trade_history.
+    Either gate failing → no commission this trade. The IB still earns
+    from the same trader on every subsequent qualifying trade.
+    """
     referral_q = await db.execute(
         select(Referral).where(Referral.referred_id == trader_user_id)
     )
     referral = referral_q.scalar_one_or_none()
     if not referral or not referral.ib_profile_id:
         return
+
+    # ── Eligibility gates ────────────────────────────────────────────
+    from packages.common.src.models import User, TradeHistory, TradingAccount
+    from packages.common.src.settings_store import (
+        get_bool_setting, get_int_setting,
+    )
+
+    requires_kyc = await get_bool_setting("ib_commission_requires_kyc", True)
+    if requires_kyc:
+        trader = (await db.execute(
+            select(User).where(User.id == trader_user_id)
+        )).scalar_one_or_none()
+        kyc = (getattr(trader, "kyc_status", None) or "pending").lower()
+        if kyc != "approved":
+            return
+
+    min_trades = await get_int_setting("ib_commission_min_trades", 3)
+    if min_trades > 0:
+        closed_n = (await db.execute(
+            select(func.count())
+            .select_from(TradeHistory)
+            .join(TradingAccount, TradingAccount.id == TradeHistory.account_id)
+            .where(TradingAccount.user_id == trader_user_id)
+        )).scalar() or 0
+        if int(closed_n) < min_trades:
+            return
 
     ib_profile_q = await db.execute(
         select(IBProfile).where(IBProfile.id == referral.ib_profile_id, IBProfile.is_active == True)
