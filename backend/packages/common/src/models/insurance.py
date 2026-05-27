@@ -37,6 +37,11 @@ class InsurancePolicy(Base):
     status = Column(String(16), nullable=False, default="active", server_default="active")
     activated_at = Column(DateTime(timezone=True), nullable=False, default=datetime.utcnow)
     settled_at = Column(DateTime(timezone=True))
+    # Why the policy ended up denied/expired (min_duration, hedge,
+    # daily_claim_limit, vol_too_low, news_blackout, cap_exhausted,
+    # not_a_loss, policy_expired, …). NULL while active or claimed.
+    # Migration 0063 — surfaced on the trader /insurance page.
+    settled_reason = Column(String(40), nullable=True)
 
 
 class InsuranceClaim(Base):

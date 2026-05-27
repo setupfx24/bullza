@@ -16,17 +16,19 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from packages.common.src.models import (
     Referral, IBProfile, IBCommission, IBCommissionPlan,
-    TradingAccount, Transaction, SystemSetting,
+    TradingAccount, Transaction, SystemSetting, User,
 )
 
 logger = logging.getLogger("ib-engine")
 
 DEFAULT_MLM_DISTRIBUTION = [40, 25, 15, 10, 10]
 
-# Fallback used if the system_settings row is absent — matches the
-# default seeded by migration 0043.
+# Fallback used if the system_settings row is absent. Matches the
+# client's 2026-05-26 spec: three levels with admin-tunable commission,
+# resolved by the IB's active-referral count — 1-20 → Starter,
+# 21-100 → Pro, 100+ → Elite. Admin retunes from /admin/config/ib-tiers.
 DEFAULT_IB_TIERS = [
-    {"label": "Starter", "min_referrals": 5,   "max_referrals": 20,   "per_lot": 6,
+    {"label": "Starter", "min_referrals": 1,   "max_referrals": 20,   "per_lot": 6,
      "instant_payout": True, "dedicated_manager": False},
     {"label": "Pro",     "min_referrals": 21,  "max_referrals": 100,  "per_lot": 8,
      "instant_payout": True, "dedicated_manager": True},
@@ -127,13 +129,49 @@ async def distribute_ib_commission(
     lots: Decimal,
     instrument_symbol: str,
 ):
-    """Called after a market order is filled. Distributes commission to IB chain."""
+    """Called after a market order is filled. Distributes commission to IB chain.
+
+    Eligibility gates (2026-05-26 client request, mirrors the user
+    referral flow):
+      • The trader's KYC must be approved (toggle: ib_commission_requires_kyc).
+      • The trader must have closed at least N trades (default 3, toggle:
+        ib_commission_min_trades). The current order doesn't count yet —
+        we count rows in trade_history.
+    Either gate failing → no commission this trade. The IB still earns
+    from the same trader on every subsequent qualifying trade.
+    """
     referral_q = await db.execute(
         select(Referral).where(Referral.referred_id == trader_user_id)
     )
     referral = referral_q.scalar_one_or_none()
     if not referral or not referral.ib_profile_id:
         return
+
+    # ── Eligibility gates ────────────────────────────────────────────
+    from packages.common.src.models import User, TradeHistory, TradingAccount
+    from packages.common.src.settings_store import (
+        get_bool_setting, get_int_setting,
+    )
+
+    requires_kyc = await get_bool_setting("ib_commission_requires_kyc", True)
+    if requires_kyc:
+        trader = (await db.execute(
+            select(User).where(User.id == trader_user_id)
+        )).scalar_one_or_none()
+        kyc = (getattr(trader, "kyc_status", None) or "pending").lower()
+        if kyc != "approved":
+            return
+
+    min_trades = await get_int_setting("ib_commission_min_trades", 3)
+    if min_trades > 0:
+        closed_n = (await db.execute(
+            select(func.count())
+            .select_from(TradeHistory)
+            .join(TradingAccount, TradingAccount.id == TradeHistory.account_id)
+            .where(TradingAccount.user_id == trader_user_id)
+        )).scalar() or 0
+        if int(closed_n) < min_trades:
+            return
 
     ib_profile_q = await db.execute(
         select(IBProfile).where(IBProfile.id == referral.ib_profile_id, IBProfile.is_active == True)
@@ -237,27 +275,21 @@ async def distribute_ib_commission(
 
         current_ib.total_earned = (current_ib.total_earned or Decimal("0")) + share
 
-        ib_account_q = await db.execute(
-            select(TradingAccount).where(
-                TradingAccount.user_id == current_ib.user_id,
-                TradingAccount.is_demo == False,
-                TradingAccount.is_active == True,
-            ).limit(1)
-        )
-        ib_account = ib_account_q.scalar_one_or_none()
-        if ib_account:
-            ib_account.balance = (ib_account.balance or Decimal("0")) + share
-            ib_account.equity = ib_account.balance + (ib_account.credit or Decimal("0"))
-            ib_account.free_margin = ib_account.equity - (ib_account.margin_used or Decimal("0"))
-
-            db.add(Transaction(
-                user_id=current_ib.user_id,
-                account_id=ib_account.id,
-                type="ib_commission",
-                amount=share,
-                balance_after=ib_account.balance,
-                description=f"IB commission L{level}: {instrument_symbol} {lots} lots",
-            ))
+        # 2026-05-26 client change: commissions now accumulate in a
+        # separate `users.ib_commission_balance` pool on the IB's user
+        # row, not directly into their trading account. The IB sees
+        # the pool on /business and presses "Transfer to Main Wallet"
+        # to move it into main_wallet_balance (which the existing
+        # withdraw flow already drains). No Transaction is written at
+        # accrual time — one row lands at transfer time covering the
+        # whole sweep, matching the referral_commission_balance flow.
+        ib_user = (await db.execute(
+            select(User).where(User.id == current_ib.user_id).with_for_update()
+        )).scalar_one_or_none()
+        if ib_user is not None:
+            ib_user.ib_commission_balance = (
+                Decimal(str(ib_user.ib_commission_balance or 0)) + share
+            )
 
         logger.info(f"IB commission L{level}: ${share:.2f} to {current_ib.referral_code} ({instrument_symbol} {lots} lots)")
 

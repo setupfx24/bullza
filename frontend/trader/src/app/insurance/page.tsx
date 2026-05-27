@@ -26,6 +26,29 @@ function formatTier(t: string | null | undefined): string {
   return t;
 }
 
+// Maps the technical reason code from the claims engine to a short
+// trader-friendly explanation. Anything we don't recognise falls
+// through to a generic fallback so we never render a raw code.
+function formatReason(code: string | null | undefined): string | null {
+  if (!code) return null;
+  switch (code) {
+    case 'not_a_loss':           return 'Trade closed in profit — no claim';
+    case 'min_duration':         return 'Trade closed too quickly (anti-abuse minimum)';
+    case 'hedge':                return 'Hedge detected on the same instrument';
+    case 'cooldown':             return 'Cooldown window between claims is still active';
+    case 'daily_claim_limit':    return 'Daily claim limit reached';
+    case 'daily_payout_limit':   return 'Daily payout cap reached';
+    case 'vol_too_low':          return 'Market volatility too low';
+    case 'vol_too_high':         return 'Market volatility too high';
+    case 'news_blackout':        return 'News blackout — claims paused';
+    case 'insurance_disabled':   return 'Insurance was disabled at close time';
+    case 'policy_expired':       return 'Trade closed after the policy validity window';
+    case 'cap_exhausted':        return 'Coverage cap already paid out on prior partial closes';
+    case 'zero_payout':          return 'Calculated payout was zero';
+    default:                     return code.replace(/_/g, ' ');
+  }
+}
+
 export default function InsurancePage() {
   const [policies, setPolicies] = useState<PolicyOut[] | null>(null);
   const [claims, setClaims] = useState<ClaimOut[] | null>(null);
@@ -71,6 +94,14 @@ export default function InsurancePage() {
   const pendingClaims = (claims || []).filter((c) => c.status === 'pending');
   const paidClaims = (claims || []).filter((c) => c.status === 'paid');
 
+  // Stat totals for the summary strip.
+  const totalClaimableAmount = pendingClaims.reduce(
+    (s, c) => s + Number(c.claim_amount || 0), 0,
+  );
+  const totalClaimedAmount = paidClaims.reduce(
+    (s, c) => s + Number(c.claim_amount || 0), 0,
+  );
+
   return (
     <DashboardShell>
       <InsuranceOnboardingModal />
@@ -100,6 +131,29 @@ export default function InsurancePage() {
           </div>
         ) : (
           <>
+            {/* Summary strip — three stat cards. Total Claimed is the
+                lifetime sum of claim payouts already swept into the
+                user's trading credit (tradable, not withdrawable). */}
+            <section className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              <Stat
+                label="Claimable"
+                value={`$${totalClaimableAmount.toFixed(2)}`}
+                sub={pendingClaims.length > 0 ? `${pendingClaims.length} payout${pendingClaims.length === 1 ? '' : 's'} waiting` : 'none yet'}
+                tone={pendingClaims.length > 0 ? 'text-[#55a630]' : 'text-text-secondary'}
+              />
+              <Stat
+                label="Total Claimed"
+                value={`$${totalClaimedAmount.toFixed(2)}`}
+                sub={paidClaims.length > 0 ? `across ${paidClaims.length} payout${paidClaims.length === 1 ? '' : 's'}` : 'no payouts yet'}
+                tone="text-green-500"
+              />
+              <Stat
+                label="Policies"
+                value={String(policies?.length ?? 0)}
+                sub={`${(policies || []).filter((p) => p.status === 'active').length} active`}
+                tone="text-text-primary"
+              />
+            </section>
             {/* Claimable — trader presses Claim to credit account.credit */}
             <Card
               title={`Claimable${pendingClaims.length ? ` (${pendingClaims.length})` : ''}`}
@@ -168,32 +222,43 @@ export default function InsurancePage() {
                 <Empty msg="You have no insurance policies yet. Activate insurance from the order ticket on the trading terminal." />
               ) : (
                 <ul className="divide-y divide-border-primary">
-                  {policies.map((p) => (
-                    <li key={p.id} className="py-3 flex items-center gap-3">
-                      <span
-                        className="text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-full"
-                        style={{
-                          color: STATUS_COLOR[p.status],
-                          background: `${STATUS_COLOR[p.status]}1f`,
-                          border: `1px solid ${STATUS_COLOR[p.status]}55`,
-                        }}
-                      >
-                        {p.status}
-                      </span>
-                      <span className="text-sm font-semibold text-text-primary truncate flex-1">
-                        {p.instrument_symbol || '—'} <span className="text-text-tertiary">·</span>{' '}
-                        <span className="text-[#55a630]">{formatTier(p.tier)}</span>
-                      </span>
-                      <div className="text-right shrink-0">
-                        <p className="text-xs font-mono tabular-nums text-text-primary">
-                          ${Number(p.fee).toFixed(2)} fee
-                        </p>
-                        <p className="text-[10px] text-text-tertiary">
-                          {Number(p.coverage_pct).toFixed(0)}% covered · max ${Number(p.max_cap).toFixed(0)}
-                        </p>
-                      </div>
-                    </li>
-                  ))}
+                  {policies.map((p) => {
+                    const reason = formatReason(p.settled_reason);
+                    return (
+                      <li key={p.id} className="py-3 flex items-start gap-3 flex-wrap">
+                        <span
+                          className="text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-full mt-0.5"
+                          style={{
+                            color: STATUS_COLOR[p.status],
+                            background: `${STATUS_COLOR[p.status]}1f`,
+                            border: `1px solid ${STATUS_COLOR[p.status]}55`,
+                          }}
+                        >
+                          {p.status}
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-semibold text-text-primary truncate">
+                            {p.instrument_symbol || '—'}{' '}
+                            <span className="text-text-tertiary">·</span>{' '}
+                            <span className="text-[#55a630]">{formatTier(p.tier)}</span>
+                          </p>
+                          {reason && (p.status === 'denied' || p.status === 'expired') && (
+                            <p className="text-[11px] text-text-tertiary mt-0.5">
+                              <span className="font-medium text-text-secondary">Reason:</span> {reason}
+                            </p>
+                          )}
+                        </div>
+                        <div className="text-right shrink-0">
+                          <p className="text-xs font-mono tabular-nums text-text-primary">
+                            ${Number(p.fee).toFixed(2)} fee
+                          </p>
+                          <p className="text-[10px] text-text-tertiary">
+                            {Number(p.coverage_pct).toFixed(0)}% covered · max ${Number(p.max_cap).toFixed(0)}
+                          </p>
+                        </div>
+                      </li>
+                    );
+                  })}
                 </ul>
               )}
             </Card>
@@ -249,4 +314,24 @@ function Card({ title, children, accent = false }: { title: string; children: Re
 
 function Empty({ msg }: { msg: string }) {
   return <p className="text-sm text-text-secondary text-center py-6">{msg}</p>;
+}
+
+function Stat({
+  label, value, sub, tone,
+}: { label: string; value: string; sub?: string; tone?: string }) {
+  return (
+    <div
+      className="rounded-2xl p-4"
+      style={{
+        background: 'var(--bg-card)',
+        border: '1px solid var(--border-primary)',
+      }}
+    >
+      <p className="text-[10px] uppercase tracking-wider text-text-tertiary">{label}</p>
+      <p className={`text-xl sm:text-2xl font-bold font-mono tabular-nums mt-1 ${tone || 'text-text-primary'}`}>
+        {value}
+      </p>
+      {sub && <p className="text-[10px] text-text-tertiary mt-0.5">{sub}</p>}
+    </div>
+  );
 }

@@ -104,16 +104,26 @@ export default function FixedReturnPage() {
     return cfg.rate_matrix_pct[tenureIdx]?.[tierIdx] ?? 0;
   }, [cfg, tierIdx, tenureIdx]);
 
-  // Projected interest. Tenure now controls cadence, not duration —
-  // total interest = principal * rate% * (lockMonths*30.4375 / tenureDays).
+  // Projected interest (client spec 2026-05-26): rate_pct is a
+  // PER-MONTH percentage; the tenure decides the cadence and bundles
+  // `monthsPerCycle` months of accrual into one credit. So:
+  //   perCycle = principal * rate% * monthsPerCycle
+  //   total    = principal * rate% * lockMonths
+  // Example: $1000 at 2% Quarterly → $20/mo × 3 = $60 per quarterly payout.
   const projected = useMemo(() => {
     if (!cfg || tenureIdx < 0 || ratePct <= 0 || principal <= 0) {
       return { perCycle: 0, cycles: 0, total: 0, payout: principal };
     }
     const t = cfg.tenures[tenureIdx];
-    const cycles = Math.max(1, Math.floor((cfg.lock_months * 30.4375) / Math.max(1, t.days)));
-    const perCycle = principal * (ratePct / 100);
-    const total = perCycle * cycles;
+    const monthsPerCycle =
+      t.days >= 700 ? 24
+      : t.days >= 350 ? 12
+      : t.days >= 170 ? 6
+      : t.days >= 80 ? 3
+      : 1;
+    const cycles = Math.max(1, Math.floor(cfg.lock_months / monthsPerCycle));
+    const perCycle = principal * (ratePct / 100) * monthsPerCycle;
+    const total = principal * (ratePct / 100) * cfg.lock_months;
     return { perCycle, cycles, total, payout: principal + total };
   }, [cfg, tenureIdx, ratePct, principal]);
 

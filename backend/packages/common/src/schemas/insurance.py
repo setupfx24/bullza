@@ -51,6 +51,10 @@ class InsurancePolicyOut(BaseModel):
     status: str
     activated_at: datetime
     settled_at: Optional[datetime] = None
+    # Why the policy ended up denied/expired (min_duration,
+    # daily_claim_limit, not_a_loss, …). NULL while active or
+    # successfully claimed. Frontend maps the code to a friendly label.
+    settled_reason: Optional[str] = None
 
 
 class InsuranceClaimOut(BaseModel):

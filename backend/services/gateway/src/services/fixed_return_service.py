@@ -105,6 +105,44 @@ def _add_months(dt: datetime, months: int) -> datetime:
     return dt.replace(year=year, month=month, day=day)
 
 
+def _tenure_to_months(tenure_days: int) -> int:
+    """Map the configured tenure_days bucket to whole calendar months so
+    payouts always land on the same day-of-month (the configured payout
+    day-of-month gate, 25 by default). The buckets follow the admin
+    Fixed Return matrix: 30 → 1, 90 → 3, 180 → 6, 365 → 12, 730 → 24."""
+    if tenure_days >= 700:
+        return 24
+    if tenure_days >= 350:
+        return 12
+    if tenure_days >= 170:
+        return 6
+    if tenure_days >= 80:
+        return 3
+    return 1
+
+
+def _snap_to_payout_window(
+    dt: datetime, *, payout_day: int = 25, advance_if_before: bool = False
+) -> datetime:
+    """Snap a datetime to the admin-configured payout day-of-month.
+
+    Client spec: every interest cycle must land between the 25th and 30th
+    of the month. We canonicalize on the 25th (admin-tunable via
+    `fixed_return_payout_day_of_month`) and zero out the time so payouts
+    drop reliably at 00:00 UTC of that day.
+
+    If `advance_if_before` is True and `dt.day > payout_day`, jump to the
+    payout day of the NEXT month instead — useful when the natural cycle
+    end-date already passed this month's window.
+    """
+    payout_day = max(25, min(28, int(payout_day or 25)))
+    if advance_if_before and dt.day > payout_day:
+        dt = _add_months(dt, 1)
+    return dt.replace(
+        day=payout_day, hour=0, minute=0, second=0, microsecond=0,
+    )
+
+
 # ─── Lock flow ───────────────────────────────────────────────────────
 
 async def create_lock(
@@ -158,7 +196,16 @@ async def create_lock(
 
     now = datetime.now(timezone.utc)
     matures_at = _add_months(now, lock_months)
-    next_payout_at = now + timedelta(days=tenure_days)
+    # Snap interest payouts to a fixed day-of-month window (25th by
+    # default) so users always see their interest land in the 25-30 of
+    # the month, regardless of lock day. Calendar-month cadence (1 / 3 /
+    # 6 / 12 / 24 months) keeps the day stable across cycles.
+    payout_dom = await get_int_setting("fixed_return_payout_day_of_month", 25)
+    cycle_months = _tenure_to_months(tenure_days)
+    cycle_end = _add_months(now, cycle_months)
+    next_payout_at = _snap_to_payout_window(
+        cycle_end, payout_day=payout_dom, advance_if_before=True,
+    )
     # If the first cycle would land past maturity (e.g. 2-Year tenure
     # in a 24-month lock), clamp to maturity so the user receives
     # exactly one cycle at the end.
@@ -291,8 +338,26 @@ async def accrue_due_payouts(db: AsyncSession) -> int:
 
     Idempotency: we only credit cycles whose next_payout_at is already
     in the past — engine ticks repeatedly with no state change.
+
+    Payout window: cycles whose next_payout_at has elapsed only credit
+    when today's day-of-month is inside the admin-set range (default
+    25–30, matching the client's banking-cycle spec). Outside the
+    window the engine returns 0 — interest sits as a pending payout
+    and lands the next time the engine ticks inside the window.
     """
     now = datetime.now(timezone.utc)
+
+    window_start = await get_int_setting("fixed_return_payout_day_start", 25)
+    window_end = await get_int_setting("fixed_return_payout_day_end", 30)
+    if window_start < 1:
+        window_start = 1
+    if window_end > 31:
+        window_end = 31
+    if window_start > window_end:
+        window_start, window_end = window_end, window_start
+    if not (window_start <= now.day <= window_end):
+        return 0
+
     rows = (await db.execute(
         select(FixedReturnLock).where(
             FixedReturnLock.state == "active",
@@ -311,9 +376,15 @@ async def accrue_due_payouts(db: AsyncSession) -> int:
                 lock.next_payout_at = None
                 continue
 
+            # Rate matrix cell is a PER-MONTH percentage (client spec
+            # 2026-05-26). Tenure decides cadence; each payout bundles
+            # `months_per_cycle` months of accrual into a single credit.
+            # Example: $1000 quarterly at 2% → 2% × 3 months = $60.
+            months_per_cycle = _tenure_to_months(int(lock.tenure_days or 0))
             interest = (
                 Decimal(str(lock.principal or 0))
                 * Decimal(str(lock.rate_pct or 0))
+                * Decimal(str(months_per_cycle))
                 / Decimal("100")
             ).quantize(Decimal("0.01"))
             if interest <= 0:
@@ -328,9 +399,11 @@ async def accrue_due_payouts(db: AsyncSession) -> int:
             )
             lock.payouts_count = int(lock.payouts_count or 0) + 1
 
-            # Advance the schedule. If the next cycle would land past
-            # maturity we mark the schedule as done (next = NULL) — the
-            # principal will be returned when the user calls withdraw
+            # Advance the schedule by exactly one calendar cycle so the
+            # day-of-month stays stable across cycles (always lands on
+            # the configured 25-30 window). If the next cycle would
+            # land past maturity we mark the schedule done (next = NULL)
+            # — the principal is returned when the user calls withdraw
             # after matures_at.
             matures_at = lock.matures_at
             if matures_at and matures_at.tzinfo is None:
@@ -338,7 +411,18 @@ async def accrue_due_payouts(db: AsyncSession) -> int:
             nxt = (lock.next_payout_at or now)
             if nxt.tzinfo is None:
                 nxt = nxt.replace(tzinfo=timezone.utc)
-            advanced = nxt + timedelta(days=int(lock.tenure_days or 0))
+            cycle_months = _tenure_to_months(int(lock.tenure_days or 0))
+            advanced = _add_months(nxt, cycle_months)
+            # Re-snap to the payout day-of-month — _add_months keeps the
+            # original day (already 25), so this is a no-op for normal
+            # cycles, but it self-heals if the row was created before
+            # this fix shipped.
+            payout_dom = await get_int_setting(
+                "fixed_return_payout_day_of_month", 25
+            )
+            advanced = _snap_to_payout_window(
+                advanced, payout_day=payout_dom, advance_if_before=False,
+            )
             if matures_at and advanced >= matures_at:
                 lock.next_payout_at = None
             else:
@@ -369,16 +453,14 @@ def _serialize_lock(r: FixedReturnLock) -> dict:
     principal = Decimal(str(r.principal or 0))
     rate_pct = Decimal(str(r.rate_pct or 0))
     interest_paid = Decimal(str(r.total_interest_paid or 0))
-    # Projected total interest assumes the lock runs to maturity. Used
-    # by the trader UI calculator.
+    # Projection: rate_pct is per-MONTH (client spec 2026-05-26), so
+    # the user receives `principal * rate_pct% * lock_months` total
+    # interest if the lock runs to maturity. Cadence (Month / Quarter /
+    # etc.) only changes when the money lands, not how much.
     lock_months = int(r.lock_months_at_creation or 24)
-    cycles_total = max(
-        1,
-        int((Decimal(lock_months) * DAYS_PER_MONTH_APPROX) // Decimal(max(1, r.tenure_days or 1))),
-    )
-    projected_interest = (principal * rate_pct / Decimal("100") * Decimal(cycles_total)).quantize(
-        Decimal("0.01")
-    )
+    projected_interest = (
+        principal * rate_pct * Decimal(lock_months) / Decimal("100")
+    ).quantize(Decimal("0.01"))
 
     return {
         "id": str(r.id),

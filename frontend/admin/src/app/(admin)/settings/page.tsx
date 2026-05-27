@@ -15,11 +15,20 @@ interface Settings {
   max_lot_size: number;
   min_lot_size: number;
   ib_min_deposit_usd: number;
+  // Platform-wide minimums applied to every trader's deposit /
+  // withdrawal submission. 0 = no minimum.
+  min_deposit_amount_usd: number;
+  min_withdrawal_amount_usd: number;
   referral_commission_amount_usd: number;
   referral_amount_standard_usd: number;
   referral_amount_ecn_usd: number;
   referral_amount_vip_usd: number;
   referral_qualifying_trades: number;
+  // IB commission gates (mirror of the referral gates above).
+  // Trader's KYC must be approved + at least N closed trades on file
+  // before the IB engine pays out on any subsequent trade.
+  ib_commission_requires_kyc: boolean;
+  ib_commission_min_trades: number;
   maintenance_mode: boolean;
   allow_new_registrations: boolean;
   allow_deposits: boolean;
@@ -41,11 +50,15 @@ const DEFAULT_SETTINGS: Settings = {
   max_lot_size: 100,
   min_lot_size: 0.01,
   ib_min_deposit_usd: 100,
+  min_deposit_amount_usd: 50,
+  min_withdrawal_amount_usd: 70,
   referral_commission_amount_usd: 5,
   referral_amount_standard_usd: 5,
   referral_amount_ecn_usd: 7,
   referral_amount_vip_usd: 10,
   referral_qualifying_trades: 3,
+  ib_commission_requires_kyc: true,
+  ib_commission_min_trades: 3,
   maintenance_mode: false,
   allow_new_registrations: true,
   allow_deposits: true,
@@ -78,6 +91,8 @@ function rowsToSettings(rows: SystemSettingRow[]): Settings {
     max_lot_size: num('max_lot_size', DEFAULT_SETTINGS.max_lot_size),
     min_lot_size: num('min_lot_size', DEFAULT_SETTINGS.min_lot_size),
     ib_min_deposit_usd: num('ib_min_deposit_usd', DEFAULT_SETTINGS.ib_min_deposit_usd),
+    min_deposit_amount_usd: num('min_deposit_amount_usd', DEFAULT_SETTINGS.min_deposit_amount_usd),
+    min_withdrawal_amount_usd: num('min_withdrawal_amount_usd', DEFAULT_SETTINGS.min_withdrawal_amount_usd),
     referral_commission_amount_usd: num(
       'referral_commission_amount_usd',
       DEFAULT_SETTINGS.referral_commission_amount_usd as number,
@@ -115,6 +130,14 @@ function rowsToSettings(rows: SystemSettingRow[]): Settings {
       'referral_qualifying_trades',
       DEFAULT_SETTINGS.referral_qualifying_trades as number,
     ),
+    ib_commission_requires_kyc: bool(
+      'ib_commission_requires_kyc',
+      DEFAULT_SETTINGS.ib_commission_requires_kyc,
+    ),
+    ib_commission_min_trades: num(
+      'ib_commission_min_trades',
+      DEFAULT_SETTINGS.ib_commission_min_trades as number,
+    ),
     maintenance_mode: bool('maintenance_mode', DEFAULT_SETTINGS.maintenance_mode),
     allow_new_registrations: bool('allow_new_registrations', DEFAULT_SETTINGS.allow_new_registrations),
     allow_deposits: bool('allow_deposits', DEFAULT_SETTINGS.allow_deposits),
@@ -132,6 +155,8 @@ function settingsToPayload(s: Settings): Record<string, unknown> {
     max_lot_size: s.max_lot_size,
     min_lot_size: s.min_lot_size,
     ib_min_deposit_usd: s.ib_min_deposit_usd,
+    min_deposit_amount_usd: s.min_deposit_amount_usd,
+    min_withdrawal_amount_usd: s.min_withdrawal_amount_usd,
     // Flat legacy amount stays — used as the fallback when the
     // referred user's account type isn't in the per-type map below.
     referral_commission_amount_usd: s.referral_commission_amount_usd,
@@ -143,6 +168,8 @@ function settingsToPayload(s: Settings): Record<string, unknown> {
       vip: s.referral_amount_vip_usd,
     },
     referral_qualifying_trades: s.referral_qualifying_trades,
+    ib_commission_requires_kyc: s.ib_commission_requires_kyc,
+    ib_commission_min_trades: s.ib_commission_min_trades,
     maintenance_mode: s.maintenance_mode,
     allow_new_registrations: s.allow_new_registrations,
     allow_deposits: s.allow_deposits,
@@ -213,6 +240,8 @@ export default function SettingsPage() {
     if (s.max_lot_size <= 0) return 'Max lot size must be greater than 0';
     if (s.min_lot_size >= s.max_lot_size) return 'Min lot size must be less than max lot size';
     if (s.ib_min_deposit_usd < 0) return 'IB minimum deposit cannot be negative';
+    if (s.min_deposit_amount_usd < 0) return 'Minimum deposit cannot be negative';
+    if (s.min_withdrawal_amount_usd < 0) return 'Minimum withdrawal cannot be negative';
     if (s.referral_commission_amount_usd < 0) {
       return 'Referral payout cannot be negative';
     }
@@ -353,6 +382,54 @@ export default function SettingsPage() {
 
             <div className="bg-bg-secondary border border-border-primary rounded-md">
               <div className="px-4 py-3 border-b border-border-primary">
+                <h2 className="text-sm font-medium text-text-primary">Wallet Limits</h2>
+                <p className="text-xxs text-text-tertiary mt-0.5">
+                  Platform-wide minimum amounts every trader sees on the deposit /
+                  withdrawal form. Set 0 to disable a minimum.
+                </p>
+              </div>
+              <div className="p-4 space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-4">
+                  <div className="min-w-0 flex-1">
+                    <label className="text-xs text-text-secondary block">Minimum Deposit</label>
+                    <p className="text-xxs text-text-tertiary mt-0.5">Any deposit below this amount is rejected before it reaches the bank/crypto picker.</p>
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <span className="text-xxs text-text-tertiary">$</span>
+                    <input
+                      type="number"
+                      step="1"
+                      min="0"
+                      value={settings.min_deposit_amount_usd}
+                      onChange={(e) => updateNum('min_deposit_amount_usd', e.target.value)}
+                      className="w-28 text-xs py-1.5 px-2 bg-bg-input border border-border-primary rounded-md font-mono tabular-nums text-right"
+                    />
+                    <span className="text-xxs text-text-tertiary w-8">USD</span>
+                  </div>
+                </div>
+                <div className="flex flex-wrap items-center justify-between gap-4">
+                  <div className="min-w-0 flex-1">
+                    <label className="text-xs text-text-secondary block">Minimum Withdrawal</label>
+                    <p className="text-xxs text-text-tertiary mt-0.5">Any withdrawal request below this amount is rejected with a clear message.</p>
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <span className="text-xxs text-text-tertiary">$</span>
+                    <input
+                      type="number"
+                      step="1"
+                      min="0"
+                      value={settings.min_withdrawal_amount_usd}
+                      onChange={(e) => updateNum('min_withdrawal_amount_usd', e.target.value)}
+                      className="w-28 text-xs py-1.5 px-2 bg-bg-input border border-border-primary rounded-md font-mono tabular-nums text-right"
+                    />
+                    <span className="text-xxs text-text-tertiary w-8">USD</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-bg-secondary border border-border-primary rounded-md">
+              <div className="px-4 py-3 border-b border-border-primary">
                 <h2 className="text-sm font-medium text-text-primary">Business / IB Program</h2>
                 <p className="text-xxs text-text-tertiary mt-0.5">Eligibility gate for users applying to become an Introducing Broker.</p>
               </div>
@@ -373,6 +450,47 @@ export default function SettingsPage() {
                       className="w-28 text-xs py-1.5 px-2 bg-bg-input border border-border-primary rounded-md font-mono tabular-nums text-right"
                     />
                     <span className="text-xxs text-text-tertiary w-8">USD</span>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center justify-between gap-4 pt-3 border-t border-border-primary/60">
+                  <div className="min-w-0 flex-1">
+                    <label className="text-xs text-text-secondary block">Require KYC on the trader</label>
+                    <p className="text-xxs text-text-tertiary mt-0.5">If on, the IB chain only earns commission on trades placed by a KYC-approved trader.</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => updateBool('ib_commission_requires_kyc', !settings.ib_commission_requires_kyc)}
+                    className={cn(
+                      'inline-flex h-6 w-11 items-center rounded-full transition-fast shrink-0',
+                      settings.ib_commission_requires_kyc ? 'bg-success' : 'bg-bg-tertiary',
+                    )}
+                    aria-pressed={settings.ib_commission_requires_kyc}
+                  >
+                    <span
+                      className={cn(
+                        'inline-block h-5 w-5 transform rounded-full bg-white transition-fast',
+                        settings.ib_commission_requires_kyc ? 'translate-x-5' : 'translate-x-1',
+                      )}
+                    />
+                  </button>
+                </div>
+
+                <div className="flex flex-wrap items-center justify-between gap-4">
+                  <div className="min-w-0 flex-1">
+                    <label className="text-xs text-text-secondary block">Minimum closed trades</label>
+                    <p className="text-xxs text-text-tertiary mt-0.5">IB commission only pays after the referred trader has closed at least this many trades. 0 disables the gate.</p>
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <input
+                      type="number"
+                      step="1"
+                      min="0"
+                      value={settings.ib_commission_min_trades}
+                      onChange={(e) => updateNum('ib_commission_min_trades', e.target.value)}
+                      className="w-24 text-xs py-1.5 px-2 bg-bg-input border border-border-primary rounded-md font-mono tabular-nums text-right"
+                    />
+                    <span className="text-xxs text-text-tertiary">trades</span>
                   </div>
                 </div>
               </div>

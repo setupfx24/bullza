@@ -238,6 +238,46 @@ async def ib_dashboard(user_id: UUID, db: AsyncSession) -> dict:
             needed_for_next = lo - int(total_referrals or 0)
             break
 
+    # Accumulated commission pool — populated by the IB engine on each
+    # qualifying trade. The IB sees this number on /business and can
+    # press "Transfer to Main Wallet" to sweep it into withdrawable
+    # balance (handled by transfer_ib_commission_to_main_wallet).
+    from packages.common.src.models import User as _U
+    ib_user = (await db.execute(
+        select(_U).where(_U.id == user_id)
+    )).scalar_one_or_none()
+    commission_balance = float(ib_user.ib_commission_balance or 0) if ib_user else 0.0
+
+    # Per-source-user breakdown — "kis user se kitna earn kiya" view.
+    # Aggregates IBCommission rows for this IB grouped by the trader
+    # who triggered the commission. Joins to users to surface name +
+    # email so the dashboard can render the table directly.
+    per_user_rows = (await db.execute(
+        select(
+            IBCommission.source_user_id,
+            _U.first_name,
+            _U.last_name,
+            _U.email,
+            func.sum(IBCommission.amount).label("total"),
+            func.count(IBCommission.id).label("count"),
+        )
+        .join(_U, _U.id == IBCommission.source_user_id)
+        .where(IBCommission.ib_id == profile.id)
+        .group_by(IBCommission.source_user_id, _U.first_name, _U.last_name, _U.email)
+        .order_by(func.sum(IBCommission.amount).desc())
+        .limit(100)
+    )).all()
+    earnings_by_user = [
+        {
+            "user_id": str(row[0]),
+            "name": " ".join(filter(None, [row[1], row[2]])).strip() or None,
+            "email": row[3],
+            "total_commission": float(row[4] or 0),
+            "trades_attributed": int(row[5] or 0),
+        }
+        for row in per_user_rows
+    ]
+
     return {
         "referral_code": profile.referral_code,
         "referral_link": f"{base_url}/auth/register?ref={profile.referral_code}",
@@ -246,11 +286,66 @@ async def ib_dashboard(user_id: UUID, db: AsyncSession) -> dict:
         "total_commission": float(total_comm),
         "pending_payout": float(profile.pending_payout),
         "total_earned": float(profile.total_earned),
+        "commission_balance": commission_balance,
+        "earnings_by_user": earnings_by_user,
         "is_active": profile.is_active,
         "tier": current_tier,
         "next_tier": next_tier,
         "needed_for_next_tier": needed_for_next,
         "tier_ladder": tiers,
+    }
+
+
+async def transfer_ib_commission_to_main_wallet(
+    user_id: UUID, db: AsyncSession,
+) -> dict:
+    """Sweep the IB's accumulated commission pool into their main
+    wallet. Writes a Transaction + notification so the bell icon and
+    /transactions update immediately. Raises 400 if the pool is empty.
+    """
+    from packages.common.src.models import User, Transaction
+    from packages.common.src.notify import create_notification
+
+    user = (await db.execute(
+        select(User).where(User.id == user_id).with_for_update()
+    )).scalar_one_or_none()
+    if user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    balance = Decimal(str(user.ib_commission_balance or 0))
+    if balance <= 0:
+        raise HTTPException(
+            status_code=400, detail="No IB commission to transfer",
+        )
+
+    new_main = Decimal(str(user.main_wallet_balance or 0)) + balance
+    user.main_wallet_balance = new_main
+    user.ib_commission_balance = Decimal("0")
+
+    db.add(Transaction(
+        user_id=user.id,
+        type="ib_commission",
+        amount=balance,
+        balance_after=new_main,
+        reference_id=user.id,
+        description=f"IB commission transferred to main wallet — ${float(balance):.2f}",
+    ))
+
+    try:
+        await create_notification(
+            db, user.id,
+            title="IB commission credited",
+            message=f"${float(balance):.2f} moved to your main wallet.",
+            notif_type="success",
+            action_url="/transactions",
+        )
+    except Exception:
+        pass
+
+    await db.commit()
+    return {
+        "transferred": float(balance),
+        "main_wallet_balance": float(new_main),
     }
 
 

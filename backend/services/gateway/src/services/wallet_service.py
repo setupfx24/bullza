@@ -309,11 +309,20 @@ async def _get_bank_for_tier(amount: Decimal, db: AsyncSession) -> BankAccount |
 # ─── Deposits ─────────────────────────────────────────────────────────────
 
 async def create_deposit(req, user_id: UUID, db: AsyncSession) -> dict:
-    from packages.common.src.settings_store import get_bool_setting
+    from packages.common.src.settings_store import get_bool_setting, get_float_setting
     if await get_bool_setting("maintenance_mode", False):
         raise HTTPException(status_code=503, detail="Platform is under maintenance. Deposits are temporarily disabled.")
     if not await get_bool_setting("allow_deposits", True):
         raise HTTPException(status_code=403, detail="Deposits are currently disabled")
+
+    # Platform-wide minimum deposit gate. Admin-tunable via
+    # system_settings.min_deposit_amount_usd (default $50). 0 = no minimum.
+    min_dep_usd = float(await get_float_setting("min_deposit_amount_usd", 50.0))
+    if min_dep_usd > 0 and float(req.amount) < min_dep_usd:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Minimum deposit is ${min_dep_usd:,.2f}.",
+        )
 
     if req.account_id is not None:
         acct = await db.execute(
@@ -1123,11 +1132,20 @@ async def handle_nowpayments_webhook(
 # ─── Withdrawals ──────────────────────────────────────────────────────────
 
 async def create_withdrawal(req, user_id: UUID, db: AsyncSession) -> dict:
-    from packages.common.src.settings_store import get_bool_setting
+    from packages.common.src.settings_store import get_bool_setting, get_float_setting
     if await get_bool_setting("maintenance_mode", False):
         raise HTTPException(status_code=503, detail="Platform is under maintenance. Withdrawals are temporarily disabled.")
     if not await get_bool_setting("allow_withdrawals", True):
         raise HTTPException(status_code=403, detail="Withdrawals are currently disabled")
+
+    # Platform-wide minimum withdrawal gate. Admin-tunable via
+    # system_settings.min_withdrawal_amount_usd (default $70). 0 = no minimum.
+    min_wd_usd = float(await get_float_setting("min_withdrawal_amount_usd", 70.0))
+    if min_wd_usd > 0 and float(req.amount) < min_wd_usd:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Minimum withdrawal is ${min_wd_usd:,.2f}.",
+        )
 
     user_q = await db.execute(select(User).where(User.id == user_id))
     user_row = user_q.scalar_one_or_none()

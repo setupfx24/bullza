@@ -46,6 +46,10 @@ export interface PolicyOut {
   status: 'active' | 'claimed' | 'expired' | 'denied';
   activated_at: string;
   settled_at: string | null;
+  // Why the policy ended up denied/expired. Backend persists a short
+  // code (min_duration, daily_claim_limit, not_a_loss, …); the UI maps
+  // it to a human-readable explanation.
+  settled_reason: string | null;
 }
 
 export type ClaimStatus = 'pending' | 'paid';

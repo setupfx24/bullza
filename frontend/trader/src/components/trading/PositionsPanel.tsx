@@ -364,8 +364,32 @@ export default function PositionsPanel({ variant = 'default' }: PositionsPanelPr
     return a?.account_number ?? accountId.slice(0, 8);
   };
 
+  // Type badge resolver — demo accounts get a "Demo" pill, MAM
+  // follower rows stay "Copy", everything else is "Real". Client
+  // reported the column was showing "Real" on demo trades.
+  const tradeTypeBadge = (
+    accountId: string,
+    tradeType: string | null | undefined,
+  ): { label: string; cls: string } => {
+    const a = accounts.find((x) => x.id === accountId);
+    if (a?.is_demo) {
+      return { label: 'Demo', cls: 'bg-warning/15 text-warning' };
+    }
+    if (tradeType === 'copy_trade') {
+      return { label: 'Copy', cls: 'bg-info/15 text-info' };
+    }
+    return { label: 'Real', cls: 'bg-success/15 text-success' };
+  };
+
+  // Depend on activeAccount.id (a stable string), NOT the activeAccount
+  // object — the Zustand store rebuilds the object reference on every
+  // WS tick (balance/equity/profit refresh), so depending on the whole
+  // object made loadHistory's identity change every second and the
+  // useEffect below kept re-firing → "Loading history…" blinked on
+  // forever for users sitting on the Closed Positions tab.
+  const activeAccountId = activeAccount?.id ?? null;
   const loadHistory = useCallback(async () => {
-    if (!activeAccount) {
+    if (!activeAccountId) {
       setHistoryTrades([]);
       return;
     }
@@ -376,7 +400,7 @@ export default function PositionsPanel({ variant = 'default' }: PositionsPanelPr
       // account's history together, which is jarring when a brand-new
       // account inherits decades of trades from a sibling.
       const res = await api.get<{ items?: ClosedTrade[] } | ClosedTrade[]>('/portfolio/trades', {
-        account_id: activeAccount.id,
+        account_id: activeAccountId,
         page: '1',
         per_page: '200',
       });
@@ -387,7 +411,7 @@ export default function PositionsPanel({ variant = 'default' }: PositionsPanelPr
       setHistoryTrades([]);
     }
     setHistoryLoading(false);
-  }, [activeAccount]);
+  }, [activeAccountId]);
 
   useEffect(() => {
     if (activeTab === 'history') void loadHistory();
@@ -1038,9 +1062,14 @@ export default function PositionsPanel({ variant = 'default' }: PositionsPanelPr
                             <div className="flex items-center gap-2">
                               <span className="text-sm font-bold text-text-primary">{pos.symbol}</span>
                               <span className={clsx('text-[10px] font-bold uppercase', pos.side === 'buy' ? 'text-buy' : 'text-sell')}>{pos.side}</span>
-                              <span className={clsx('text-[10px] px-1.5 py-0.5 rounded-sm font-medium', pos.trade_type === 'copy_trade' ? 'bg-info/15 text-info' : 'bg-success/15 text-success')}>
-                                {pos.trade_type === 'copy_trade' ? 'Copy' : 'Real'}
-                              </span>
+                              {(() => {
+                                const b = tradeTypeBadge(pos.account_id, pos.trade_type);
+                                return (
+                                  <span className={clsx('text-[10px] px-1.5 py-0.5 rounded-sm font-medium', b.cls)}>
+                                    {b.label}
+                                  </span>
+                                );
+                              })()}
                             </div>
                             <span className="font-mono text-sm font-bold tabular-nums" style={{ color: pnl >= 0 ? '#2962FF' : '#FF2440' }}>
                               {pnl >= 0 ? '+' : ''}${pnl.toFixed(2)}
@@ -1130,9 +1159,14 @@ export default function PositionsPanel({ variant = 'default' }: PositionsPanelPr
                             <td className={td}>{accountLabel(pos.account_id)}</td>
                             <td className={clsx(td, 'font-bold')}>{pos.symbol}</td>
                             <td className={td}>
-                              <span className={clsx('text-[10px] px-1.5 py-0.5 rounded-sm font-medium', pos.trade_type === 'copy_trade' ? 'bg-info/15 text-info' : 'bg-success/15 text-success')}>
-                                {pos.trade_type === 'copy_trade' ? 'Copy' : 'Real'}
-                              </span>
+                              {(() => {
+                                const b = tradeTypeBadge(pos.account_id, pos.trade_type);
+                                return (
+                                  <span className={clsx('text-[10px] px-1.5 py-0.5 rounded-sm font-medium', b.cls)}>
+                                    {b.label}
+                                  </span>
+                                );
+                              })()}
                             </td>
                             <td className={td}>
                               <span
@@ -1416,9 +1450,15 @@ export default function PositionsPanel({ variant = 'default' }: PositionsPanelPr
                               <div className="flex items-center gap-2">
                                 <span className="text-sm font-bold text-text-primary">{trade.symbol}</span>
                                 <span className={clsx('text-[10px] font-bold uppercase', trade.side === 'buy' ? 'text-buy' : 'text-sell')}>{trade.side}</span>
-                                <span className={clsx('text-[10px] px-1.5 py-0.5 rounded-sm font-medium', trade.trade_type === 'copy_trade' ? 'bg-info/15 text-info' : 'bg-success/15 text-success')}>
-                                  {trade.trade_type === 'copy_trade' ? 'Copy' : 'Real'}
-                                </span>
+                                {(() => {
+                                  // Closed-positions list is scoped to activeAccount; trade row carries no account_id of its own.
+                                  const b = tradeTypeBadge(activeAccount?.id ?? '', trade.trade_type);
+                                  return (
+                                    <span className={clsx('text-[10px] px-1.5 py-0.5 rounded-sm font-medium', b.cls)}>
+                                      {b.label}
+                                    </span>
+                                  );
+                                })()}
                               </div>
                               <span className="font-mono text-sm font-bold tabular-nums" style={{ color: net >= 0 ? '#2962FF' : '#FF2440' }}>
                                 {net >= 0 ? '+' : ''}${net.toFixed(2)}
@@ -1474,9 +1514,14 @@ export default function PositionsPanel({ variant = 'default' }: PositionsPanelPr
                           <tr key={trade.id} className={tbodyRowClass}>
                             <td className={clsx(td, 'font-bold')}>{trade.symbol}</td>
                             <td className={td}>
-                              <span className={clsx('text-[10px] px-1.5 py-0.5 rounded-sm font-medium', trade.trade_type === 'copy_trade' ? 'bg-info/15 text-info' : 'bg-success/15 text-success')}>
-                                {trade.trade_type === 'copy_trade' ? 'Copy' : 'Real'}
-                              </span>
+                              {(() => {
+                                const b = tradeTypeBadge(activeAccount?.id ?? '', trade.trade_type);
+                                return (
+                                  <span className={clsx('text-[10px] px-1.5 py-0.5 rounded-sm font-medium', b.cls)}>
+                                    {b.label}
+                                  </span>
+                                );
+                              })()}
                             </td>
                             <td className={td}>
                               <span

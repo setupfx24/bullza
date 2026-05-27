@@ -336,6 +336,98 @@ async def approve_deposit(
         bonus_msg = f" + ${float(bonus_amount):.2f} bonus ({offer.name})"
         applied_bonuses.append((offer.name, bonus_amount))
 
+    # ── bonus_code path: auto-resolve on deposit approval ─────────────
+    # Earlier flow showed a separate Grant/Deny button pair on the admin
+    # deposits page for any deposit whose user typed a bonus_code. That
+    # was confusing alongside the deposit Approve/Reject pair (client
+    # complained — 2026-05-26), so the buttons were removed and the
+    # bonus is decided here instead: match the typed code (case-insensitive)
+    # against the active BonusOffer rows, apply percentage/fixed_amount
+    # with min/max caps, write Transaction + notification. If no offer
+    # matches OR the user is past the first-deposit window, stamp the row
+    # as 'denied' so the trader sees a definite outcome.
+    if deposit.bonus_code and deposit.bonus_status in (None, "pending"):
+        code_clean = deposit.bonus_code.strip()
+        code_lower = code_clean.lower()
+        code_offer = (await db.execute(
+            select(BonusOffer).where(
+                func.lower(BonusOffer.name) == code_lower,
+                BonusOffer.is_active == True,
+            ).limit(1)
+        )).scalar_one_or_none()
+
+        denial_reason: str | None = None
+        bonus_amount = Decimal("0")
+        if code_offer is None:
+            denial_reason = f"Code '{code_clean}' is not a recognised promo."
+        elif code_offer.starts_at and code_offer.starts_at > now:
+            denial_reason = f"Code '{code_clean}' is not active yet."
+        elif code_offer.expires_at and code_offer.expires_at < now:
+            denial_reason = f"Code '{code_clean}' has expired."
+        elif user_row.bonus_forfeited_at is not None:
+            denial_reason = (
+                "Bonus was forfeited on a prior withdrawal — codes can't "
+                "be granted after that."
+            )
+        elif prior_approved > 0 and (code_offer.bonus_type or "").lower() in ("welcome", "deposit"):
+            denial_reason = "Welcome / first-deposit bonus only — prior deposit on file."
+        elif deposit.amount < (code_offer.min_deposit or Decimal("0")):
+            denial_reason = (
+                f"Minimum deposit for code '{code_clean}' is "
+                f"${float(code_offer.min_deposit or 0):.2f}."
+            )
+        elif code_offer.max_deposit is not None and deposit.amount > code_offer.max_deposit:
+            denial_reason = (
+                f"Maximum deposit for code '{code_clean}' is "
+                f"${float(code_offer.max_deposit):.2f}."
+            )
+        else:
+            if code_offer.percentage and code_offer.percentage > 0:
+                bonus_amount = (deposit.amount * code_offer.percentage / Decimal("100"))
+            elif code_offer.fixed_amount and code_offer.fixed_amount > 0:
+                bonus_amount = Decimal(str(code_offer.fixed_amount))
+            else:
+                denial_reason = "Bonus offer has no percentage or fixed amount configured."
+            if code_offer.max_bonus and bonus_amount > code_offer.max_bonus:
+                bonus_amount = Decimal(str(code_offer.max_bonus))
+
+        if denial_reason is None and bonus_amount > 0:
+            user_row.main_wallet_bonus = (
+                user_row.main_wallet_bonus or Decimal("0")
+            ) + bonus_amount
+            db.add(Transaction(
+                user_id=deposit.user_id,
+                account_id=None,
+                type="bonus",
+                amount=bonus_amount,
+                balance_after=user_row.main_wallet_bonus,
+                reference_id=deposit.id,
+                description=(
+                    f"Bonus code {code_clean} — {code_offer.name} "
+                    f"(${float(bonus_amount):.2f})"
+                ),
+                created_by=admin_id,
+            ))
+            deposit.bonus_amount = bonus_amount
+            deposit.bonus_status = "granted"
+            deposit.bonus_decided_by = admin_id
+            deposit.bonus_decided_at = now.replace(tzinfo=timezone.utc) if now.tzinfo is None else now
+            bonus_msg += f" + ${float(bonus_amount):.2f} bonus ({code_clean})"
+            applied_bonuses.append((code_clean, bonus_amount))
+        else:
+            deposit.bonus_status = "denied"
+            deposit.bonus_decided_by = admin_id
+            deposit.bonus_decided_at = now.replace(tzinfo=timezone.utc) if now.tzinfo is None else now
+            try:
+                await create_notification(
+                    db, deposit.user_id,
+                    title="Bonus code declined",
+                    message=denial_reason or "Bonus code could not be applied.",
+                    notif_type="warning", action_url="/wallet",
+                )
+            except Exception:
+                pass
+
     # Note: user-level referral commission used to fire here on first
     # deposit. The policy changed (per client) — it's now a FLAT amount
     # paid by trading_service.close_position once the referred user
@@ -498,6 +590,15 @@ async def reject_deposit(
     deposit.rejection_reason = reason
     deposit.approved_by = admin_id
     deposit.approved_at = datetime.utcnow()
+
+    # Rejected deposit → any pending bonus_code request is implicitly
+    # denied, otherwise the row sits forever with a "pending" bonus pill
+    # even though no money will arrive (the Grant/Deny buttons were
+    # removed in the 2026-05-26 UX cleanup).
+    if deposit.bonus_code and deposit.bonus_status in (None, "pending"):
+        deposit.bonus_status = "denied"
+        deposit.bonus_decided_by = admin_id
+        deposit.bonus_decided_at = datetime.now(timezone.utc)
 
     await write_audit_log(
         db, admin_id, "reject_deposit", "deposit", deposit_id,
