@@ -361,6 +361,7 @@ async def _list_policies(
             status=p.status,
             activated_at=p.activated_at,
             settled_at=p.settled_at,
+            settled_reason=p.settled_reason,
         )
         for (p, symbol) in rows
     ]

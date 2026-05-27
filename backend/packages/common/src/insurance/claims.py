@@ -241,6 +241,9 @@ async def maybe_pay(
                 "news_blackout", "insurance_disabled",
             ) else "expired"
             policy.settled_at = datetime.now(timezone.utc)
+            # Persist the reason so the trader /insurance page can
+            # render "why" under each non-claimed row.
+            policy.settled_reason = reason
             logger.info(
                 "Insurance claim denied policy=%s reason=%s",
                 policy.id, reason,
