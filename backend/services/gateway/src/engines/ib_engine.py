@@ -23,10 +23,12 @@ logger = logging.getLogger("ib-engine")
 
 DEFAULT_MLM_DISTRIBUTION = [40, 25, 15, 10, 10]
 
-# Fallback used if the system_settings row is absent — matches the
-# default seeded by migration 0043.
+# Fallback used if the system_settings row is absent. Matches the
+# client's 2026-05-26 spec: three levels with admin-tunable commission,
+# resolved by the IB's active-referral count — 1-20 → Starter,
+# 21-100 → Pro, 100+ → Elite. Admin retunes from /admin/config/ib-tiers.
 DEFAULT_IB_TIERS = [
-    {"label": "Starter", "min_referrals": 5,   "max_referrals": 20,   "per_lot": 6,
+    {"label": "Starter", "min_referrals": 1,   "max_referrals": 20,   "per_lot": 6,
      "instant_payout": True, "dedicated_manager": False},
     {"label": "Pro",     "min_referrals": 21,  "max_referrals": 100,  "per_lot": 8,
      "instant_payout": True, "dedicated_manager": True},

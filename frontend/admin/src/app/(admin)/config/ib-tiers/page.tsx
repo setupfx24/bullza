@@ -49,7 +49,7 @@ interface Tier {
 const FALLBACK_TIERS: Tier[] = [
   {
     label: 'Starter',
-    min_referrals: 5,
+    min_referrals: 1,
     max_referrals: 20,
     per_lot: 6,
     per_lot_by_account_type: {},
