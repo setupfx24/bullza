@@ -10,11 +10,15 @@ import { usdPipValuePerLot, usdMarginPerLot, suggestedLotSize } from '@/lib/trad
 
 type CalcTab = 'margin' | 'pnl' | 'lotsize' | 'swap';
 
-const TABS: { id: CalcTab; label: string }[] = [
-  { id: 'margin', label: 'Margin Calculator' },
-  { id: 'pnl', label: 'Profit/Loss Calculator' },
-  { id: 'lotsize', label: 'Lot Size Calculator' },
-  { id: 'swap', label: 'Swap Calculator' },
+// 2026-05-26 client change: replace the horizontal pill tabs with a
+// vertical accordion. One row per calculator, arrow rotates when the
+// row is open, form + result render below — matches the disclosure
+// pattern used elsewhere on the trader dashboard.
+const TABS: { id: CalcTab; label: string; sub: string }[] = [
+  { id: 'margin', label: 'Margin Calculator', sub: 'Required margin for a position' },
+  { id: 'pnl', label: 'Profit / Loss Calculator', sub: 'Estimate P&L from entry to exit price' },
+  { id: 'lotsize', label: 'Lot Size Calculator', sub: 'Lot size from risk amount + SL distance' },
+  { id: 'swap', label: 'Swap Calculator', sub: 'Overnight swap fee across the days held' },
 ];
 
 /* ─── Searchable instrument picker ─── */
@@ -288,7 +292,8 @@ export default function RiskCalculatorPage() {
     return () => { cancelled = true; };
   }, []);
 
-  const [tab, setTab] = useState<CalcTab>('margin');
+  // `tab` doubles as the "open accordion row" — null = all collapsed.
+  const [tab, setTab] = useState<CalcTab | null>('margin');
 
   // ── Shared state ──
   const [selectedAccountId, setSelectedAccountId] = useState(activeAccount?.id ?? '');
@@ -405,28 +410,47 @@ export default function RiskCalculatorPage() {
           </p>
         </div>
 
-        {/* ── Tab bar ── */}
-        <div className="flex items-center rounded-full border border-border-primary bg-bg-secondary p-1 overflow-x-auto scrollbar-none">
-          {TABS.map((t) => (
-            <button
-              key={t.id}
-              type="button"
-              onClick={() => setTab(t.id)}
-              className={clsx(
-                'flex-1 sm:flex-none px-4 sm:px-6 py-2.5 rounded-full text-xs sm:text-sm font-semibold transition-all whitespace-nowrap',
-                tab === t.id
-                  ? 'bg-accent text-white shadow-lg shadow-accent/20'
-                  : 'text-text-secondary hover:text-text-primary',
-              )}
-            >
-              {t.label}
-            </button>
-          ))}
-        </div>
+        {/* ── Accordion list ──
+            Replaces the previous horizontal pill-tab bar (2026-05-26
+            client request). Each calculator is a collapsible row with
+            an arrow; clicking the header toggles that row and
+            collapses any other open row. */}
+        <div className="space-y-3">
+          {TABS.map((t) => {
+            const open = tab === t.id;
+            return (
+              <div
+                key={t.id}
+                className={clsx(
+                  'rounded-2xl border bg-bg-secondary overflow-hidden transition-colors',
+                  open ? 'border-accent/40' : 'border-border-primary',
+                )}
+              >
+                <button
+                  type="button"
+                  onClick={() => setTab(open ? null : t.id)}
+                  className="w-full flex items-center justify-between px-5 py-4 hover:bg-bg-hover/40 transition-colors"
+                >
+                  <div className="text-left min-w-0">
+                    <p className="text-sm sm:text-base font-bold text-text-primary truncate">
+                      {t.label}
+                    </p>
+                    <p className="text-[11px] sm:text-xs text-text-tertiary mt-0.5 truncate">
+                      {t.sub}
+                    </p>
+                  </div>
+                  <ChevronDown
+                    size={18}
+                    className={clsx(
+                      'shrink-0 ml-3 transition-transform',
+                      open ? 'rotate-180 text-accent' : 'text-text-tertiary',
+                    )}
+                  />
+                </button>
 
-        {/* ── Calculator card ── */}
-        <div className="rounded-2xl border border-border-primary bg-bg-secondary overflow-hidden">
-          <div className="grid grid-cols-1 lg:grid-cols-5">
+                {open && (
+                  <div className="border-t border-border-primary">
+                    <div className="grid grid-cols-1 lg:grid-cols-5">
 
             {/* LEFT — Form fields */}
             <div className="lg:col-span-3 p-5 sm:p-6 space-y-4 border-b lg:border-b-0 lg:border-r border-border-primary">
@@ -629,7 +653,12 @@ export default function RiskCalculatorPage() {
                 {!swapResult && tab === 'swap' && <ResultPanel label="Result" value="$0.00" />}
               </div>
             </div>
-          </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
 
         {/* Disclaimer */}
