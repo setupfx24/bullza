@@ -170,14 +170,18 @@ async def approve_deposit(
     bonus_msg = ""
     applied_bonuses: list[tuple[str, Decimal]] = []
     now = datetime.utcnow()
-    # Three gates (migration 0056 contract):
-    #   - bonus_code typed at deposit? → skip auto (admin's manual grant
-    #     handles it, no double-dip)
+    # Two gates only (2026-05-27 client fix):
     #   - user already had a prior approved deposit? → skip (first deposit only)
     #   - user already had a withdrawal approved? → skip (bonus_forfeited_at
     #     prevents farming via withdraw+redeposit cycles)
-    # Gate is duplicated inline here (not imported from gateway) so the
-    # admin service stays independent of the gateway service tree.
+    #
+    # Earlier code ALSO skipped the welcome-bonus brackets when the
+    # user typed a bonus_code at deposit time. That meant if the code
+    # was unknown / expired, the user got nothing — not even the
+    # automatic bracket-based welcome bonus they were entitled to as
+    # a first-deposit user. The code-specific path runs separately
+    # below and is now purely additive (stacks with the welcome bonus
+    # when valid, no-ops when not).
     from packages.common.src.models import Deposit as _Deposit
     prior_approved = (await db.execute(
         select(func.count()).select_from(_Deposit).where(
@@ -187,8 +191,7 @@ async def approve_deposit(
         )
     )).scalar() or 0
     skip_auto_bonus = (
-        bool(deposit.bonus_code)
-        or prior_approved > 0
+        prior_approved > 0
         or user_row.bonus_forfeited_at is not None
     )
 
