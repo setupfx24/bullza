@@ -506,6 +506,9 @@ function WalletPageContent() {
           bank_details: { oxapay_payout: payout },
         });
         toast.success(`Withdrawal of $${amt.toLocaleString()} submitted — pending approval`);
+        // Reset so the user can't re-fire the same withdrawal.
+        setWithdrawAmount('');
+        setWithdrawOxapayDetails('');
         void fetchData(true);
       } catch (err) {
         toast.error(err instanceof Error ? err.message : 'Withdrawal failed');
@@ -551,6 +554,11 @@ function WalletPageContent() {
         throw new Error(msg);
       }
       toast.success(`Manual withdrawal of $${amt.toLocaleString()} submitted — pending approval`);
+      // Reset so the user can't re-fire the same withdrawal request.
+      setWithdrawAmount('');
+      setManualWithdrawUpi('');
+      setManualWithdrawNotes('');
+      setManualWithdrawQrFile(null);
       void fetchData(true);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Withdrawal failed');
@@ -652,6 +660,15 @@ function WalletPageContent() {
         throw new Error(msg);
       }
       toast.success(`Manual deposit of $${amt.toLocaleString()} submitted — pending approval`);
+      // Reset the form after a successful submit so the user can't
+      // accidentally fire the same deposit again (client report
+      // 2026-05-28 — duplicate requests). Clearing the amount also
+      // disables the Deposit button (it requires amt > 0).
+      setDepositAmount('');
+      setDepositTxId('');
+      setDepositProofFile(null);
+      setDepositBonusCode('');
+      setManualBankInfo(null);
       void fetchData(true);
       void loadBonusOverview();
     } catch (err) {
