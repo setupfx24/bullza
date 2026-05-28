@@ -208,6 +208,23 @@ function WalletPageContent() {
   const [bonusOverview, setBonusOverview] = useState<BonusOverview | null>(null);
   const [bonusLoading, setBonusLoading] = useState(false);
 
+  // Platform-wide wallet minimums (admin-tunable). Fetched from the
+  // public /auth/platform-status so the form can show + enforce them
+  // client-side before the request even leaves the page.
+  const [minDeposit, setMinDeposit] = useState(50);
+  const [minWithdraw, setMinWithdraw] = useState(70);
+  useEffect(() => {
+    void (async () => {
+      try {
+        const s = await api.get<{ min_deposit_amount_usd?: number; min_withdrawal_amount_usd?: number }>(
+          '/auth/platform-status',
+        );
+        if (typeof s.min_deposit_amount_usd === 'number') setMinDeposit(s.min_deposit_amount_usd);
+        if (typeof s.min_withdrawal_amount_usd === 'number') setMinWithdraw(s.min_withdrawal_amount_usd);
+      } catch { /* keep defaults */ }
+    })();
+  }, []);
+
   const [withdrawChannel, setWithdrawChannel] = useState<FundingChannel>('crypto');
   const [withdrawAmount, setWithdrawAmount] = useState('');
   const [withdrawOxapayDetails, setWithdrawOxapayDetails] = useState('');
@@ -491,6 +508,10 @@ function WalletPageContent() {
       toast.error('Enter a valid amount');
       return;
     }
+    if (minWithdraw > 0 && amt < minWithdraw) {
+      toast.error(`Minimum withdrawal is $${minWithdraw.toLocaleString()}.`);
+      return;
+    }
     if (withdrawChannel === 'crypto') {
       const detail = withdrawOxapayDetails.trim();
       if (!detail) {
@@ -575,6 +596,10 @@ function WalletPageContent() {
     const amt = parseFloat(depositAmount);
     if (!amt || amt <= 0) {
       toast.error('Enter a valid amount');
+      return;
+    }
+    if (minDeposit > 0 && amt < minDeposit) {
+      toast.error(`Minimum deposit is $${minDeposit.toLocaleString()}.`);
       return;
     }
     if (depositChannel === 'crypto') {
@@ -1090,7 +1115,12 @@ function WalletPageContent() {
                     <>
                       {/* Crypto deposit via NOWPayments wallet-connect modal */}
                       <div className="space-y-1">
-                        <label className="text-xs text-text-secondary">Amount (USD)</label>
+                        <label className="text-xs text-text-secondary">
+                          Amount (USD)
+                          {minDeposit > 0 && (
+                            <span className="text-text-tertiary"> · min ${minDeposit.toLocaleString()}</span>
+                          )}
+                        </label>
                         <div className="relative">
                           <span className="absolute left-3 top-1/2 -translate-y-1/2 text-text-tertiary font-bold">$</span>
                           <input
@@ -1150,7 +1180,12 @@ function WalletPageContent() {
                     <>
                       {/* Manual deposit — amount + bank details + proof */}
                       <div className="space-y-1">
-                        <label className="text-xs text-text-secondary">Amount (USD)</label>
+                        <label className="text-xs text-text-secondary">
+                          Amount (USD)
+                          {minDeposit > 0 && (
+                            <span className="text-text-tertiary"> · min ${minDeposit.toLocaleString()}</span>
+                          )}
+                        </label>
                         <div className="relative">
                           <span className="absolute left-3 top-1/2 -translate-y-1/2 text-text-tertiary font-bold">$</span>
                           <input
@@ -1414,7 +1449,12 @@ function WalletPageContent() {
 
                       <div className="space-y-1">
                         <div className="flex items-center justify-between gap-2">
-                          <label className="text-xs text-text-secondary">Amount (USD)</label>
+                          <label className="text-xs text-text-secondary">
+                          Amount (USD)
+                          {minWithdraw > 0 && (
+                            <span className="text-text-tertiary"> · min ${minWithdraw.toLocaleString()}</span>
+                          )}
+                        </label>
                           <button
                             type="button"
                             onClick={() =>
@@ -1483,7 +1523,12 @@ function WalletPageContent() {
                     <>
                       <div className="space-y-1">
                         <div className="flex items-center justify-between gap-2">
-                          <label className="text-xs text-text-secondary">Amount (USD)</label>
+                          <label className="text-xs text-text-secondary">
+                          Amount (USD)
+                          {minWithdraw > 0 && (
+                            <span className="text-text-tertiary"> · min ${minWithdraw.toLocaleString()}</span>
+                          )}
+                        </label>
                           <button
                             type="button"
                             onClick={() =>
