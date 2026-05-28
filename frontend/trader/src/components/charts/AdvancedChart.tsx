@@ -97,11 +97,21 @@ export default function AdvancedChart() {
     script.src = 'https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js';
     script.async = true;
     script.type = 'text/javascript';
+    // Use the viewer's own timezone so the chart clock matches their
+    // wall-clock instead of always showing UTC (client couldn't change
+    // it — the embed widget locks the clock to whatever `timezone` we
+    // pass). Falls back to UTC if the browser doesn't resolve one.
+    let viewerTz = 'Etc/UTC';
+    try {
+      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      if (tz) viewerTz = tz;
+    } catch { /* keep UTC */ }
+
     script.innerHTML = JSON.stringify({
       autosize: true,
       symbol: tvSymbol,
       interval: '5',
-      timezone: 'Etc/UTC',
+      timezone: viewerTz,
       theme: tvTheme,
       style: '1',                 // candles
       locale: 'en',
