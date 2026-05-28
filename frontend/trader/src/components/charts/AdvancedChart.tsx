@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Maximize2, Minimize2 } from 'lucide-react';
 import { useTradingStore } from '@/stores/tradingStore';
 import { useUIStore } from '@/stores/uiStore';
 
@@ -78,6 +79,25 @@ export default function AdvancedChart() {
   const tvSymbol = useMemo(() => resolveTvSymbol(selectedSymbol), [selectedSymbol]);
   const tvTheme: 'dark' | 'light' = theme === 'light' ? 'light' : 'dark';
 
+  // Fullscreen toggle — the embed widget has no fullscreen button of
+  // its own, so we drive the browser Fullscreen API on our wrapper.
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  useEffect(() => {
+    const onFsChange = () => setIsFullscreen(Boolean(document.fullscreenElement));
+    document.addEventListener('fullscreenchange', onFsChange);
+    return () => document.removeEventListener('fullscreenchange', onFsChange);
+  }, []);
+  const toggleFullscreen = () => {
+    const el = wrapRef.current;
+    if (!el) return;
+    if (document.fullscreenElement) {
+      void document.exitFullscreen().catch(() => {});
+    } else {
+      void el.requestFullscreen().catch(() => {});
+    }
+  };
+
   // Re-mount the widget when the resolved symbol or theme changes.
   // The embed script reads its config from the <script> tag content
   // and renders into a sibling div, so the cleanest re-render path
@@ -135,9 +155,32 @@ export default function AdvancedChart() {
 
   return (
     <div
-      ref={containerRef}
-      className="tradingview-widget-container w-full h-full min-h-[200px] min-w-0"
-      data-tv-chart-root
-    />
+      ref={wrapRef}
+      className="relative w-full h-full min-h-[200px] min-w-0 bg-bg-base"
+    >
+      {/* Brand logo overlay — top-left of the chart. pointer-events-none
+          so it never blocks the chart's own toolbar / interactions. */}
+      <img
+        src="/images/swisdex_png5.png"
+        alt="SwisDex"
+        className="absolute top-2 left-2 z-20 h-6 w-auto opacity-80 pointer-events-none select-none drop-shadow"
+      />
+
+      {/* Fullscreen toggle — the embed widget ships no fullscreen control. */}
+      <button
+        type="button"
+        onClick={toggleFullscreen}
+        title={isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}
+        className="absolute top-2 right-2 z-20 p-1.5 rounded-md bg-black/40 hover:bg-black/60 text-white/80 hover:text-white backdrop-blur-sm transition-colors"
+      >
+        {isFullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
+      </button>
+
+      <div
+        ref={containerRef}
+        className="tradingview-widget-container w-full h-full min-h-[200px] min-w-0"
+        data-tv-chart-root
+      />
+    </div>
   );
 }
