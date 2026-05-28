@@ -65,6 +65,19 @@ export default function SpreadsPage() {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
+  // Unique segments derived from the instruments list (each instrument
+  // carries segment + segment_id). Powers the Per-Segment dropdown so
+  // admin can set one spread for an entire asset class.
+  const segments = (() => {
+    const seen = new Map<string, string>();
+    for (const i of instruments) {
+      if (i.segment_id && !seen.has(i.segment_id)) {
+        seen.set(i.segment_id, i.segment || i.segment_id.slice(0, 8));
+      }
+    }
+    return Array.from(seen, ([id, name]) => ({ id, name }));
+  })();
+
   const addRow = (scope: string) => setRows(prev => [...prev, { _key: newKey(), scope, instrument_id: null, segment_id: null, user_id: null, account_group_id: null, spread_type: 'fixed', value: 1, is_enabled: true }]);
   const updateRow = (key: string, field: string, val: any) => {
     setRows(prev => prev.map(r => {
@@ -89,7 +102,9 @@ export default function SpreadsPage() {
     setRows(next);
     try {
       const normalized = normalizeRows(next);
-      const cleaned = normalized.filter(r => !(r.scope === 'user' && !r.user_id));
+      const cleaned = normalized.filter(r =>
+        !(r.scope === 'user' && !r.user_id) && !(r.scope === 'segment' && !r.segment_id),
+      );
       await adminApi.put('/config/spreads', {
         configs: cleaned.map(r => ({ scope: r.scope, instrument_id: r.instrument_id, segment_id: r.segment_id, user_id: r.user_id, account_group_id: r.account_group_id, spread_type: r.spread_type, value: r.value, is_enabled: r.is_enabled })),
       });
@@ -113,6 +128,8 @@ export default function SpreadsPage() {
   const saveAll = async () => {
     const badUser = rows.find(r => r.scope === 'user' && !r.user_id);
     if (badUser) { toast.error('Pick a user for every Per-User rule or remove that row.'); return; }
+    const badSegment = rows.find(r => r.scope === 'segment' && !r.segment_id);
+    if (badSegment) { toast.error('Pick a segment for every Per-Segment rule or remove that row.'); return; }
     const cleaned = normalizeRows(rows);
     setSaving(true);
     try {
@@ -125,6 +142,7 @@ export default function SpreadsPage() {
 
   const globalRows = rows.filter(r => r.scope === 'default');
   const instrumentRows = rows.filter(r => r.scope === 'instrument');
+  const segmentRows = rows.filter(r => r.scope === 'segment');
   const userRows = rows.filter(r => r.scope === 'user');
 
   const renderTable = (title: string, items: SpreadRow[], scopeType: string) => (
@@ -136,7 +154,7 @@ export default function SpreadsPage() {
         <div className="overflow-visible">
           <table className="w-full">
             <thead><tr className="border-b border-border-primary bg-bg-tertiary/40">
-              {(scopeType === 'instrument' ? ['Instrument'] : scopeType === 'user' ? ['User', 'Instrument'] : []).concat(['Account type', 'Type', 'Value (pips)', 'On', '']).map(c => (
+              {(scopeType === 'instrument' ? ['Instrument'] : scopeType === 'segment' ? ['Segment'] : scopeType === 'user' ? ['User', 'Instrument'] : []).concat(['Account type', 'Type', 'Value (pips)', 'On', '']).map(c => (
                 <th key={c} className="text-left px-3 py-2 text-xxs font-medium text-text-tertiary uppercase tracking-wide">{c}</th>
               ))}
             </tr></thead>
@@ -163,6 +181,9 @@ export default function SpreadsPage() {
                     )}
                     {(scopeType === 'instrument' || scopeType === 'user') && (
                       <td className="px-3 py-2"><select value={r.instrument_id || ''} onChange={e => updateRow(k, 'instrument_id', e.target.value || null)} className="text-xs py-1 pl-2 pr-6 appearance-none bg-bg-input border border-border-primary rounded text-text-primary w-32"><option value="">All</option>{instruments.map(i => <option key={i.id} value={i.id}>{i.symbol}</option>)}</select></td>
+                    )}
+                    {scopeType === 'segment' && (
+                      <td className="px-3 py-2"><select value={r.segment_id || ''} onChange={e => updateRow(k, 'segment_id', e.target.value || null)} className="text-xs py-1 pl-2 pr-6 appearance-none bg-bg-input border border-border-primary rounded text-text-primary w-40"><option value="">Select segment…</option>{segments.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</select></td>
                     )}
                     <td className="px-3 py-2">
                       <select
@@ -195,10 +216,12 @@ export default function SpreadsPage() {
           <div>
             <h1 className="text-lg font-semibold text-text-primary">Spread Configuration</h1>
             <p className="text-xxs text-text-tertiary mt-0.5">
-              When <strong className="text-text-secondary">Default</strong> is on, that spread applies to{' '}
-              <strong className="text-text-secondary">all</strong> instruments (per-instrument and per-segment rows are
-              not used for pricing). User overrides still apply first when trading as that user. If Default is off or
-              missing, spread is <strong className="text-text-secondary">0</strong> (no fallback).
+              Priority (highest → lowest):{' '}
+              <strong className="text-text-secondary">Per-User → Per-Instrument → Per-Segment → Default</strong>.
+              A Per-Segment rule applies that spread to <strong className="text-text-secondary">every instrument
+              in that segment</strong> unless a Per-Instrument or Per-User rule overrides it. Default applies to
+              anything not covered by the rules above. If nothing matches, spread is{' '}
+              <strong className="text-text-secondary">0</strong>.
             </p>
           </div>
           <button onClick={saveAll} disabled={saving} className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-buy rounded-md hover:bg-buy-light disabled:opacity-50 transition-fast">
@@ -206,6 +229,7 @@ export default function SpreadsPage() {
           </button>
         </div>
         {renderTable('Default (All Instruments)', globalRows, 'default')}
+        {renderTable('Per Segment (e.g. Forex / Metals / Crypto — applies to every instrument in that segment)', segmentRows, 'segment')}
         {renderTable('Per Instrument', instrumentRows, 'instrument')}
         {renderTable('Per User (Override)', userRows, 'user')}
       </div>
