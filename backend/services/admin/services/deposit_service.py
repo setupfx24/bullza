@@ -170,14 +170,18 @@ async def approve_deposit(
     bonus_msg = ""
     applied_bonuses: list[tuple[str, Decimal]] = []
     now = datetime.utcnow()
-    # Three gates (migration 0056 contract):
-    #   - bonus_code typed at deposit? → skip auto (admin's manual grant
-    #     handles it, no double-dip)
+    # Two gates only (2026-05-27 client fix):
     #   - user already had a prior approved deposit? → skip (first deposit only)
     #   - user already had a withdrawal approved? → skip (bonus_forfeited_at
     #     prevents farming via withdraw+redeposit cycles)
-    # Gate is duplicated inline here (not imported from gateway) so the
-    # admin service stays independent of the gateway service tree.
+    #
+    # Earlier code ALSO skipped the welcome-bonus brackets when the
+    # user typed a bonus_code at deposit time. That meant if the code
+    # was unknown / expired, the user got nothing — not even the
+    # automatic bracket-based welcome bonus they were entitled to as
+    # a first-deposit user. The code-specific path runs separately
+    # below and is now purely additive (stacks with the welcome bonus
+    # when valid, no-ops when not).
     from packages.common.src.models import Deposit as _Deposit
     prior_approved = (await db.execute(
         select(func.count()).select_from(_Deposit).where(
@@ -187,8 +191,7 @@ async def approve_deposit(
         )
     )).scalar() or 0
     skip_auto_bonus = (
-        bool(deposit.bonus_code)
-        or prior_approved > 0
+        prior_approved > 0
         or user_row.bonus_forfeited_at is not None
     )
 
@@ -356,21 +359,38 @@ async def approve_deposit(
             ).limit(1)
         )).scalar_one_or_none()
 
+        # Did the bracket-based welcome bonus already land on THIS deposit?
+        # If so we suppress the "code not recognised" notification — the
+        # user already got a bonus, no point confusing them with a decline.
+        welcome_already_granted = len(applied_bonuses) > 0
+
         denial_reason: str | None = None
+        # notify_user: whether to push a "Bonus code declined" bell. We
+        # silence it for the unknown-code case when a welcome bonus was
+        # already applied (client request 2026-05-28 — that notification
+        # was confusing users who DID receive a bonus).
+        notify_user = True
         bonus_amount = Decimal("0")
-        if code_offer is None:
+
+        # ── Account-level gates FIRST (independent of which code typed) ──
+        # so a repeat depositor sees "first deposit only" instead of the
+        # generic "not a recognised promo" even if the code is unknown.
+        if prior_approved > 0:
+            denial_reason = "This bonus is applicable for your first deposit only."
+        elif user_row.bonus_forfeited_at is not None:
+            denial_reason = (
+                "Bonus was forfeited on a prior withdrawal — it can't be "
+                "granted again."
+            )
+        # ── Code-specific gates ──────────────────────────────────────────
+        elif code_offer is None:
             denial_reason = f"Code '{code_clean}' is not a recognised promo."
+            if welcome_already_granted:
+                notify_user = False  # user got the welcome bonus anyway
         elif code_offer.starts_at and code_offer.starts_at > now:
             denial_reason = f"Code '{code_clean}' is not active yet."
         elif code_offer.expires_at and code_offer.expires_at < now:
             denial_reason = f"Code '{code_clean}' has expired."
-        elif user_row.bonus_forfeited_at is not None:
-            denial_reason = (
-                "Bonus was forfeited on a prior withdrawal — codes can't "
-                "be granted after that."
-            )
-        elif prior_approved > 0 and (code_offer.bonus_type or "").lower() in ("welcome", "deposit"):
-            denial_reason = "Welcome / first-deposit bonus only — prior deposit on file."
         elif deposit.amount < (code_offer.min_deposit or Decimal("0")):
             denial_reason = (
                 f"Minimum deposit for code '{code_clean}' is "
@@ -418,15 +438,16 @@ async def approve_deposit(
             deposit.bonus_status = "denied"
             deposit.bonus_decided_by = admin_id
             deposit.bonus_decided_at = now.replace(tzinfo=timezone.utc) if now.tzinfo is None else now
-            try:
-                await create_notification(
-                    db, deposit.user_id,
-                    title="Bonus code declined",
-                    message=denial_reason or "Bonus code could not be applied.",
-                    notif_type="warning", action_url="/wallet",
-                )
-            except Exception:
-                pass
+            if notify_user:
+                try:
+                    await create_notification(
+                        db, deposit.user_id,
+                        title="Bonus code declined",
+                        message=denial_reason or "Bonus code could not be applied.",
+                        notif_type="warning", action_url="/wallet",
+                    )
+                except Exception:
+                    pass
 
     # Note: user-level referral commission used to fire here on first
     # deposit. The policy changed (per client) — it's now a FLAT amount

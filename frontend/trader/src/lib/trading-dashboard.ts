@@ -6,6 +6,9 @@
 export interface TradingJournalBlock {
   balance: number;
   equity: number;
+  // Non-withdrawable credit (bonus + insurance payouts) included in
+  // equity. Surfaced so the Balance↔Equity gap is explainable.
+  credit?: number;
   netPl: number;
   netPlTradeCount: number;
   profitFactor: number;
@@ -215,6 +218,7 @@ interface TradeLike {
 export function buildDashboardFromPortfolio(input: {
   balance: number;
   equity: number;
+  credit?: number;
   allTimePnl: number;
   lotsFromOpenPositions: number;
   periodPnl: number;
@@ -323,6 +327,7 @@ export function buildDashboardFromPortfolio(input: {
   const journal: TradingJournalBlock = {
     balance: input.balance,
     equity: input.equity,
+    credit: input.credit ?? 0,
     netPl: input.allTimePnl,
     netPlTradeCount: totalTrades,
     profitFactor: Number((profitFactor || 0).toFixed(2)),

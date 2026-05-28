@@ -42,12 +42,16 @@ _client_ip_for_inet = client_ip_for_inet
 async def platform_status():
     """Public: returns current platform flags so the frontend can gate UI
     (maintenance banner, register button, etc.). No auth required."""
-    from packages.common.src.settings_store import get_bool_setting
+    from packages.common.src.settings_store import get_bool_setting, get_float_setting
     return {
         "maintenance_mode": await get_bool_setting("maintenance_mode", False),
         "allow_new_registrations": await get_bool_setting("allow_new_registrations", True),
         "allow_deposits": await get_bool_setting("allow_deposits", True),
         "allow_withdrawals": await get_bool_setting("allow_withdrawals", True),
+        # Wallet minimums so the deposit/withdraw form can show the limit
+        # up-front instead of only rejecting on submit.
+        "min_deposit_amount_usd": float(await get_float_setting("min_deposit_amount_usd", 50.0)),
+        "min_withdrawal_amount_usd": float(await get_float_setting("min_withdrawal_amount_usd", 70.0)),
     }
 
 

@@ -452,12 +452,21 @@ async def create_manual_deposit(
     db: AsyncSession,
     bonus_code: str | None = None,
 ) -> dict:
-    from packages.common.src.settings_store import get_bool_setting
+    from packages.common.src.settings_store import get_bool_setting, get_float_setting
     if not await get_bool_setting("allow_deposits", True):
         raise HTTPException(status_code=403, detail="Deposits are currently disabled")
 
     if amount <= 0:
         raise HTTPException(status_code=400, detail="Invalid amount")
+
+    # Platform-wide minimum deposit gate — same as the crypto path in
+    # create_deposit. Manual (bank/UPI) deposits were bypassing it.
+    min_dep_usd = float(await get_float_setting("min_deposit_amount_usd", 50.0))
+    if min_dep_usd > 0 and float(amount) < min_dep_usd:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Minimum deposit is ${min_dep_usd:,.2f}.",
+        )
 
     tid = (transaction_id or "").strip()
     if not tid:
@@ -1224,12 +1233,21 @@ async def create_manual_withdrawal(
     file: UploadFile | None,
     db: AsyncSession,
 ) -> dict:
-    from packages.common.src.settings_store import get_bool_setting
+    from packages.common.src.settings_store import get_bool_setting, get_float_setting
     if not await get_bool_setting("allow_withdrawals", True):
         raise HTTPException(status_code=403, detail="Withdrawals are currently disabled")
 
     if amount <= 0:
         raise HTTPException(status_code=400, detail="Invalid amount")
+
+    # Platform-wide minimum withdrawal gate — same as the crypto path in
+    # create_withdrawal. Manual (bank/UPI) withdrawals were bypassing it.
+    min_wd_usd = float(await get_float_setting("min_withdrawal_amount_usd", 70.0))
+    if min_wd_usd > 0 and float(amount) < min_wd_usd:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Minimum withdrawal is ${min_wd_usd:,.2f}.",
+        )
 
     upi = (upi_id or "").strip()
     notes = (payout_notes or "").strip()

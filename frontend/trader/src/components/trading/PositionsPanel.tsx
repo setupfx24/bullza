@@ -1080,6 +1080,17 @@ export default function PositionsPanel({ variant = 'default' }: PositionsPanelPr
                             <div><span className="text-text-tertiary">Open</span> <span className="text-text-primary font-mono">{pos.open_price.toFixed(d)}</span></div>
                             <div><span className="text-text-tertiary">Now</span> <span className="text-text-primary font-mono">{pos.current_price != null ? pos.current_price.toFixed(d) : '—'}</span></div>
                             <div><span className="text-text-tertiary">Acct</span> <span className="text-text-secondary">{accountLabel(pos.account_id)}</span></div>
+                            {(() => {
+                              const charges = (pos.commission || 0) + (pos.swap || 0);
+                              return (
+                                <div>
+                                  <span className="text-text-tertiary">Charges</span>{' '}
+                                  <span className={clsx('font-mono', charges < 0 ? 'text-sell' : 'text-text-secondary')}>
+                                    {charges === 0 ? '$0.00' : (charges > 0 ? '+' : '-') + '$' + Math.abs(charges).toFixed(2)}
+                                  </span>
+                                </div>
+                              );
+                            })()}
                           </div>
                           <div className="flex items-center justify-between pt-1 border-t border-border-glass/40">
                             <div className="text-[10px]">
@@ -1130,7 +1141,7 @@ export default function PositionsPanel({ variant = 'default' }: PositionsPanelPr
                 </div>
                 {/* Desktop table layout — block + full width so table aligns left, not centered in flex */}
                 <div className="hidden md:block w-full min-w-0 flex-1 overflow-x-auto">
-                  <table className="w-full min-w-[860px] border-collapse">
+                  <table className="w-full min-w-[920px] border-collapse">
                     <thead>
                       <tr className={theadRowClass}>
                         <th className={th}>Account</th>
@@ -1143,6 +1154,9 @@ export default function PositionsPanel({ variant = 'default' }: PositionsPanelPr
                         <th className={th}>
                           <span className="block">P&amp;L</span>
                         </th>
+                        <th className={th}>
+                          <span className="block">Charges</span>
+                        </th>
                         <th className={th}>SL / TP</th>
                         <th className={clsx(th, 'text-right pr-3')}>Action</th>
                       </tr>
@@ -1154,6 +1168,10 @@ export default function PositionsPanel({ variant = 'default' }: PositionsPanelPr
                         // unrealised P&L; commission/swap are already booked
                         // against balance and must not be subtracted twice.
                         const pnl = pos.profit || 0;
+                        // Per-trade charges = commission + swap that the
+                        // admin's spreads/charges config booked when the
+                        // order opened. 0 when admin hasn't set any.
+                        const charges = (pos.commission || 0) + (pos.swap || 0);
                         return (
                           <tr key={pos.id} className={tbodyRowClass}>
                             <td className={td}>{accountLabel(pos.account_id)}</td>
@@ -1185,6 +1203,9 @@ export default function PositionsPanel({ variant = 'default' }: PositionsPanelPr
                             </td>
                             <td className={clsx(td, 'font-mono font-bold tabular-nums')} style={{ color: pnl >= 0 ? '#2962FF' : '#FF2440' }}>
                               {pnl >= 0 ? '+' : ''}${pnl.toFixed(2)}
+                            </td>
+                            <td className={clsx(td, 'font-mono tabular-nums', charges < 0 ? 'text-sell' : 'text-text-secondary')}>
+                              {charges === 0 ? '$0.00' : (charges > 0 ? '+' : '-') + '$' + Math.abs(charges).toFixed(2)}
                             </td>
                             <td className={clsx(td, 'text-[10px]')}>
                               {sltpEdit && sltpEdit.positionId === pos.id ? (
