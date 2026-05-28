@@ -38,6 +38,8 @@ interface PortfolioSummary {
 
   total_balance: number;
 
+  total_credit?: number;
+
   total_equity: number;
 
   total_unrealized_pnl: number;
@@ -511,6 +513,7 @@ function PortfolioPageContent() {
     return buildDashboardFromPortfolio({
       balance,
       equity,
+      credit: Number(summary.total_credit) || 0,
       allTimePnl: summary.pnl_breakdown?.all_time ?? 0,
       lotsFromOpenPositions: lotsOpen,
       periodPnl,
