@@ -20,8 +20,16 @@ from packages.common.src.redis_client import redis_client, PriceChannel
 
 
 async def _get_user_accounts(user_id: UUID, db: AsyncSession) -> list[TradingAccount]:
+    # Portfolio reflects REAL money only — demo accounts carry virtual
+    # balances that must never roll into the user's net-worth / equity
+    # totals (client report 2026-05-28: demo funds were inflating the
+    # portfolio). Also skip soft-deleted accounts.
     result = await db.execute(
-        select(TradingAccount).where(TradingAccount.user_id == user_id)
+        select(TradingAccount).where(
+            TradingAccount.user_id == user_id,
+            TradingAccount.is_demo == False,
+            TradingAccount.is_active == True,
+        )
     )
     return result.scalars().all()
 

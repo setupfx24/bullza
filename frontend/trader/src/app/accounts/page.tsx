@@ -1110,9 +1110,15 @@ function AccountCard({
   }, [initialExpanded]);
 
   const alias = readAlias(row.id);
-  const pnl = row.equity - row.balance;
+  // Floating P&L = open-position P&L ONLY. equity = balance + credit +
+  // floating_pnl, so credit must be subtracted too — otherwise bonus /
+  // insurance credit shows up as fake trading "profit" even with no
+  // open position (client report 2026-05-28: +$4.31 "P&L" on zero open
+  // trades was actually credit sitting in the account).
+  const pnl = row.equity - row.balance - (row.credit || 0);
+  const pnlBase = row.balance + (row.credit || 0);
   const pct =
-    row.balance > 0 && Number.isFinite(row.equity) ? (row.equity / row.balance - 1) * 100 : 0;
+    pnlBase > 0 && Number.isFinite(row.equity) ? (pnl / pnlBase) * 100 : 0;
   const pnlPositive = pnl >= 0;
   const idLabel = row.is_demo ? `#D#${row.account_number}` : `#L#${row.account_number}`;
 
