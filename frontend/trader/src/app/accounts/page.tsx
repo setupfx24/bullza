@@ -1212,6 +1212,11 @@ function AccountCard({
             <div className="min-w-0">
               <p className="text-[10px] sm:text-[11px] text-text-tertiary font-medium mb-0.5">Equity</p>
               <p className="text-sm sm:text-lg font-bold text-text-primary tabular-nums font-mono truncate">{fmt(row.equity, row.currency)}</p>
+              {(row.credit || 0) > 0 && (
+                <p className="text-[10px] sm:text-[11px] text-amber-400/80 font-medium tabular-nums mt-0.5 truncate">
+                  incl. {fmt(row.credit, row.currency)} credit
+                </p>
+              )}
             </div>
             <div className="min-w-0">
               <p className="text-[10px] sm:text-[11px] text-text-tertiary font-medium mb-0.5">P&amp;L</p>
@@ -1259,6 +1264,15 @@ function AccountCard({
                   <p className="text-[11px] text-text-tertiary font-medium mb-0.5">Margin Level</p>
                   <p className="text-base font-bold text-text-primary font-mono tabular-nums">
                     {Number.isFinite(row.margin_level) && row.margin_level > 0 ? `${row.margin_level.toFixed(2)}%` : '0.00%'}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-[11px] text-text-tertiary font-medium mb-0.5">Credit</p>
+                  <p className="text-base font-bold font-mono tabular-nums text-amber-400">
+                    {fmt(row.credit || 0, row.currency)}
+                  </p>
+                  <p className="text-[10px] text-text-tertiary mt-0.5 leading-tight">
+                    Bonus / insurance — tradeable, not withdrawable
                   </p>
                 </div>
                 <div>
