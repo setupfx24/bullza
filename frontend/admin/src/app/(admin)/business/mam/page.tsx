@@ -37,6 +37,10 @@ interface Master {
   description: string | null;
   spread_markup_pips: number | null;
   commission_per_lot_usd: number | null;
+  // Admin-set risk controls (Mig 0066).
+  max_drawdown_pct: number;
+  max_loss_per_trade_pct: number | null;
+  insurance_enabled: boolean;
   created_at: string | null;
 }
 
@@ -92,6 +96,10 @@ interface MamFormState {
   spread_markup_pips: string;
   commission_per_lot_usd: string;
   status: string;
+  // Mig 0066: admin-owned risk controls + insurance gate.
+  max_drawdown_pct: string;
+  max_loss_per_trade_pct: string;
+  insurance_enabled: boolean;
 }
 
 const EMPTY_FORM: MamFormState = {
@@ -106,6 +114,9 @@ const EMPTY_FORM: MamFormState = {
   spread_markup_pips: '',
   commission_per_lot_usd: '',
   status: 'approved',
+  max_drawdown_pct: '',
+  max_loss_per_trade_pct: '',
+  insurance_enabled: true,
 };
 
 function fmtMoney(n: number) {
@@ -319,6 +330,9 @@ export default function MamPage() {
       spread_markup_pips: m.spread_markup_pips != null ? String(m.spread_markup_pips) : '',
       commission_per_lot_usd: m.commission_per_lot_usd != null ? String(m.commission_per_lot_usd) : '',
       status: m.status,
+      max_drawdown_pct: m.max_drawdown_pct != null && m.max_drawdown_pct > 0 ? String(m.max_drawdown_pct) : '',
+      max_loss_per_trade_pct: m.max_loss_per_trade_pct != null ? String(m.max_loss_per_trade_pct) : '',
+      insurance_enabled: m.insurance_enabled !== false,
     });
   };
 
@@ -347,6 +361,9 @@ export default function MamPage() {
         description: form.description || null,
         spread_markup_pips: form.spread_markup_pips === '' ? null : Number(form.spread_markup_pips),
         commission_per_lot_usd: form.commission_per_lot_usd === '' ? null : Number(form.commission_per_lot_usd),
+        max_drawdown_pct: form.max_drawdown_pct === '' ? null : Number(form.max_drawdown_pct),
+        max_loss_per_trade_pct: form.max_loss_per_trade_pct === '' ? null : Number(form.max_loss_per_trade_pct),
+        insurance_enabled: !!form.insurance_enabled,
       };
       const res = await adminApi.post<{ pool_account_number: string }>('/business/masters', body);
       toast.success(`MAM created — pool account ${res.pool_account_number}`);
@@ -375,6 +392,9 @@ export default function MamPage() {
         description: form.description || null,
         spread_markup_pips: form.spread_markup_pips === '' ? null : Number(form.spread_markup_pips),
         commission_per_lot_usd: form.commission_per_lot_usd === '' ? null : Number(form.commission_per_lot_usd),
+        max_drawdown_pct: form.max_drawdown_pct === '' ? null : Number(form.max_drawdown_pct),
+        max_loss_per_trade_pct: form.max_loss_per_trade_pct === '' ? null : Number(form.max_loss_per_trade_pct),
+        insurance_enabled: !!form.insurance_enabled,
       };
       await adminApi.put(`/business/masters/${editTarget.id}`, body);
       toast.success('MAM updated');
@@ -747,6 +767,55 @@ export default function MamPage() {
                     <p className="text-xxs text-text-tertiary mt-1">Replaces resolved commission.</p>
                   </div>
                 </div>
+              </div>
+
+              <div className="rounded-md bg-amber-500/5 border border-amber-500/30 p-3 space-y-3">
+                <div>
+                  <p className="text-xxs font-semibold text-amber-400 flex items-center gap-1">
+                    <AlertTriangle size={11} /> Admin-set risk controls
+                  </p>
+                  <p className="text-xxs text-text-tertiary mt-0.5">
+                    Investors don&apos;t see these — they&apos;re yours to set per master. Mig 0066.
+                  </p>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xxs text-text-tertiary uppercase mb-1">Max drawdown %</label>
+                    <input
+                      type="number" step="0.1" min="0" max="100"
+                      placeholder="0 = disabled"
+                      value={form.max_drawdown_pct}
+                      onChange={(e) => setForm((s) => ({ ...s, max_drawdown_pct: e.target.value }))}
+                      className="w-full px-3 py-2 text-xs font-mono bg-bg-tertiary border border-border-primary rounded-md focus:outline-none focus:border-accent"
+                    />
+                    <p className="text-xxs text-text-tertiary mt-1">Peak-to-trough equity halt.</p>
+                  </div>
+                  <div>
+                    <label className="block text-xxs text-text-tertiary uppercase mb-1">Max loss / trade %</label>
+                    <input
+                      type="number" step="0.1" min="0" max="100"
+                      placeholder="blank = no cap"
+                      value={form.max_loss_per_trade_pct}
+                      onChange={(e) => setForm((s) => ({ ...s, max_loss_per_trade_pct: e.target.value }))}
+                      className="w-full px-3 py-2 text-xs font-mono bg-bg-tertiary border border-border-primary rounded-md focus:outline-none focus:border-accent"
+                    />
+                    <p className="text-xxs text-text-tertiary mt-1">Single-trade loss cap (% of pool equity).</p>
+                  </div>
+                </div>
+                <label className="flex items-start gap-2 cursor-pointer select-none pt-1">
+                  <input
+                    type="checkbox"
+                    checked={form.insurance_enabled}
+                    onChange={(e) => setForm((s) => ({ ...s, insurance_enabled: e.target.checked }))}
+                    className="mt-0.5 h-4 w-4 accent-amber-500 cursor-pointer"
+                  />
+                  <span className="text-xxs text-text-primary">
+                    Allow investors to auto-insure copied trades on this master
+                    <span className="block text-xxs text-text-tertiary mt-0.5">
+                      Off = the trader-side invest modal hides the insurance opt-in checkbox.
+                    </span>
+                  </span>
+                </label>
               </div>
 
               <div>

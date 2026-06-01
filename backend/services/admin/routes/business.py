@@ -416,6 +416,13 @@ class MasterCreateIn(BaseModel):
     description: str | None = None
     spread_markup_pips: float | None = None
     commission_per_lot_usd: float | None = None
+    # Admin-set risk controls (Mig 0066). Optional on create — null
+    # leaves the column default in place (0 / NULL = disabled).
+    max_drawdown_pct: float | None = None
+    max_loss_per_trade_pct: float | None = None
+    # Default TRUE in the model; admin can flip it off at create time
+    # to forbid investors from auto-insuring trades on this master.
+    insurance_enabled: bool = True
 
 
 @router.post("/masters")
@@ -439,6 +446,9 @@ async def create_master(
         description=body.description,
         spread_markup_pips=body.spread_markup_pips,
         commission_per_lot_usd=body.commission_per_lot_usd,
+        max_drawdown_pct=body.max_drawdown_pct,
+        max_loss_per_trade_pct=body.max_loss_per_trade_pct,
+        insurance_enabled=body.insurance_enabled,
         admin_id=admin.id,
         ip_address=request.client.host if request.client else None,
         db=db,
@@ -458,6 +468,11 @@ class MasterUpdateIn(BaseModel):
     # SpreadConfig / ChargeConfig resolver for this master's pool fills.
     spread_markup_pips: float | None = None
     commission_per_lot_usd: float | None = None
+    # Mig 0066 admin risk + insurance fields. Patch semantics — only
+    # update what's explicitly sent.
+    max_drawdown_pct: float | None = None
+    max_loss_per_trade_pct: float | None = None
+    insurance_enabled: bool | None = None
 
 
 @router.put("/masters/{master_id}")

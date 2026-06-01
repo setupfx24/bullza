@@ -217,6 +217,10 @@ async def invest_managed_account(
         False,
         description="When true, pull from main_wallet_bonus first then top up with cash. Bonus portion is forfeited on withdraw.",
     ),
+    insurance_opt_in: bool = Query(
+        False,
+        description="When true AND master.insurance_enabled, copy engine auto-activates an insurance policy on each mirrored position open. Stored on the allocation; flipping it on a top-up updates the preference.",
+    ),
     current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -224,6 +228,7 @@ async def invest_managed_account(
         master_id=master_id, account_id=account_id, amount=amount,
         max_drawdown_pct=max_drawdown_pct, volume_scaling_pct=volume_scaling_pct,
         lot_multiplier=lot_multiplier, use_bonus=use_bonus,
+        insurance_opt_in=insurance_opt_in,
         user_id=current_user["user_id"], db=db,
     )
 

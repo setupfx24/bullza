@@ -1110,6 +1110,15 @@ async def list_masters(
             "description": master.description,
             "spread_markup_pips": float(master.spread_markup_pips) if master.spread_markup_pips is not None else None,
             "commission_per_lot_usd": float(master.commission_per_lot_usd) if master.commission_per_lot_usd is not None else None,
+            # Mig 0066 risk + insurance fields — admin form reads
+            # these on edit so the inputs hydrate with the persisted
+            # values instead of defaulting to blank.
+            "max_drawdown_pct": float(master.max_drawdown_pct or 0),
+            "max_loss_per_trade_pct": (
+                float(master.max_loss_per_trade_pct)
+                if master.max_loss_per_trade_pct is not None else None
+            ),
+            "insurance_enabled": bool(master.insurance_enabled),
             "created_at": master.created_at.isoformat() if master.created_at else None,
         })
 
@@ -1365,6 +1374,12 @@ async def create_master(
     admin_id: uuid.UUID,
     ip_address: str | None,
     db: AsyncSession,
+    *,
+    # Mig 0066 admin risk + insurance fields. Optional — falls back
+    # to the model defaults when callers don't pass them.
+    max_drawdown_pct: float | None = None,
+    max_loss_per_trade_pct: float | None = None,
+    insurance_enabled: bool = True,
 ) -> dict:
     """Admin-direct master creation. Bypasses the user 'become_provider' →
     'pending' → 'approved' flow. Creates the master row + dedicated pool
@@ -1420,6 +1435,13 @@ async def create_master(
         description=description,
         spread_markup_pips=Decimal(str(spread_markup_pips)) if spread_markup_pips is not None else None,
         commission_per_lot_usd=Decimal(str(commission_per_lot_usd)) if commission_per_lot_usd is not None else None,
+        max_drawdown_pct=(
+            Decimal(str(max_drawdown_pct)) if max_drawdown_pct is not None else Decimal("0")
+        ),
+        max_loss_per_trade_pct=(
+            Decimal(str(max_loss_per_trade_pct)) if max_loss_per_trade_pct is not None else None
+        ),
+        insurance_enabled=bool(insurance_enabled),
     )
     db.add(master)
 
@@ -1597,9 +1619,11 @@ async def update_master(
     decimal_fields = (
         "performance_fee_pct", "management_fee_pct", "admin_commission_pct",
         "min_investment", "spread_markup_pips", "commission_per_lot_usd",
+        "max_drawdown_pct", "max_loss_per_trade_pct",
     )
     int_fields = ("max_investors",)
     str_fields = ("description", "master_type", "status")
+    bool_fields = ("insurance_enabled",)
 
     changed: dict = {}
     for f in decimal_fields:
@@ -1616,6 +1640,10 @@ async def update_master(
         if f in patch:
             setattr(master, f, patch[f])
             changed[f] = patch[f]
+    for f in bool_fields:
+        if f in patch and patch[f] is not None:
+            setattr(master, f, bool(patch[f]))
+            changed[f] = bool(patch[f])
 
     await write_audit_log(
         db, admin_id, "update_master", "master_account", master_id,

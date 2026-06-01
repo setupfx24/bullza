@@ -1302,14 +1302,22 @@ async def list_managed_accounts(page: int, per_page: int, db: AsyncSession) -> d
             "master_type": master.master_type,
             "total_return_pct": float(master.total_return_pct),
             "max_drawdown_pct": float(master.max_drawdown_pct),
+            "max_loss_per_trade_pct": (
+                float(master.max_loss_per_trade_pct)
+                if master.max_loss_per_trade_pct is not None else None
+            ),
             "sharpe_ratio": float(master.sharpe_ratio),
             "performance_fee_pct": float(master.performance_fee_pct),
             "management_fee_pct": float(master.management_fee_pct),
+            "admin_commission_pct": float(master.admin_commission_pct or 0),
             "min_investment": float(master.min_investment),
             "max_investors": master.max_investors,
             "active_investors": active,
             "slots_available": master.max_investors - active,
             "description": master.description,
+            # Trader invest modal reads this to gate the "auto-insure"
+            # opt-in checkbox.
+            "insurance_enabled": bool(master.insurance_enabled),
         })
 
     return {
@@ -1333,6 +1341,11 @@ async def invest_managed_account(
     # non-withdrawable credit) then top up from cash. Forfeit on
     # withdraw — same contract as the welcome bonus.
     use_bonus: bool = False,
+    # Investor opts in to auto-insure copied trades on this allocation.
+    # Only honoured if master.insurance_enabled (admin gate). Persisted
+    # on InvestorAllocation; the copy engine fires insurance.activate
+    # on each mirrored open when both flags are True.
+    insurance_opt_in: bool = False,
 ) -> dict:
     master_result = await db.execute(
         select(MasterAccount).where(
@@ -1345,22 +1358,11 @@ async def invest_managed_account(
     if not master:
         raise HTTPException(status_code=404, detail="Managed account not found")
 
-    # PAMM only — gate investor deposits to the admin's monthly window.
-    # MAMM has no pooled-fund timing constraint, so it stays unaffected.
-    if (master.master_type or "").lower() == "pamm":
-        from .pamm_config_service import get_pamm_config, in_deposit_withdrawal_window
-
-        cfg = await get_pamm_config()
-        if not in_deposit_withdrawal_window(cfg):
-            start = cfg.get("dep_window_start_day")
-            end = cfg.get("dep_window_end_day")
-            raise HTTPException(
-                status_code=400,
-                detail=(
-                    f"PAMM deposits are only accepted between day {start} and day {end} "
-                    f"of each month. Please try again during the next window."
-                ),
-            )
+    # PAMM deposits used to be gated to a monthly window — client request
+    # 2026-06-01 #2 was to drop the deposit gate (deposits any time) while
+    # KEEPING the withdrawal window. The gate now lives only in
+    # withdraw_managed_account; investors can top up at any point of the
+    # month.
 
     if amount < master.min_investment:
         raise HTTPException(status_code=400, detail=f"Minimum investment is {master.min_investment}")
@@ -1441,6 +1443,13 @@ async def invest_managed_account(
         existing_alloc.bonus_portion = (
             (existing_alloc.bonus_portion or Decimal("0")) + bonus_used
         )
+        # Always re-apply the latest opt-in choice — same logic as
+        # volume scaling: a top-up is the natural moment to flip the
+        # insurance preference.
+        if master.insurance_enabled:
+            existing_alloc.insurance_opt_in = bool(insurance_opt_in)
+        else:
+            existing_alloc.insurance_opt_in = False
         if master.master_type == "mamm":
             # Lot multiplier wins outright when provided; pct stays for
             # backwards-compat when only the slider was used.
@@ -1539,6 +1548,8 @@ async def invest_managed_account(
             allocation_pct=alloc_pct,
             lot_multiplier=alloc_lot_mult,
             bonus_portion=bonus_used,
+            # Honour the opt-in only when the master admit insurance.
+            insurance_opt_in=bool(insurance_opt_in) and bool(master.insurance_enabled),
             max_drawdown_pct=max_drawdown_pct, status="active",
         )
         db.add(allocation)
@@ -1866,10 +1877,16 @@ async def master_investors(user_id: UUID, db: AsyncSession) -> dict:
     if not master:
         raise HTTPException(status_code=404, detail="You are not an approved PAMM/MAM manager")
 
+    # PAMM allocations have NULL investor_account_id (pooled fund — the
+    # investor has no sub-account). The original inner join on
+    # TradingAccount filtered all PAMM rows out, so PAMM masters were
+    # always seeing an empty investor list. Switching to an outer join
+    # surfaces them. `account_number` falls back to '— PAMM pool —' so
+    # the column is never blank for PAMM rows.
     allocations_result = await db.execute(
         select(InvestorAllocation, User, TradingAccount)
         .join(User, InvestorAllocation.investor_user_id == User.id)
-        .join(TradingAccount, InvestorAllocation.investor_account_id == TradingAccount.id)
+        .outerjoin(TradingAccount, InvestorAllocation.investor_account_id == TradingAccount.id)
         .where(
             InvestorAllocation.master_id == master.id,
             InvestorAllocation.status == "active",
@@ -1892,7 +1909,9 @@ async def master_investors(user_id: UUID, db: AsyncSession) -> dict:
             "user_id": str(user.id),
             "user_name": f"{user.first_name or ''} {user.last_name or ''}".strip() or user.email,
             "user_email": user.email,
-            "account_number": account.account_number,
+            "account_number": (
+                account.account_number if account is not None else "— PAMM pool —"
+            ),
             "allocated": round(invested, 2),
             "pnl": round(pnl, 2),
             "pnl_pct": round(pnl_pct, 2),

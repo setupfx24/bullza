@@ -20,12 +20,19 @@ interface MammPammAccount {
   manager_name: string;
   master_type: string;
   total_return_pct: number;
+  // Admin-set risk caps (Mig 0066). Read-only for the trader; shown
+  // on the invest modal so investors see the broker-imposed safeguards
+  // before committing capital.
   max_drawdown_pct: number;
+  max_loss_per_trade_pct?: number | null;
   performance_fee_pct: number;
   // Backend returns these but the old type missed them — without
   // declaring them here the invest-modal fee stack couldn't compile.
   management_fee_pct?: number;
   admin_commission_pct?: number;
+  // When false, the trader UI hides the "auto-insure copied trades"
+  // opt-in. Admin per-master toggle.
+  insurance_enabled?: boolean;
   min_investment: number;
   active_investors: number;
   slots_available: number;
@@ -273,6 +280,9 @@ export default function PammPage() {
   // Use bonus credit alongside cash. Forfeit on withdraw per the
   // welcome-bonus contract.
   const [investUseBonus, setInvestUseBonus] = useState(false);
+  // Opt-in to auto-insurance on copied trades. Only visible when
+  // master.insurance_enabled is true (admin gate, Mig 0066).
+  const [investInsuranceOptIn, setInvestInsuranceOptIn] = useState(false);
   const [investing, setInvesting] = useState(false);
   const [walletBalance, setWalletBalance] = useState(0);
   const [walletBonus, setWalletBonus] = useState(0);
@@ -421,6 +431,9 @@ export default function PammPage() {
         }
       }
       if (investUseBonus) params.set('use_bonus', 'true');
+      if (investInsuranceOptIn && investTarget.insurance_enabled !== false) {
+        params.set('insurance_opt_in', 'true');
+      }
       const res = await api.post<{
         top_up?: number; cash_used?: number; bonus_used?: number;
       }>(`/social/mamm-pamm/${investTarget.id}/invest?${params.toString()}`, {});
@@ -436,6 +449,7 @@ export default function PammPage() {
       setInvestLotMultiplier('');
       setInvestMode('scaling');
       setInvestUseBonus(false);
+      setInvestInsuranceOptIn(false);
       fetchBrowse();
       fetchWallet();
       if (activeTab === 'investments') fetchAllocations();
@@ -638,29 +652,29 @@ export default function PammPage() {
                       </button>
                     </div>
                     <div className="mb-4">
-                      <p className="text-[10px] text-text-tertiary uppercase tracking-wide mb-0.5">Total ROI</p>
-                      <p className={clsx('text-2xl font-bold font-mono tabular-nums', a.total_return_pct >= 0 ? 'text-[#55a630]' : 'text-red-400')}>
+                      <p className="text-xs font-semibold text-text-secondary uppercase tracking-wide mb-0.5">Total ROI</p>
+                      <p className={clsx('text-3xl font-extrabold font-mono tabular-nums', a.total_return_pct >= 0 ? 'text-[#55a630]' : 'text-red-400')}>
                         {a.total_return_pct >= 0 ? '+' : ''}{a.total_return_pct.toFixed(2)}%
                       </p>
                     </div>
-                    {a.description && <p className="text-[11px] text-text-tertiary mb-4 line-clamp-2">{a.description}</p>}
+                    {a.description && <p className="text-xs text-text-secondary mb-4 line-clamp-2">{a.description}</p>}
                     <div className="grid grid-cols-3 gap-2 pt-3 border-t border-border-primary mt-auto">
                       <div>
-                        <p className="text-[10px] text-text-tertiary">Drawdown</p>
-                        <p className="text-xs font-semibold tabular-nums text-red-400">{a.max_drawdown_pct.toFixed(2)}%</p>
+                        <p className="text-xs font-semibold text-text-secondary uppercase tracking-wide">Drawdown</p>
+                        <p className="text-base font-bold tabular-nums text-red-400">{a.max_drawdown_pct.toFixed(2)}%</p>
                       </div>
                       <div>
-                        <p className="text-[10px] text-text-tertiary">Investors</p>
-                        <p className="text-xs font-semibold tabular-nums text-text-primary">{a.active_investors}</p>
+                        <p className="text-xs font-semibold text-text-secondary uppercase tracking-wide">Investors</p>
+                        <p className="text-base font-bold tabular-nums text-text-primary">{a.active_investors}</p>
                       </div>
                       <div>
-                        <p className="text-[10px] text-text-tertiary">Slots</p>
-                        <p className="text-xs font-semibold tabular-nums text-text-primary">{a.slots_available}</p>
+                        <p className="text-xs font-semibold text-text-secondary uppercase tracking-wide">Slots</p>
+                        <p className="text-base font-bold tabular-nums text-text-primary">{a.slots_available}</p>
                       </div>
                     </div>
-                    <div className="flex items-center justify-between mt-3 text-[10px] text-text-tertiary">
-                      <span className="flex items-center gap-1"><TrendingUp size={10} /> Fee: {a.performance_fee_pct}%</span>
-                      <span className="flex items-center gap-1"><DollarSign size={10} /> Min: ${a.min_investment.toLocaleString()}</span>
+                    <div className="flex items-center justify-between mt-3 text-xs text-text-secondary font-medium">
+                      <span className="flex items-center gap-1"><TrendingUp size={11} /> Fee: <span className="text-text-primary font-semibold">{a.performance_fee_pct}%</span></span>
+                      <span className="flex items-center gap-1"><DollarSign size={11} /> Min: <span className="text-text-primary font-semibold">${a.min_investment.toLocaleString()}</span></span>
                     </div>
                   </div>
                 ))}
@@ -1204,6 +1218,50 @@ export default function PammPage() {
                 <span className="text-text-primary">{investTarget.slots_available}</span>
               </div>
             </div>
+
+            {/* Admin-set risk caps (Mig 0066) — display-only so the
+                investor sees the broker safeguards before committing.
+                Hidden when both fields are zero / null. */}
+            {(investTarget.max_drawdown_pct > 0 || (investTarget.max_loss_per_trade_pct ?? 0) > 0) && (
+              <div className="rounded-lg bg-amber-500/[0.06] border border-amber-500/30 p-3 text-[11px] text-amber-300 space-y-1">
+                <div className="font-semibold text-amber-300">Broker risk caps</div>
+                {investTarget.max_drawdown_pct > 0 && (
+                  <div className="flex justify-between">
+                    <span>Max drawdown</span>
+                    <span className="font-mono tabular-nums">{Number(investTarget.max_drawdown_pct).toFixed(2)}%</span>
+                  </div>
+                )}
+                {(investTarget.max_loss_per_trade_pct ?? 0) > 0 && (
+                  <div className="flex justify-between">
+                    <span>Max loss / trade</span>
+                    <span className="font-mono tabular-nums">{Number(investTarget.max_loss_per_trade_pct).toFixed(2)}%</span>
+                  </div>
+                )}
+                <p className="text-[10px] text-amber-300/80 pt-0.5">
+                  Set by the broker — automatic safeguards beyond your control.
+                </p>
+              </div>
+            )}
+
+            {/* Auto-insurance opt-in — only visible when the master
+                allows insurance (admin gate, Mig 0066). Off by default. */}
+            {investTarget.insurance_enabled !== false && (
+              <label className="flex items-start gap-2 rounded-lg bg-bg-secondary border border-border-primary p-3 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={investInsuranceOptIn}
+                  onChange={(e) => setInvestInsuranceOptIn(e.target.checked)}
+                  className="mt-0.5 h-4 w-4 accent-accent cursor-pointer"
+                />
+                <span className="text-[11px] text-text-secondary">
+                  Auto-insure copied trades on this allocation
+                  <span className="block text-[10px] text-text-tertiary mt-0.5">
+                    Each mirrored position opens with a default-tier insurance policy.
+                    Fees are charged per-trade from your investor sub-account credit.
+                  </span>
+                </span>
+              </label>
+            )}
 
             {/* Bonus opt-in — visible only when the user actually has
                 bonus credit. Off by default so existing flows aren't
