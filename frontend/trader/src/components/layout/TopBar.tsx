@@ -3,7 +3,6 @@
 import { useEffect, useState, useRef } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { SwisDexWordmark } from '@/components/layout/SwisDexWordmark';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
 import { wsManager, ConnectionStatus } from '@/lib/ws/wsManager';
 import { useAuthStore } from '@/stores/authStore';
@@ -84,17 +83,13 @@ export default function TopBar() {
           </button>
         )}
 
-        {/* Brand — left anchor */}
-        <div className="shrink-0 z-20 min-w-0 max-w-[min(52%,12rem)] sm:max-w-[14rem] md:max-w-none flex items-center h-7 sm:h-9 lg:h-[52px]">
-          <SwisDexWordmark
-            href="/dashboard"
-            className="items-center"
-            textClassName="text-lg sm:text-xl lg:text-3xl lg:leading-none"
-          />
-        </div>
+        {/* Brand wordmark removed — sidebar already shows the SwisDex logo
+            in the same row, and rendering it twice felt noisy in the
+            trading terminal. The active account badge below now becomes
+            the left-anchor on the terminal page. */}
 
         {showTerminalAccount && activeAccount ? (
-          <div className="hidden sm:flex min-w-0 max-w-[min(42vw,14rem)] md:max-w-xs lg:max-w-md ml-2 pl-2 border-l border-border-glass shrink items-center">
+          <div className="hidden sm:flex min-w-0 max-w-[min(42vw,14rem)] md:max-w-xs lg:max-w-md items-center">
             <ActiveAccountBadge account={activeAccount} variant="compact" className="w-full" />
           </div>
         ) : null}
