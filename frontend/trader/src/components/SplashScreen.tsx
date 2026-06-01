@@ -17,8 +17,10 @@ export default function SplashScreen() {
   const [removed, setRemoved] = useState(false);  // unmounts after fade
 
   useEffect(() => {
-    const fade = setTimeout(() => setHidden(true), 1500);
-    const remove = setTimeout(() => setRemoved(true), 2150);
+    // Short hold + quick fade so the splash is barely a flicker — pages
+    // appear almost instantly instead of being blocked for ~1.5s.
+    const fade = setTimeout(() => setHidden(true), 250);
+    const remove = setTimeout(() => setRemoved(true), 650);
     return () => { clearTimeout(fade); clearTimeout(remove); };
   }, []);
 
@@ -33,7 +35,6 @@ export default function SplashScreen() {
       <div className="swisdex-splash__inner">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/images/swisdex_png5.png" alt="SwisDex" className="swisdex-splash__logo" />
-        <span className="swisdex-splash__ring" />
       </div>
     </div>
   );

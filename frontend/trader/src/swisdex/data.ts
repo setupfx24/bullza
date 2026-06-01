@@ -152,7 +152,7 @@ export const FAQ = [
   },
   {
     q: 'How do I get the 100% Welcome Bonus?',
-    a: 'The 100% Welcome Bonus is applied automatically to your first qualifying deposit — no promo code required. Deposit $100 → trade with $200 of equity; deposit $1,000 → trade with $2,000. The bonus is fully tradeable from the moment it lands in your account. See the /bonus page for the full tier breakdown.',
+    a: 'The 100% Welcome Bonus is applied automatically to your first qualifying deposit — no promo code required. Deposit $100 → get a $100 bonus; deposit $200 → get a $200 bonus. The bonus is fully tradeable from the moment it lands in your account. See the /bonus page for the full tier breakdown.',
   },
   {
     q: 'Which deposit and withdrawal methods are available, and how long do they take?',
