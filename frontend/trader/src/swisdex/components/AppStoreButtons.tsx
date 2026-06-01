@@ -1,15 +1,16 @@
 'use client';
 
+import { Apple, Play } from 'lucide-react';
+
 /**
- * Twin App Store / Google Play download badges.
+ * Twin "Download on the App Store" / "Android App" pill buttons.
  * Sits just above the TrustBadges row on every public landing page.
  * Currently the hrefs are placeholders — swap them when the iOS and
- * Android builds land in their respective stores. Uses the official
- * branded store badges (drop replacements at /public/images/).
+ * Android builds land in their respective stores.
  */
 const STORES = [
-  { src: '/images/app_store.png',   alt: 'Download on the App Store',     href: '#' },
-  { src: '/images/google_play.png', alt: 'Get it on Google Play',         href: '#' },
+  { Icon: Apple, top: 'Download on the', bottom: 'App Store',  href: '#' },
+  { Icon: Play,  top: 'Download our',    bottom: 'Android App', href: '#' },
 ];
 
 export function AppStoreButtons() {
@@ -30,24 +31,26 @@ export function AppStoreButtons() {
         <p className="text-center text-[11px] uppercase tracking-[0.24em] text-foreground/55 mb-7 font-semibold">
           Download Now
         </p>
-        <div className="flex flex-wrap items-center justify-center gap-4 sm:gap-5">
-          {STORES.map(({ src, alt, href }) => (
-            <a
-              key={alt}
-              href={href}
-              aria-label={alt}
-              className="inline-flex items-center justify-center transition-opacity hover:opacity-85 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 rounded-xl"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={src}
-                alt={alt}
-                className="h-14 sm:h-16 w-auto object-contain"
-              />
-            </a>
-          ))}
+        <div className="flex flex-wrap items-center justify-center gap-3 sm:gap-4">
+        {STORES.map(({ Icon, top, bottom, href }) => (
+          <a
+            key={bottom}
+            href={href}
+            className="inline-flex items-center gap-3 rounded-2xl px-5 py-2.5 bg-black/85 hover:bg-black border border-foreground/20 hover:border-primary/50 transition-colors min-w-[200px]"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            <Icon className="size-8 shrink-0 text-foreground" aria-hidden />
+            <div className="flex flex-col leading-tight text-left">
+              <span className="text-[10px] uppercase tracking-[0.16em] text-foreground/65">
+                {top}
+              </span>
+              <span className="font-display text-lg tracking-tight text-foreground">
+                {bottom}
+              </span>
+            </div>
+          </a>
+        ))}
         </div>
       </div>
     </section>

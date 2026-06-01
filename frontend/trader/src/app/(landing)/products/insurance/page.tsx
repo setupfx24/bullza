@@ -17,15 +17,20 @@ export default function InsurancePage() {
         />
       </section>
 
-      {/* Insurance plan illustration / table image */}
+      {/* Black-box content placeholder — drop the final Insurance table / copy here */}
       <section className="mx-auto max-w-[1200px] px-[var(--gutter)] py-12 sm:py-16">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src="/images/insurance_banner.png"
-          alt="SwisDex trade-insurance plan details"
+        <div
+          aria-label="Insurance content placeholder"
           className="w-full rounded-3xl"
-          style={{ border: '1px solid rgba(255,255,255,0.06)' }}
+          style={{
+            background: '#000',
+            border: '1px solid rgba(255,255,255,0.06)',
+            minHeight: 'min(720px, 80vh)',
+          }}
         />
+        <p className="mt-4 text-center text-xs text-foreground/45">
+          Final content drop pending — replace this black box with the Insurance table / page content.
+        </p>
       </section>
 
       {/* CTA */}

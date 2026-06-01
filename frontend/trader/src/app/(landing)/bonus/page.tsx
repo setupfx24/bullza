@@ -177,7 +177,7 @@ export default function BonusPage() {
             </h2>
             <p className="mt-4 text-foreground/70 text-sm sm:text-base leading-relaxed max-w-xl">
               SwisDex matches your first deposit with bonus equity that lands in your account within minutes.
-              The bigger the tier you hit, the larger the matched amount — up to a full <span className="text-primary font-semibold">$200</span> credited on a $200 deposit.
+              The bigger the tier you hit, the larger the matched amount — up to a full <span className="text-primary font-semibold">$1,000</span> credited on a $1,000 deposit.
             </p>
             <div className="mt-7 flex flex-wrap gap-3">
               <Link href={SIGNUP_HREF} className="inline-flex items-center gap-2 rounded-full bg-primary text-white px-6 py-3 text-sm font-semibold uppercase tracking-wider hover:opacity-90">
