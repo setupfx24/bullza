@@ -156,31 +156,31 @@ export default function AdvancedChart() {
   return (
     <div
       ref={wrapRef}
-      className="relative w-full h-full min-h-[200px] min-w-0 bg-bg-base"
+      className="relative w-full h-full min-h-[200px] min-w-0 bg-bg-base flex flex-col"
     >
-      {/* Brand logo overlay — bottom-left this time so it can't overlap
-          TradingView's instrument-name watermark (top-left) or the
-          fullscreen button (top-right). pointer-events-none keeps the
-          chart's own controls clickable through it. */}
-      <img
-        src="/images/swisdex_png5.png"
-        alt="SwisDex"
-        className="absolute bottom-2 left-2 z-20 h-5 sm:h-6 w-auto opacity-70 pointer-events-none select-none drop-shadow"
-      />
-
-      {/* Fullscreen toggle — the embed widget ships no fullscreen control. */}
-      <button
-        type="button"
-        onClick={toggleFullscreen}
-        title={isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}
-        className="absolute top-2 right-2 z-20 p-1.5 rounded-md bg-black/40 hover:bg-black/60 text-white/80 hover:text-white backdrop-blur-sm transition-colors"
-      >
-        {isFullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
-      </button>
+      {/* SwisDex brand strip — sits ABOVE the TradingView iframe so it
+          can't overlap the instrument-name watermark or the fullscreen
+          button. Always visible without scrolling, ~28px tall so it
+          doesn't eat meaningful chart real estate. */}
+      <div className="flex items-center justify-between px-3 py-1.5 border-b border-border-primary/60 bg-bg-secondary/40 shrink-0">
+        <img
+          src="/images/swisdex_png5.png"
+          alt="SwisDex"
+          className="h-4 sm:h-5 w-auto opacity-90 select-none drop-shadow"
+        />
+        <button
+          type="button"
+          onClick={toggleFullscreen}
+          title={isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}
+          className="p-1 rounded text-text-tertiary hover:text-text-primary hover:bg-bg-hover transition-colors"
+        >
+          {isFullscreen ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
+        </button>
+      </div>
 
       <div
         ref={containerRef}
-        className="tradingview-widget-container w-full h-full min-h-[200px] min-w-0"
+        className="tradingview-widget-container w-full flex-1 min-h-0 min-w-0"
         data-tv-chart-root
       />
     </div>
