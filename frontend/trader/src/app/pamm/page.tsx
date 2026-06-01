@@ -22,6 +22,10 @@ interface MammPammAccount {
   total_return_pct: number;
   max_drawdown_pct: number;
   performance_fee_pct: number;
+  // Backend returns these but the old type missed them — without
+  // declaring them here the invest-modal fee stack couldn't compile.
+  management_fee_pct?: number;
+  admin_commission_pct?: number;
   min_investment: number;
   active_investors: number;
   slots_available: number;
@@ -40,6 +44,10 @@ interface MyAllocation {
   total_pnl: number;
   pnl_pct: number;
   performance_fee_pct: number;
+  management_fee_pct?: number;
+  // Slice of allocation_amount that was funded from bonus credit.
+  // Forfeited on withdraw — drives the warning in the exit modal.
+  bonus_portion?: number;
   joined_at: string;
   status: string;
 }
@@ -257,8 +265,17 @@ export default function PammPage() {
   const [investAccount, setInvestAccount] = useState('');
   const [investAmount, setInvestAmount] = useState('');
   const [investScaling, setInvestScaling] = useState('100');
+  // MAM direct-mode lot multiplier. Empty = use volume scaling (legacy
+  // pct path). When set, the engine takes master_lots × this value on
+  // every copy trade, ignoring volume scaling entirely.
+  const [investLotMultiplier, setInvestLotMultiplier] = useState('');
+  const [investMode, setInvestMode] = useState<'scaling' | 'multiplier'>('scaling');
+  // Use bonus credit alongside cash. Forfeit on withdraw per the
+  // welcome-bonus contract.
+  const [investUseBonus, setInvestUseBonus] = useState(false);
   const [investing, setInvesting] = useState(false);
   const [walletBalance, setWalletBalance] = useState(0);
+  const [walletBonus, setWalletBonus] = useState(0);
 
   // Apply form state
   const [applyAccount, setApplyAccount] = useState('');
@@ -340,9 +357,10 @@ export default function PammPage() {
 
   const fetchWallet = useCallback(async () => {
     try {
-      const s = await api.get<{ main_wallet_balance?: number }>('/wallet/summary');
+      const s = await api.get<{ main_wallet_balance?: number; main_wallet_bonus?: number }>('/wallet/summary');
       setWalletBalance(Number(s.main_wallet_balance) || 0);
-    } catch { setWalletBalance(0); }
+      setWalletBonus(Number(s.main_wallet_bonus) || 0);
+    } catch { setWalletBalance(0); setWalletBonus(0); }
   }, []);
 
   useEffect(() => {
@@ -371,18 +389,53 @@ export default function PammPage() {
     const amount = parseFloat(investAmount);
     if (!investAccount || isNaN(amount) || amount <= 0) { toast.error('Enter a valid amount'); return; }
     if (amount < investTarget.min_investment) { toast.error(`Minimum investment is $${investTarget.min_investment}`); return; }
-    if (amount > walletBalance) { toast.error('Insufficient wallet balance'); return; }
+    // With use_bonus on, the available pool is balance + bonus. Without
+    // it we still only spend cash. Same UX guard either way.
+    const available = walletBalance + (investUseBonus ? walletBonus : 0);
+    if (amount > available) {
+      toast.error(
+        investUseBonus
+          ? `Insufficient available funds — cash $${walletBalance.toFixed(2)} + bonus $${walletBonus.toFixed(2)}`
+          : 'Insufficient wallet balance',
+      );
+      return;
+    }
     setInvesting(true);
     try {
       const params = new URLSearchParams({ account_id: investAccount, amount: investAmount });
       if (investTarget.master_type === 'mamm') {
-        const s = parseFloat(investScaling);
-        if (isNaN(s) || s < 1 || s > 500) { toast.error('Volume scaling must be 1–500'); setInvesting(false); return; }
-        params.set('volume_scaling_pct', investScaling);
+        if (investMode === 'multiplier') {
+          const m = parseFloat(investLotMultiplier);
+          if (isNaN(m) || m <= 0 || m > 100) {
+            toast.error('Lot multiplier must be > 0 and ≤ 100');
+            setInvesting(false); return;
+          }
+          params.set('lot_multiplier', String(m));
+        } else {
+          const s = parseFloat(investScaling);
+          if (isNaN(s) || s < 1 || s > 500) {
+            toast.error('Volume scaling must be 1–500');
+            setInvesting(false); return;
+          }
+          params.set('volume_scaling_pct', investScaling);
+        }
       }
-      const res = await api.post<{ top_up?: number }>(`/social/mamm-pamm/${investTarget.id}/invest?${params.toString()}`, {});
-      toast.success(res?.top_up ? `Top-up of $${res.top_up.toFixed(2)} added!` : 'Investment started! Amount deducted from wallet.');
+      if (investUseBonus) params.set('use_bonus', 'true');
+      const res = await api.post<{
+        top_up?: number; cash_used?: number; bonus_used?: number;
+      }>(`/social/mamm-pamm/${investTarget.id}/invest?${params.toString()}`, {});
+      const breakdown = res?.bonus_used && res.bonus_used > 0
+        ? ` ($${(res.cash_used ?? 0).toFixed(2)} cash + $${res.bonus_used.toFixed(2)} bonus)`
+        : '';
+      toast.success(
+        res?.top_up
+          ? `Top-up of $${res.top_up.toFixed(2)} added${breakdown}`
+          : `Investment started${breakdown}`,
+      );
       setInvestTarget(null);
+      setInvestLotMultiplier('');
+      setInvestMode('scaling');
+      setInvestUseBonus(false);
       fetchBrowse();
       fetchWallet();
       if (activeTab === 'investments') fetchAllocations();
@@ -1076,20 +1129,109 @@ export default function PammPage() {
             </div>
 
             {investTarget.master_type === 'mamm' && (
-              <div>
-                <label className="block text-xs text-text-secondary mb-1.5">Volume Scaling %</label>
-                <input
-                  type="number" min="1" max="500" step="1"
-                  value={investScaling}
-                  onChange={(e) => setInvestScaling(e.target.value)}
-                  className="w-full bg-bg-secondary border border-border-primary rounded-lg px-3 py-2.5 text-sm text-text-primary focus:outline-none focus:border-accent/50"
-                />
-                <p className="text-[10px] text-text-tertiary mt-1">100 = proportional share · 200 = 2× leverage</p>
+              <div className="space-y-2">
+                {/* Mode toggle — let the investor decide whether their
+                    lot is a % of pool share, or a direct multiplier on
+                    the master's lot. Mutually exclusive. */}
+                <div className="flex gap-2">
+                  {(['scaling', 'multiplier'] as const).map((m) => (
+                    <button
+                      key={m}
+                      type="button"
+                      onClick={() => setInvestMode(m)}
+                      className={clsx(
+                        'flex-1 py-1.5 px-2 rounded-md text-[11px] font-semibold border transition-colors',
+                        investMode === m
+                          ? 'bg-accent/15 text-accent border-accent/40'
+                          : 'bg-transparent text-text-tertiary border-border-primary hover:text-text-secondary',
+                      )}
+                    >
+                      {m === 'scaling' ? 'Volume scaling %' : 'Direct lot ×'}
+                    </button>
+                  ))}
+                </div>
+                {investMode === 'scaling' ? (
+                  <div>
+                    <label className="block text-xs text-text-secondary mb-1.5">Volume Scaling %</label>
+                    <input
+                      type="number" min="1" max="500" step="1"
+                      value={investScaling}
+                      onChange={(e) => setInvestScaling(e.target.value)}
+                      className="w-full bg-bg-secondary border border-border-primary rounded-lg px-3 py-2.5 text-sm text-text-primary focus:outline-none focus:border-accent/50"
+                    />
+                    <p className="text-[10px] text-text-tertiary mt-1">100 = proportional share · 200 = 2× leverage</p>
+                  </div>
+                ) : (
+                  <div>
+                    <label className="block text-xs text-text-secondary mb-1.5">Lot multiplier</label>
+                    <input
+                      type="number" min="0.01" max="100" step="0.01"
+                      placeholder="e.g. 0.5"
+                      value={investLotMultiplier}
+                      onChange={(e) => setInvestLotMultiplier(e.target.value)}
+                      className="w-full bg-bg-secondary border border-border-primary rounded-lg px-3 py-2.5 text-sm text-text-primary focus:outline-none focus:border-accent/50"
+                    />
+                    <p className="text-[10px] text-text-tertiary mt-1">
+                      Take master_lots × this value on every trade. e.g. master opens 1.0 lots → you get 0.5 lots.
+                    </p>
+                  </div>
+                )}
               </div>
             )}
 
-            <div className="rounded-lg bg-bg-secondary border border-border-primary p-3 text-[11px] text-text-tertiary">
-              Performance fee: <span className="text-text-primary">{investTarget.performance_fee_pct}%</span> · Slots left: <span className="text-text-primary">{investTarget.slots_available}</span>
+            {/* Full fee stack — perf + mgmt + admin cut. Was hidden in
+                the old single-line summary; now broken out so the
+                investor sees exactly what the broker keeps. */}
+            <div className="rounded-lg bg-bg-secondary border border-border-primary p-3 text-[11px] text-text-tertiary space-y-1">
+              <div className="flex justify-between">
+                <span>Performance fee</span>
+                <span className="text-text-primary">{Number(investTarget.performance_fee_pct ?? 0).toFixed(1)}%</span>
+              </div>
+              {Number(investTarget.management_fee_pct ?? 0) > 0 && (
+                <div className="flex justify-between">
+                  <span>Management fee (annual)</span>
+                  <span className="text-text-primary">{Number(investTarget.management_fee_pct).toFixed(1)}%</span>
+                </div>
+              )}
+              {Number(investTarget.admin_commission_pct ?? 0) > 0 && (
+                <div className="flex justify-between">
+                  <span>Broker commission (of perf fee)</span>
+                  <span className="text-text-primary">{Number(investTarget.admin_commission_pct).toFixed(1)}%</span>
+                </div>
+              )}
+              <div className="flex justify-between pt-1 border-t border-border-primary/60">
+                <span>Slots left</span>
+                <span className="text-text-primary">{investTarget.slots_available}</span>
+              </div>
+            </div>
+
+            {/* Bonus opt-in — visible only when the user actually has
+                bonus credit. Off by default so existing flows aren't
+                disturbed and so the user has to consent to the
+                "forfeit on withdraw" tradeoff explicitly. */}
+            {walletBonus > 0 && (
+              <label className="flex items-start gap-2 rounded-lg bg-bg-secondary border border-border-primary p-3 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={investUseBonus}
+                  onChange={(e) => setInvestUseBonus(e.target.checked)}
+                  className="mt-0.5 h-4 w-4 accent-accent cursor-pointer"
+                />
+                <span className="text-[11px] text-text-secondary">
+                  Use my bonus balance (${walletBonus.toFixed(2)}) first
+                  <span className="block text-[10px] text-text-tertiary mt-0.5">
+                    Bonus credit is tradable but non-withdrawable — the bonus portion is forfeited when you exit the investment.
+                  </span>
+                </span>
+              </label>
+            )}
+
+            {/* Available funds summary — bonus is added only when the
+                opt-in is on, so the total always matches what the
+                backend will accept. */}
+            <div className="text-[11px] text-text-tertiary">
+              Available: <span className="text-text-primary font-mono tabular-nums">${(walletBalance + (investUseBonus ? walletBonus : 0)).toFixed(2)}</span>
+              <span className="text-text-tertiary/70"> (cash ${walletBalance.toFixed(2)}{investUseBonus ? ` + bonus $${walletBonus.toFixed(2)}` : ''})</span>
             </div>
 
             <div className="flex gap-2 pt-1">
@@ -1114,11 +1256,15 @@ export default function PammPage() {
         )}
       </Modal>
 
-      {/* Withdraw Modal */}
+      {/* Withdraw Modal — copy + warnings split by master_type. The
+          endpoint is shared but the user-facing semantics differ
+          enough (PAMM: monthly window + pro-rata of pool; MAM: per-
+          investor sub-account closed on demand) that one generic
+          modal was confusing both audiences. */}
       <Modal
         open={!!withdrawTarget}
         onClose={() => { if (!withdrawing) setWithdrawTarget(null); }}
-        title="Withdraw Investment"
+        title={withdrawTarget?.master_type === 'pamm' ? 'Exit PAMM pool' : 'Exit MAM allocation'}
         width="sm"
       >
         {withdrawTarget && (
@@ -1129,7 +1275,9 @@ export default function PammPage() {
                 <span className="text-text-primary font-medium">{withdrawTarget.manager_name}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-text-tertiary">Invested</span>
+                <span className="text-text-tertiary">
+                  {withdrawTarget.master_type === 'pamm' ? 'Pool share' : 'Invested'}
+                </span>
                 <span className="text-text-primary">${fmt(withdrawTarget.allocation_amount)}</span>
               </div>
               <div className="flex justify-between">
@@ -1138,10 +1286,38 @@ export default function PammPage() {
               </div>
             </div>
 
-            <div className="flex items-start gap-2 px-3 py-2.5 rounded-lg bg-yellow-500/[0.08] border border-yellow-500/20 text-[11px] text-yellow-400">
-              <AlertCircle size={13} className="shrink-0 mt-0.5" />
-              <span>All open positions tied to this investment will be closed automatically.</span>
-            </div>
+            {withdrawTarget.master_type === 'pamm' ? (
+              <div className="flex items-start gap-2 px-3 py-2.5 rounded-lg bg-amber-500/[0.08] border border-amber-500/30 text-[11px] text-amber-300">
+                <AlertCircle size={13} className="shrink-0 mt-0.5" />
+                <span>
+                  PAMM exit: your share of the pool is valued at the current pool balance,
+                  performance fee is netted, and the remaining capital + P&L is returned to
+                  your main wallet. Withdrawals only process inside the admin-set monthly
+                  window — outside it you'll receive an error and need to wait.
+                </span>
+              </div>
+            ) : (
+              <div className="flex items-start gap-2 px-3 py-2.5 rounded-lg bg-yellow-500/[0.08] border border-yellow-500/20 text-[11px] text-yellow-400">
+                <AlertCircle size={13} className="shrink-0 mt-0.5" />
+                <span>
+                  MAM exit: every open position on your investor sub-account is closed at
+                  the current market price, the realised P&L (after performance fee) lands
+                  on your main wallet, and the sub-account is retired.
+                </span>
+              </div>
+            )}
+            {(withdrawTarget.bonus_portion ?? 0) > 0 && (
+              <div className="flex items-start gap-2 px-3 py-2.5 rounded-lg bg-red-500/[0.08] border border-red-500/30 text-[11px] text-red-300">
+                <AlertCircle size={13} className="shrink-0 mt-0.5" />
+                <span>
+                  Bonus forfeit on exit:{' '}
+                  <span className="font-semibold">${fmt(withdrawTarget.bonus_portion ?? 0)}</span>{' '}
+                  of this allocation was funded from your bonus balance. Per the welcome-
+                  bonus contract, that portion is non-withdrawable and will be deducted
+                  from the returned amount.
+                </span>
+              </div>
+            )}
 
             <div className="flex gap-2 pt-1">
               <button

@@ -359,11 +359,34 @@ async def list_sub_brokers(
 async def list_masters(
     page: int = Query(1, ge=1),
     per_page: int = Query(50, ge=1, le=200),
+    master_type: str | None = Query(
+        None,
+        description="Filter to a single master_type (signal_provider | pamm | mamm). Default = all.",
+    ),
     admin: User = Depends(require_permission("ib.view")),
     db: AsyncSession = Depends(get_db),
 ):
-    """List all copy-trade masters (signal_provider, pamm, mamm)."""
-    return await business_service.list_masters(page=page, per_page=per_page, db=db)
+    """List copy-trade masters with stats. Pass `master_type=mamm` to
+    scope the result to MAM only (so the admin MAM dashboard never
+    receives PAMM rows even before the client-side filter runs)."""
+    return await business_service.list_masters(
+        page=page, per_page=per_page, db=db, master_type=master_type,
+    )
+
+
+@router.get("/masters/admin-commission-summary")
+async def admin_commission_summary(
+    master_type: str | None = Query(None),
+    admin: User = Depends(require_permission("ib.view")),
+    db: AsyncSession = Depends(get_db),
+):
+    """Aggregate admin-cut earned across all masters of `master_type`
+    (default = all). Returns the lifetime total + a per-master
+    breakdown so the admin MAM dashboard can show who's contributing
+    how much to the house cut."""
+    return await business_service.admin_commission_summary(
+        master_type=master_type, db=db,
+    )
 
 
 @router.delete("/masters/{master_id}")

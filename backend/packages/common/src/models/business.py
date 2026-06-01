@@ -133,9 +133,23 @@ class InvestorAllocation(Base):
     investor_account_id = Column(UUID(as_uuid=True), ForeignKey("trading_accounts.id"))
     copy_type = Column(String(20), default="signal")
     allocation_amount = Column(Numeric(18, 8), nullable=False)
+    # MAM volume scaling — kept for backwards compat with existing rows.
+    # If `lot_multiplier` is set the engine uses it INSTEAD of allocation_pct
+    # (direct mode); otherwise it falls back to the pct-of-pool path.
     allocation_pct = Column(Numeric(5, 2))
+    # Direct lot multiplier for MAM (e.g. 0.5 = take half the master's lot
+    # every trade, independent of pool share). NULL = use allocation_pct
+    # (volume scaling %). Honored only when copy_type == 'mam'. Mig 0065.
+    lot_multiplier = Column(Numeric(10, 4), nullable=True)
     max_drawdown_pct = Column(Numeric(5, 2))
     max_lot_override = Column(Numeric(10, 4))
+    # How much of allocation_amount was pulled from main_wallet_bonus
+    # (vs main_wallet_balance). Mig 0065. On withdraw we forfeit this
+    # portion so the bonus stays non-withdrawable per the welcome-bonus
+    # contract. 0 = fully cash investment.
+    bonus_portion = Column(
+        Numeric(18, 8), nullable=False, default=0, server_default="0",
+    )
     status = Column(String(20), default="active")
     total_profit = Column(Numeric(18, 8), default=0)
     last_distribution_at = Column(DateTime(timezone=True), nullable=True)

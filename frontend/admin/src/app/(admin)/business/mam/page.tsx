@@ -245,9 +245,10 @@ export default function MamPage() {
     }
   };
 
-  // Client-side filter: /business/masters returns all types; this page
-  // shows only mamm so admins managing MAM don't have to scan through
-  // PAMM and signal providers.
+  // The list endpoint is now scoped server-side via ?master_type=mamm
+  // (client request 2026-06-01 #6 — PAMM rows were leaking in past the
+  // client filter). We keep a defensive client-side filter so a stray
+  // signal_provider row from a stale cache can't render here either.
   const masters = useMemo(
     () => allMasters.filter((m) => (m.master_type || '').toLowerCase() === 'mamm'),
     [allMasters],
@@ -265,7 +266,9 @@ export default function MamPage() {
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await adminApi.get<{ items: Master[] }>('/business/masters');
+      const res = await adminApi.get<{ items: Master[] }>(
+        '/business/masters?master_type=mamm&per_page=200',
+      );
       setAllMasters(res.items || []);
     } catch (e: any) {
       toast.error(e.message || 'Failed to load MAM accounts');
@@ -439,7 +442,7 @@ export default function MamPage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <div className="bg-bg-secondary border border-border-primary rounded-md px-4 py-3">
             <p className="text-xxs text-text-tertiary uppercase tracking-wide">Active MAMs</p>
             <p className="text-lg font-semibold text-text-primary mt-1 tabular-nums">
@@ -461,7 +464,12 @@ export default function MamPage() {
             </p>
             <p className="text-xxs text-text-tertiary mt-0.5">active allocations</p>
           </div>
+          <AdminCommissionCard />
         </div>
+
+        {/* Admin commission breakdown — per-master estimate */}
+        <AdminCommissionBreakdown />
+
 
         <div className="bg-bg-secondary border border-border-primary rounded-md">
           {loading ? (
@@ -1382,5 +1390,113 @@ export default function MamPage() {
         </div>
       )}
     </>
+  );
+}
+
+
+// ─── Admin Commission cards ─────────────────────────────────────────
+
+interface CommissionSummary {
+  lifetime_total: number;
+  breakdown_total_estimate: number;
+  by_master: {
+    master_id: string;
+    provider_name: string;
+    email: string;
+    master_type: string;
+    admin_commission_pct: number;
+    master_net_earned: number;
+    admin_earned_estimate: number;
+  }[];
+}
+
+function useCommissionSummary() {
+  const [data, setData] = useState<CommissionSummary | null>(null);
+  const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await adminApi.get<CommissionSummary>(
+          '/business/masters/admin-commission-summary?master_type=mamm',
+        );
+        if (!cancelled) setData(res);
+      } catch {
+        if (!cancelled) setData({ lifetime_total: 0, breakdown_total_estimate: 0, by_master: [] });
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+  return { data, loading };
+}
+
+function AdminCommissionCard() {
+  const { data, loading } = useCommissionSummary();
+  return (
+    <div className="bg-bg-secondary border border-border-primary rounded-md px-4 py-3">
+      <p className="text-xxs text-text-tertiary uppercase tracking-wide">Admin commission</p>
+      <p className="text-lg font-semibold text-accent mt-1 font-mono tabular-nums">
+        {loading || !data ? '—' : `$${fmtMoney(data.lifetime_total)}`}
+      </p>
+      <p className="text-xxs text-text-tertiary mt-0.5">lifetime (all master types)</p>
+    </div>
+  );
+}
+
+function AdminCommissionBreakdown() {
+  const { data, loading } = useCommissionSummary();
+  if (loading || !data || data.by_master.length === 0) {
+    return null;
+  }
+  return (
+    <div className="bg-bg-secondary border border-border-primary rounded-md">
+      <div className="px-4 py-3 border-b border-border-primary flex items-center justify-between">
+        <div>
+          <h2 className="text-sm font-semibold text-text-primary">Admin commission — by master</h2>
+          <p className="text-xxs text-text-tertiary mt-0.5">
+            Estimated admin slice per MAM, derived from
+            <span className="text-text-secondary"> master.total_fee_earned </span>
+            ×<span className="text-text-secondary"> admin_pct / (100 − admin_pct)</span>.
+            Lifetime sum: <span className="text-accent font-mono">${fmtMoney(data.lifetime_total)}</span>
+            {data.breakdown_total_estimate > 0 && (
+              <> · breakdown estimate <span className="text-text-secondary font-mono">${fmtMoney(data.breakdown_total_estimate)}</span></>
+            )}
+          </p>
+        </div>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[640px]">
+          <thead>
+            <tr className="border-b border-border-primary bg-bg-tertiary/40">
+              <th className="text-left px-4 py-2.5 text-xxs font-medium text-text-tertiary uppercase tracking-wide">Master</th>
+              <th className="text-right px-4 py-2.5 text-xxs font-medium text-text-tertiary uppercase tracking-wide">Admin %</th>
+              <th className="text-right px-4 py-2.5 text-xxs font-medium text-text-tertiary uppercase tracking-wide">Master net</th>
+              <th className="text-right px-4 py-2.5 text-xxs font-medium text-text-tertiary uppercase tracking-wide">Admin earned (est)</th>
+            </tr>
+          </thead>
+          <tbody>
+            {data.by_master.map((r) => (
+              <tr key={r.master_id} className="border-b border-border-primary/50 hover:bg-bg-hover/30">
+                <td className="px-4 py-2.5">
+                  <div className="text-xs text-text-primary">{r.provider_name}</div>
+                  <div className="text-xxs text-text-tertiary">{r.email}</div>
+                </td>
+                <td className="px-4 py-2.5 text-right text-xs font-mono tabular-nums text-text-secondary">
+                  {r.admin_commission_pct.toFixed(1)}%
+                </td>
+                <td className="px-4 py-2.5 text-right text-xs font-mono tabular-nums text-text-primary">
+                  ${fmtMoney(r.master_net_earned)}
+                </td>
+                <td className="px-4 py-2.5 text-right text-xs font-mono tabular-nums text-accent font-semibold">
+                  ${fmtMoney(r.admin_earned_estimate)}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
   );
 }

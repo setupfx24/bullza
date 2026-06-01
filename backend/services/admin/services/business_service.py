@@ -1039,17 +1039,38 @@ async def get_ib_referrals(ib_id: uuid.UUID, page: int, per_page: int, db: Async
 
 # ─── Copy-Trade Master Management ──────────────────────────────
 
-async def list_masters(page: int, per_page: int, db: AsyncSession) -> dict:
-    """List all copy-trade masters (signal_provider, pamm, mamm) with stats."""
-    count_q = await db.execute(select(func.count(MasterAccount.id)))
+async def list_masters(
+    page: int, per_page: int, db: AsyncSession,
+    *, master_type: str | None = None,
+) -> dict:
+    """List copy-trade masters with stats. Pass `master_type` to scope
+    the query SERVER-SIDE so the admin MAM dashboard can never see a
+    PAMM row even if the client-side filter regressed (client request
+    2026-06-01 #6 — PAMM rows were leaking into MAM)."""
+    base_filters = []
+    if master_type:
+        normalized = master_type.strip().lower()
+        if normalized in ("signal_provider", "pamm", "mamm"):
+            base_filters.append(MasterAccount.master_type == normalized)
+
+    count_stmt = select(func.count(MasterAccount.id))
+    if base_filters:
+        count_stmt = count_stmt.where(*base_filters)
+    count_q = await db.execute(count_stmt)
     total = count_q.scalar() or 0
 
-    result = await db.execute(
+    list_stmt = (
         select(MasterAccount, User.first_name, User.last_name, User.email)
         .join(User, MasterAccount.user_id == User.id)
+    )
+    if base_filters:
+        list_stmt = list_stmt.where(*base_filters)
+    list_stmt = (
+        list_stmt
         .order_by(MasterAccount.created_at.desc())
         .offset((page - 1) * per_page).limit(per_page)
     )
+    result = await db.execute(list_stmt)
     rows = result.all()
 
     items = []
@@ -1095,6 +1116,78 @@ async def list_masters(page: int, per_page: int, db: AsyncSession) -> dict:
     return {
         "items": items, "total": total, "page": page, "per_page": per_page,
         "pages": (total + per_page - 1) // per_page if total else 0,
+    }
+
+
+async def admin_commission_summary(
+    *, master_type: str | None, db: AsyncSession,
+) -> dict:
+    """Aggregate the admin's slice of copy-trade performance fees.
+
+    Two numbers, both useful:
+
+    - ``lifetime_total``: exact sum of Transaction(type='admin_commission')
+      rows; this is what actually landed in the super-admin's wallet over
+      time. Includes commission from every master type.
+    - ``by_master[]``: per-master estimate derived from
+      ``master.total_fee_earned`` and ``master.admin_commission_pct``.
+      master.total_fee_earned is the master's NET slice (after the admin
+      cut), so the admin's cumulative cut on that master is
+      ``master_net × admin_pct / (100 − admin_pct)``. Approximate when
+      the admin pct has been edited mid-stream, but close enough for the
+      dashboard breakdown the client asked for (2026-06-01 #4).
+    """
+    # Lifetime total — exact.
+    total_q = await db.execute(
+        select(func.coalesce(func.sum(Transaction.amount), 0))
+        .where(Transaction.type == "admin_commission")
+    )
+    lifetime_total = float(total_q.scalar() or 0)
+
+    # Per-master breakdown.
+    filters = []
+    if master_type:
+        normalized = master_type.strip().lower()
+        if normalized in ("signal_provider", "pamm", "mamm"):
+            filters.append(MasterAccount.master_type == normalized)
+    list_stmt = (
+        select(MasterAccount, User.first_name, User.last_name, User.email)
+        .join(User, MasterAccount.user_id == User.id)
+    )
+    if filters:
+        list_stmt = list_stmt.where(*filters)
+    list_stmt = list_stmt.order_by(MasterAccount.total_fee_earned.desc().nullslast())
+    rows = (await db.execute(list_stmt)).all()
+
+    by_master: list[dict] = []
+    breakdown_total = Decimal("0")
+    for master, first_name, last_name, email in rows:
+        master_net = Decimal(str(master.total_fee_earned or 0))
+        admin_pct = Decimal(str(master.admin_commission_pct or 0))
+        if admin_pct <= 0 or admin_pct >= 100:
+            admin_earned = Decimal("0")
+        else:
+            # master_net = perf_fee × (100−p)/100  →  perf_fee = master_net × 100/(100−p)
+            # admin_cut = perf_fee × p/100 = master_net × p/(100−p)
+            admin_earned = master_net * admin_pct / (Decimal("100") - admin_pct)
+        breakdown_total += admin_earned
+        by_master.append({
+            "master_id": str(master.id),
+            "provider_name": f"{first_name or ''} {last_name or ''}".strip() or email,
+            "email": email,
+            "master_type": master.master_type or "signal_provider",
+            "admin_commission_pct": float(master.admin_commission_pct or 0),
+            "master_net_earned": float(master_net),
+            "admin_earned_estimate": float(admin_earned),
+        })
+
+    return {
+        "lifetime_total": lifetime_total,
+        # Sum of the per-master estimates — useful for sanity-checking
+        # against lifetime_total. They drift when admin pct changes
+        # mid-flight, which is expected.
+        "breakdown_total_estimate": float(breakdown_total),
+        "by_master": by_master,
     }
 
 
