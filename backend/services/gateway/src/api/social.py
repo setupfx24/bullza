@@ -205,7 +205,21 @@ async def invest_managed_account(
         Decimal("100"),
         ge=Decimal("1"),
         le=Decimal("500"),
-        description="MAM only: multiplier on proportional share (100 = same as PAMM share)",
+        description="MAM legacy mode: multiplier on proportional share (100 = same as PAMM share). Ignored when lot_multiplier is provided.",
+    ),
+    lot_multiplier: Decimal | None = Query(
+        None,
+        gt=Decimal("0"),
+        le=Decimal("100"),
+        description="MAM direct mode: take exactly master_lots × lot_multiplier on every trade. Wins over volume_scaling_pct.",
+    ),
+    use_bonus: bool = Query(
+        False,
+        description="When true, pull from main_wallet_bonus first then top up with cash. Bonus portion is forfeited on withdraw.",
+    ),
+    insurance_opt_in: bool = Query(
+        False,
+        description="When true AND master.insurance_enabled, copy engine auto-activates an insurance policy on each mirrored position open. Stored on the allocation; flipping it on a top-up updates the preference.",
     ),
     current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -213,6 +227,8 @@ async def invest_managed_account(
     return await social_service.invest_managed_account(
         master_id=master_id, account_id=account_id, amount=amount,
         max_drawdown_pct=max_drawdown_pct, volume_scaling_pct=volume_scaling_pct,
+        lot_multiplier=lot_multiplier, use_bonus=use_bonus,
+        insurance_opt_in=insurance_opt_in,
         user_id=current_user["user_id"], db=db,
     )
 

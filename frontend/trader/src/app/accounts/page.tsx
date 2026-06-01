@@ -48,6 +48,13 @@ interface AccountRow {
   is_demo: boolean;
   account_group?: AccountGroupInfo | null;
   created_at?: string;
+  // MAM sub-account markers — backend sets these when the row is an
+  // investor sub-account. Frontend uses lifetime_pnl in place of the
+  // default floating-only P&L so closed mirrored trades show up.
+  is_managed_account?: boolean;
+  allocation_amount?: number | null;
+  lifetime_pnl?: number | null;
+  lifetime_pnl_pct?: number | null;
 }
 
 function fmt(n: number, currency = 'USD') {
@@ -1110,15 +1117,23 @@ function AccountCard({
   }, [initialExpanded]);
 
   const alias = readAlias(row.id);
-  // Floating P&L = open-position P&L ONLY. equity = balance + credit +
-  // floating_pnl, so credit must be subtracted too — otherwise bonus /
-  // insurance credit shows up as fake trading "profit" even with no
-  // open position (client report 2026-05-28: +$4.31 "P&L" on zero open
-  // trades was actually credit sitting in the account).
-  const pnl = row.equity - row.balance - (row.credit || 0);
-  const pnlBase = row.balance + (row.credit || 0);
-  const pct =
-    pnlBase > 0 && Number.isFinite(row.equity) ? (pnl / pnlBase) * 100 : 0;
+  // For MAM sub-accounts the backend ships lifetime_pnl = equity − the
+  // original allocation amount. The default floating-only number reads
+  // $0 whenever positions are flat — which for a copy account is most
+  // of the time — so we honour the lifetime number when it's present
+  // (client report 2026-06-01: "MAM P&L not showing anything").
+  // Regular accounts keep the floating-only path so bonus / insurance
+  // credit doesn't masquerade as P&L on a zero-trades account.
+  const floatingPnl = row.equity - row.balance - (row.credit || 0);
+  const floatingBase = row.balance + (row.credit || 0);
+  const floatingPct =
+    floatingBase > 0 && Number.isFinite(row.equity) ? (floatingPnl / floatingBase) * 100 : 0;
+  const pnl = row.is_managed_account && row.lifetime_pnl != null
+    ? row.lifetime_pnl
+    : floatingPnl;
+  const pct = row.is_managed_account && row.lifetime_pnl_pct != null
+    ? row.lifetime_pnl_pct
+    : floatingPct;
   const pnlPositive = pnl >= 0;
   const idLabel = row.is_demo ? `#D#${row.account_number}` : `#L#${row.account_number}`;
 
@@ -1219,10 +1234,18 @@ function AccountCard({
               )}
             </div>
             <div className="min-w-0">
-              <p className="text-[10px] sm:text-[11px] text-text-tertiary font-medium mb-0.5">P&amp;L</p>
+              <p className="text-[10px] sm:text-[11px] text-text-tertiary font-medium mb-0.5">
+                P&amp;L
+                {row.is_managed_account && row.allocation_amount != null && (
+                  <span className="ml-1 text-text-tertiary/60">vs ${row.allocation_amount.toLocaleString()}</span>
+                )}
+              </p>
               <div className="flex items-center gap-1">
                 <span className={clsx('text-sm sm:text-lg font-bold tabular-nums font-mono truncate', pnlPositive ? 'text-[#55a630]' : 'text-red-400')}>
-                  ~{' '}{pnlPositive ? '+' : ''}{fmt(pnl, row.currency)}
+                  {/* Lifetime P&L is exact (equity − allocation), so drop
+                      the "~ approximation" prefix that the floating-only
+                      path uses. */}
+                  {row.is_managed_account ? '' : '~ '}{pnlPositive ? '+' : ''}{fmt(pnl, row.currency)}
                 </span>
               </div>
               <p className={clsx('text-[10px] sm:text-xs font-semibold tabular-nums', pnlPositive ? 'text-[#55a630]/70' : 'text-red-400/70')}>

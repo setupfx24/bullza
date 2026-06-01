@@ -37,7 +37,9 @@ DAYS_PER_MONTH_APPROX = Decimal("30.4375")
 
 # ─── Config ──────────────────────────────────────────────────────────
 
-async def get_config() -> dict:
+async def get_config(
+    *, user_id: UUID | None = None, db: AsyncSession | None = None,
+) -> dict:
     raw = await get_system_setting("fixed_return_rates", None)
     rates = raw if isinstance(raw, dict) and raw.get("tiers") else _fallback_rates()
     fee_pct = await get_float_setting(
@@ -46,10 +48,34 @@ async def get_config() -> dict:
     lock_months = await get_int_setting(
         "fixed_return_lock_months", DEFAULT_LOCK_MONTHS,
     )
+
+    # Per-user rate override (Migration 0064). The admin can stamp a
+    # custom matrix on a single trader without touching the global
+    # ladder. Shape we honour: { "rate_matrix_pct": [[..], ..] } with
+    # the same dimensions as the global matrix. If the dimensions
+    # don't match (admin re-shaped global tiers / tenures after
+    # setting the override), we fall back to the global matrix so the
+    # trader never sees a NaN cell.
+    has_override = False
+    if user_id is not None and db is not None:
+        override = (await db.execute(
+            select(User.fixed_return_rate_override).where(User.id == user_id)
+        )).scalar_one_or_none()
+        if isinstance(override, dict):
+            ov_matrix = override.get("rate_matrix_pct")
+            if isinstance(ov_matrix, list) and len(ov_matrix) == len(rates["tenures"]):
+                if all(
+                    isinstance(row, list) and len(row) == len(rates["tiers"])
+                    for row in ov_matrix
+                ):
+                    rates = {**rates, "rate_matrix_pct": ov_matrix}
+                    has_override = True
+
     return {
         **rates,
         "early_withdrawal_fee_pct": fee_pct,
         "lock_months": lock_months,
+        "has_personal_override": has_override,
     }
 
 
@@ -154,7 +180,8 @@ async def create_lock(
     if principal <= 0:
         raise HTTPException(status_code=400, detail="Principal must be positive")
 
-    cfg = await get_config()
+    # Pass user context so any per-user override is honoured.
+    cfg = await get_config(user_id=user_id, db=db)
     tiers = cfg["tiers"]
     tenures = cfg["tenures"]
     matrix = cfg["rate_matrix_pct"]
@@ -279,51 +306,208 @@ async def withdraw_lock(
 
     if matures_at and matures_at <= now:
         # Matured — interest was already paid in cycles; user gets the
-        # principal back, period.
+        # principal back, period. Fires immediately; no admin review.
         payout = principal
         fee = Decimal("0")
-        new_state = "matured"
-        tx_type = "fixed_return_matured"
-        desc = (
-            f"Fixed Return matured — principal returned "
-            f"(interest paid in {lock.payouts_count} cycles: ${total_interest:,.2f})"
-        )
-    else:
-        # Early exit. Two penalties stack:
-        #   1. % of principal as the broker's break fee.
-        #   2. All interest paid so far claws back against the principal.
-        fee_pct = await get_float_setting(
-            "fixed_return_early_withdrawal_fee_pct", DEFAULT_FEE_PCT,
-        )
-        fee = (principal * Decimal(str(fee_pct)) / Decimal("100")).quantize(Decimal("0.01"))
-        payout = (principal - fee - total_interest).quantize(Decimal("0.01"))
-        if payout < 0:
-            payout = Decimal("0")
-        new_state = "withdrawn_early"
-        tx_type = "fixed_return_early"
-        desc = (
-            f"Fixed Return early withdrawal — penalty ${fee:,.2f} + "
-            f"interest claw-back ${total_interest:,.2f}"
-        )
+        user.main_wallet_balance = Decimal(str(user.main_wallet_balance or 0)) + payout
+        lock.state = "matured"
+        lock.payout = payout
+        lock.fee_paid = fee
+        lock.settled_at = now
+        lock.next_payout_at = None
+        db.add(Transaction(
+            user_id=user_id,
+            type="fixed_return_matured",
+            amount=payout,
+            balance_after=user.main_wallet_balance,
+            description=(
+                f"Fixed Return matured — principal returned "
+                f"(interest paid in {lock.payouts_count} cycles: ${total_interest:,.2f})"
+            ),
+        ))
+        await db.commit()
+        await db.refresh(lock)
+        return _serialize_lock(lock)
 
-    user.main_wallet_balance = Decimal(str(user.main_wallet_balance or 0)) + payout
-
-    lock.state = new_state
-    lock.payout = payout
-    lock.fee_paid = fee
-    lock.settled_at = now
-    lock.next_payout_at = None  # no more cycles
-
+    # Early exit — client request 2026-06-01: route through admin approval
+    # instead of crediting immediately. We park the lock in `early_pending`
+    # so the trader can't keep racking up interest (engine skips non-active
+    # states) AND so the funds stay where they are until an admin signs off.
+    if lock.state == "early_pending":
+        raise HTTPException(
+            status_code=409,
+            detail="An early-withdrawal request is already pending admin approval",
+        )
+    lock.state = "early_pending"
+    lock.early_requested_at = now
+    # We deliberately do NOT touch user.main_wallet_balance, lock.payout,
+    # lock.fee_paid, or lock.settled_at here — admin approval (or rejection)
+    # is what mutates those.
     db.add(Transaction(
         user_id=user_id,
-        type=tx_type,
-        amount=payout,
-        balance_after=user.main_wallet_balance,
-        description=desc,
+        type="fixed_return_early_request",
+        amount=Decimal("0"),
+        balance_after=Decimal(str(user.main_wallet_balance or 0)),
+        description=(
+            f"Fixed Return early-withdrawal request filed — awaiting admin "
+            f"approval (principal ${principal:,.2f}, "
+            f"interest-to-date ${total_interest:,.2f})"
+        ),
     ))
     await db.commit()
     await db.refresh(lock)
     return _serialize_lock(lock)
+
+
+async def admin_approve_early_withdrawal(
+    lock_id: UUID, db: AsyncSession,
+) -> dict:
+    """Admin sign-off: credit the trader's wallet with
+    principal × (1 − fee_pct) − total_interest_paid, flip the lock to
+    `withdrawn_early`, and write the realised Transaction. Idempotent
+    against double-clicks because the second call sees state != early_pending
+    and raises 409."""
+    lock = (await db.execute(
+        select(FixedReturnLock)
+        .where(FixedReturnLock.id == lock_id)
+        .with_for_update()
+    )).scalar_one_or_none()
+    if lock is None:
+        raise HTTPException(status_code=404, detail="Lock not found")
+    if lock.state != "early_pending":
+        raise HTTPException(
+            status_code=409,
+            detail=f"Lock is {lock.state}, not waiting on approval",
+        )
+
+    user = (await db.execute(
+        select(User).where(User.id == lock.user_id).with_for_update()
+    )).scalar_one_or_none()
+    if user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    principal = Decimal(str(lock.principal))
+    total_interest = Decimal(str(lock.total_interest_paid or 0))
+    fee_pct = await get_float_setting(
+        "fixed_return_early_withdrawal_fee_pct", DEFAULT_FEE_PCT,
+    )
+    fee = (principal * Decimal(str(fee_pct)) / Decimal("100")).quantize(Decimal("0.01"))
+    payout = (principal - fee - total_interest).quantize(Decimal("0.01"))
+    if payout < 0:
+        payout = Decimal("0")
+
+    now = datetime.now(timezone.utc)
+    user.main_wallet_balance = Decimal(str(user.main_wallet_balance or 0)) + payout
+    lock.state = "withdrawn_early"
+    lock.payout = payout
+    lock.fee_paid = fee
+    lock.settled_at = now
+    lock.early_requested_at = None
+    lock.next_payout_at = None
+
+    db.add(Transaction(
+        user_id=lock.user_id,
+        type="fixed_return_early",
+        amount=payout,
+        balance_after=user.main_wallet_balance,
+        description=(
+            f"Fixed Return early withdrawal (approved) — penalty ${fee:,.2f} + "
+            f"interest claw-back ${total_interest:,.2f}"
+        ),
+    ))
+    await db.commit()
+    await db.refresh(lock)
+    return _serialize_lock(lock)
+
+
+async def admin_reject_early_withdrawal(
+    lock_id: UUID, db: AsyncSession, *, reason: str | None = None,
+) -> dict:
+    """Admin denies the request. Lock returns to `active`; interest
+    accrual resumes on the next engine tick inside the payout window.
+    We do NOT restore next_payout_at here because the engine sets it
+    when active locks with NULL next_payout_at are picked up — but to
+    be safe, we re-snap it from now+cycle_months."""
+    lock = (await db.execute(
+        select(FixedReturnLock)
+        .where(FixedReturnLock.id == lock_id)
+        .with_for_update()
+    )).scalar_one_or_none()
+    if lock is None:
+        raise HTTPException(status_code=404, detail="Lock not found")
+    if lock.state != "early_pending":
+        raise HTTPException(
+            status_code=409,
+            detail=f"Lock is {lock.state}, not waiting on approval",
+        )
+
+    now = datetime.now(timezone.utc)
+    matures_at = lock.matures_at
+    if matures_at and matures_at.tzinfo is None:
+        matures_at = matures_at.replace(tzinfo=timezone.utc)
+
+    cycle_months = _tenure_to_months(int(lock.tenure_days or 0))
+    payout_dom = await get_int_setting("fixed_return_payout_day_of_month", 25)
+    next_payout = _snap_to_payout_window(
+        _add_months(now, cycle_months), payout_day=payout_dom, advance_if_before=True,
+    )
+    if matures_at and next_payout > matures_at:
+        next_payout = matures_at
+
+    lock.state = "active"
+    lock.early_requested_at = None
+    lock.next_payout_at = next_payout
+
+    db.add(Transaction(
+        user_id=lock.user_id,
+        type="fixed_return_early_rejected",
+        amount=Decimal("0"),
+        balance_after=Decimal("0"),  # no balance change, informational
+        description=(
+            f"Fixed Return early-withdrawal request rejected by admin"
+            + (f": {reason}" if reason else "")
+        ),
+    ))
+    await db.commit()
+    await db.refresh(lock)
+    return _serialize_lock(lock)
+
+
+async def admin_list_pending(db: AsyncSession) -> list[dict]:
+    """All locks currently parked in early_pending — admin queue."""
+    rows = (await db.execute(
+        select(FixedReturnLock, User)
+        .join(User, User.id == FixedReturnLock.user_id)
+        .where(FixedReturnLock.state == "early_pending")
+        .order_by(FixedReturnLock.early_requested_at.asc())
+    )).all()
+    out: list[dict] = []
+    for lock, user in rows:
+        principal = Decimal(str(lock.principal))
+        total_interest = Decimal(str(lock.total_interest_paid or 0))
+        fee_pct = await get_float_setting(
+            "fixed_return_early_withdrawal_fee_pct", DEFAULT_FEE_PCT,
+        )
+        fee = (principal * Decimal(str(fee_pct)) / Decimal("100")).quantize(Decimal("0.01"))
+        projected = (principal - fee - total_interest).quantize(Decimal("0.01"))
+        if projected < 0:
+            projected = Decimal("0")
+        out.append({
+            **_serialize_lock(lock),
+            "user_id": str(user.id),
+            "user_email": user.email,
+            "user_name": (
+                " ".join(filter(None, [user.first_name, user.last_name])).strip()
+                or None
+            ),
+            "projected_payout": float(projected),
+            "projected_fee": float(fee),
+            "early_requested_at": (
+                lock.early_requested_at.isoformat()
+                if lock.early_requested_at else None
+            ),
+        })
+    return out
 
 
 # ─── Interest payout engine ──────────────────────────────────────────
@@ -462,6 +646,38 @@ def _serialize_lock(r: FixedReturnLock) -> dict:
         principal * rate_pct * Decimal(lock_months) / Decimal("100")
     ).quantize(Decimal("0.01"))
 
+    # Daily / since-last-cycle accrual — the trader's most-asked-for
+    # number ("kitna interest ban chuka hai"). Engine credits in
+    # discrete cycles, so anything earned since the last credit is a
+    # projection: principal × rate_pct/100 × days_elapsed/30.
+    # We anchor `days_elapsed` to the last actual payout (or locked_at
+    # if no payout has fired yet), so the figure resets cleanly to 0
+    # the moment a cycle credits.
+    now = datetime.now(timezone.utc)
+    anchor = None
+    if r.payouts_count and r.next_payout_at:
+        # last_credit ≈ next_payout - cycle_months
+        nxt = r.next_payout_at
+        if nxt.tzinfo is None:
+            nxt = nxt.replace(tzinfo=timezone.utc)
+        cycle_months = _tenure_to_months(int(r.tenure_days or 0))
+        anchor = _add_months(nxt, -cycle_months)
+    if anchor is None:
+        anchor = r.locked_at
+        if anchor and anchor.tzinfo is None:
+            anchor = anchor.replace(tzinfo=timezone.utc)
+    days_elapsed = 0
+    if anchor is not None:
+        days_elapsed = max(0, (now - anchor).days)
+    # rate_pct is per 30-day month per client spec, so daily ≈ rate/30.
+    daily_rate = rate_pct / Decimal("100") / Decimal("30")
+    accrued_since_last = (
+        principal * daily_rate * Decimal(days_elapsed)
+    ).quantize(Decimal("0.01"))
+    if accrued_since_last < 0:
+        accrued_since_last = Decimal("0")
+    interest_to_date = (interest_paid + accrued_since_last).quantize(Decimal("0.01"))
+
     return {
         "id": str(r.id),
         "principal": float(principal),
@@ -474,9 +690,19 @@ def _serialize_lock(r: FixedReturnLock) -> dict:
         "matures_at": r.matures_at.isoformat() if r.matures_at else None,
         "next_payout_at": r.next_payout_at.isoformat() if r.next_payout_at else None,
         "settled_at": r.settled_at.isoformat() if r.settled_at else None,
+        "early_requested_at": (
+            r.early_requested_at.isoformat() if r.early_requested_at else None
+        ),
         "state": r.state,
         "payouts_count": int(r.payouts_count or 0),
         "total_interest_paid": float(interest_paid),
+        # Pro-rata projection between cycles — never persisted, recomputed
+        # each request so it stays current to the day without an engine
+        # tick. Resets to 0 when a real cycle credits.
+        "accrued_since_last_payout": float(accrued_since_last),
+        # Convenience for the trader card: "interest earned so far",
+        # smoothing the saw-tooth of cycle credits.
+        "interest_to_date": float(interest_to_date),
         "projected_total_interest": float(projected_interest),
         "projected_total_payout": float(principal + projected_interest),
         "payout": float(r.payout) if r.payout is not None else None,

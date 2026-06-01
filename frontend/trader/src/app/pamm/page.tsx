@@ -20,8 +20,19 @@ interface MammPammAccount {
   manager_name: string;
   master_type: string;
   total_return_pct: number;
+  // Admin-set risk caps (Mig 0066). Read-only for the trader; shown
+  // on the invest modal so investors see the broker-imposed safeguards
+  // before committing capital.
   max_drawdown_pct: number;
+  max_loss_per_trade_pct?: number | null;
   performance_fee_pct: number;
+  // Backend returns these but the old type missed them — without
+  // declaring them here the invest-modal fee stack couldn't compile.
+  management_fee_pct?: number;
+  admin_commission_pct?: number;
+  // When false, the trader UI hides the "auto-insure copied trades"
+  // opt-in. Admin per-master toggle.
+  insurance_enabled?: boolean;
   min_investment: number;
   active_investors: number;
   slots_available: number;
@@ -40,6 +51,19 @@ interface MyAllocation {
   total_pnl: number;
   pnl_pct: number;
   performance_fee_pct: number;
+  management_fee_pct?: number;
+  admin_commission_pct?: number;
+  // Decomposed perf-fee stack — what the master keeps vs what the broker takes.
+  master_share_pct?: number;
+  admin_share_pct?: number;
+  // Estimated fees the investor has paid so far on realised gains.
+  // Best-effort: gross isn't stored, so we derive from the configured pct.
+  fees_paid_estimate?: number;
+  // Slice of allocation_amount that was funded from bonus credit.
+  // Forfeited on withdraw — drives the warning in the exit modal.
+  bonus_portion?: number;
+  insurance_opt_in?: boolean;
+  insurance_enabled?: boolean;
   joined_at: string;
   status: string;
 }
@@ -257,8 +281,20 @@ export default function PammPage() {
   const [investAccount, setInvestAccount] = useState('');
   const [investAmount, setInvestAmount] = useState('');
   const [investScaling, setInvestScaling] = useState('100');
+  // MAM direct-mode lot multiplier. Empty = use volume scaling (legacy
+  // pct path). When set, the engine takes master_lots × this value on
+  // every copy trade, ignoring volume scaling entirely.
+  const [investLotMultiplier, setInvestLotMultiplier] = useState('');
+  const [investMode, setInvestMode] = useState<'scaling' | 'multiplier'>('scaling');
+  // Use bonus credit alongside cash. Forfeit on withdraw per the
+  // welcome-bonus contract.
+  const [investUseBonus, setInvestUseBonus] = useState(false);
+  // Opt-in to auto-insurance on copied trades. Only visible when
+  // master.insurance_enabled is true (admin gate, Mig 0066).
+  const [investInsuranceOptIn, setInvestInsuranceOptIn] = useState(false);
   const [investing, setInvesting] = useState(false);
   const [walletBalance, setWalletBalance] = useState(0);
+  const [walletBonus, setWalletBonus] = useState(0);
 
   // Apply form state
   const [applyAccount, setApplyAccount] = useState('');
@@ -340,9 +376,10 @@ export default function PammPage() {
 
   const fetchWallet = useCallback(async () => {
     try {
-      const s = await api.get<{ main_wallet_balance?: number }>('/wallet/summary');
+      const s = await api.get<{ main_wallet_balance?: number; main_wallet_bonus?: number }>('/wallet/summary');
       setWalletBalance(Number(s.main_wallet_balance) || 0);
-    } catch { setWalletBalance(0); }
+      setWalletBonus(Number(s.main_wallet_bonus) || 0);
+    } catch { setWalletBalance(0); setWalletBonus(0); }
   }, []);
 
   useEffect(() => {
@@ -371,18 +408,57 @@ export default function PammPage() {
     const amount = parseFloat(investAmount);
     if (!investAccount || isNaN(amount) || amount <= 0) { toast.error('Enter a valid amount'); return; }
     if (amount < investTarget.min_investment) { toast.error(`Minimum investment is $${investTarget.min_investment}`); return; }
-    if (amount > walletBalance) { toast.error('Insufficient wallet balance'); return; }
+    // With use_bonus on, the available pool is balance + bonus. Without
+    // it we still only spend cash. Same UX guard either way.
+    const available = walletBalance + (investUseBonus ? walletBonus : 0);
+    if (amount > available) {
+      toast.error(
+        investUseBonus
+          ? `Insufficient available funds — cash $${walletBalance.toFixed(2)} + bonus $${walletBonus.toFixed(2)}`
+          : 'Insufficient wallet balance',
+      );
+      return;
+    }
     setInvesting(true);
     try {
       const params = new URLSearchParams({ account_id: investAccount, amount: investAmount });
       if (investTarget.master_type === 'mamm') {
-        const s = parseFloat(investScaling);
-        if (isNaN(s) || s < 1 || s > 500) { toast.error('Volume scaling must be 1–500'); setInvesting(false); return; }
-        params.set('volume_scaling_pct', investScaling);
+        if (investMode === 'multiplier') {
+          const m = parseFloat(investLotMultiplier);
+          if (isNaN(m) || m <= 0 || m > 100) {
+            toast.error('Lot multiplier must be > 0 and ≤ 100');
+            setInvesting(false); return;
+          }
+          params.set('lot_multiplier', String(m));
+        } else {
+          const s = parseFloat(investScaling);
+          if (isNaN(s) || s < 1 || s > 500) {
+            toast.error('Volume scaling must be 1–500');
+            setInvesting(false); return;
+          }
+          params.set('volume_scaling_pct', investScaling);
+        }
       }
-      const res = await api.post<{ top_up?: number }>(`/social/mamm-pamm/${investTarget.id}/invest?${params.toString()}`, {});
-      toast.success(res?.top_up ? `Top-up of $${res.top_up.toFixed(2)} added!` : 'Investment started! Amount deducted from wallet.');
+      if (investUseBonus) params.set('use_bonus', 'true');
+      if (investInsuranceOptIn && investTarget.insurance_enabled !== false) {
+        params.set('insurance_opt_in', 'true');
+      }
+      const res = await api.post<{
+        top_up?: number; cash_used?: number; bonus_used?: number;
+      }>(`/social/mamm-pamm/${investTarget.id}/invest?${params.toString()}`, {});
+      const breakdown = res?.bonus_used && res.bonus_used > 0
+        ? ` ($${(res.cash_used ?? 0).toFixed(2)} cash + $${res.bonus_used.toFixed(2)} bonus)`
+        : '';
+      toast.success(
+        res?.top_up
+          ? `Top-up of $${res.top_up.toFixed(2)} added${breakdown}`
+          : `Investment started${breakdown}`,
+      );
       setInvestTarget(null);
+      setInvestLotMultiplier('');
+      setInvestMode('scaling');
+      setInvestUseBonus(false);
+      setInvestInsuranceOptIn(false);
       fetchBrowse();
       fetchWallet();
       if (activeTab === 'investments') fetchAllocations();
@@ -585,29 +661,45 @@ export default function PammPage() {
                       </button>
                     </div>
                     <div className="mb-4">
-                      <p className="text-[10px] text-text-tertiary uppercase tracking-wide mb-0.5">Total ROI</p>
-                      <p className={clsx('text-2xl font-bold font-mono tabular-nums', a.total_return_pct >= 0 ? 'text-[#55a630]' : 'text-red-400')}>
+                      <p className="text-xs font-semibold text-text-secondary uppercase tracking-wide mb-0.5">Total ROI</p>
+                      <p className={clsx('text-3xl font-extrabold font-mono tabular-nums', a.total_return_pct >= 0 ? 'text-[#55a630]' : 'text-red-400')}>
                         {a.total_return_pct >= 0 ? '+' : ''}{a.total_return_pct.toFixed(2)}%
                       </p>
                     </div>
-                    {a.description && <p className="text-[11px] text-text-tertiary mb-4 line-clamp-2">{a.description}</p>}
+                    {a.description && <p className="text-xs text-text-secondary mb-4 line-clamp-2">{a.description}</p>}
                     <div className="grid grid-cols-3 gap-2 pt-3 border-t border-border-primary mt-auto">
                       <div>
-                        <p className="text-[10px] text-text-tertiary">Drawdown</p>
-                        <p className="text-xs font-semibold tabular-nums text-red-400">{a.max_drawdown_pct.toFixed(2)}%</p>
+                        <p className="text-xs font-semibold text-text-secondary uppercase tracking-wide">Drawdown</p>
+                        <p className="text-base font-bold tabular-nums text-red-400">{a.max_drawdown_pct.toFixed(2)}%</p>
                       </div>
                       <div>
-                        <p className="text-[10px] text-text-tertiary">Investors</p>
-                        <p className="text-xs font-semibold tabular-nums text-text-primary">{a.active_investors}</p>
+                        <p className="text-xs font-semibold text-text-secondary uppercase tracking-wide">Investors</p>
+                        <p className="text-base font-bold tabular-nums text-text-primary">{a.active_investors}</p>
                       </div>
                       <div>
-                        <p className="text-[10px] text-text-tertiary">Slots</p>
-                        <p className="text-xs font-semibold tabular-nums text-text-primary">{a.slots_available}</p>
+                        <p className="text-xs font-semibold text-text-secondary uppercase tracking-wide">Slots</p>
+                        <p className="text-base font-bold tabular-nums text-text-primary">{a.slots_available}</p>
                       </div>
                     </div>
-                    <div className="flex items-center justify-between mt-3 text-[10px] text-text-tertiary">
-                      <span className="flex items-center gap-1"><TrendingUp size={10} /> Fee: {a.performance_fee_pct}%</span>
-                      <span className="flex items-center gap-1"><DollarSign size={10} /> Min: ${a.min_investment.toLocaleString()}</span>
+                    <div className="flex items-center justify-between mt-3 text-xs text-text-secondary font-medium">
+                      <span className="flex items-center gap-1"><TrendingUp size={11} /> Fee: <span className="text-text-primary font-semibold">{a.performance_fee_pct}%</span></span>
+                      <span className="flex items-center gap-1"><DollarSign size={11} /> Min: <span className="text-text-primary font-semibold">${a.min_investment.toLocaleString()}</span></span>
+                    </div>
+
+                    {/* Feature badges — make it obvious that this master
+                        accepts bonus credit and (optionally) auto-insures
+                        copied trades. The user-asked-three-times-for-this
+                        moment from 2026-06-01: bonus + insurance need to
+                        be visible up-front, not buried in the invest modal. */}
+                    <div className="flex flex-wrap items-center gap-1.5 mt-3">
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/30 text-[10px] font-semibold text-amber-400">
+                        Bonus accepted
+                      </span>
+                      {a.insurance_enabled !== false && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#55a630]/10 border border-[#55a630]/30 text-[10px] font-semibold text-[#55a630]">
+                          Insurance available
+                        </span>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -654,8 +746,29 @@ export default function PammPage() {
                     </button>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {allocations.map((a) => (
+                  // Split by master type so PAMM and MAM rows can't visually
+                  // bleed into each other on the same page. Section headers
+                  // make the boundary obvious + count + colour-code the cards.
+                  <div className="space-y-6">{(['pamm', 'mamm'] as const).flatMap((bucket) => {
+                    const subset = allocations.filter((a) => (a.master_type || '').toLowerCase() === bucket);
+                    if (subset.length === 0) return [];
+                    const label = bucket === 'pamm' ? 'PAMM Investments' : 'MAM Investments';
+                    const sub = bucket === 'pamm'
+                      ? 'Pooled fund — capital sits with the master; P&L distributed on close.'
+                      : 'Direct copy — every mirrored trade lands on your own sub-account.';
+                    return [(
+                      <section key={`section-${bucket}`} className="space-y-3">
+                        <div className="flex items-baseline justify-between gap-3">
+                          <div>
+                            <h3 className="text-base font-bold text-text-primary">{label}</h3>
+                            <p className="text-xs text-text-tertiary">{sub}</p>
+                          </div>
+                          <span className="text-xs font-mono tabular-nums text-text-secondary">
+                            {subset.length} active
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                          {subset.map((a) => (
                       <div key={a.id} className="bg-card border border-border-primary rounded-xl p-5 flex flex-col hover:border-accent/20 shadow-[0_2px_12px_rgba(0,0,0,0.06)] transition-colors">
                         <div className="flex items-start justify-between gap-2 mb-3">
                           <div className="min-w-0">
@@ -692,10 +805,15 @@ export default function PammPage() {
                             <span className="text-text-primary font-semibold tabular-nums">${fmt(a.current_value)}</span>
                           </div>
                           <div className="flex items-center justify-between pt-2 border-t border-border-primary">
-                            <span className="text-text-tertiary">Total P&L</span>
+                            <span className="text-sm font-semibold text-text-secondary">Total P&L</span>
                             <div className="text-right">
-                              <p className="font-bold tabular-nums"><PnlText value={a.total_pnl} /></p>
-                              <p className="text-[10px] tabular-nums"><PnlText value={a.pnl_pct} suffix="%" /></p>
+                              <p className="text-lg font-extrabold tabular-nums"><PnlText value={a.total_pnl} /></p>
+                              <p className={clsx(
+                                'text-sm font-bold tabular-nums',
+                                a.pnl_pct >= 0 ? 'text-[#55a630]' : 'text-red-400',
+                              )}>
+                                {a.pnl_pct >= 0 ? '+' : ''}{a.pnl_pct.toFixed(2)}%
+                              </p>
                             </div>
                           </div>
                           <div className="flex items-center justify-between text-[11px]">
@@ -706,11 +824,60 @@ export default function PammPage() {
                             <span className="text-text-tertiary">Unrealized</span>
                             <span className={a.unrealized_pnl >= 0 ? 'text-[#55a630]/70' : 'text-red-400/70'}>${fmt(Math.abs(a.unrealized_pnl))}</span>
                           </div>
+
+                          {/* Charges breakdown — perf-fee split into master
+                              + admin slices so the user sees exactly what
+                              the broker takes off their gross. Hidden when
+                              fee_pct == 0 (no skim configured). */}
+                          {a.performance_fee_pct > 0 && (
+                            <div className="rounded-lg bg-bg-secondary border border-border-primary/70 p-2.5 mt-2 space-y-1 text-[11px]">
+                              <div className="flex items-center justify-between font-semibold text-text-secondary uppercase tracking-wide text-[10px]">
+                                <span>Charges on profit</span>
+                                <span>{a.performance_fee_pct}% total</span>
+                              </div>
+                              <div className="flex items-center justify-between">
+                                <span className="text-text-tertiary">Master keeps</span>
+                                <span className="text-text-primary tabular-nums">{(a.master_share_pct ?? a.performance_fee_pct).toFixed(2)}%</span>
+                              </div>
+                              {(a.admin_share_pct ?? 0) > 0 && (
+                                <div className="flex items-center justify-between">
+                                  <span className="text-text-tertiary">Broker commission</span>
+                                  <span className="text-text-primary tabular-nums">{(a.admin_share_pct ?? 0).toFixed(2)}%</span>
+                                </div>
+                              )}
+                              {(a.fees_paid_estimate ?? 0) > 0 && (
+                                <div className="flex items-center justify-between pt-1 border-t border-border-primary/40">
+                                  <span className="text-text-secondary">Fees paid (est.)</span>
+                                  <span className="text-red-400 tabular-nums">−${fmt(a.fees_paid_estimate ?? 0)}</span>
+                                </div>
+                              )}
+                            </div>
+                          )}
+
+                          {/* Bonus + insurance status — confirms what the
+                              user opted into at invest time so they can
+                              spot misconfiguration before withdrawing. */}
+                          {((a.bonus_portion ?? 0) > 0 || a.insurance_opt_in) && (
+                            <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                              {(a.bonus_portion ?? 0) > 0 && (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/15 border border-amber-500/30 text-[10px] font-semibold text-amber-400">
+                                  Bonus: ${fmt(a.bonus_portion ?? 0)}
+                                </span>
+                              )}
+                              {a.insurance_opt_in && (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#55a630]/15 border border-[#55a630]/30 text-[10px] font-semibold text-[#55a630]">
+                                  Auto-insurance ON
+                                </span>
+                              )}
+                            </div>
+                          )}
                         </div>
 
                         <div className="flex items-center justify-between mt-3 pt-3 border-t border-border-primary text-[10px] text-text-tertiary">
-                          <span>Fee: {a.performance_fee_pct}%</span>
                           <span>Joined {new Date(a.joined_at).toLocaleDateString()}</span>
+                          {a.management_fee_pct ? (
+                            <span>Mgmt: {a.management_fee_pct}% / yr</span>
+                          ) : null}
                         </div>
 
                         {a.master_type === 'pamm' && (
@@ -751,8 +918,11 @@ export default function PammPage() {
                           </div>
                         )}
                       </div>
-                    ))}
-                  </div>
+                          ))}
+                        </div>
+                      </section>
+                    )];
+                  })}</div>
                 )}
               </>
             )}
@@ -1004,23 +1174,30 @@ export default function PammPage() {
                 {performance.monthly_breakdown.length > 0 && (
                   <div className="bg-card border border-border-primary rounded-xl overflow-hidden shadow-[0_2px_12px_rgba(0,0,0,0.06)]">
                     <div className="px-4 py-3 border-b border-border-primary">
-                      <p className="text-sm font-semibold text-text-primary">Monthly Performance</p>
+                      <p className="text-base font-bold text-text-primary">Monthly Performance</p>
                     </div>
                     <div className="overflow-x-auto">
-                      <table className="w-full text-xs">
+                      <table className="w-full text-sm">
                         <thead>
-                          <tr className="border-b border-border-primary text-text-tertiary text-left">
-                            <th className="px-4 py-2.5 font-medium">Month</th>
-                            <th className="px-4 py-2.5 font-medium text-right">Profit</th>
-                            <th className="px-4 py-2.5 font-medium text-right">Cumulative</th>
+                          <tr className="border-b border-border-primary text-text-secondary text-left bg-bg-secondary/30">
+                            <th className="px-4 py-3 font-semibold uppercase tracking-wide text-xs">Month</th>
+                            <th className="px-4 py-3 font-semibold uppercase tracking-wide text-xs text-right">Profit</th>
+                            <th className="px-4 py-3 font-semibold uppercase tracking-wide text-xs text-right">Cumulative</th>
                           </tr>
                         </thead>
                         <tbody>
                           {performance.monthly_breakdown.map((row) => (
                             <tr key={row.month} className="border-b border-border-primary last:border-0 hover:bg-bg-hover">
-                              <td className="px-4 py-3 text-text-primary">{row.month}</td>
-                              <td className="px-4 py-3 text-right tabular-nums"><PnlText value={row.profit} /></td>
-                              <td className="px-4 py-3 text-right tabular-nums text-text-secondary">${fmt(row.cumulative)}</td>
+                              <td className="px-4 py-3 text-text-primary font-semibold">{row.month}</td>
+                              <td className="px-4 py-3 text-right tabular-nums font-bold text-base">
+                                <PnlText value={row.profit} />
+                              </td>
+                              <td className={clsx(
+                                'px-4 py-3 text-right tabular-nums font-bold text-base',
+                                row.cumulative >= 0 ? 'text-text-primary' : 'text-red-400',
+                              )}>
+                                {row.cumulative < 0 ? '-' : ''}${fmt(Math.abs(row.cumulative))}
+                              </td>
                             </tr>
                           ))}
                         </tbody>
@@ -1076,20 +1253,153 @@ export default function PammPage() {
             </div>
 
             {investTarget.master_type === 'mamm' && (
-              <div>
-                <label className="block text-xs text-text-secondary mb-1.5">Volume Scaling %</label>
-                <input
-                  type="number" min="1" max="500" step="1"
-                  value={investScaling}
-                  onChange={(e) => setInvestScaling(e.target.value)}
-                  className="w-full bg-bg-secondary border border-border-primary rounded-lg px-3 py-2.5 text-sm text-text-primary focus:outline-none focus:border-accent/50"
-                />
-                <p className="text-[10px] text-text-tertiary mt-1">100 = proportional share · 200 = 2× leverage</p>
+              <div className="space-y-2">
+                {/* Mode toggle — let the investor decide whether their
+                    lot is a % of pool share, or a direct multiplier on
+                    the master's lot. Mutually exclusive. */}
+                <div className="flex gap-2">
+                  {(['scaling', 'multiplier'] as const).map((m) => (
+                    <button
+                      key={m}
+                      type="button"
+                      onClick={() => setInvestMode(m)}
+                      className={clsx(
+                        'flex-1 py-1.5 px-2 rounded-md text-[11px] font-semibold border transition-colors',
+                        investMode === m
+                          ? 'bg-accent/15 text-accent border-accent/40'
+                          : 'bg-transparent text-text-tertiary border-border-primary hover:text-text-secondary',
+                      )}
+                    >
+                      {m === 'scaling' ? 'Volume scaling %' : 'Direct lot ×'}
+                    </button>
+                  ))}
+                </div>
+                {investMode === 'scaling' ? (
+                  <div>
+                    <label className="block text-xs text-text-secondary mb-1.5">Volume Scaling %</label>
+                    <input
+                      type="number" min="1" max="500" step="1"
+                      value={investScaling}
+                      onChange={(e) => setInvestScaling(e.target.value)}
+                      className="w-full bg-bg-secondary border border-border-primary rounded-lg px-3 py-2.5 text-sm text-text-primary focus:outline-none focus:border-accent/50"
+                    />
+                    <p className="text-[10px] text-text-tertiary mt-1">100 = proportional share · 200 = 2× leverage</p>
+                  </div>
+                ) : (
+                  <div>
+                    <label className="block text-xs text-text-secondary mb-1.5">Lot multiplier</label>
+                    <input
+                      type="number" min="0.01" max="100" step="0.01"
+                      placeholder="e.g. 0.5"
+                      value={investLotMultiplier}
+                      onChange={(e) => setInvestLotMultiplier(e.target.value)}
+                      className="w-full bg-bg-secondary border border-border-primary rounded-lg px-3 py-2.5 text-sm text-text-primary focus:outline-none focus:border-accent/50"
+                    />
+                    <p className="text-[10px] text-text-tertiary mt-1">
+                      Take master_lots × this value on every trade. e.g. master opens 1.0 lots → you get 0.5 lots.
+                    </p>
+                  </div>
+                )}
               </div>
             )}
 
-            <div className="rounded-lg bg-bg-secondary border border-border-primary p-3 text-[11px] text-text-tertiary">
-              Performance fee: <span className="text-text-primary">{investTarget.performance_fee_pct}%</span> · Slots left: <span className="text-text-primary">{investTarget.slots_available}</span>
+            {/* Full fee stack — perf + mgmt + admin cut. Was hidden in
+                the old single-line summary; now broken out so the
+                investor sees exactly what the broker keeps. */}
+            <div className="rounded-lg bg-bg-secondary border border-border-primary p-3 text-[11px] text-text-tertiary space-y-1">
+              <div className="flex justify-between">
+                <span>Performance fee</span>
+                <span className="text-text-primary">{Number(investTarget.performance_fee_pct ?? 0).toFixed(1)}%</span>
+              </div>
+              {Number(investTarget.management_fee_pct ?? 0) > 0 && (
+                <div className="flex justify-between">
+                  <span>Management fee (annual)</span>
+                  <span className="text-text-primary">{Number(investTarget.management_fee_pct).toFixed(1)}%</span>
+                </div>
+              )}
+              {Number(investTarget.admin_commission_pct ?? 0) > 0 && (
+                <div className="flex justify-between">
+                  <span>Broker commission (of perf fee)</span>
+                  <span className="text-text-primary">{Number(investTarget.admin_commission_pct).toFixed(1)}%</span>
+                </div>
+              )}
+              <div className="flex justify-between pt-1 border-t border-border-primary/60">
+                <span>Slots left</span>
+                <span className="text-text-primary">{investTarget.slots_available}</span>
+              </div>
+            </div>
+
+            {/* Admin-set risk caps (Mig 0066) — display-only so the
+                investor sees the broker safeguards before committing.
+                Hidden when both fields are zero / null. */}
+            {(investTarget.max_drawdown_pct > 0 || (investTarget.max_loss_per_trade_pct ?? 0) > 0) && (
+              <div className="rounded-lg bg-amber-500/[0.06] border border-amber-500/30 p-3 text-[11px] text-amber-300 space-y-1">
+                <div className="font-semibold text-amber-300">Broker risk caps</div>
+                {investTarget.max_drawdown_pct > 0 && (
+                  <div className="flex justify-between">
+                    <span>Max drawdown</span>
+                    <span className="font-mono tabular-nums">{Number(investTarget.max_drawdown_pct).toFixed(2)}%</span>
+                  </div>
+                )}
+                {(investTarget.max_loss_per_trade_pct ?? 0) > 0 && (
+                  <div className="flex justify-between">
+                    <span>Max loss / trade</span>
+                    <span className="font-mono tabular-nums">{Number(investTarget.max_loss_per_trade_pct).toFixed(2)}%</span>
+                  </div>
+                )}
+                <p className="text-[10px] text-amber-300/80 pt-0.5">
+                  Set by the broker — automatic safeguards beyond your control.
+                </p>
+              </div>
+            )}
+
+            {/* Auto-insurance opt-in — only visible when the master
+                allows insurance (admin gate, Mig 0066). Off by default. */}
+            {investTarget.insurance_enabled !== false && (
+              <label className="flex items-start gap-2 rounded-lg bg-bg-secondary border border-border-primary p-3 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={investInsuranceOptIn}
+                  onChange={(e) => setInvestInsuranceOptIn(e.target.checked)}
+                  className="mt-0.5 h-4 w-4 accent-accent cursor-pointer"
+                />
+                <span className="text-[11px] text-text-secondary">
+                  Auto-insure copied trades on this allocation
+                  <span className="block text-[10px] text-text-tertiary mt-0.5">
+                    Each mirrored position opens with a default-tier insurance policy.
+                    Fees are charged per-trade from your investor sub-account credit.
+                  </span>
+                </span>
+              </label>
+            )}
+
+            {/* Bonus opt-in — visible only when the user actually has
+                bonus credit. Off by default so existing flows aren't
+                disturbed and so the user has to consent to the
+                "forfeit on withdraw" tradeoff explicitly. */}
+            {walletBonus > 0 && (
+              <label className="flex items-start gap-2 rounded-lg bg-bg-secondary border border-border-primary p-3 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={investUseBonus}
+                  onChange={(e) => setInvestUseBonus(e.target.checked)}
+                  className="mt-0.5 h-4 w-4 accent-accent cursor-pointer"
+                />
+                <span className="text-[11px] text-text-secondary">
+                  Use my bonus balance (${walletBonus.toFixed(2)}) first
+                  <span className="block text-[10px] text-text-tertiary mt-0.5">
+                    Bonus credit is tradable but non-withdrawable — the bonus portion is forfeited when you exit the investment.
+                  </span>
+                </span>
+              </label>
+            )}
+
+            {/* Available funds summary — bonus is added only when the
+                opt-in is on, so the total always matches what the
+                backend will accept. */}
+            <div className="text-[11px] text-text-tertiary">
+              Available: <span className="text-text-primary font-mono tabular-nums">${(walletBalance + (investUseBonus ? walletBonus : 0)).toFixed(2)}</span>
+              <span className="text-text-tertiary/70"> (cash ${walletBalance.toFixed(2)}{investUseBonus ? ` + bonus $${walletBonus.toFixed(2)}` : ''})</span>
             </div>
 
             <div className="flex gap-2 pt-1">
@@ -1114,11 +1424,15 @@ export default function PammPage() {
         )}
       </Modal>
 
-      {/* Withdraw Modal */}
+      {/* Withdraw Modal — copy + warnings split by master_type. The
+          endpoint is shared but the user-facing semantics differ
+          enough (PAMM: monthly window + pro-rata of pool; MAM: per-
+          investor sub-account closed on demand) that one generic
+          modal was confusing both audiences. */}
       <Modal
         open={!!withdrawTarget}
         onClose={() => { if (!withdrawing) setWithdrawTarget(null); }}
-        title="Withdraw Investment"
+        title={withdrawTarget?.master_type === 'pamm' ? 'Exit PAMM pool' : 'Exit MAM allocation'}
         width="sm"
       >
         {withdrawTarget && (
@@ -1129,7 +1443,9 @@ export default function PammPage() {
                 <span className="text-text-primary font-medium">{withdrawTarget.manager_name}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-text-tertiary">Invested</span>
+                <span className="text-text-tertiary">
+                  {withdrawTarget.master_type === 'pamm' ? 'Pool share' : 'Invested'}
+                </span>
                 <span className="text-text-primary">${fmt(withdrawTarget.allocation_amount)}</span>
               </div>
               <div className="flex justify-between">
@@ -1138,10 +1454,38 @@ export default function PammPage() {
               </div>
             </div>
 
-            <div className="flex items-start gap-2 px-3 py-2.5 rounded-lg bg-yellow-500/[0.08] border border-yellow-500/20 text-[11px] text-yellow-400">
-              <AlertCircle size={13} className="shrink-0 mt-0.5" />
-              <span>All open positions tied to this investment will be closed automatically.</span>
-            </div>
+            {withdrawTarget.master_type === 'pamm' ? (
+              <div className="flex items-start gap-2 px-3 py-2.5 rounded-lg bg-amber-500/[0.08] border border-amber-500/30 text-[11px] text-amber-300">
+                <AlertCircle size={13} className="shrink-0 mt-0.5" />
+                <span>
+                  PAMM exit: your share of the pool is valued at the current pool balance,
+                  performance fee is netted, and the remaining capital + P&L is returned to
+                  your main wallet. Withdrawals only process inside the admin-set monthly
+                  window — outside it you'll receive an error and need to wait.
+                </span>
+              </div>
+            ) : (
+              <div className="flex items-start gap-2 px-3 py-2.5 rounded-lg bg-yellow-500/[0.08] border border-yellow-500/20 text-[11px] text-yellow-400">
+                <AlertCircle size={13} className="shrink-0 mt-0.5" />
+                <span>
+                  MAM exit: every open position on your investor sub-account is closed at
+                  the current market price, the realised P&L (after performance fee) lands
+                  on your main wallet, and the sub-account is retired.
+                </span>
+              </div>
+            )}
+            {(withdrawTarget.bonus_portion ?? 0) > 0 && (
+              <div className="flex items-start gap-2 px-3 py-2.5 rounded-lg bg-red-500/[0.08] border border-red-500/30 text-[11px] text-red-300">
+                <AlertCircle size={13} className="shrink-0 mt-0.5" />
+                <span>
+                  Bonus forfeit on exit:{' '}
+                  <span className="font-semibold">${fmt(withdrawTarget.bonus_portion ?? 0)}</span>{' '}
+                  of this allocation was funded from your bonus balance. Per the welcome-
+                  bonus contract, that portion is non-withdrawable and will be deducted
+                  from the returned amount.
+                </span>
+              </div>
+            )}
 
             <div className="flex gap-2 pt-1">
               <button

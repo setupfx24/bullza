@@ -96,18 +96,34 @@ class CopyTradeEngine:
             amt = float(investor_allocation.allocation_amount or 0)
             raw = ml * (amt / total_pool)
         elif ct == "mam":
-            if total_pool <= 0:
-                return None, "mam_zero_total_pool"
-            pct = (
-                float(investor_allocation.allocation_pct)
-                if investor_allocation.allocation_pct is not None
-                else 100.0
-            )
-            if pct == 0:
-                return None, "mam_zero_allocation_pct"
-            amt = float(investor_allocation.allocation_amount or 0)
-            pool_share_lots = ml * (amt / total_pool)
-            raw = pool_share_lots * (pct / 100.0)
+            # Direct lot multiplier — if the investor set one (e.g. 0.5
+            # = always take half the master's lot every trade), it
+            # wins outright over the pct-of-pool path. This is the
+            # "tell me exactly what lot to copy" model.
+            direct = getattr(investor_allocation, "lot_multiplier", None)
+            if direct is not None:
+                try:
+                    mult = float(direct)
+                except (TypeError, ValueError):
+                    mult = 0.0
+                if mult > 0:
+                    raw = ml * mult
+                else:
+                    return None, "mam_zero_lot_multiplier"
+            else:
+                # Legacy pct-of-pool path (volume scaling %).
+                if total_pool <= 0:
+                    return None, "mam_zero_total_pool"
+                pct = (
+                    float(investor_allocation.allocation_pct)
+                    if investor_allocation.allocation_pct is not None
+                    else 100.0
+                )
+                if pct == 0:
+                    return None, "mam_zero_allocation_pct"
+                amt = float(investor_allocation.allocation_amount or 0)
+                pool_share_lots = ml * (amt / total_pool)
+                raw = pool_share_lots * (pct / 100.0)
         else:
             return None, f"unknown_copy_type:{ct}"
 

@@ -22,25 +22,40 @@ _BORDER      = "#2a2a2a"
 
 
 def _header_brand_html() -> str:
-    """Logo image when EMAIL_LOGO_URL is set; styled wordmark text otherwise.
+    """Header brand block.
 
-    Most clients (Gmail, Outlook, iOS Mail) block remote images by default
-    until the user clicks "Display images". The alt text is the brand
-    wordmark so the header still reads "SwisDex" with images off.
+    We ALWAYS render the CSS-only styled wordmark — it's HTML text,
+    can't break, and looks intentional in every client. If
+    EMAIL_LOGO_URL is set we render the logo image to its LEFT in the
+    same row; when Gmail's image proxy can't fetch the image (which is
+    what produced the broken-icon report 2026-06-01), the user still
+    sees the styled "SwisDex" wordmark instead of a lone broken icon.
+
+    The image sits in its own table cell so its alt-text fallback
+    doesn't push the wordmark out of alignment.
     """
-    logo = (getattr(get_settings(), "EMAIL_LOGO_URL", "") or "").strip()
-    if logo:
-        return (
-            f'<img src="{escape(logo, quote=True)}" alt="SwisDex" '
-            f'width="140" height="40" '
-            f'style="display:block;height:40px;width:auto;max-width:160px;'
-            f'border:0;outline:none;text-decoration:none;">'
-        )
-    return (
-        f'<span style="font-weight:700;font-size:22px;letter-spacing:0.2px;">'
+    wordmark = (
+        f'<span style="font-weight:700;font-size:22px;letter-spacing:0.2px;'
+        f'font-family:-apple-system,BlinkMacSystemFont,\'Segoe UI\',Helvetica,Arial,sans-serif;">'
         f'<span style="color:{_TEXT};">Swis</span>'
         f'<span style="color:{_BRAND};">Dex</span>'
         f'</span>'
+    )
+    logo = (getattr(get_settings(), "EMAIL_LOGO_URL", "") or "").strip()
+    if not logo:
+        return wordmark
+    return (
+        f'<table role="presentation" cellpadding="0" cellspacing="0" border="0">'
+        f'<tr>'
+        f'<td style="vertical-align:middle;padding-right:12px;">'
+        f'<img src="{escape(logo, quote=True)}" alt="" '
+        f'width="40" height="40" '
+        f'style="display:block;height:40px;width:40px;border:0;outline:none;'
+        f'text-decoration:none;border-radius:6px;">'
+        f'</td>'
+        f'<td style="vertical-align:middle;">{wordmark}</td>'
+        f'</tr>'
+        f'</table>'
     )
 
 

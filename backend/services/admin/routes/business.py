@@ -359,11 +359,34 @@ async def list_sub_brokers(
 async def list_masters(
     page: int = Query(1, ge=1),
     per_page: int = Query(50, ge=1, le=200),
+    master_type: str | None = Query(
+        None,
+        description="Filter to a single master_type (signal_provider | pamm | mamm). Default = all.",
+    ),
     admin: User = Depends(require_permission("ib.view")),
     db: AsyncSession = Depends(get_db),
 ):
-    """List all copy-trade masters (signal_provider, pamm, mamm)."""
-    return await business_service.list_masters(page=page, per_page=per_page, db=db)
+    """List copy-trade masters with stats. Pass `master_type=mamm` to
+    scope the result to MAM only (so the admin MAM dashboard never
+    receives PAMM rows even before the client-side filter runs)."""
+    return await business_service.list_masters(
+        page=page, per_page=per_page, db=db, master_type=master_type,
+    )
+
+
+@router.get("/masters/admin-commission-summary")
+async def admin_commission_summary(
+    master_type: str | None = Query(None),
+    admin: User = Depends(require_permission("ib.view")),
+    db: AsyncSession = Depends(get_db),
+):
+    """Aggregate admin-cut earned across all masters of `master_type`
+    (default = all). Returns the lifetime total + a per-master
+    breakdown so the admin MAM dashboard can show who's contributing
+    how much to the house cut."""
+    return await business_service.admin_commission_summary(
+        master_type=master_type, db=db,
+    )
 
 
 @router.delete("/masters/{master_id}")
@@ -393,6 +416,13 @@ class MasterCreateIn(BaseModel):
     description: str | None = None
     spread_markup_pips: float | None = None
     commission_per_lot_usd: float | None = None
+    # Admin-set risk controls (Mig 0066). Optional on create — null
+    # leaves the column default in place (0 / NULL = disabled).
+    max_drawdown_pct: float | None = None
+    max_loss_per_trade_pct: float | None = None
+    # Default TRUE in the model; admin can flip it off at create time
+    # to forbid investors from auto-insuring trades on this master.
+    insurance_enabled: bool = True
 
 
 @router.post("/masters")
@@ -416,6 +446,9 @@ async def create_master(
         description=body.description,
         spread_markup_pips=body.spread_markup_pips,
         commission_per_lot_usd=body.commission_per_lot_usd,
+        max_drawdown_pct=body.max_drawdown_pct,
+        max_loss_per_trade_pct=body.max_loss_per_trade_pct,
+        insurance_enabled=body.insurance_enabled,
         admin_id=admin.id,
         ip_address=request.client.host if request.client else None,
         db=db,
@@ -435,6 +468,11 @@ class MasterUpdateIn(BaseModel):
     # SpreadConfig / ChargeConfig resolver for this master's pool fills.
     spread_markup_pips: float | None = None
     commission_per_lot_usd: float | None = None
+    # Mig 0066 admin risk + insurance fields. Patch semantics — only
+    # update what's explicitly sent.
+    max_drawdown_pct: float | None = None
+    max_loss_per_trade_pct: float | None = None
+    insurance_enabled: bool | None = None
 
 
 @router.put("/masters/{master_id}")

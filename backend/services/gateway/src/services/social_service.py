@@ -671,7 +671,16 @@ async def withdraw_managed_account(
         if gross_profit > 0 and master and master.performance_fee_pct:
             perf_fee = gross_profit * (master.performance_fee_pct or Decimal("0")) / Decimal("100")
 
-        return_amount = share_value - perf_fee
+        # Forfeit the bonus portion of this allocation. The welcome-bonus
+        # contract is "tradable, not withdrawable" — if the investor used
+        # bonus credit to top up their allocation, that portion must NOT
+        # come back to their cash wallet on withdraw. The bonus stays
+        # behind as pool credit, same as on a regular trading account.
+        bonus_forfeit = min(
+            Decimal(str(allocation.bonus_portion or 0)),
+            share_value if share_value > 0 else Decimal("0"),
+        )
+        return_amount = share_value - perf_fee - bonus_forfeit
         if return_amount < 0:
             return_amount = Decimal("0")
 
@@ -796,7 +805,18 @@ async def withdraw_managed_account(
     user_result = await db.execute(select(User).where(User.id == user_id))
     user = user_result.scalar_one_or_none()
 
-    return_amount = (allocation.allocation_amount or Decimal("0")) + total_closed_pnl
+    # Forfeit the bonus portion (welcome-bonus contract: tradable not
+    # withdrawable). Capped at the allocation amount so a bonus_portion
+    # that exceeds the allocation due to data drift can't go negative.
+    bonus_forfeit = min(
+        Decimal(str(allocation.bonus_portion or 0)),
+        Decimal(str(allocation.allocation_amount or 0)),
+    )
+    return_amount = (
+        (allocation.allocation_amount or Decimal("0"))
+        + total_closed_pnl
+        - bonus_forfeit
+    )
     if return_amount < 0:
         return_amount = Decimal("0")
 
@@ -1282,14 +1302,22 @@ async def list_managed_accounts(page: int, per_page: int, db: AsyncSession) -> d
             "master_type": master.master_type,
             "total_return_pct": float(master.total_return_pct),
             "max_drawdown_pct": float(master.max_drawdown_pct),
+            "max_loss_per_trade_pct": (
+                float(master.max_loss_per_trade_pct)
+                if master.max_loss_per_trade_pct is not None else None
+            ),
             "sharpe_ratio": float(master.sharpe_ratio),
             "performance_fee_pct": float(master.performance_fee_pct),
             "management_fee_pct": float(master.management_fee_pct),
+            "admin_commission_pct": float(master.admin_commission_pct or 0),
             "min_investment": float(master.min_investment),
             "max_investors": master.max_investors,
             "active_investors": active,
             "slots_available": master.max_investors - active,
             "description": master.description,
+            # Trader invest modal reads this to gate the "auto-insure"
+            # opt-in checkbox.
+            "insurance_enabled": bool(master.insurance_enabled),
         })
 
     return {
@@ -1302,6 +1330,22 @@ async def invest_managed_account(
     master_id: UUID, account_id: UUID, amount: Decimal,
     max_drawdown_pct: Decimal | None, volume_scaling_pct: Decimal,
     user_id: UUID, db: AsyncSession,
+    *,
+    # MAM direct lot multiplier (e.g. 0.5 = take half the master's lot).
+    # When set, copy_engine ignores volume_scaling_pct and uses this
+    # constant multiplier directly. PAMM ignores it entirely (pooled
+    # fund — investor doesn't control sizing).
+    lot_multiplier: Decimal | None = None,
+    # Allow main_wallet_bonus to count toward the invest amount.
+    # When True, we pull from bonus first (use_it_or_lose_it for
+    # non-withdrawable credit) then top up from cash. Forfeit on
+    # withdraw — same contract as the welcome bonus.
+    use_bonus: bool = False,
+    # Investor opts in to auto-insure copied trades on this allocation.
+    # Only honoured if master.insurance_enabled (admin gate). Persisted
+    # on InvestorAllocation; the copy engine fires insurance.activate
+    # on each mirrored open when both flags are True.
+    insurance_opt_in: bool = False,
 ) -> dict:
     master_result = await db.execute(
         select(MasterAccount).where(
@@ -1314,22 +1358,11 @@ async def invest_managed_account(
     if not master:
         raise HTTPException(status_code=404, detail="Managed account not found")
 
-    # PAMM only — gate investor deposits to the admin's monthly window.
-    # MAMM has no pooled-fund timing constraint, so it stays unaffected.
-    if (master.master_type or "").lower() == "pamm":
-        from .pamm_config_service import get_pamm_config, in_deposit_withdrawal_window
-
-        cfg = await get_pamm_config()
-        if not in_deposit_withdrawal_window(cfg):
-            start = cfg.get("dep_window_start_day")
-            end = cfg.get("dep_window_end_day")
-            raise HTTPException(
-                status_code=400,
-                detail=(
-                    f"PAMM deposits are only accepted between day {start} and day {end} "
-                    f"of each month. Please try again during the next window."
-                ),
-            )
+    # PAMM deposits used to be gated to a monthly window — client request
+    # 2026-06-01 #2 was to drop the deposit gate (deposits any time) while
+    # KEEPING the withdrawal window. The gate now lives only in
+    # withdraw_managed_account; investors can top up at any point of the
+    # month.
 
     if amount < master.min_investment:
         raise HTTPException(status_code=400, detail=f"Minimum investment is {master.min_investment}")
@@ -1343,14 +1376,31 @@ async def invest_managed_account(
     if investor_count.scalar() >= master.max_investors:
         raise HTTPException(status_code=400, detail="No slots available")
 
-    # Deduct from main wallet
+    # Deduct from main wallet — optionally including the bonus pool.
+    # When `use_bonus` is on the available pool is balance + bonus; we
+    # pull from bonus FIRST so the user is never sitting on idle bonus
+    # while their cash gets spent. Bonus is non-withdrawable so this
+    # also forces the welcome-bonus credit to be put to work.
     user_result = await db.execute(select(User).where(User.id == user_id))
     user = user_result.scalar_one_or_none()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     wallet_bal = user.main_wallet_balance or Decimal("0")
-    if wallet_bal < amount:
-        raise HTTPException(status_code=400, detail=f"Insufficient wallet balance (available: {wallet_bal})")
+    wallet_bonus = (
+        user.main_wallet_bonus or Decimal("0") if use_bonus else Decimal("0")
+    )
+    total_available = wallet_bal + wallet_bonus
+    if total_available < amount:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"Insufficient available balance ({total_available}; "
+                f"cash {wallet_bal} + bonus {wallet_bonus})"
+            ),
+        )
+    # Split the requested amount across bonus then cash.
+    bonus_used = min(amount, wallet_bonus)
+    cash_used = amount - bonus_used
 
     existing_result = await db.execute(
         select(InvestorAllocation).where(
@@ -1361,13 +1411,21 @@ async def invest_managed_account(
     )
     existing_alloc = existing_result.scalar_one_or_none()
 
-    # Deduct from wallet
-    user.main_wallet_balance = wallet_bal - amount
+    # Debit cash + bonus pools. Bonus has its own column so the welcome-
+    # bonus forfeit logic can find it; cash stays the user's withdrawable
+    # main balance.
+    user.main_wallet_balance = wallet_bal - cash_used
+    if bonus_used > 0:
+        user.main_wallet_bonus = (user.main_wallet_bonus or Decimal("0")) - bonus_used
 
-    # Add funds to master's pool trading account
+    # Add funds to master's pool trading account. Cash → balance,
+    # bonus → credit, so the pool account itself preserves the
+    # tradable-but-not-withdrawable property of bonus credit.
     pool_account = await db.get(TradingAccount, master.account_id) if master.account_id else None
     if pool_account:
-        pool_account.balance = (pool_account.balance or Decimal("0")) + amount
+        pool_account.balance = (pool_account.balance or Decimal("0")) + cash_used
+        if bonus_used > 0:
+            pool_account.credit = (pool_account.credit or Decimal("0")) + bonus_used
         pool_account.equity = pool_account.balance + (pool_account.credit or Decimal("0"))
         pool_account.free_margin = pool_account.equity - (pool_account.margin_used or Decimal("0"))
 
@@ -1382,8 +1440,23 @@ async def invest_managed_account(
     if existing_alloc:
         # ── Top-up: add funds to existing allocation ──
         existing_alloc.allocation_amount = (existing_alloc.allocation_amount or Decimal("0")) + amount
-        if volume_scaling_pct and master.master_type == "mamm":
-            existing_alloc.allocation_pct = volume_scaling_pct
+        existing_alloc.bonus_portion = (
+            (existing_alloc.bonus_portion or Decimal("0")) + bonus_used
+        )
+        # Always re-apply the latest opt-in choice — same logic as
+        # volume scaling: a top-up is the natural moment to flip the
+        # insurance preference.
+        if master.insurance_enabled:
+            existing_alloc.insurance_opt_in = bool(insurance_opt_in)
+        else:
+            existing_alloc.insurance_opt_in = False
+        if master.master_type == "mamm":
+            # Lot multiplier wins outright when provided; pct stays for
+            # backwards-compat when only the slider was used.
+            if lot_multiplier is not None:
+                existing_alloc.lot_multiplier = lot_multiplier
+            if volume_scaling_pct:
+                existing_alloc.allocation_pct = volume_scaling_pct
         if max_drawdown_pct is not None:
             existing_alloc.max_drawdown_pct = max_drawdown_pct
 
@@ -1398,7 +1471,10 @@ async def invest_managed_account(
         else:
             inv_acct = await db.get(TradingAccount, existing_alloc.investor_account_id)
             if inv_acct:
-                inv_acct.balance = (inv_acct.balance or Decimal("0")) + amount
+                # Cash → balance, bonus → credit, equity recomputed.
+                inv_acct.balance = (inv_acct.balance or Decimal("0")) + cash_used
+                if bonus_used > 0:
+                    inv_acct.credit = (inv_acct.credit or Decimal("0")) + bonus_used
                 inv_acct.equity = inv_acct.balance + (inv_acct.credit or Decimal("0"))
                 inv_acct.free_margin = inv_acct.equity - (inv_acct.margin_used or Decimal("0"))
 
@@ -1424,13 +1500,17 @@ async def invest_managed_account(
     else:
         investor_account = None
         if not is_pamm:
-            # MAM allocation: auto-create dedicated sub-account for position mirroring.
+            # MAM allocation: auto-create dedicated sub-account for
+            # position mirroring. Cash sits in balance, bonus in credit
+            # so the welcome-bonus contract (tradable not withdrawable)
+            # is preserved per-investor.
             investor_account = TradingAccount(
                 user_id=user_id,
                 account_number=_gen_investor_account_number("mam"),
-                balance=amount,
-                equity=amount,
-                free_margin=amount,
+                balance=cash_used,
+                credit=bonus_used,
+                equity=cash_used + bonus_used,
+                free_margin=cash_used + bonus_used,
                 margin_used=Decimal("0"),
                 leverage=500,
                 currency="USD",
@@ -1454,6 +1534,7 @@ async def invest_managed_account(
             ))
 
         alloc_pct = volume_scaling_pct if master.master_type == "mamm" else None
+        alloc_lot_mult = lot_multiplier if master.master_type == "mamm" else None
         copy_type_val = (
             AllocationCopyType.PAMM.value if is_pamm
             else AllocationCopyType.MAM.value
@@ -1463,7 +1544,12 @@ async def invest_managed_account(
             master_id=master_id, investor_user_id=user_id,
             investor_account_id=(investor_account.id if investor_account else None),
             copy_type=copy_type_val,
-            allocation_amount=amount, allocation_pct=alloc_pct,
+            allocation_amount=amount,
+            allocation_pct=alloc_pct,
+            lot_multiplier=alloc_lot_mult,
+            bonus_portion=bonus_used,
+            # Honour the opt-in only when the master admit insurance.
+            insurance_opt_in=bool(insurance_opt_in) and bool(master.insurance_enabled),
             max_drawdown_pct=max_drawdown_pct, status="active",
         )
         db.add(allocation)
@@ -1482,6 +1568,12 @@ async def invest_managed_account(
         }
     if master.master_type == "mamm":
         out["volume_scaling_pct"] = float(volume_scaling_pct)
+        if lot_multiplier is not None:
+            out["lot_multiplier"] = float(lot_multiplier)
+    # Surface the bonus split so the trader UI can confirm the bonus
+    # was actually applied (and didn't silently fall back to cash-only).
+    out["cash_used"] = float(cash_used)
+    out["bonus_used"] = float(bonus_used)
     return out
 
 
@@ -1643,6 +1735,24 @@ async def my_allocations(user_id: UUID, db: AsyncSession) -> dict:
 
         pnl_pct = (total_pnl / invested * 100) if invested > 0 else 0.0
 
+        # Fee stack the investor actually pays per profitable trade —
+        # surfaced on the card so the user can see WHERE their net P&L
+        # diverged from gross. master_share + admin_share both apply to
+        # the realised profit (not to principal). When both are zero the
+        # client just suppresses the section.
+        perf_pct = float(master.performance_fee_pct or 0)
+        admin_pct = float(master.admin_commission_pct or 0)
+        # admin_share = perf × admin_pct / 100; master keeps the rest.
+        admin_share_pct = perf_pct * admin_pct / 100.0 if perf_pct > 0 else 0.0
+        master_share_pct = max(0.0, perf_pct - admin_share_pct)
+        # Approx fees paid on realised gains so far (gross to net diff).
+        # Best-effort — pre-fee gross isn't stored, so we estimate from
+        # the configured pct: if net = gross × (1 − perf_pct/100), then
+        # fees_paid ≈ net × perf_pct / (100 − perf_pct) on positive net.
+        fees_paid = 0.0
+        if realized_pnl > 0 and perf_pct > 0 and perf_pct < 100:
+            fees_paid = realized_pnl * perf_pct / (100.0 - perf_pct)
+
         items.append({
             "id": str(alloc.id),
             "master_id": str(master.id),
@@ -1655,7 +1765,20 @@ async def my_allocations(user_id: UUID, db: AsyncSession) -> dict:
             "unrealized_pnl": round(unrealized_pnl, 2),
             "total_pnl": round(total_pnl, 2),
             "pnl_pct": round(pnl_pct, 2),
-            "performance_fee_pct": float(master.performance_fee_pct),
+            "performance_fee_pct": perf_pct,
+            "management_fee_pct": float(master.management_fee_pct or 0),
+            "admin_commission_pct": admin_pct,
+            "master_share_pct": round(master_share_pct, 2),
+            "admin_share_pct": round(admin_share_pct, 2),
+            "fees_paid_estimate": round(fees_paid, 2),
+            # Bonus portion of this allocation — forfeited on withdraw.
+            # Surfaced so the trader-side withdraw modal can warn about
+            # the deduction before the user confirms.
+            "bonus_portion": float(alloc.bonus_portion or 0),
+            # Insurance opt-in surfaced so the My Investments card can
+            # show ON / OFF for the auto-insure setting per allocation.
+            "insurance_opt_in": bool(getattr(alloc, "insurance_opt_in", False)),
+            "insurance_enabled": bool(getattr(master, "insurance_enabled", True)),
             "joined_at": alloc.created_at.isoformat() if alloc.created_at else None,
             "status": alloc.status,
         })
@@ -1780,10 +1903,16 @@ async def master_investors(user_id: UUID, db: AsyncSession) -> dict:
     if not master:
         raise HTTPException(status_code=404, detail="You are not an approved PAMM/MAM manager")
 
+    # PAMM allocations have NULL investor_account_id (pooled fund — the
+    # investor has no sub-account). The original inner join on
+    # TradingAccount filtered all PAMM rows out, so PAMM masters were
+    # always seeing an empty investor list. Switching to an outer join
+    # surfaces them. `account_number` falls back to '— PAMM pool —' so
+    # the column is never blank for PAMM rows.
     allocations_result = await db.execute(
         select(InvestorAllocation, User, TradingAccount)
         .join(User, InvestorAllocation.investor_user_id == User.id)
-        .join(TradingAccount, InvestorAllocation.investor_account_id == TradingAccount.id)
+        .outerjoin(TradingAccount, InvestorAllocation.investor_account_id == TradingAccount.id)
         .where(
             InvestorAllocation.master_id == master.id,
             InvestorAllocation.status == "active",
@@ -1806,7 +1935,9 @@ async def master_investors(user_id: UUID, db: AsyncSession) -> dict:
             "user_id": str(user.id),
             "user_name": f"{user.first_name or ''} {user.last_name or ''}".strip() or user.email,
             "user_email": user.email,
-            "account_number": account.account_number,
+            "account_number": (
+                account.account_number if account is not None else "— PAMM pool —"
+            ),
             "allocated": round(invested, 2),
             "pnl": round(pnl, 2),
             "pnl_pct": round(pnl_pct, 2),

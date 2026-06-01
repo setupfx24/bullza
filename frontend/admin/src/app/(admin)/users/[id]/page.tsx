@@ -15,6 +15,7 @@ import {
   Mail,
   MapPin,
   Phone,
+  Save,
   Shield,
   UserRound,
   Wallet,
@@ -190,6 +191,9 @@ export default function UserDetailPage() {
           </div>
         </div>
 
+        {/* Fixed Return per-user rate override */}
+        <FixedReturnOverrideCard userId={userId} />
+
         {/* Trading Accounts */}
         <div className="bg-bg-secondary border border-border-primary rounded-lg p-5">
           <h2 className="text-base font-bold text-text-primary mb-4">Trading Accounts ({accounts.length})</h2>
@@ -230,5 +234,224 @@ export default function UserDetailPage() {
         </div>
       </div>
     </>
+  );
+}
+
+
+// ─── Fixed Return per-user rate override ─────────────────────────────
+
+interface FRConfig {
+  tiers: { label: string; min_amount: number }[];
+  tenures: { label: string; days: number }[];
+  rate_matrix_pct: number[][];
+}
+
+function FixedReturnOverrideCard({ userId }: { userId: string }) {
+  const [globalCfg, setGlobalCfg] = useState<FRConfig | null>(null);
+  // null = no override set; matrix = override active.
+  const [override, setOverride] = useState<number[][] | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      // Pull the global config from /settings so the editor's rows/columns
+      // line up with whatever the admin set on /config/fixed-return.
+      const [all, ov] = await Promise.all([
+        adminApi.get<{ key: string; value: any }[]>('/settings').catch(() => []),
+        adminApi.get<{ rate_override: { rate_matrix_pct?: number[][] } | null }>(
+          `/fixed-return/users/${userId}/rate-override`,
+        ).catch(() => ({ rate_override: null })),
+      ]);
+      const list = Array.isArray(all) ? all : [];
+      const raw = list.find((s) => s.key === 'fixed_return_rates')?.value;
+      const fallback: FRConfig = {
+        tiers: [
+          { label: '$1K', min_amount: 1000 },
+          { label: '$10K', min_amount: 10000 },
+          { label: '$25K', min_amount: 25000 },
+          { label: '$50K', min_amount: 50000 },
+          { label: '$100K', min_amount: 100000 },
+        ],
+        tenures: [
+          { label: 'Month', days: 30 },
+          { label: 'Quarter', days: 90 },
+          { label: 'Half-Year', days: 180 },
+          { label: 'Year', days: 365 },
+          { label: '2 Year', days: 730 },
+        ],
+        rate_matrix_pct: [
+          [1, 2, 2.5, 3, 4],
+          [2, 3, 3, 3.5, 4.5],
+          [3, 4, 4.5, 5, 5],
+          [4, 5, 5.5, 6, 5.5],
+          [5, 6, 6.5, 7, 7],
+        ],
+      };
+      const cfg: FRConfig = raw && Array.isArray(raw.tiers) ? {
+        tiers: raw.tiers,
+        tenures: raw.tenures || fallback.tenures,
+        rate_matrix_pct: Array.isArray(raw.rate_matrix_pct) ? raw.rate_matrix_pct : fallback.rate_matrix_pct,
+      } : fallback;
+      setGlobalCfg(cfg);
+      const matrix = ov?.rate_override?.rate_matrix_pct;
+      setOverride(Array.isArray(matrix) ? matrix : null);
+    } finally {
+      setLoading(false);
+    }
+  }, [userId]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const enable = () => {
+    if (!globalCfg) return;
+    // Seed override with a copy of the current global matrix so admin
+    // can edit just the cells they want different.
+    setOverride(globalCfg.rate_matrix_pct.map((row) => [...row]));
+  };
+
+  const disable = async () => {
+    if (!window.confirm('Clear this user\'s personal rate matrix? They will revert to the global ladder.')) return;
+    setSaving(true);
+    try {
+      await adminApi.put(`/fixed-return/users/${userId}/rate-override`, { rate_matrix_pct: null });
+      toast.success('Personal override removed');
+      load();
+    } catch (e: any) {
+      toast.error(e?.message || 'Save failed');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const updateCell = (ti: number, ci: number, value: string) => {
+    setOverride((prev) => {
+      if (!prev) return prev;
+      const n = parseFloat(value);
+      const m = prev.map((row) => row.slice());
+      m[ti][ci] = Number.isFinite(n) ? n : 0;
+      return m;
+    });
+  };
+
+  const save = async () => {
+    if (!override) return;
+    setSaving(true);
+    try {
+      await adminApi.put(`/fixed-return/users/${userId}/rate-override`, { rate_matrix_pct: override });
+      toast.success('Personal rate matrix saved');
+      load();
+    } catch (e: any) {
+      toast.error(e?.message || 'Save failed');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading || !globalCfg) {
+    return (
+      <div className="bg-bg-secondary border border-border-primary rounded-lg p-5">
+        <Loader2 size={16} className="animate-spin text-text-tertiary" />
+      </div>
+    );
+  }
+
+  const isActive = override !== null;
+
+  return (
+    <div className="bg-bg-secondary border border-border-primary rounded-lg p-5">
+      <div className="flex items-start justify-between gap-3 mb-3 flex-wrap">
+        <div className="min-w-0">
+          <h2 className="text-base font-bold text-text-primary">Fixed Return — Personal Rates</h2>
+          <p className="text-xs text-text-tertiary mt-0.5 max-w-2xl">
+            Set a custom rate matrix that only applies to this trader. When inactive, the user
+            sees the global ladder configured on{' '}
+            <Link href="/config/fixed-return" className="text-buy hover:text-buy-light underline underline-offset-2">
+              /config/fixed-return
+            </Link>.
+          </p>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          {isActive ? (
+            <>
+              <button
+                onClick={save}
+                disabled={saving}
+                className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-white bg-buy rounded-md hover:bg-buy-light disabled:opacity-50"
+              >
+                {saving ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
+                Save
+              </button>
+              <button
+                onClick={disable}
+                disabled={saving}
+                className="inline-flex items-center gap-1 px-3 py-1.5 text-xs text-text-secondary border border-border-primary rounded-md hover:bg-bg-hover disabled:opacity-50"
+              >
+                <X size={12} /> Use global
+              </button>
+            </>
+          ) : (
+            <button
+              onClick={enable}
+              className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-white bg-buy rounded-md hover:bg-buy-light"
+            >
+              Set custom rates
+            </button>
+          )}
+        </div>
+      </div>
+
+      {isActive && override ? (
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[520px]">
+            <thead>
+              <tr className="border-b border-border-primary bg-bg-tertiary/40">
+                <th className="text-left px-3 py-2 text-xxs uppercase tracking-wide text-text-tertiary">Tenure</th>
+                {globalCfg.tiers.map((t, i) => (
+                  <th key={i} className="px-3 py-2 text-center text-xxs uppercase tracking-wide text-text-tertiary">
+                    {t.label}
+                    <div className="text-[10px] font-normal text-text-tertiary/70 mt-0.5">
+                      ≥ ${t.min_amount.toLocaleString()}
+                    </div>
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {globalCfg.tenures.map((tn, ti) => (
+                <tr key={ti} className="border-b border-border-primary/40">
+                  <th scope="row" className="text-left px-3 py-2 font-medium text-text-primary text-xs">
+                    {tn.label}
+                    <div className="text-[10px] font-normal text-text-tertiary mt-0.5">every {tn.days} days</div>
+                  </th>
+                  {globalCfg.tiers.map((_, ci) => (
+                    <td key={ci} className="px-2 py-2 text-center">
+                      <input
+                        type="number"
+                        step="0.01"
+                        min={0}
+                        value={override[ti]?.[ci] ?? 0}
+                        onChange={(e) => updateCell(ti, ci, e.target.value)}
+                        className="w-16 px-2 py-1 text-xs bg-bg-input border border-border-primary rounded font-mono tabular-nums text-text-primary text-center"
+                      />
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <p className="text-[11px] text-text-tertiary mt-2">
+            Each cell is the % paid <strong>per month</strong>. Same shape as the global matrix —
+            if you re-shape global later, the override must match the new shape or it will be
+            ignored (fall back to global) until re-saved here.
+          </p>
+        </div>
+      ) : (
+        <div className="rounded-md border border-dashed border-border-primary px-4 py-6 text-center text-xs text-text-tertiary">
+          No personal rates set — this user sees the global ladder.
+        </div>
+      )}
+    </div>
   );
 }

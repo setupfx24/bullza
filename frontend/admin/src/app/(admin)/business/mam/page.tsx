@@ -37,6 +37,10 @@ interface Master {
   description: string | null;
   spread_markup_pips: number | null;
   commission_per_lot_usd: number | null;
+  // Admin-set risk controls (Mig 0066).
+  max_drawdown_pct: number;
+  max_loss_per_trade_pct: number | null;
+  insurance_enabled: boolean;
   created_at: string | null;
 }
 
@@ -92,6 +96,10 @@ interface MamFormState {
   spread_markup_pips: string;
   commission_per_lot_usd: string;
   status: string;
+  // Mig 0066: admin-owned risk controls + insurance gate.
+  max_drawdown_pct: string;
+  max_loss_per_trade_pct: string;
+  insurance_enabled: boolean;
 }
 
 const EMPTY_FORM: MamFormState = {
@@ -106,6 +114,9 @@ const EMPTY_FORM: MamFormState = {
   spread_markup_pips: '',
   commission_per_lot_usd: '',
   status: 'approved',
+  max_drawdown_pct: '',
+  max_loss_per_trade_pct: '',
+  insurance_enabled: true,
 };
 
 function fmtMoney(n: number) {
@@ -245,9 +256,10 @@ export default function MamPage() {
     }
   };
 
-  // Client-side filter: /business/masters returns all types; this page
-  // shows only mamm so admins managing MAM don't have to scan through
-  // PAMM and signal providers.
+  // The list endpoint is now scoped server-side via ?master_type=mamm
+  // (client request 2026-06-01 #6 — PAMM rows were leaking in past the
+  // client filter). We keep a defensive client-side filter so a stray
+  // signal_provider row from a stale cache can't render here either.
   const masters = useMemo(
     () => allMasters.filter((m) => (m.master_type || '').toLowerCase() === 'mamm'),
     [allMasters],
@@ -265,7 +277,9 @@ export default function MamPage() {
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await adminApi.get<{ items: Master[] }>('/business/masters');
+      const res = await adminApi.get<{ items: Master[] }>(
+        '/business/masters?master_type=mamm&per_page=200',
+      );
       setAllMasters(res.items || []);
     } catch (e: any) {
       toast.error(e.message || 'Failed to load MAM accounts');
@@ -316,6 +330,9 @@ export default function MamPage() {
       spread_markup_pips: m.spread_markup_pips != null ? String(m.spread_markup_pips) : '',
       commission_per_lot_usd: m.commission_per_lot_usd != null ? String(m.commission_per_lot_usd) : '',
       status: m.status,
+      max_drawdown_pct: m.max_drawdown_pct != null && m.max_drawdown_pct > 0 ? String(m.max_drawdown_pct) : '',
+      max_loss_per_trade_pct: m.max_loss_per_trade_pct != null ? String(m.max_loss_per_trade_pct) : '',
+      insurance_enabled: m.insurance_enabled !== false,
     });
   };
 
@@ -344,6 +361,9 @@ export default function MamPage() {
         description: form.description || null,
         spread_markup_pips: form.spread_markup_pips === '' ? null : Number(form.spread_markup_pips),
         commission_per_lot_usd: form.commission_per_lot_usd === '' ? null : Number(form.commission_per_lot_usd),
+        max_drawdown_pct: form.max_drawdown_pct === '' ? null : Number(form.max_drawdown_pct),
+        max_loss_per_trade_pct: form.max_loss_per_trade_pct === '' ? null : Number(form.max_loss_per_trade_pct),
+        insurance_enabled: !!form.insurance_enabled,
       };
       const res = await adminApi.post<{ pool_account_number: string }>('/business/masters', body);
       toast.success(`MAM created — pool account ${res.pool_account_number}`);
@@ -372,6 +392,9 @@ export default function MamPage() {
         description: form.description || null,
         spread_markup_pips: form.spread_markup_pips === '' ? null : Number(form.spread_markup_pips),
         commission_per_lot_usd: form.commission_per_lot_usd === '' ? null : Number(form.commission_per_lot_usd),
+        max_drawdown_pct: form.max_drawdown_pct === '' ? null : Number(form.max_drawdown_pct),
+        max_loss_per_trade_pct: form.max_loss_per_trade_pct === '' ? null : Number(form.max_loss_per_trade_pct),
+        insurance_enabled: !!form.insurance_enabled,
       };
       await adminApi.put(`/business/masters/${editTarget.id}`, body);
       toast.success('MAM updated');
@@ -439,7 +462,7 @@ export default function MamPage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <div className="bg-bg-secondary border border-border-primary rounded-md px-4 py-3">
             <p className="text-xxs text-text-tertiary uppercase tracking-wide">Active MAMs</p>
             <p className="text-lg font-semibold text-text-primary mt-1 tabular-nums">
@@ -461,7 +484,12 @@ export default function MamPage() {
             </p>
             <p className="text-xxs text-text-tertiary mt-0.5">active allocations</p>
           </div>
+          <AdminCommissionCard />
         </div>
+
+        {/* Admin commission breakdown — per-master estimate */}
+        <AdminCommissionBreakdown />
+
 
         <div className="bg-bg-secondary border border-border-primary rounded-md">
           {loading ? (
@@ -739,6 +767,55 @@ export default function MamPage() {
                     <p className="text-xxs text-text-tertiary mt-1">Replaces resolved commission.</p>
                   </div>
                 </div>
+              </div>
+
+              <div className="rounded-md bg-amber-500/5 border border-amber-500/30 p-3 space-y-3">
+                <div>
+                  <p className="text-xxs font-semibold text-amber-400 flex items-center gap-1">
+                    <AlertTriangle size={11} /> Admin-set risk controls
+                  </p>
+                  <p className="text-xxs text-text-tertiary mt-0.5">
+                    Investors don&apos;t see these — they&apos;re yours to set per master. Mig 0066.
+                  </p>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xxs text-text-tertiary uppercase mb-1">Max drawdown %</label>
+                    <input
+                      type="number" step="0.1" min="0" max="100"
+                      placeholder="0 = disabled"
+                      value={form.max_drawdown_pct}
+                      onChange={(e) => setForm((s) => ({ ...s, max_drawdown_pct: e.target.value }))}
+                      className="w-full px-3 py-2 text-xs font-mono bg-bg-tertiary border border-border-primary rounded-md focus:outline-none focus:border-accent"
+                    />
+                    <p className="text-xxs text-text-tertiary mt-1">Peak-to-trough equity halt.</p>
+                  </div>
+                  <div>
+                    <label className="block text-xxs text-text-tertiary uppercase mb-1">Max loss / trade %</label>
+                    <input
+                      type="number" step="0.1" min="0" max="100"
+                      placeholder="blank = no cap"
+                      value={form.max_loss_per_trade_pct}
+                      onChange={(e) => setForm((s) => ({ ...s, max_loss_per_trade_pct: e.target.value }))}
+                      className="w-full px-3 py-2 text-xs font-mono bg-bg-tertiary border border-border-primary rounded-md focus:outline-none focus:border-accent"
+                    />
+                    <p className="text-xxs text-text-tertiary mt-1">Single-trade loss cap (% of pool equity).</p>
+                  </div>
+                </div>
+                <label className="flex items-start gap-2 cursor-pointer select-none pt-1">
+                  <input
+                    type="checkbox"
+                    checked={form.insurance_enabled}
+                    onChange={(e) => setForm((s) => ({ ...s, insurance_enabled: e.target.checked }))}
+                    className="mt-0.5 h-4 w-4 accent-amber-500 cursor-pointer"
+                  />
+                  <span className="text-xxs text-text-primary">
+                    Allow investors to auto-insure copied trades on this master
+                    <span className="block text-xxs text-text-tertiary mt-0.5">
+                      Off = the trader-side invest modal hides the insurance opt-in checkbox.
+                    </span>
+                  </span>
+                </label>
               </div>
 
               <div>
@@ -1382,5 +1459,113 @@ export default function MamPage() {
         </div>
       )}
     </>
+  );
+}
+
+
+// ─── Admin Commission cards ─────────────────────────────────────────
+
+interface CommissionSummary {
+  lifetime_total: number;
+  breakdown_total_estimate: number;
+  by_master: {
+    master_id: string;
+    provider_name: string;
+    email: string;
+    master_type: string;
+    admin_commission_pct: number;
+    master_net_earned: number;
+    admin_earned_estimate: number;
+  }[];
+}
+
+function useCommissionSummary() {
+  const [data, setData] = useState<CommissionSummary | null>(null);
+  const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await adminApi.get<CommissionSummary>(
+          '/business/masters/admin-commission-summary?master_type=mamm',
+        );
+        if (!cancelled) setData(res);
+      } catch {
+        if (!cancelled) setData({ lifetime_total: 0, breakdown_total_estimate: 0, by_master: [] });
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+  return { data, loading };
+}
+
+function AdminCommissionCard() {
+  const { data, loading } = useCommissionSummary();
+  return (
+    <div className="bg-bg-secondary border border-border-primary rounded-md px-4 py-3">
+      <p className="text-xxs text-text-tertiary uppercase tracking-wide">Admin commission</p>
+      <p className="text-lg font-semibold text-accent mt-1 font-mono tabular-nums">
+        {loading || !data ? '—' : `$${fmtMoney(data.lifetime_total)}`}
+      </p>
+      <p className="text-xxs text-text-tertiary mt-0.5">lifetime (all master types)</p>
+    </div>
+  );
+}
+
+function AdminCommissionBreakdown() {
+  const { data, loading } = useCommissionSummary();
+  if (loading || !data || data.by_master.length === 0) {
+    return null;
+  }
+  return (
+    <div className="bg-bg-secondary border border-border-primary rounded-md">
+      <div className="px-4 py-3 border-b border-border-primary flex items-center justify-between">
+        <div>
+          <h2 className="text-sm font-semibold text-text-primary">Admin commission — by master</h2>
+          <p className="text-xxs text-text-tertiary mt-0.5">
+            Estimated admin slice per MAM, derived from
+            <span className="text-text-secondary"> master.total_fee_earned </span>
+            ×<span className="text-text-secondary"> admin_pct / (100 − admin_pct)</span>.
+            Lifetime sum: <span className="text-accent font-mono">${fmtMoney(data.lifetime_total)}</span>
+            {data.breakdown_total_estimate > 0 && (
+              <> · breakdown estimate <span className="text-text-secondary font-mono">${fmtMoney(data.breakdown_total_estimate)}</span></>
+            )}
+          </p>
+        </div>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[640px]">
+          <thead>
+            <tr className="border-b border-border-primary bg-bg-tertiary/40">
+              <th className="text-left px-4 py-2.5 text-xxs font-medium text-text-tertiary uppercase tracking-wide">Master</th>
+              <th className="text-right px-4 py-2.5 text-xxs font-medium text-text-tertiary uppercase tracking-wide">Admin %</th>
+              <th className="text-right px-4 py-2.5 text-xxs font-medium text-text-tertiary uppercase tracking-wide">Master net</th>
+              <th className="text-right px-4 py-2.5 text-xxs font-medium text-text-tertiary uppercase tracking-wide">Admin earned (est)</th>
+            </tr>
+          </thead>
+          <tbody>
+            {data.by_master.map((r) => (
+              <tr key={r.master_id} className="border-b border-border-primary/50 hover:bg-bg-hover/30">
+                <td className="px-4 py-2.5">
+                  <div className="text-xs text-text-primary">{r.provider_name}</div>
+                  <div className="text-xxs text-text-tertiary">{r.email}</div>
+                </td>
+                <td className="px-4 py-2.5 text-right text-xs font-mono tabular-nums text-text-secondary">
+                  {r.admin_commission_pct.toFixed(1)}%
+                </td>
+                <td className="px-4 py-2.5 text-right text-xs font-mono tabular-nums text-text-primary">
+                  ${fmtMoney(r.master_net_earned)}
+                </td>
+                <td className="px-4 py-2.5 text-right text-xs font-mono tabular-nums text-accent font-semibold">
+                  ${fmtMoney(r.admin_earned_estimate)}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
   );
 }

@@ -114,10 +114,23 @@ class MasterAccount(Base):
     strategy_info = Column(JSONB, default=None)
     min_investment = Column(Numeric(18, 8), default=100)
     total_return_pct = Column(Numeric(10, 4), default=0)
+    # Admin-set risk controls (Mig 0066). max_drawdown_pct = peak-to-
+    # trough equity drawdown % beyond which trading is halted on the
+    # pool account. max_loss_per_trade_pct = single-trade loss cap as
+    # % of pool equity. Both stored; enforcement is in the trading
+    # engine (max_drawdown via stats engine, per-trade via execute).
     max_drawdown_pct = Column(Numeric(10, 4), default=0)
+    max_loss_per_trade_pct = Column(Numeric(5, 2), nullable=True)
     sharpe_ratio = Column(Numeric(10, 4), default=0)
     followers_count = Column(Integer, default=0)
     total_fee_earned = Column(Numeric(18, 8), default=0)
+    # Per-master insurance opt-in switch (Mig 0066). Default TRUE so
+    # existing masters keep behaving the same. When FALSE, the trader
+    # invest modal hides the "auto-insure copied trades" checkbox and
+    # the copy engine skips auto-activating policies on mirrored trades.
+    insurance_enabled = Column(
+        Boolean, nullable=False, default=True, server_default="true",
+    )
     created_at = Column(DateTime(timezone=True), default=datetime.utcnow)
 
     user = relationship("User", lazy="selectin")
@@ -133,9 +146,30 @@ class InvestorAllocation(Base):
     investor_account_id = Column(UUID(as_uuid=True), ForeignKey("trading_accounts.id"))
     copy_type = Column(String(20), default="signal")
     allocation_amount = Column(Numeric(18, 8), nullable=False)
+    # MAM volume scaling — kept for backwards compat with existing rows.
+    # If `lot_multiplier` is set the engine uses it INSTEAD of allocation_pct
+    # (direct mode); otherwise it falls back to the pct-of-pool path.
     allocation_pct = Column(Numeric(5, 2))
+    # Direct lot multiplier for MAM (e.g. 0.5 = take half the master's lot
+    # every trade, independent of pool share). NULL = use allocation_pct
+    # (volume scaling %). Honored only when copy_type == 'mam'. Mig 0065.
+    lot_multiplier = Column(Numeric(10, 4), nullable=True)
     max_drawdown_pct = Column(Numeric(5, 2))
     max_lot_override = Column(Numeric(10, 4))
+    # How much of allocation_amount was pulled from main_wallet_bonus
+    # (vs main_wallet_balance). Mig 0065. On withdraw we forfeit this
+    # portion so the bonus stays non-withdrawable per the welcome-bonus
+    # contract. 0 = fully cash investment.
+    bonus_portion = Column(
+        Numeric(18, 8), nullable=False, default=0, server_default="0",
+    )
+    # Investor opts in to auto-insure copied trades on this allocation
+    # (Mig 0066). Only honoured when master.insurance_enabled is True
+    # (admin gate). Copy engine reads both and fires an insurance
+    # activate() on each mirrored position open when both are True.
+    insurance_opt_in = Column(
+        Boolean, nullable=False, default=False, server_default="false",
+    )
     status = Column(String(20), default="active")
     total_profit = Column(Numeric(18, 8), default=0)
     last_distribution_at = Column(DateTime(timezone=True), nullable=True)
