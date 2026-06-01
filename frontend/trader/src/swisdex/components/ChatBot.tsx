@@ -31,7 +31,7 @@ const RULES: { keys: string[]; reply: string; cta?: { label: string; href: strin
   {
     keys: ['bonus', 'welcome bonus', '100%', 'promo', 'first deposit bonus'],
     reply:
-      'The 100% Welcome Bonus is applied automatically on your first deposit — no promo code needed. Deposit $100 → trade with $200; deposit $1,000 → trade with $2,000. Tiers: $100–$499 → $100 bonus; $500–$999 → $300 bonus; $1,000+ → full $1,000 match.',
+      'The 100% Welcome Bonus is applied automatically on your first deposit — no promo code needed. Every tier is a true 100% match, capped at the tier ceiling: $100 deposit → $100 bonus, $500 → $500 bonus, $1,000 or more → full $1,000 match. Maximum bonus is $1,000.',
     cta: [{ label: 'See bonus details', href: '/bonus' }],
   },
   {

@@ -48,14 +48,14 @@ const TIERS: Tier[] = [
     features: ['Lifetime per-lot commissions', 'Multi-tier earnings', 'Marketing kit and dashboard', 'Dedicated partner manager'],
   },
   {
-    name: 'Demo',
-    href: '/accounts/demo',
-    badge: 'Risk-Free',
-    deposit: '$100,000 virtual',
-    spread: 'Live spreads',
-    commission: 'None',
-    desc: 'Practise risk-free with identical live conditions. Real market spreads, no KYC, and one-click switch to live trading.',
-    features: ['Identical execution to live', 'Real market spreads', 'No KYC required', 'Switch to live in one click'],
+    name: 'Swap',
+    href: '/accounts/swap',
+    badge: 'Swap-Free',
+    deposit: '$200',
+    spread: 'From 0.8 pips',
+    commission: 'No swap charges',
+    desc: 'Sharia-compliant swap-free account. Hold positions overnight with zero swap or rollover interest — built for faith-based and long-term traders.',
+    features: ['Zero overnight swap charges', 'Sharia-compliant trading', 'Full platform & instrument access', 'Hold positions indefinitely'],
   },
 ];
 
@@ -139,16 +139,16 @@ const COLUMN_HEADERS = [
   { name: 'Standard', gradient: 'linear-gradient(180deg, #1f2937 0%, #0a0a0a 100%)' }, // neutral slate
   { name: 'ECN',      gradient: 'linear-gradient(180deg, #55a630 0%, #1a3210 100%)' }, // brand green (popular)
   { name: 'IB',       gradient: 'linear-gradient(180deg, #2c3e50 0%, #0e1418 100%)' }, // partner navy
-  { name: 'Demo',     gradient: 'linear-gradient(180deg, #d00000 0%, #3d0000 100%)' }, // brand red
+  { name: 'Swap',     gradient: 'linear-gradient(180deg, #d00000 0%, #3d0000 100%)' }, // brand red (swap-free / Islamic)
 ];
 
 const INSTRUMENTS = ['Forex', 'Metal', 'Crypto', 'Energies', 'Stocks', 'Indices'];
 
 const FEATURE_ROWS: Array<{ label: string; values: React.ReactNode[] }> = [
-  { label: 'Minimum Deposit', values: ['$50', '$200', '$500', '$100,000 virtual'] },
-  { label: 'Spread',          values: ['From 1.1 pips', 'From 0.0 pips', 'Pass-through', 'Live spreads'] },
-  { label: 'Commission',      values: ['No Commission', 'Ultra-low per lot', 'Lifetime per-lot earnings', 'No Commission'] },
-  { label: 'Maximum Leverage', values: ['1:500', '1:500', '1:500', '1:500'] },
+  { label: 'Minimum Deposit',  values: ['$50', '$200', '$500', '$200'] },
+  { label: 'Spread',           values: ['From 0.6 pips', 'From 0.4 pips', 'From 0.8 pips', 'From 0.8 pips'] },
+  { label: 'Commission',       values: ['No Commission', 'Ultra-low per lot', 'Lifetime per-lot earnings', 'No swap charges'] },
+  { label: 'Maximum Leverage', values: ['1:1000', '1:1000', '1:1000', '1:1000'] },
   {
     label: 'Instruments',
     values: [0, 1, 2, 3].map((i) => (
@@ -161,33 +161,14 @@ const FEATURE_ROWS: Array<{ label: string; values: React.ReactNode[] }> = [
       </div>
     )),
   },
-  { label: 'Minimum lot size',          values: ['0.01', '0.01', '0.01', '0.01'] },
-  {
-    label: 'Maximum lot size',
-    values: Array(4).fill(
-      <span className="block text-[13px] leading-snug">
-        200 (7:00 – 20:59 GMT +0),
-        <br />
-        60 (21:00 – 6:59 GMT +0)
-      </span>
-    ),
-  },
+  { label: 'Minimum lot size',           values: ['0.01', '0.01', '0.01', '0.01'] },
   { label: 'Maximum Number of positions', values: ['Unlimited', 'Unlimited', 'Unlimited', 'Unlimited'] },
-  { label: 'Hedged Margin',                values: ['0%', '0%', '0%', '0%'] },
-  { label: 'Margin call',                  values: ['30%', '30%', '30%', '30%'] },
-  { label: 'Stop out',                     values: ['0% (See details about stocks)', '0% (See details about stocks)', '0% (See details about stocks)', '0% (See details about stocks)'] },
-  {
-    label: 'Order execution',
-    values: [
-      'Market',
-      <span key="ecn" className="block text-[13px] leading-snug">
-        Instant (Forex, metals, energies, stocks, indices), market (crypto)
-      </span>,
-      'Market',
-      'Market',
-    ],
-  },
-  { label: 'Swap-Free', values: ['Available', 'Available', 'Available', 'Available'] },
+  { label: 'Hedged Margin',              values: ['0%', '0%', '0%', '0%'] },
+  { label: 'Margin call',                values: ['30%', '30%', '30%', '30%'] },
+  { label: 'Stop out',                   values: ['0% (See details about stocks)', '0% (See details about stocks)', '0% (See details about stocks)', '0% (See details about stocks)'] },
+  { label: 'Order execution',            values: ['Instant', 'Instant', 'Instant', 'Instant'] },
+  // Swap is the dedicated swap-free / Sharia-compliant account.
+  { label: 'Swap-Free',                  values: ['Optional', 'Optional', 'Optional', 'Always-on'] },
 ];
 
 function FeatureComparison() {

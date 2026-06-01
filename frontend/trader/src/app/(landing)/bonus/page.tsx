@@ -90,8 +90,8 @@ const FALLBACK_TIERS: Tier[] = [
   },
   {
     range: '$500 – $999',
-    percent: '60%',
-    cap: 'Up to $300',
+    percent: '100%',
+    cap: 'Up to $500',
     features: [
       'Auto-credited within minutes',
       'Tradeable on all instruments',
@@ -323,7 +323,7 @@ export default function BonusPage() {
         <div className="space-y-3">
           <FaqItem q="Do I need a promo code?">
             No. The welcome bonus is applied automatically based on the size of your first deposit. Deposit
-            $100 → $100 bonus; $500 → $300; $1,000 or more → full $1,000 match.
+            Deposit $100 → $100 bonus; $500 → $500 bonus; $1,000 or more → full $1,000 match — every tier is a true 100% match, capped at the tier ceiling.
           </FaqItem>
           <FaqItem q="Can I withdraw the bonus immediately?">
             Your profits from trading the bonus are withdrawable at any time. The bonus equity itself

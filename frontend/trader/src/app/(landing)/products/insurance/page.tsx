@@ -2,21 +2,20 @@
 
 import Link from 'next/link';
 import { ArrowUpRight } from 'lucide-react';
-import { BannerPlaceholder } from '@/swisdex/components/BannerPlaceholder';
 
-/**
- * Stub page — waiting for the final Insurance table / copy.
- * Renders plain black placeholder blocks at the intended dimensions per
- * client direction ("leave a plain black box/div as a placeholder of the
- * correct dimensions").
- */
 export default function InsurancePage() {
   return (
     <main className="min-h-screen bg-background">
-      <BannerPlaceholder
-        title="Trade Insurance"
-        tagline="Every position policy-backed by on-chain insurance. Full plan table coming shortly."
-      />
+      {/* Hero banner — replaces the previous BannerPlaceholder */}
+      <section className="mx-auto max-w-[1200px] px-[var(--gutter)] pt-24 sm:pt-28">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/images/insurance_banner1.png"
+          alt="SwisDex Trade Insurance — protect every position"
+          className="w-full rounded-3xl"
+          style={{ border: '1px solid rgba(255,255,255,0.06)' }}
+        />
+      </section>
 
       {/* Insurance plan illustration / table image */}
       <section className="mx-auto max-w-[1200px] px-[var(--gutter)] py-12 sm:py-16">

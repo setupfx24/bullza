@@ -124,7 +124,7 @@ const AboutUs = () => {
               <StatBox value="15+" label="Years in Business" />
             </ScrollRevealItem>
             <ScrollRevealItem>
-              <StatBox value="500000+" label="Active Traders" />
+              <StatBox value="50K+" label="Active Traders" />
             </ScrollRevealItem>
             <ScrollRevealItem>
               <StatBox value="150+" label="Countries Served" />
