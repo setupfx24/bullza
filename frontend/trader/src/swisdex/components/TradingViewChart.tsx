@@ -22,13 +22,16 @@ export function TradingViewChart({ symbol, height = '100%' }: Props) {
     widgetDiv.style.width = '100%';
     container.appendChild(widgetDiv);
 
-    // Use the viewer's resolved timezone so the embed's clock matches
-    // the user's wall-clock. Mirrors the AdvancedChart fix (e98725a).
-    let viewerTz = 'Etc/UTC';
+    // Default fallback = Asia/Kolkata for SwisDex's India-based audience
+    // when the browser returns 'UTC' (UTC system clock / VPN). Matches
+    // the AdvancedChart fallback chain.
+    let viewerTz = 'Asia/Kolkata';
     try {
       const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-      if (tz) viewerTz = tz;
-    } catch { /* keep UTC */ }
+      if (tz && tz !== 'UTC' && tz !== 'Etc/UTC' && tz !== 'Etc/GMT') {
+        viewerTz = tz;
+      }
+    } catch { /* keep IST default */ }
 
     const script = document.createElement('script');
     script.type = 'text/javascript';

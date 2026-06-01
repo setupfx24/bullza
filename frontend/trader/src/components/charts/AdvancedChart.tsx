@@ -118,14 +118,24 @@ export default function AdvancedChart() {
     script.async = true;
     script.type = 'text/javascript';
     // Use the viewer's own timezone so the chart clock matches their
-    // wall-clock instead of always showing UTC (client couldn't change
-    // it — the embed widget locks the clock to whatever `timezone` we
-    // pass). Falls back to UTC if the browser doesn't resolve one.
-    let viewerTz = 'Etc/UTC';
+    // wall-clock instead of always showing UTC (the embed widget locks
+    // the clock to whatever `timezone` we pass).
+    //
+    // Fallback chain:
+    //   1. Browser's resolved IANA zone if it's NOT UTC.
+    //   2. SwisDex's primary market — Asia/Kolkata (IST) — when the
+    //      browser returns UTC. That happens on systems with UTC
+    //      system clock or some VPN setups. Picking IST here means an
+    //      India-based trader still sees a sensible local clock even
+    //      when their browser hands us back 'UTC'.
+    //   3. Etc/UTC as a last resort if anything throws.
+    let viewerTz = 'Asia/Kolkata';
     try {
       const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-      if (tz) viewerTz = tz;
-    } catch { /* keep UTC */ }
+      if (tz && tz !== 'UTC' && tz !== 'Etc/UTC' && tz !== 'Etc/GMT') {
+        viewerTz = tz;
+      }
+    } catch { /* keep IST default */ }
 
     script.innerHTML = JSON.stringify({
       autosize: true,
