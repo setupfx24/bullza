@@ -1174,23 +1174,30 @@ export default function PammPage() {
                 {performance.monthly_breakdown.length > 0 && (
                   <div className="bg-card border border-border-primary rounded-xl overflow-hidden shadow-[0_2px_12px_rgba(0,0,0,0.06)]">
                     <div className="px-4 py-3 border-b border-border-primary">
-                      <p className="text-sm font-semibold text-text-primary">Monthly Performance</p>
+                      <p className="text-base font-bold text-text-primary">Monthly Performance</p>
                     </div>
                     <div className="overflow-x-auto">
-                      <table className="w-full text-xs">
+                      <table className="w-full text-sm">
                         <thead>
-                          <tr className="border-b border-border-primary text-text-tertiary text-left">
-                            <th className="px-4 py-2.5 font-medium">Month</th>
-                            <th className="px-4 py-2.5 font-medium text-right">Profit</th>
-                            <th className="px-4 py-2.5 font-medium text-right">Cumulative</th>
+                          <tr className="border-b border-border-primary text-text-secondary text-left bg-bg-secondary/30">
+                            <th className="px-4 py-3 font-semibold uppercase tracking-wide text-xs">Month</th>
+                            <th className="px-4 py-3 font-semibold uppercase tracking-wide text-xs text-right">Profit</th>
+                            <th className="px-4 py-3 font-semibold uppercase tracking-wide text-xs text-right">Cumulative</th>
                           </tr>
                         </thead>
                         <tbody>
                           {performance.monthly_breakdown.map((row) => (
                             <tr key={row.month} className="border-b border-border-primary last:border-0 hover:bg-bg-hover">
-                              <td className="px-4 py-3 text-text-primary">{row.month}</td>
-                              <td className="px-4 py-3 text-right tabular-nums"><PnlText value={row.profit} /></td>
-                              <td className="px-4 py-3 text-right tabular-nums text-text-secondary">${fmt(row.cumulative)}</td>
+                              <td className="px-4 py-3 text-text-primary font-semibold">{row.month}</td>
+                              <td className="px-4 py-3 text-right tabular-nums font-bold text-base">
+                                <PnlText value={row.profit} />
+                              </td>
+                              <td className={clsx(
+                                'px-4 py-3 text-right tabular-nums font-bold text-base',
+                                row.cumulative >= 0 ? 'text-text-primary' : 'text-red-400',
+                              )}>
+                                {row.cumulative < 0 ? '-' : ''}${fmt(Math.abs(row.cumulative))}
+                              </td>
                             </tr>
                           ))}
                         </tbody>
