@@ -236,6 +236,33 @@ async def open_live_account(
     }
 
 
+async def _load_managed_allocations_by_account(
+    user_id: UUID, db: AsyncSession,
+) -> dict:
+    """Map account_id → (allocation_amount, total_profit) for every
+    MAM allocation owned by this user. Used by list_accounts to compute
+    lifetime P&L for the auto-created investor sub-accounts (CF/IF
+    prefix) — the floating-only P&L on those rows always shows $0
+    because the engine closes positions before they accumulate on the
+    sub-account. Client report 2026-06-01."""
+    from packages.common.src.models import InvestorAllocation
+    rows = (await db.execute(
+        select(InvestorAllocation).where(
+            InvestorAllocation.investor_user_id == user_id,
+            InvestorAllocation.investor_account_id.is_not(None),
+            InvestorAllocation.status == "active",
+        )
+    )).scalars().all()
+    return {
+        str(r.investor_account_id): {
+            "allocation_amount": Decimal(str(r.allocation_amount or 0)),
+            "total_profit": Decimal(str(r.total_profit or 0)),
+            "bonus_portion": Decimal(str(getattr(r, "bonus_portion", 0) or 0)),
+        }
+        for r in rows
+    }
+
+
 async def list_accounts(user_id: UUID, db: AsyncSession) -> dict:
     # Filter is_active=True so soft-deleted accounts (delete_trading_account
     # flips is_active to False) disappear from every user-facing picker —
@@ -259,6 +286,10 @@ async def list_accounts(user_id: UUID, db: AsyncSession) -> dict:
     user_row = (await db.execute(
         select(User).where(User.id == user_id)
     )).scalar_one_or_none()
+
+    # MAM sub-accounts need lifetime P&L vs the original allocation,
+    # not just floating. One query → in-memory map keyed by account_id.
+    managed_by_account = await _load_managed_allocations_by_account(user_id, db)
 
     items = []
     for a in accounts:
@@ -317,6 +348,25 @@ async def list_accounts(user_id: UUID, db: AsyncSession) -> dict:
                 "effective_max_leverage": int(effective_cap),
             }
 
+        # Lifetime P&L for MAM sub-accounts — the floating-only number
+        # always reads $0 because the copy engine closes mirrored
+        # positions back into the sub-account's balance, so there's
+        # nothing "open" to mark. We compute the real number here:
+        # equity (= cash + credit + floating) − original allocation.
+        # The frontend uses this when `is_managed_account` is true.
+        alloc_info = managed_by_account.get(str(a.id))
+        is_managed = alloc_info is not None
+        if is_managed:
+            invested = alloc_info["allocation_amount"]
+            lifetime_pnl = equity - invested
+            lifetime_pnl_pct = (
+                float((lifetime_pnl / invested) * 100) if invested > 0 else 0.0
+            )
+        else:
+            invested = None
+            lifetime_pnl = None
+            lifetime_pnl_pct = None
+
         items.append({
             "id": str(a.id),
             "account_number": a.account_number,
@@ -332,6 +382,12 @@ async def list_accounts(user_id: UUID, db: AsyncSession) -> dict:
             "is_demo": a.is_demo,
             "is_active": a.is_active,
             "account_group": group_payload,
+            # Managed-account markers — null on regular accounts so the
+            # client falls through to the floating-only logic.
+            "is_managed_account": is_managed,
+            "allocation_amount": float(invested) if invested is not None else None,
+            "lifetime_pnl": float(lifetime_pnl) if lifetime_pnl is not None else None,
+            "lifetime_pnl_pct": lifetime_pnl_pct,
         })
 
     return {"items": items}
