@@ -1735,6 +1735,24 @@ async def my_allocations(user_id: UUID, db: AsyncSession) -> dict:
 
         pnl_pct = (total_pnl / invested * 100) if invested > 0 else 0.0
 
+        # Fee stack the investor actually pays per profitable trade —
+        # surfaced on the card so the user can see WHERE their net P&L
+        # diverged from gross. master_share + admin_share both apply to
+        # the realised profit (not to principal). When both are zero the
+        # client just suppresses the section.
+        perf_pct = float(master.performance_fee_pct or 0)
+        admin_pct = float(master.admin_commission_pct or 0)
+        # admin_share = perf × admin_pct / 100; master keeps the rest.
+        admin_share_pct = perf_pct * admin_pct / 100.0 if perf_pct > 0 else 0.0
+        master_share_pct = max(0.0, perf_pct - admin_share_pct)
+        # Approx fees paid on realised gains so far (gross to net diff).
+        # Best-effort — pre-fee gross isn't stored, so we estimate from
+        # the configured pct: if net = gross × (1 − perf_pct/100), then
+        # fees_paid ≈ net × perf_pct / (100 − perf_pct) on positive net.
+        fees_paid = 0.0
+        if realized_pnl > 0 and perf_pct > 0 and perf_pct < 100:
+            fees_paid = realized_pnl * perf_pct / (100.0 - perf_pct)
+
         items.append({
             "id": str(alloc.id),
             "master_id": str(master.id),
@@ -1747,12 +1765,20 @@ async def my_allocations(user_id: UUID, db: AsyncSession) -> dict:
             "unrealized_pnl": round(unrealized_pnl, 2),
             "total_pnl": round(total_pnl, 2),
             "pnl_pct": round(pnl_pct, 2),
-            "performance_fee_pct": float(master.performance_fee_pct),
+            "performance_fee_pct": perf_pct,
             "management_fee_pct": float(master.management_fee_pct or 0),
+            "admin_commission_pct": admin_pct,
+            "master_share_pct": round(master_share_pct, 2),
+            "admin_share_pct": round(admin_share_pct, 2),
+            "fees_paid_estimate": round(fees_paid, 2),
             # Bonus portion of this allocation — forfeited on withdraw.
             # Surfaced so the trader-side withdraw modal can warn about
             # the deduction before the user confirms.
             "bonus_portion": float(alloc.bonus_portion or 0),
+            # Insurance opt-in surfaced so the My Investments card can
+            # show ON / OFF for the auto-insure setting per allocation.
+            "insurance_opt_in": bool(getattr(alloc, "insurance_opt_in", False)),
+            "insurance_enabled": bool(getattr(master, "insurance_enabled", True)),
             "joined_at": alloc.created_at.isoformat() if alloc.created_at else None,
             "status": alloc.status,
         })

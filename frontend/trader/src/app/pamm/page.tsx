@@ -52,9 +52,18 @@ interface MyAllocation {
   pnl_pct: number;
   performance_fee_pct: number;
   management_fee_pct?: number;
+  admin_commission_pct?: number;
+  // Decomposed perf-fee stack — what the master keeps vs what the broker takes.
+  master_share_pct?: number;
+  admin_share_pct?: number;
+  // Estimated fees the investor has paid so far on realised gains.
+  // Best-effort: gross isn't stored, so we derive from the configured pct.
+  fees_paid_estimate?: number;
   // Slice of allocation_amount that was funded from bonus credit.
   // Forfeited on withdraw — drives the warning in the exit modal.
   bonus_portion?: number;
+  insurance_opt_in?: boolean;
+  insurance_enabled?: boolean;
   joined_at: string;
   status: string;
 }
@@ -676,6 +685,22 @@ export default function PammPage() {
                       <span className="flex items-center gap-1"><TrendingUp size={11} /> Fee: <span className="text-text-primary font-semibold">{a.performance_fee_pct}%</span></span>
                       <span className="flex items-center gap-1"><DollarSign size={11} /> Min: <span className="text-text-primary font-semibold">${a.min_investment.toLocaleString()}</span></span>
                     </div>
+
+                    {/* Feature badges — make it obvious that this master
+                        accepts bonus credit and (optionally) auto-insures
+                        copied trades. The user-asked-three-times-for-this
+                        moment from 2026-06-01: bonus + insurance need to
+                        be visible up-front, not buried in the invest modal. */}
+                    <div className="flex flex-wrap items-center gap-1.5 mt-3">
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/30 text-[10px] font-semibold text-amber-400">
+                        Bonus accepted
+                      </span>
+                      {a.insurance_enabled !== false && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#55a630]/10 border border-[#55a630]/30 text-[10px] font-semibold text-[#55a630]">
+                          Insurance available
+                        </span>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>
@@ -721,8 +746,29 @@ export default function PammPage() {
                     </button>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {allocations.map((a) => (
+                  // Split by master type so PAMM and MAM rows can't visually
+                  // bleed into each other on the same page. Section headers
+                  // make the boundary obvious + count + colour-code the cards.
+                  <div className="space-y-6">{(['pamm', 'mamm'] as const).flatMap((bucket) => {
+                    const subset = allocations.filter((a) => (a.master_type || '').toLowerCase() === bucket);
+                    if (subset.length === 0) return [];
+                    const label = bucket === 'pamm' ? 'PAMM Investments' : 'MAM Investments';
+                    const sub = bucket === 'pamm'
+                      ? 'Pooled fund — capital sits with the master; P&L distributed on close.'
+                      : 'Direct copy — every mirrored trade lands on your own sub-account.';
+                    return [(
+                      <section key={`section-${bucket}`} className="space-y-3">
+                        <div className="flex items-baseline justify-between gap-3">
+                          <div>
+                            <h3 className="text-base font-bold text-text-primary">{label}</h3>
+                            <p className="text-xs text-text-tertiary">{sub}</p>
+                          </div>
+                          <span className="text-xs font-mono tabular-nums text-text-secondary">
+                            {subset.length} active
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                          {subset.map((a) => (
                       <div key={a.id} className="bg-card border border-border-primary rounded-xl p-5 flex flex-col hover:border-accent/20 shadow-[0_2px_12px_rgba(0,0,0,0.06)] transition-colors">
                         <div className="flex items-start justify-between gap-2 mb-3">
                           <div className="min-w-0">
@@ -759,10 +805,15 @@ export default function PammPage() {
                             <span className="text-text-primary font-semibold tabular-nums">${fmt(a.current_value)}</span>
                           </div>
                           <div className="flex items-center justify-between pt-2 border-t border-border-primary">
-                            <span className="text-text-tertiary">Total P&L</span>
+                            <span className="text-sm font-semibold text-text-secondary">Total P&L</span>
                             <div className="text-right">
-                              <p className="font-bold tabular-nums"><PnlText value={a.total_pnl} /></p>
-                              <p className="text-[10px] tabular-nums"><PnlText value={a.pnl_pct} suffix="%" /></p>
+                              <p className="text-lg font-extrabold tabular-nums"><PnlText value={a.total_pnl} /></p>
+                              <p className={clsx(
+                                'text-sm font-bold tabular-nums',
+                                a.pnl_pct >= 0 ? 'text-[#55a630]' : 'text-red-400',
+                              )}>
+                                {a.pnl_pct >= 0 ? '+' : ''}{a.pnl_pct.toFixed(2)}%
+                              </p>
                             </div>
                           </div>
                           <div className="flex items-center justify-between text-[11px]">
@@ -773,11 +824,60 @@ export default function PammPage() {
                             <span className="text-text-tertiary">Unrealized</span>
                             <span className={a.unrealized_pnl >= 0 ? 'text-[#55a630]/70' : 'text-red-400/70'}>${fmt(Math.abs(a.unrealized_pnl))}</span>
                           </div>
+
+                          {/* Charges breakdown — perf-fee split into master
+                              + admin slices so the user sees exactly what
+                              the broker takes off their gross. Hidden when
+                              fee_pct == 0 (no skim configured). */}
+                          {a.performance_fee_pct > 0 && (
+                            <div className="rounded-lg bg-bg-secondary border border-border-primary/70 p-2.5 mt-2 space-y-1 text-[11px]">
+                              <div className="flex items-center justify-between font-semibold text-text-secondary uppercase tracking-wide text-[10px]">
+                                <span>Charges on profit</span>
+                                <span>{a.performance_fee_pct}% total</span>
+                              </div>
+                              <div className="flex items-center justify-between">
+                                <span className="text-text-tertiary">Master keeps</span>
+                                <span className="text-text-primary tabular-nums">{(a.master_share_pct ?? a.performance_fee_pct).toFixed(2)}%</span>
+                              </div>
+                              {(a.admin_share_pct ?? 0) > 0 && (
+                                <div className="flex items-center justify-between">
+                                  <span className="text-text-tertiary">Broker commission</span>
+                                  <span className="text-text-primary tabular-nums">{(a.admin_share_pct ?? 0).toFixed(2)}%</span>
+                                </div>
+                              )}
+                              {(a.fees_paid_estimate ?? 0) > 0 && (
+                                <div className="flex items-center justify-between pt-1 border-t border-border-primary/40">
+                                  <span className="text-text-secondary">Fees paid (est.)</span>
+                                  <span className="text-red-400 tabular-nums">−${fmt(a.fees_paid_estimate ?? 0)}</span>
+                                </div>
+                              )}
+                            </div>
+                          )}
+
+                          {/* Bonus + insurance status — confirms what the
+                              user opted into at invest time so they can
+                              spot misconfiguration before withdrawing. */}
+                          {((a.bonus_portion ?? 0) > 0 || a.insurance_opt_in) && (
+                            <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                              {(a.bonus_portion ?? 0) > 0 && (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/15 border border-amber-500/30 text-[10px] font-semibold text-amber-400">
+                                  Bonus: ${fmt(a.bonus_portion ?? 0)}
+                                </span>
+                              )}
+                              {a.insurance_opt_in && (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#55a630]/15 border border-[#55a630]/30 text-[10px] font-semibold text-[#55a630]">
+                                  Auto-insurance ON
+                                </span>
+                              )}
+                            </div>
+                          )}
                         </div>
 
                         <div className="flex items-center justify-between mt-3 pt-3 border-t border-border-primary text-[10px] text-text-tertiary">
-                          <span>Fee: {a.performance_fee_pct}%</span>
                           <span>Joined {new Date(a.joined_at).toLocaleDateString()}</span>
+                          {a.management_fee_pct ? (
+                            <span>Mgmt: {a.management_fee_pct}% / yr</span>
+                          ) : null}
                         </div>
 
                         {a.master_type === 'pamm' && (
@@ -818,8 +918,11 @@ export default function PammPage() {
                           </div>
                         )}
                       </div>
-                    ))}
-                  </div>
+                          ))}
+                        </div>
+                      </section>
+                    )];
+                  })}</div>
                 )}
               </>
             )}
