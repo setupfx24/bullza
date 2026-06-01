@@ -140,15 +140,18 @@ export default function ReferralAdminPage() {
 
       {/* Qualifying rules — replaces the legacy % rate, since the engine
           now pays a flat USD bounty only after the friend clears the
-          KYC / first-deposit / N-trades gates. */}
+          KYC / first-deposit / N-trades gates. The actual per-referral
+          payout is decided by the tier ladder (1–20 / 21–100 / 101+) on
+          /config/ib-tiers; the bounty input below is only the fallback. */}
       <div className="bg-bg-secondary border border-border-primary rounded-md p-4 space-y-3">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <h2 className="text-sm font-semibold text-text-primary">Qualifying rules</h2>
             <p className="text-xxs text-text-tertiary mt-0.5">
-              These are the actual gates the engine enforces before a referrer can press Claim.
-              Bounty is paid into <span className="text-text-secondary">referral commission balance</span>;
-              the user then withdraws it to their main wallet.
+              Gates the engine enforces before a referrer can press Claim. The per-referral
+              payout itself comes from the <a href="/config/ib-tiers" className="text-buy hover:text-buy-light underline underline-offset-2">tier ladder</a>{' '}
+              (by the referrer's active referral count); the bounty input below is the
+              fallback used only when no tier matches.
             </p>
           </div>
           <button
@@ -162,9 +165,9 @@ export default function ReferralAdminPage() {
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {/* Bounty USD */}
+          {/* Bounty USD — fallback only */}
           <label className="flex flex-col gap-1">
-            <span className="text-xxs text-text-tertiary uppercase tracking-wide">Bounty per qualified referral</span>
+            <span className="text-xxs text-text-tertiary uppercase tracking-wide">Fallback bounty (no matching tier)</span>
             <div className="flex items-center gap-2">
               <span className="text-xs text-text-tertiary">$</span>
               <input

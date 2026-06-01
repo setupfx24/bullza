@@ -20,9 +20,6 @@ interface Settings {
   min_deposit_amount_usd: number;
   min_withdrawal_amount_usd: number;
   referral_commission_amount_usd: number;
-  referral_amount_standard_usd: number;
-  referral_amount_ecn_usd: number;
-  referral_amount_vip_usd: number;
   referral_qualifying_trades: number;
   // IB commission gates (mirror of the referral gates above).
   // Trader's KYC must be approved + at least N closed trades on file
@@ -53,9 +50,6 @@ const DEFAULT_SETTINGS: Settings = {
   min_deposit_amount_usd: 50,
   min_withdrawal_amount_usd: 70,
   referral_commission_amount_usd: 5,
-  referral_amount_standard_usd: 5,
-  referral_amount_ecn_usd: 7,
-  referral_amount_vip_usd: 10,
   referral_qualifying_trades: 3,
   ib_commission_requires_kyc: true,
   ib_commission_min_trades: 3,
@@ -97,35 +91,6 @@ function rowsToSettings(rows: SystemSettingRow[]): Settings {
       'referral_commission_amount_usd',
       DEFAULT_SETTINGS.referral_commission_amount_usd as number,
     ),
-    // Per-account-type map lives under a single JSON key; we explode
-    // it into 3 form fields for the input row, then re-pack on save.
-    referral_amount_standard_usd: (() => {
-      const raw = map['referral_commission_amounts_usd'];
-      if (raw && typeof raw === 'object') {
-        const v = (raw as Record<string, unknown>).standard;
-        const n = typeof v === 'number' ? v : parseFloat(String(v));
-        if (Number.isFinite(n)) return n;
-      }
-      return DEFAULT_SETTINGS.referral_amount_standard_usd as number;
-    })(),
-    referral_amount_ecn_usd: (() => {
-      const raw = map['referral_commission_amounts_usd'];
-      if (raw && typeof raw === 'object') {
-        const v = (raw as Record<string, unknown>).ecn;
-        const n = typeof v === 'number' ? v : parseFloat(String(v));
-        if (Number.isFinite(n)) return n;
-      }
-      return DEFAULT_SETTINGS.referral_amount_ecn_usd as number;
-    })(),
-    referral_amount_vip_usd: (() => {
-      const raw = map['referral_commission_amounts_usd'];
-      if (raw && typeof raw === 'object') {
-        const v = (raw as Record<string, unknown>).vip;
-        const n = typeof v === 'number' ? v : parseFloat(String(v));
-        if (Number.isFinite(n)) return n;
-      }
-      return DEFAULT_SETTINGS.referral_amount_vip_usd as number;
-    })(),
     referral_qualifying_trades: num(
       'referral_qualifying_trades',
       DEFAULT_SETTINGS.referral_qualifying_trades as number,
@@ -157,16 +122,10 @@ function settingsToPayload(s: Settings): Record<string, unknown> {
     ib_min_deposit_usd: s.ib_min_deposit_usd,
     min_deposit_amount_usd: s.min_deposit_amount_usd,
     min_withdrawal_amount_usd: s.min_withdrawal_amount_usd,
-    // Flat legacy amount stays — used as the fallback when the
-    // referred user's account type isn't in the per-type map below.
+    // Fallback flat USD bounty — used only when ib_commission_tiers
+    // (the by-active-referral-count ladder, editable at /config/ib-tiers)
+    // has no matching tier for the referrer's position.
     referral_commission_amount_usd: s.referral_commission_amount_usd,
-    // Per-account-type map. Keys are lowercased AccountGroup.name —
-    // the gateway's referral_service indexes against that.
-    referral_commission_amounts_usd: {
-      standard: s.referral_amount_standard_usd,
-      ecn: s.referral_amount_ecn_usd,
-      vip: s.referral_amount_vip_usd,
-    },
     referral_qualifying_trades: s.referral_qualifying_trades,
     ib_commission_requires_kyc: s.ib_commission_requires_kyc,
     ib_commission_min_trades: s.ib_commission_min_trades,
@@ -527,33 +486,19 @@ export default function SettingsPage() {
                   </div>
                 </div>
 
-                <div className="rounded-md border border-border-primary/60 p-3 space-y-2">
-                  <div className="text-xs text-text-secondary font-medium">Per-account-type payout</div>
-                  <p className="text-xxs text-text-tertiary -mt-1">
-                    Standard / ECN / VIP rates — engine matches by the referred user&apos;s primary trading-account type.
+                <div className="rounded-md border border-border-primary/60 p-3 space-y-1">
+                  <div className="text-xs text-text-secondary font-medium">Per-referral ladder (by referrer's active count)</div>
+                  <p className="text-xxs text-text-tertiary">
+                    Bounty scales with the <span className="text-text-secondary">referrer's</span> number of qualified referrals
+                    (e.g. 1–20 → $5, 21–100 → $7, 101+ → $10) — NOT by the referred user's account type.
+                    Edit the ladder on the dedicated tier-editor page so per-lot IB rates stay in sync.
                   </p>
-                  <div className="grid grid-cols-3 gap-2 pt-1">
-                    {([
-                      { key: 'referral_amount_standard_usd', label: 'Standard' },
-                      { key: 'referral_amount_ecn_usd',      label: 'ECN'      },
-                      { key: 'referral_amount_vip_usd',      label: 'VIP'      },
-                    ] as const).map((f) => (
-                      <label key={f.key} className="flex flex-col gap-1">
-                        <span className="text-xxs text-text-tertiary">{f.label}</span>
-                        <div className="flex items-center gap-1">
-                          <span className="text-xxs text-text-tertiary">$</span>
-                          <input
-                            type="number"
-                            step="0.5"
-                            min="0"
-                            value={settings[f.key] as number}
-                            onChange={(e) => updateNum(f.key, e.target.value)}
-                            className="w-full text-xs py-1.5 px-2 bg-bg-input border border-border-primary rounded-md font-mono tabular-nums text-right"
-                          />
-                        </div>
-                      </label>
-                    ))}
-                  </div>
+                  <a
+                    href="/config/ib-tiers"
+                    className="inline-flex items-center gap-1.5 mt-1 text-xs text-buy hover:text-buy-light underline underline-offset-2"
+                  >
+                    Open tier editor →
+                  </a>
                 </div>
                 <div className="flex flex-wrap items-center justify-between gap-4">
                   <div className="min-w-0 flex-1">
