@@ -100,7 +100,7 @@ export function ClosePositionModal({
                 <div className="flex justify-between text-[11px] font-medium pt-1 mt-1 border-t border-border-primary/50">
                   <span className="text-text-tertiary">Estimated booking</span>
                   <span className={clsx('font-mono font-bold tabular-nums', typedBooking >= 0 ? 'text-buy' : 'text-sell')}>
-                    {typedBooking >= 0 ? '+' : ''}${Math.abs(typedBooking).toFixed(2)}
+                    {typedBooking >= 0 ? '+' : '-'}${Math.abs(typedBooking).toFixed(2)}
                   </span>
                 </div>
               )}
@@ -135,7 +135,7 @@ export function ClosePositionModal({
                           'text-[9px] font-mono normal-case tracking-normal mt-0.5',
                           v >= 0 ? 'text-buy' : 'text-sell',
                         )}>
-                          {v >= 0 ? '+' : ''}${Math.abs(v).toFixed(2)}
+                          {v >= 0 ? '+' : '-'}${Math.abs(v).toFixed(2)}
                         </span>
                       )}
                     </button>
@@ -155,7 +155,7 @@ export function ClosePositionModal({
                       'text-[9px] font-mono normal-case tracking-normal mt-0.5',
                       livePnl >= 0 ? 'text-buy' : 'text-sell',
                     )}>
-                      {livePnl >= 0 ? '+' : ''}${Math.abs(livePnl).toFixed(2)}
+                      {livePnl >= 0 ? '+' : '-'}${Math.abs(livePnl).toFixed(2)}
                     </span>
                   )}
                 </button>

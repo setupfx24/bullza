@@ -1779,7 +1779,11 @@ export default function PositionsPanel({ variant = 'default' }: PositionsPanelPr
                     if (!pos || !pos.lots || !Number.isFinite(cl) || cl <= 0) return null;
                     const ratio = Math.min(1, cl / pos.lots);
                     const booking = (pos.profit ?? 0) * ratio;
-                    const sign = booking >= 0 ? '+' : '';
+                    // '+' on profit, '-' on loss. The previous '' for
+                    // losses dropped the negative sign so a $22.10 loss
+                    // rendered identically to a $22.10 profit (only the
+                    // colour told them apart — client report 2026-06-01).
+                    const sign = booking >= 0 ? '+' : '-';
                     return (
                       <div className="flex justify-between text-[11px] font-medium pt-1 mt-1 border-t border-border-primary/50">
                         <span className="text-text-tertiary">Estimated booking</span>
@@ -1808,8 +1812,11 @@ export default function PositionsPanel({ variant = 'default' }: PositionsPanelPr
                     const pos = positions.find((p) => p.id === closeModal.id);
                     const livePnl = pos?.profit ?? 0;
                     const previewFor = (frac: number) => {
-                      const sign = livePnl >= 0 ? '+' : '';
+                      // Show '-' on loss so the 25/50/75/FULL chips
+                      // can't read like profit when the position is
+                      // underwater (only colour was distinguishing them).
                       const v = livePnl * frac;
+                      const sign = v >= 0 ? '+' : '-';
                       return { label: `${sign}$${Math.abs(v).toFixed(2)}`, positive: v >= 0 };
                     };
                     return (
@@ -1862,7 +1869,7 @@ export default function PositionsPanel({ variant = 'default' }: PositionsPanelPr
                               'text-[9px] font-mono normal-case tracking-normal mt-0.5',
                               livePnl >= 0 ? 'text-buy' : 'text-sell',
                             )}>
-                              {livePnl >= 0 ? '+' : ''}${Math.abs(livePnl).toFixed(2)}
+                              {livePnl >= 0 ? '+' : '-'}${Math.abs(livePnl).toFixed(2)}
                             </span>
                           )}
                         </button>
