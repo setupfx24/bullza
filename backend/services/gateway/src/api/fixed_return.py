@@ -23,9 +23,16 @@ class CreateLockRequest(BaseModel):
 
 
 @router.get("/config")
-async def get_config() -> dict[str, Any]:
-    """Public — rate matrix + early-withdrawal fee%."""
-    return await fixed_return_service.get_config()
+async def get_config(
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    """Rate matrix + early-withdrawal fee%. Passes the caller's user id
+    so a per-user rate override (admin-set) shadows the global ladder
+    transparently — same response shape, different cell values."""
+    return await fixed_return_service.get_config(
+        user_id=current_user["user_id"], db=db,
+    )
 
 
 @router.get("/locks")

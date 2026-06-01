@@ -75,7 +75,13 @@ class FixedReturnLock(Base):
     total_interest_paid = Column(Numeric(18, 2), nullable=False, default=0, server_default="0")
     payouts_count = Column(Integer, nullable=False, default=0, server_default="0")
 
-    # 'active' | 'matured' | 'withdrawn_early'
+    # 'active' | 'early_pending' | 'matured' | 'withdrawn_early'.
+    # early_pending = trader pressed Withdraw early; awaiting admin
+    # approval. Admin approve → withdrawn_early + credit. Admin reject
+    # → back to active.
     state = Column(String(20), nullable=False, default="active")
+    # Set when the trader files an early-withdrawal request; cleared
+    # when admin approves or rejects.
+    early_requested_at = Column(DateTime(timezone=True), nullable=True)
     payout = Column(Numeric(18, 2), nullable=True)
     fee_paid = Column(Numeric(18, 2), nullable=True)

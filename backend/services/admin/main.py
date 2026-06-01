@@ -18,6 +18,7 @@ from routes import (
     support, employees, settings, transactions, kyc, account_types, user_audit_logs,
     insurance as insurance_admin, play_zone as play_zone_admin,
     lifestyle as lifestyle_admin, approvals, notifications, broadcast,
+    fixed_return as fixed_return_admin,
 )
 
 app_settings = get_settings()
@@ -119,6 +120,7 @@ app.include_router(kyc.router, prefix=prefix)
 app.include_router(account_types.router, prefix=prefix)
 app.include_router(user_audit_logs.router, prefix=prefix)
 app.include_router(insurance_admin.router, prefix=prefix)
+app.include_router(fixed_return_admin.router, prefix=prefix)
 app.include_router(play_zone_admin.router, prefix=prefix)
 app.include_router(lifestyle_admin.router, prefix=prefix)
 app.include_router(approvals.router, prefix=f"{prefix}/approvals", tags=["Approvals"])

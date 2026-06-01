@@ -30,9 +30,15 @@ interface LockRow {
   matures_at: string | null;
   next_payout_at: string | null;
   settled_at: string | null;
-  state: 'active' | 'matured' | 'withdrawn_early';
+  early_requested_at: string | null;
+  state: 'active' | 'early_pending' | 'matured' | 'withdrawn_early';
   payouts_count: number;
   total_interest_paid: number;
+  // Pro-rata interest since the last cycle credit (or lock open if no
+  // cycle yet) — recomputed by the backend on every fetch.
+  accrued_since_last_payout: number;
+  // total_interest_paid + accrued_since_last_payout, convenience field.
+  interest_to_date: number;
   projected_total_interest: number;
   projected_total_payout: number;
   payout: number | null;
@@ -154,12 +160,16 @@ export default function FixedReturnPage() {
     const matured = l.matures_at && new Date(l.matures_at).getTime() <= now;
     const msg = matured
       ? `Mature withdrawal — you'll receive your principal of ${fmtUsd(l.principal)} back. Interest (${fmtUsd(l.total_interest_paid)} so far) was already paid in cycles. Continue?`
-      : `Early withdrawal penalty:\n• ${cfg.early_withdrawal_fee_pct}% of principal as the broker break fee\n• ALL interest paid to date (${fmtUsd(l.total_interest_paid)}) claws back from the principal\n\nProjected return: ${fmtUsd(Math.max(0, l.principal * (1 - cfg.early_withdrawal_fee_pct / 100) - l.total_interest_paid))}. Continue?`;
+      : `Early withdrawal request:\n• ${cfg.early_withdrawal_fee_pct}% penalty on principal\n• ALL interest paid to date (${fmtUsd(l.total_interest_paid)}) claws back\n\nThe request goes to admin for approval — funds are NOT credited until approved. Projected return after approval: ${fmtUsd(Math.max(0, l.principal * (1 - cfg.early_withdrawal_fee_pct / 100) - l.total_interest_paid))}. Continue?`;
     if (!window.confirm(msg)) return;
     setWithdrawing(l.id);
     try {
       await api.post(`/fixed-return/locks/${l.id}/withdraw`, {});
-      toast.success(matured ? 'Principal returned' : 'Funds returned (fee + interest claw-back applied)');
+      toast.success(
+        matured
+          ? 'Principal returned'
+          : 'Early-withdrawal request submitted — awaiting admin approval',
+      );
       await load();
     } catch (e: any) {
       toast.error(e?.message || 'Withdrawal failed');
@@ -347,86 +357,123 @@ export default function FixedReturnPage() {
               No locks yet. Open one above to start earning periodic interest.
             </div>
           ) : (
-            <div className="space-y-2">
+            <div className="space-y-3">
               {locks.map((l) => {
                 const now = new Date();
                 const matured = l.matures_at && new Date(l.matures_at) <= now;
                 const isActive = l.state === 'active';
+                const isPending = l.state === 'early_pending';
                 return (
                   <div
                     key={l.id}
-                    className="rounded-xl border border-border-primary bg-bg-secondary p-4 grid grid-cols-2 md:grid-cols-7 gap-3 items-center"
+                    className="rounded-xl border border-border-primary bg-bg-secondary p-4 space-y-3"
                   >
-                    <div>
-                      <div className="text-xs text-text-tertiary uppercase">Principal</div>
-                      <div className="font-mono tabular-nums text-text-primary font-semibold">
-                        {fmtUsd(l.principal)}
+                    {/* Top row: metric grid */}
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+                      <div>
+                        <div className="text-[10px] text-text-tertiary uppercase tracking-wide">Principal</div>
+                        <div className="font-mono tabular-nums text-text-primary font-semibold">
+                          {fmtUsd(l.principal)}
+                        </div>
                       </div>
-                    </div>
-                    <div>
-                      <div className="text-xs text-text-tertiary uppercase">Cycle</div>
-                      <div className="text-text-primary text-sm">{l.tenure_label}</div>
-                    </div>
-                    <div>
-                      <div className="text-xs text-text-tertiary uppercase">Rate</div>
-                      <div className="font-mono tabular-nums text-accent">{l.rate_pct.toFixed(2)}%</div>
-                    </div>
-                    <div>
-                      <div className="text-xs text-text-tertiary uppercase">Interest paid</div>
-                      <div className="font-mono tabular-nums text-buy">
-                        {fmtUsd(l.total_interest_paid)}
+                      <div>
+                        <div className="text-[10px] text-text-tertiary uppercase tracking-wide">Cycle</div>
+                        <div className="text-text-primary text-sm">{l.tenure_label}</div>
+                        <div className="text-[10px] text-text-tertiary">
+                          <span className="font-mono tabular-nums text-accent">{l.rate_pct.toFixed(2)}%</span>/month
+                        </div>
                       </div>
-                      <div className="text-[10px] text-text-tertiary">{l.payouts_count} cycles</div>
-                    </div>
-                    <div>
-                      <div className="text-xs text-text-tertiary uppercase">Next payout</div>
-                      <div className="text-text-primary text-sm flex items-center gap-1">
-                        <Calendar size={11} className="text-text-tertiary" />
-                        {l.next_payout_at ? fmtDate(l.next_payout_at) : '—'}
+                      <div>
+                        <div className="text-[10px] text-text-tertiary uppercase tracking-wide">Interest earned</div>
+                        <div className="font-mono tabular-nums text-buy">
+                          {fmtUsd(l.interest_to_date ?? l.total_interest_paid)}
+                        </div>
+                        <div className="text-[10px] text-text-tertiary">
+                          {l.payouts_count} cycle{l.payouts_count === 1 ? '' : 's'} paid
+                          {l.accrued_since_last_payout > 0 && (
+                            <> · <span className="text-amber-400">+{fmtUsd(l.accrued_since_last_payout)} accruing</span></>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                    <div>
-                      <div className="text-xs text-text-tertiary uppercase">Matures</div>
-                      <div className="text-text-primary text-sm flex items-center gap-1">
-                        <Clock size={11} className="text-text-tertiary" />
-                        {fmtDate(l.matures_at)}
-                        {isActive && l.matures_at && !matured && (
-                          <span className="text-[10px] text-text-tertiary ml-1">
-                            ({daysBetween(l.matures_at, now)}d)
-                          </span>
-                        )}
+                      <div>
+                        <div className="text-[10px] text-text-tertiary uppercase tracking-wide">Next payout</div>
+                        <div className="text-text-primary text-sm flex items-center gap-1">
+                          <Calendar size={11} className="text-text-tertiary shrink-0" />
+                          {l.next_payout_at ? fmtDate(l.next_payout_at) : '—'}
+                        </div>
                       </div>
-                    </div>
-                    <div className="col-span-2 md:col-span-1 flex items-center gap-2 md:justify-end">
-                      <span
-                        className={clsx(
-                          'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium',
-                          isActive && !matured && 'bg-amber-500/10 text-amber-400',
-                          isActive && matured && 'bg-buy/15 text-buy',
-                          l.state === 'matured' && 'bg-buy/15 text-buy',
-                          l.state === 'withdrawn_early' && 'bg-text-tertiary/10 text-text-tertiary',
-                        )}
-                      >
-                        {isActive && matured && <CheckCircle2 size={11} />}
-                        {l.state === 'matured' && <CheckCircle2 size={11} />}
-                        {isActive ? (matured ? 'Matured' : 'Active') : l.state === 'matured' ? 'Settled' : 'Closed (early)'}
-                      </span>
-                      {isActive && (
-                        <button
-                          onClick={() => withdraw(l)}
-                          disabled={withdrawing === l.id}
+                      <div>
+                        <div className="text-[10px] text-text-tertiary uppercase tracking-wide">Matures</div>
+                        <div className="text-text-primary text-sm flex items-center gap-1">
+                          <Clock size={11} className="text-text-tertiary shrink-0" />
+                          <span>{fmtDate(l.matures_at)}</span>
+                          {isActive && l.matures_at && !matured && (
+                            <span className="text-[10px] text-text-tertiary">
+                              ({daysBetween(l.matures_at, now)}d)
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-[10px] text-text-tertiary uppercase tracking-wide">Status</div>
+                        <span
                           className={clsx(
-                            'inline-flex items-center gap-1 px-3 py-1.5 rounded-md text-xs font-semibold transition-fast',
-                            matured
-                              ? 'bg-buy text-white hover:bg-buy/90'
-                              : 'border border-amber-400/40 text-amber-400 hover:bg-amber-400/10',
+                            'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium mt-0.5',
+                            isActive && !matured && 'bg-amber-500/10 text-amber-400',
+                            isActive && matured && 'bg-buy/15 text-buy',
+                            isPending && 'bg-amber-500/20 text-amber-300',
+                            l.state === 'matured' && 'bg-buy/15 text-buy',
+                            l.state === 'withdrawn_early' && 'bg-text-tertiary/10 text-text-tertiary',
                           )}
                         >
-                          {withdrawing === l.id && <Loader2 size={11} className="animate-spin" />}
-                          {matured ? 'Claim principal' : 'Withdraw early'}
-                        </button>
-                      )}
+                          {isActive && matured && <CheckCircle2 size={11} />}
+                          {l.state === 'matured' && <CheckCircle2 size={11} />}
+                          {isPending && <Clock size={11} />}
+                          {isPending
+                            ? 'Pending approval'
+                            : isActive
+                              ? (matured ? 'Matured' : 'Active')
+                              : l.state === 'matured'
+                                ? 'Settled'
+                                : 'Closed (early)'}
+                        </span>
+                      </div>
                     </div>
+
+                    {/* Pending-approval banner — moved out of the action row so
+                        it never overlaps the status pill on narrow widths. */}
+                    {isPending && (
+                      <div className="rounded-md border border-amber-400/40 bg-amber-500/5 px-3 py-2 text-[11px] text-amber-300 flex items-start gap-2">
+                        <AlertTriangle size={12} className="mt-0.5 shrink-0" />
+                        <span>
+                          Early-withdrawal request submitted
+                          {l.early_requested_at ? ` on ${fmtDate(l.early_requested_at)}` : ''}.
+                          Funds stay locked until an admin approves; interest pauses meanwhile.
+                        </span>
+                      </div>
+                    )}
+
+                    {/* Action row — separate band, full-width on mobile so the
+                        button never sits beside dense text. */}
+                    {(isActive || isPending) && (
+                      <div className="flex flex-wrap items-center justify-end gap-2 pt-1 border-t border-border-primary/40">
+                        {isActive && (
+                          <button
+                            onClick={() => withdraw(l)}
+                            disabled={withdrawing === l.id}
+                            className={clsx(
+                              'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-fast disabled:opacity-50',
+                              matured
+                                ? 'bg-buy text-white hover:bg-buy/90'
+                                : 'border border-amber-400/40 text-amber-400 hover:bg-amber-400/10',
+                            )}
+                          >
+                            {withdrawing === l.id && <Loader2 size={11} className="animate-spin" />}
+                            {matured ? 'Claim principal' : 'Request early withdrawal'}
+                          </button>
+                        )}
+                      </div>
+                    )}
                   </div>
                 );
               })}

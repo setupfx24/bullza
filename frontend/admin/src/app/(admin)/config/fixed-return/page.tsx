@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
-import { Loader2, Save, Plus, Trash2 } from 'lucide-react';
+import { Loader2, Save, Plus, Trash2, Check, X, Clock } from 'lucide-react';
 import { adminApi } from '@/lib/api';
 import { cn } from '@/lib/utils';
 
@@ -428,6 +428,162 @@ export default function FixedReturnConfigPage() {
             </tr>
           </tbody>
         </table>
+      </div>
+
+      <PendingEarlyWithdrawals />
+    </div>
+  );
+}
+
+
+// ─── Early-withdrawal approval queue ─────────────────────────────────
+
+interface PendingRow {
+  id: string;
+  user_id: string;
+  user_email: string;
+  user_name: string | null;
+  principal: number;
+  total_interest_paid: number;
+  projected_payout: number;
+  projected_fee: number;
+  tenure_label: string;
+  rate_pct: number;
+  early_requested_at: string | null;
+  locked_at: string | null;
+  matures_at: string | null;
+}
+
+function PendingEarlyWithdrawals() {
+  const [rows, setRows] = useState<PendingRow[] | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    try {
+      const data = await adminApi.get<PendingRow[]>('/fixed-return/pending');
+      setRows(Array.isArray(data) ? data : []);
+    } catch (e: any) {
+      toast.error(e?.message || 'Failed to load early-withdrawal queue');
+      setRows([]);
+    }
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  const approve = async (r: PendingRow) => {
+    if (!window.confirm(
+      `Approve early withdrawal for ${r.user_email}?\n\nUser will receive $${r.projected_payout.toFixed(2)} (principal $${r.principal.toFixed(2)} − fee $${r.projected_fee.toFixed(2)} − interest claw-back $${r.total_interest_paid.toFixed(2)}).`,
+    )) return;
+    setBusyId(r.id);
+    try {
+      await adminApi.post(`/fixed-return/${r.id}/approve`, {});
+      toast.success('Approved — funds credited to user\'s main wallet');
+      load();
+    } catch (e: any) {
+      toast.error(e?.message || 'Approve failed');
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const reject = async (r: PendingRow) => {
+    const reason = window.prompt(
+      `Reject early withdrawal for ${r.user_email}?\nOptional reason (shown on the user's transaction log):`,
+      '',
+    );
+    if (reason === null) return;
+    setBusyId(r.id);
+    try {
+      await adminApi.post(`/fixed-return/${r.id}/reject`, { reason: reason || null });
+      toast.success('Rejected — lock reverted to active');
+      load();
+    } catch (e: any) {
+      toast.error(e?.message || 'Reject failed');
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  return (
+    <div className="bg-bg-secondary border border-border-primary rounded-md">
+      <div className="px-4 py-3 border-b border-border-primary flex items-center gap-2">
+        <Clock size={14} className="text-amber-400" />
+        <h2 className="text-sm font-semibold text-text-primary">Early-withdrawal approvals</h2>
+        <span className="text-xxs text-text-tertiary ml-2">
+          {rows == null ? '…' : `${rows.length} pending`}
+        </span>
+        <button
+          onClick={load}
+          className="ml-auto text-xxs text-text-secondary hover:text-text-primary"
+        >
+          Refresh
+        </button>
+      </div>
+      <div className="overflow-x-auto">
+        {rows == null ? (
+          <div className="px-4 py-6 text-center"><Loader2 size={16} className="animate-spin text-text-tertiary inline-block" /></div>
+        ) : rows.length === 0 ? (
+          <div className="px-4 py-8 text-center text-xs text-text-tertiary">
+            No early-withdrawal requests waiting.
+          </div>
+        ) : (
+          <table className="w-full min-w-[760px]">
+            <thead>
+              <tr className="border-b border-border-primary bg-bg-tertiary/40">
+                <th className="text-left px-4 py-2.5 text-xxs font-medium text-text-tertiary uppercase tracking-wide">User</th>
+                <th className="text-right px-4 py-2.5 text-xxs font-medium text-text-tertiary uppercase tracking-wide">Principal</th>
+                <th className="text-right px-4 py-2.5 text-xxs font-medium text-text-tertiary uppercase tracking-wide">Interest paid</th>
+                <th className="text-right px-4 py-2.5 text-xxs font-medium text-text-tertiary uppercase tracking-wide">Fee</th>
+                <th className="text-right px-4 py-2.5 text-xxs font-medium text-text-tertiary uppercase tracking-wide">Payout</th>
+                <th className="text-left  px-4 py-2.5 text-xxs font-medium text-text-tertiary uppercase tracking-wide">Requested</th>
+                <th className="text-right px-4 py-2.5 text-xxs font-medium text-text-tertiary uppercase tracking-wide">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r) => (
+                <tr key={r.id} className="border-b border-border-primary/50 last:border-0 hover:bg-bg-hover/30">
+                  <td className="px-4 py-2.5">
+                    <div className="text-xs text-text-primary truncate max-w-[220px]">{r.user_name || '—'}</div>
+                    <div className="text-xxs text-text-tertiary truncate max-w-[220px]">{r.user_email}</div>
+                  </td>
+                  <td className="px-4 py-2.5 text-right text-xs font-mono tabular-nums text-text-primary">
+                    ${r.principal.toFixed(2)}
+                  </td>
+                  <td className="px-4 py-2.5 text-right text-xs font-mono tabular-nums text-buy">
+                    ${r.total_interest_paid.toFixed(2)}
+                  </td>
+                  <td className="px-4 py-2.5 text-right text-xs font-mono tabular-nums text-danger">
+                    -${r.projected_fee.toFixed(2)}
+                  </td>
+                  <td className="px-4 py-2.5 text-right text-xs font-mono tabular-nums text-text-primary font-semibold">
+                    ${r.projected_payout.toFixed(2)}
+                  </td>
+                  <td className="px-4 py-2.5 text-xxs text-text-secondary whitespace-nowrap">
+                    {r.early_requested_at ? new Date(r.early_requested_at).toLocaleString() : '—'}
+                  </td>
+                  <td className="px-4 py-2.5 text-right">
+                    <div className="inline-flex items-center gap-1">
+                      <button
+                        onClick={() => approve(r)}
+                        disabled={busyId === r.id}
+                        className="inline-flex items-center gap-1 px-2.5 py-1 text-xxs text-white bg-buy rounded hover:bg-buy-light disabled:opacity-50"
+                      >
+                        <Check size={12} /> Approve
+                      </button>
+                      <button
+                        onClick={() => reject(r)}
+                        disabled={busyId === r.id}
+                        className="inline-flex items-center gap-1 px-2.5 py-1 text-xxs text-text-secondary border border-border-primary rounded hover:bg-bg-hover disabled:opacity-50"
+                      >
+                        <X size={12} /> Reject
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
       </div>
     </div>
   );

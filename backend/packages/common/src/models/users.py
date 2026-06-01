@@ -115,6 +115,14 @@ class User(Base):
     ib_commission_balance = Column(
         Numeric(18, 8), nullable=False, default=0, server_default="0",
     )
+    # Per-user Fixed Return rate override. NULL = use the global
+    # `fixed_return_rates` setting (the rate matrix configured on
+    # /admin/config/fixed-return). When set, expected shape:
+    #   { "rate_matrix_pct": [[..], ..] }  same dims as the global matrix.
+    # Read inside fixed_return_service.create_lock so a VIP trader can
+    # be granted a non-standard ladder without changing the global
+    # ladder visible to everyone else. Migration 0064.
+    fixed_return_rate_override = Column(JSONB, nullable=True)
     # Eligibility-nudge engine: when the user crossed the funded-account
     # threshold and we educated them about Fixed Return + Trade Insurance.
     # NULL = never nudged; we re-nudge ~quarterly while still eligible.
