@@ -18,7 +18,14 @@ interface Payout {
   created_at: string | null;
 }
 interface Overview {
+  /** Legacy % — no longer read by the engine; kept for old clients. */
   commission_pct: number;
+  /** Flat USD paid per qualified claim. */
+  bounty_usd: number;
+  /** Closed trades a friend must make before they qualify. */
+  qualifying_trades: number;
+  requires_kyc: boolean;
+  requires_funded: boolean;
   total_paid: number;
   total_payouts: number;
   total_referred_users: number;
@@ -45,15 +52,25 @@ export default function ReferralAdminPage() {
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [pct, setPct] = useState<number>(5);
-  const [savingPct, setSavingPct] = useState(false);
+
+  // Editable gate config — mirrors the trader engine's actual inputs:
+  // referral_commission_amount_usd, referral_qualifying_trades,
+  // referral_requires_kyc, referral_requires_funded.
+  const [bountyUsd, setBountyUsd] = useState<number>(5);
+  const [qualifyingTrades, setQualifyingTrades] = useState<number>(3);
+  const [requiresKyc, setRequiresKyc] = useState<boolean>(true);
+  const [requiresFunded, setRequiresFunded] = useState<boolean>(true);
+  const [savingRules, setSavingRules] = useState(false);
 
   const load = useCallback(async () => {
     setRefreshing(true);
     try {
       const d = await adminApi.get<Overview>('/business/referral/overview', { page: String(page), per_page: '20' });
       setData(d);
-      setPct(d.commission_pct);
+      setBountyUsd(d.bounty_usd ?? 5);
+      setQualifyingTrades(d.qualifying_trades ?? 3);
+      setRequiresKyc(d.requires_kyc ?? true);
+      setRequiresFunded(d.requires_funded ?? true);
     } catch (e: any) {
       toast.error(e?.message || 'Failed to load referral overview');
     } finally {
@@ -64,20 +81,31 @@ export default function ReferralAdminPage() {
 
   useEffect(() => { load(); }, [load]);
 
-  const saveRate = async () => {
-    if (pct < 0 || pct > 100) {
-      toast.error('Commission % must be between 0 and 100');
+  const saveRules = async () => {
+    if (bountyUsd < 0) {
+      toast.error('Bounty must be ≥ 0');
       return;
     }
-    setSavingPct(true);
+    if (qualifyingTrades < 1) {
+      toast.error('Qualifying trades must be ≥ 1');
+      return;
+    }
+    setSavingRules(true);
     try {
-      await adminApi.put('/settings', { settings: { referral_commission_pct: pct } });
-      toast.success('Commission rate saved');
+      await adminApi.put('/settings', {
+        settings: {
+          referral_commission_amount_usd: bountyUsd,
+          referral_qualifying_trades: qualifyingTrades,
+          referral_requires_kyc: requiresKyc,
+          referral_requires_funded: requiresFunded,
+        },
+      });
+      toast.success('Referral rules saved');
       load();
     } catch (e: any) {
       toast.error(e?.message || 'Save failed');
     } finally {
-      setSavingPct(false);
+      setSavingRules(false);
     }
   };
 
@@ -110,33 +138,94 @@ export default function ReferralAdminPage() {
         </button>
       </div>
 
-      {/* Commission rate */}
-      <div className="bg-bg-secondary border border-border-primary rounded-md p-4 flex flex-wrap items-center gap-3">
-        <div className="min-w-0 flex-1">
-          <h2 className="text-sm font-semibold text-text-primary">Commission rate</h2>
-          <p className="text-xxs text-text-tertiary mt-0.5">
-            % of the referred user&apos;s first approved deposit credited to the referrer&apos;s main wallet.
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <input
-            type="number"
-            min={0}
-            max={100}
-            step={0.1}
-            value={pct}
-            onChange={(e) => setPct(parseFloat(e.target.value) || 0)}
-            className="w-24 text-xs py-1.5 px-2 bg-bg-input border border-border-primary rounded-md font-mono tabular-nums text-right text-text-primary"
-          />
-          <span className="text-xs text-text-tertiary">%</span>
+      {/* Qualifying rules — replaces the legacy % rate, since the engine
+          now pays a flat USD bounty only after the friend clears the
+          KYC / first-deposit / N-trades gates. */}
+      <div className="bg-bg-secondary border border-border-primary rounded-md p-4 space-y-3">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <h2 className="text-sm font-semibold text-text-primary">Qualifying rules</h2>
+            <p className="text-xxs text-text-tertiary mt-0.5">
+              These are the actual gates the engine enforces before a referrer can press Claim.
+              Bounty is paid into <span className="text-text-secondary">referral commission balance</span>;
+              the user then withdraws it to their main wallet.
+            </p>
+          </div>
           <button
-            onClick={saveRate}
-            disabled={savingPct}
-            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-md text-xs font-medium text-white bg-buy hover:bg-buy-light disabled:opacity-50"
+            onClick={saveRules}
+            disabled={savingRules}
+            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-md text-xs font-medium text-white bg-buy hover:bg-buy-light disabled:opacity-50 shrink-0"
           >
-            {savingPct ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
+            {savingRules ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
             Save
           </button>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {/* Bounty USD */}
+          <label className="flex flex-col gap-1">
+            <span className="text-xxs text-text-tertiary uppercase tracking-wide">Bounty per qualified referral</span>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-text-tertiary">$</span>
+              <input
+                type="number"
+                min={0}
+                step={0.5}
+                value={bountyUsd}
+                onChange={(e) => setBountyUsd(parseFloat(e.target.value) || 0)}
+                className="w-32 text-xs py-1.5 px-2 bg-bg-input border border-border-primary rounded-md font-mono tabular-nums text-right text-text-primary"
+              />
+              <span className="text-xxs text-text-tertiary">USD</span>
+            </div>
+          </label>
+
+          {/* Qualifying trades */}
+          <label className="flex flex-col gap-1">
+            <span className="text-xxs text-text-tertiary uppercase tracking-wide">Closed trades to qualify</span>
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                min={1}
+                step={1}
+                value={qualifyingTrades}
+                onChange={(e) => setQualifyingTrades(parseInt(e.target.value, 10) || 1)}
+                className="w-24 text-xs py-1.5 px-2 bg-bg-input border border-border-primary rounded-md font-mono tabular-nums text-right text-text-primary"
+              />
+              <span className="text-xxs text-text-tertiary">trades</span>
+            </div>
+          </label>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+          <label className="flex items-start gap-2 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={requiresKyc}
+              onChange={(e) => setRequiresKyc(e.target.checked)}
+              className="mt-0.5 h-4 w-4 accent-buy cursor-pointer"
+            />
+            <span className="text-xs text-text-primary">
+              Require friend's KYC to be approved
+              <span className="block text-xxs text-text-tertiary">
+                Off = pay even if friend is still pending verification.
+              </span>
+            </span>
+          </label>
+
+          <label className="flex items-start gap-2 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={requiresFunded}
+              onChange={(e) => setRequiresFunded(e.target.checked)}
+              className="mt-0.5 h-4 w-4 accent-buy cursor-pointer"
+            />
+            <span className="text-xs text-text-primary">
+              Require friend's first approved deposit
+              <span className="block text-xxs text-text-tertiary">
+                Off = pay even on demo / unfunded sign-ups (not recommended).
+              </span>
+            </span>
+          </label>
         </div>
       </div>
 

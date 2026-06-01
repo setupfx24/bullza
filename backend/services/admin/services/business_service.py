@@ -165,10 +165,43 @@ async def referral_program_overview(
     payout. We pull aggregates from those rows here so no new ledger is
     needed.
     """
-    cur_pct_row = (await db.execute(
-        select(SystemSetting).where(SystemSetting.key == "referral_commission_pct")
-    )).scalar_one_or_none()
-    cur_pct = float(cur_pct_row.value) if cur_pct_row and cur_pct_row.value is not None else 5.0
+    # Engine actually reads these — the legacy `referral_commission_pct`
+    # row is kept around for old-client compatibility but no code path
+    # honours it any more. Surface the real gate config so the admin
+    # /business/referral page can edit what's enforced.
+    async def _read(key: str, default):
+        row = (await db.execute(
+            select(SystemSetting).where(SystemSetting.key == key)
+        )).scalar_one_or_none()
+        return row.value if row and row.value is not None else default
+
+    legacy_pct_raw = await _read("referral_commission_pct", "5")
+    try:
+        cur_pct = float(legacy_pct_raw)
+    except (TypeError, ValueError):
+        cur_pct = 5.0
+
+    try:
+        bounty_usd = float(await _read("referral_commission_amount_usd", "5"))
+    except (TypeError, ValueError):
+        bounty_usd = 5.0
+
+    try:
+        qualifying_trades = int(float(await _read("referral_qualifying_trades", "3")))
+    except (TypeError, ValueError):
+        qualifying_trades = 3
+
+    def _flag(raw, default: bool) -> bool:
+        if isinstance(raw, bool):
+            return raw
+        if isinstance(raw, (int, float)):
+            return bool(raw)
+        if isinstance(raw, str):
+            return raw.strip().lower() in {"1", "true", "yes", "on"}
+        return default
+
+    requires_kyc = _flag(await _read("referral_requires_kyc", "true"), True)
+    requires_funded = _flag(await _read("referral_requires_funded", "true"), True)
 
     total_paid = (await db.execute(
         select(func.coalesce(func.sum(Transaction.amount), 0))
@@ -230,7 +263,13 @@ async def referral_program_overview(
         })
 
     return {
+        # Kept for backwards-compat with older admin clients; new clients
+        # should use bounty_usd + the gate flags below.
         "commission_pct": cur_pct,
+        "bounty_usd": bounty_usd,
+        "qualifying_trades": qualifying_trades,
+        "requires_kyc": requires_kyc,
+        "requires_funded": requires_funded,
         "total_paid": float(total_paid),
         "total_payouts": int(total_payouts),
         "total_referred_users": int(total_referred_users),

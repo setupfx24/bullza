@@ -413,6 +413,11 @@ async def list_my_referrals(db: AsyncSession, user_id: UUID) -> dict:
             "claimed_at": r.referral_claimed_at.isoformat() if r.referral_claimed_at else None,
         })
 
+    # What the trader would earn for their NEXT claim, given the tier
+    # ladder + how many they've already claimed. Computed once here so the
+    # UI can show "Claim → $X" without a second roundtrip.
+    next_bounty = await _bounty_for_next_claim(db, user_id)
+
     return {
         "items": items,
         "commission_balance": float(me.referral_commission_balance or 0),
