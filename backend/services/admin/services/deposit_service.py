@@ -709,17 +709,35 @@ async def approve_withdrawal(
     forfeit_user = await db.get(User, withdrawal.user_id)
     if forfeit_user is not None and forfeit_user.bonus_forfeited_at is None:
         forfeited_main = Decimal(str(forfeit_user.main_wallet_bonus or 0))
-        # Collect every live trading account's credit balance and zero it.
+        # Forfeit ONLY the bonus portion of each account's credit. Insurance
+        # claim payouts also land in account.credit but they're EARNED money
+        # (the user paid the insurance fee) — they must survive a withdrawal
+        # (client report 2026-05-28: insurance was being wiped too). We size
+        # the protected amount per account as the lifetime insurance_payout
+        # credited there, clamped to the current credit (in case some was
+        # already traded away).
         accts_q = await db.execute(
             select(TradingAccount).where(TradingAccount.user_id == withdrawal.user_id)
         )
         forfeited_account_credit = Decimal("0")
         for acc in accts_q.scalars().all():
             credit = Decimal(str(acc.credit or 0))
-            if credit > 0:
-                forfeited_account_credit += credit
-                acc.credit = Decimal("0")
-                acc.equity = (acc.balance or Decimal("0"))
+            if credit <= 0:
+                continue
+            insurance_credit = Decimal(str((await db.execute(
+                select(func.coalesce(func.sum(Transaction.amount), 0)).where(
+                    Transaction.account_id == acc.id,
+                    Transaction.type == "insurance_payout",
+                )
+            )).scalar() or 0))
+            # Keep the insurance portion (up to whatever credit remains);
+            # forfeit the rest (welcome bonus / admin credit).
+            protected = min(credit, max(Decimal("0"), insurance_credit))
+            forfeit_here = credit - protected
+            if forfeit_here > 0:
+                forfeited_account_credit += forfeit_here
+                acc.credit = protected
+                acc.equity = (acc.balance or Decimal("0")) + protected
                 acc.free_margin = acc.equity - (acc.margin_used or Decimal("0"))
 
         total_forfeit = forfeited_main + forfeited_account_credit
@@ -734,7 +752,8 @@ async def approve_withdrawal(
                 description=(
                     "Welcome bonus forfeited on first withdrawal "
                     f"(main wallet bonus ${float(forfeited_main):.2f} + "
-                    f"account credit ${float(forfeited_account_credit):.2f})"
+                    f"account credit ${float(forfeited_account_credit):.2f}). "
+                    "Insurance payouts retained."
                 ),
                 created_by=admin_id,
             ))
