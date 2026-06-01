@@ -18,6 +18,17 @@ function buildWidgetEmbedUrl(
   interval: string,
 ): string {
   const tvSymbol = toTradingViewSymbol(symbol);
+  // Use the viewer's resolved timezone so the chart clock matches their
+  // wall-clock instead of always showing UTC. Same fix that landed on
+  // AdvancedChart in commit e98725a — without it the embed iframe is
+  // stuck on UTC even when the user is in IST / GMT+5:30.
+  let viewerTz = 'Etc/UTC';
+  if (typeof window !== 'undefined') {
+    try {
+      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      if (tz) viewerTz = tz;
+    } catch { /* keep UTC */ }
+  }
   const params = new URLSearchParams({
     frameElementId: 'pt_tradingview_chart',
     symbol: tvSymbol,
@@ -31,7 +42,7 @@ function buildWidgetEmbedUrl(
     hideideas: '1',
     theme,
     style: '1',
-    timezone: 'Etc/UTC',
+    timezone: viewerTz,
     studies_overrides: '{}',
     overrides: '{}',
     enabled_features: '[]',

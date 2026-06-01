@@ -22,6 +22,14 @@ export function TradingViewChart({ symbol, height = '100%' }: Props) {
     widgetDiv.style.width = '100%';
     container.appendChild(widgetDiv);
 
+    // Use the viewer's resolved timezone so the embed's clock matches
+    // the user's wall-clock. Mirrors the AdvancedChart fix (e98725a).
+    let viewerTz = 'Etc/UTC';
+    try {
+      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      if (tz) viewerTz = tz;
+    } catch { /* keep UTC */ }
+
     const script = document.createElement('script');
     script.type = 'text/javascript';
     script.src =
@@ -31,7 +39,7 @@ export function TradingViewChart({ symbol, height = '100%' }: Props) {
       autosize: true,
       symbol,
       interval: 'D',
-      timezone: 'Etc/UTC',
+      timezone: viewerTz,
       theme: 'dark',
       style: '1',
       locale: 'en',

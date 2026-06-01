@@ -158,10 +158,15 @@ export default function AdvancedChart() {
       ref={wrapRef}
       className="relative w-full h-full min-h-[200px] min-w-0 bg-bg-base"
     >
-      {/* Brand logo overlay removed 2026-06-01 — it sat on top of
-          TradingView's instrument-name watermark in the same top-left
-          slot, making both labels unreadable. The sidebar already shows
-          the SwisDex mark, so this overlay was redundant noise. */}
+      {/* Brand logo overlay — bottom-left this time so it can't overlap
+          TradingView's instrument-name watermark (top-left) or the
+          fullscreen button (top-right). pointer-events-none keeps the
+          chart's own controls clickable through it. */}
+      <img
+        src="/images/swisdex_png5.png"
+        alt="SwisDex"
+        className="absolute bottom-2 left-2 z-20 h-5 sm:h-6 w-auto opacity-70 pointer-events-none select-none drop-shadow"
+      />
 
       {/* Fullscreen toggle — the embed widget ships no fullscreen control. */}
       <button

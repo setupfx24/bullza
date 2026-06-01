@@ -13,7 +13,6 @@ interface UIState {
   activeBottomTab: string;
   chartTimeframe: string;
   chartType: string;
-  oneClickTrading: boolean;
   sidebarCollapsed: boolean;
   /** Trading terminal: symbol list drawer under order panel. */
   terminalMarketsOpen: boolean;
@@ -28,7 +27,6 @@ interface UIState {
   setActiveBottomTab: (t: string) => void;
   setChartTimeframe: (tf: string) => void;
   setChartType: (ct: string) => void;
-  setOneClickTrading: (v: boolean) => void;
   setSidebarCollapsed: (v: boolean) => void;
   setTerminalMarketsOpen: (v: boolean) => void;
   toggleTerminalMarkets: () => void;
@@ -57,7 +55,6 @@ export const useUIStore = create<UIState>()(
       activeBottomTab: 'positions',
       chartTimeframe: '15m',
       chartType: 'candlestick',
-      oneClickTrading: false,
       sidebarCollapsed: false,
       terminalMarketsOpen: false,
       terminalNewsOpen: false,
@@ -86,7 +83,6 @@ export const useUIStore = create<UIState>()(
       setActiveBottomTab: (t) => set({ activeBottomTab: t }),
       setChartTimeframe: (tf) => set({ chartTimeframe: tf }),
       setChartType: (ct) => set({ chartType: ct }),
-      setOneClickTrading: (v) => set({ oneClickTrading: v }),
       setSidebarCollapsed: (v) => set({ sidebarCollapsed: v }),
       setTerminalMarketsOpen: (v) => set({ terminalMarketsOpen: v }),
       toggleTerminalMarkets: () =>
