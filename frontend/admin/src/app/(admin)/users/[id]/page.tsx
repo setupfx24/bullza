@@ -35,6 +35,10 @@ interface UserDetail {
     status: string;
     kyc_status: string;
     is_demo: boolean;
+    // Security / verification flags surfaced 2026-06-01 (#5) — admin
+    // uses these to decide whether to trigger a reset / revoke sessions.
+    email_verified?: boolean;
+    two_factor_enabled?: boolean;
     created_at: string | null;
   };
   accounts: {
@@ -190,6 +194,9 @@ export default function UserDetailPage() {
             ))}
           </div>
         </div>
+
+        {/* Account security & sessions — Reset Password, Revoke, list */}
+        <SecurityCard userId={userId} user={user} />
 
         {/* Fixed Return per-user rate override */}
         <FixedReturnOverrideCard userId={userId} />
@@ -452,6 +459,206 @@ function FixedReturnOverrideCard({ userId }: { userId: string }) {
           No personal rates set — this user sees the global ladder.
         </div>
       )}
+    </div>
+  );
+}
+
+
+// ─── Account security & sessions ─────────────────────────────────────
+
+interface UserSession {
+  id: string;
+  ip_address: string | null;
+  user_agent: string | null;
+  created_at: string | null;
+  expires_at: string | null;
+}
+
+function SecurityCard({
+  userId,
+  user,
+}: {
+  userId: string;
+  user: UserDetail['user'];
+}) {
+  const [sessions, setSessions] = useState<UserSession[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [resetting, setResetting] = useState(false);
+  const [revoking, setRevoking] = useState<string | null>(null);
+  const [revokingAll, setRevokingAll] = useState(false);
+
+  const loadSessions = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await adminApi.get<{ items: UserSession[] }>(
+        `/users/${userId}/sessions`,
+      );
+      setSessions(res.items || []);
+    } catch {
+      setSessions([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [userId]);
+
+  useEffect(() => { loadSessions(); }, [loadSessions]);
+
+  const triggerReset = async () => {
+    if (!window.confirm(
+      `Send a password reset email to ${user.email}?\n\nThe user will receive a one-time 15-minute link to set a new password. You will NOT see the plain password — it's never stored in readable form anywhere in the system.`,
+    )) return;
+    setResetting(true);
+    try {
+      const res = await adminApi.post<{ message: string; sent: boolean }>(
+        `/users/${userId}/reset-password`, {},
+      );
+      toast.success(res.message || 'Reset email sent');
+    } catch (e: any) {
+      toast.error(e?.message || 'Failed to trigger reset');
+    } finally {
+      setResetting(false);
+    }
+  };
+
+  const revokeOne = async (sid: string) => {
+    if (!window.confirm('Revoke this session? The user will be logged out from that device.')) return;
+    setRevoking(sid);
+    try {
+      await adminApi.delete(`/users/${userId}/sessions/${sid}`);
+      toast.success('Session revoked');
+      loadSessions();
+    } catch (e: any) {
+      toast.error(e?.message || 'Failed to revoke');
+    } finally {
+      setRevoking(null);
+    }
+  };
+
+  const revokeAll = async () => {
+    if (!window.confirm(`Revoke ALL ${sessions.length} active session(s) for ${user.email}?\n\nThe user will be forced to re-authenticate on every device.`)) return;
+    setRevokingAll(true);
+    try {
+      await adminApi.post(`/users/${userId}/sessions/revoke-all`, {});
+      toast.success('All sessions revoked');
+      loadSessions();
+    } catch (e: any) {
+      toast.error(e?.message || 'Failed to revoke');
+    } finally {
+      setRevokingAll(false);
+    }
+  };
+
+  return (
+    <div className="bg-bg-secondary border border-border-primary rounded-lg p-5 space-y-4">
+      <div className="flex items-start justify-between gap-3 flex-wrap">
+        <div className="min-w-0">
+          <h2 className="text-base font-bold text-text-primary">Account Security</h2>
+          <p className="text-xs text-text-tertiary mt-0.5 max-w-2xl">
+            Passwords are stored as <span className="text-text-secondary">bcrypt hashes</span> —
+            plain text is never retrievable, even by admins. Use the actions
+            below to help users regain access or to lock out suspicious sessions.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={triggerReset}
+          disabled={resetting}
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-buy rounded-md hover:bg-buy-light disabled:opacity-50 shrink-0"
+        >
+          {resetting ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
+          Send Password Reset Email
+        </button>
+      </div>
+
+      {/* Flags row — email verified, 2FA */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-1">
+        <Flag
+          label="Email verified"
+          value={user.email_verified ? 'Yes' : 'No'}
+          good={!!user.email_verified}
+        />
+        <Flag
+          label="Two-factor (2FA)"
+          value={user.two_factor_enabled ? 'Enabled' : 'Disabled'}
+          good={!!user.two_factor_enabled}
+        />
+        <Flag label="Account status" value={user.status} good={user.status === 'active'} />
+        <Flag label="KYC" value={user.kyc_status || '—'} good={['verified', 'approved'].includes((user.kyc_status || '').toLowerCase())} />
+      </div>
+
+      {/* Sessions */}
+      <div className="pt-2">
+        <div className="flex items-center justify-between mb-2">
+          <h3 className="text-sm font-bold text-text-primary">
+            Active Sessions ({sessions.length})
+          </h3>
+          {sessions.length > 0 && (
+            <button
+              type="button"
+              onClick={revokeAll}
+              disabled={revokingAll}
+              className="text-xs text-danger hover:underline disabled:opacity-50"
+            >
+              {revokingAll ? 'Revoking…' : 'Revoke all'}
+            </button>
+          )}
+        </div>
+        {loading ? (
+          <div className="py-4 text-center"><Loader2 size={16} className="animate-spin text-text-tertiary inline-block" /></div>
+        ) : sessions.length === 0 ? (
+          <div className="text-xs text-text-tertiary py-3 text-center border border-dashed border-border-primary rounded-md">
+            No active sessions
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[480px]">
+              <thead>
+                <tr className="border-b border-border-primary text-text-tertiary text-xxs uppercase tracking-wide">
+                  <th className="text-left py-2">IP</th>
+                  <th className="text-left py-2">User agent</th>
+                  <th className="text-left py-2">Created</th>
+                  <th className="text-right py-2">Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {sessions.map((s) => (
+                  <tr key={s.id} className="border-b border-border-primary/40 last:border-0">
+                    <td className="py-2 text-xs font-mono text-text-secondary">{s.ip_address || '—'}</td>
+                    <td className="py-2 text-xs text-text-tertiary truncate max-w-[280px]" title={s.user_agent || ''}>
+                      {s.user_agent || '—'}
+                    </td>
+                    <td className="py-2 text-xxs text-text-tertiary">
+                      {s.created_at ? new Date(s.created_at).toLocaleString() : '—'}
+                    </td>
+                    <td className="py-2 text-right">
+                      <button
+                        type="button"
+                        onClick={() => revokeOne(s.id)}
+                        disabled={revoking === s.id}
+                        className="text-xxs text-danger hover:underline disabled:opacity-50"
+                      >
+                        {revoking === s.id ? 'Revoking…' : 'Revoke'}
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function Flag({ label, value, good }: { label: string; value: string; good: boolean }) {
+  return (
+    <div className="rounded-md border border-border-primary bg-bg-tertiary/30 px-3 py-2">
+      <p className="text-[10px] uppercase text-text-tertiary tracking-wide">{label}</p>
+      <p className={cn(
+        'text-sm font-bold mt-0.5',
+        good ? 'text-success' : 'text-warning',
+      )}>{value}</p>
     </div>
   );
 }
