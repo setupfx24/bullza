@@ -962,7 +962,28 @@ function WalletPageContent() {
                         </p>
                         <p className="text-sm sm:text-lg md:text-xl font-bold tabular-nums font-mono text-text-primary truncate">{line}</p>
                       </div>
-                      {!isManaged ? (
+                      {isManaged ? (
+                        // CF / IF investor sub-account — engine-driven,
+                        // user can't manually shuffle funds in/out.
+                        <div className="flex items-center justify-center rounded-xl border py-2 text-[10px] font-bold tracking-wide"
+                          style={{ borderColor: `rgba(${ac.r},0.15)`, color: `rgba(${ac.r},0.5)`, background: `rgba(${ac.r},0.04)` }}
+                        >
+                          Managed
+                        </div>
+                      ) : isPool ? (
+                        // PM / CT / MM master pool — funds belong to
+                        // investors, master cannot drain to main wallet
+                        // (backend also enforces; this just hides the
+                        // useless / dangerous button). Client report
+                        // 2026-06-01: "pamm master fund transfer kar pa
+                        // raha hai... pool amount sab withdraw le lega".
+                        <div className="flex items-center justify-center rounded-xl border py-2 text-[10px] font-bold tracking-wide"
+                          style={{ borderColor: `rgba(${ac.r},0.15)`, color: `rgba(${ac.r},0.5)`, background: `rgba(${ac.r},0.04)` }}
+                          title="Pool funds belong to investors — not transferable to your main wallet"
+                        >
+                          Pool (held for investors)
+                        </div>
+                      ) : (
                         <div className="flex gap-2">
                           <button
                             type="button"
@@ -982,12 +1003,6 @@ function WalletPageContent() {
                           >
                             <ArrowUpFromLine className="h-3 w-3" strokeWidth={2.25} />
                           </button>
-                        </div>
-                      ) : (
-                        <div className="flex items-center justify-center rounded-xl border py-2 text-[10px] font-bold tracking-wide"
-                          style={{ borderColor: `rgba(${ac.r},0.15)`, color: `rgba(${ac.r},0.5)`, background: `rgba(${ac.r},0.04)` }}
-                        >
-                          Managed
                         </div>
                       )}
                     </div>

@@ -1405,6 +1405,31 @@ async def transfer_trading_to_main(req, user_id: UUID, db: AsyncSession) -> dict
     if not account:
         raise HTTPException(status_code=404, detail="Trading account not found")
 
+    # Block master pool accounts (PAMM / MAM). The pool holds INVESTORS'
+    # money, so the master must never be able to internal-transfer it
+    # into their own main wallet — client report 2026-06-01: "pamm
+    # master fund transfer kar pa raha hai, ese to pool amount jo
+    # collect hoga sab withdraw le lega". The funds only legitimately
+    # leave the pool through:
+    #   • investor withdraw_managed_account (their share back to them)
+    #   • admin delete_master (sweep with full investor refund)
+    #   • engine cycles (performance fee → master's row, but that
+    #     lands on a Transaction, not the pool account).
+    from packages.common.src.models import MasterAccount
+    is_pool = (await db.execute(
+        select(MasterAccount).where(MasterAccount.account_id == account.id)
+    )).scalar_one_or_none()
+    if is_pool is not None:
+        raise HTTPException(
+            status_code=403,
+            detail=(
+                "This is a PAMM / MAM pool account. Funds cannot be moved "
+                "to the main wallet — they're held in trust for investors. "
+                "Use the admin delete-master flow to wind the pool down "
+                "with proper investor refunds."
+            ),
+        )
+
     free = (account.balance or Decimal("0")) - (account.margin_used or Decimal("0"))
     if free < amt:
         raise HTTPException(
