@@ -78,6 +78,19 @@ export default function ChargesPage() {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
+  // Unique segments derived from the instruments list. Each instrument
+  // carries segment + segment_id; we dedupe by id. Powers the Per
+  // Segment dropdown so admin can set one charge for an asset class.
+  const segments = (() => {
+    const seen = new Map<string, string>();
+    for (const i of instruments) {
+      if (i.segment_id && !seen.has(i.segment_id)) {
+        seen.set(i.segment_id, i.segment || i.segment_id.slice(0, 8));
+      }
+    }
+    return Array.from(seen, ([id, name]) => ({ id, name }));
+  })();
+
   const addRow = (scope: string) => {
     setRows(prev => [...prev, {
       _key: newKey(),
@@ -116,7 +129,9 @@ export default function ChargesPage() {
     // Commit delete to backend immediately so the row really disappears.
     try {
       const normalized = normalizeRows(next);
-      const cleaned = normalized.filter(r => !(r.scope === 'user' && !r.user_id));
+      const cleaned = normalized.filter(r =>
+        !(r.scope === 'user' && !r.user_id) && !(r.scope === 'segment' && !r.segment_id),
+      );
       await adminApi.put('/config/charges', {
         configs: cleaned.map(r => ({
           scope: r.scope, instrument_id: r.instrument_id, segment_id: r.segment_id,
@@ -156,6 +171,11 @@ export default function ChargesPage() {
       toast.error('Pick a user for every Per-User rule or remove that row.');
       return;
     }
+    const badSegment = rows.find(r => r.scope === 'segment' && !r.segment_id);
+    if (badSegment) {
+      toast.error('Pick a segment for every Per-Segment rule or remove that row.');
+      return;
+    }
     const cleaned = normalizeRows(rows);
     setSaving(true);
     try {
@@ -174,6 +194,7 @@ export default function ChargesPage() {
   if (loading) return <><div className="flex items-center justify-center h-96"><Loader2 size={20} className="animate-spin text-text-tertiary" /></div></>;
 
   const globalRows = rows.filter(r => r.scope === 'default');
+  const segmentRows = rows.filter(r => r.scope === 'segment');
   const instrumentRows = rows.filter(r => r.scope === 'instrument');
   const userRows = rows.filter(r => r.scope === 'user');
 
@@ -189,7 +210,7 @@ export default function ChargesPage() {
           <table className="w-full">
             <thead>
               <tr className="border-b border-border-primary bg-bg-tertiary/40">
-                {(scopeType === 'instrument' ? ['Instrument'] : scopeType === 'user' ? ['User', 'Instrument'] : []).concat(['Account type', 'Charge Type', 'Value', 'On', '']).map(c => (
+                {(scopeType === 'instrument' ? ['Instrument'] : scopeType === 'segment' ? ['Segment'] : scopeType === 'user' ? ['User', 'Instrument'] : []).concat(['Account type', 'Charge Type', 'Value', 'On', '']).map(c => (
                   <th key={c} className="text-left px-3 py-2 text-xxs font-medium text-text-tertiary uppercase tracking-wide">{c}</th>
                 ))}
               </tr>
@@ -229,6 +250,14 @@ export default function ChargesPage() {
                         <select value={r.instrument_id || ''} onChange={e => updateRow(k, 'instrument_id', e.target.value || null)} className="text-xs py-1 pl-2 pr-6 appearance-none bg-bg-input border border-border-primary rounded text-text-primary w-32">
                           <option value="">All</option>
                           {instruments.map(i => <option key={i.id} value={i.id}>{i.symbol}</option>)}
+                        </select>
+                      </td>
+                    )}
+                    {scopeType === 'segment' && (
+                      <td className="px-3 py-2">
+                        <select value={r.segment_id || ''} onChange={e => updateRow(k, 'segment_id', e.target.value || null)} className="text-xs py-1 pl-2 pr-6 appearance-none bg-bg-input border border-border-primary rounded text-text-primary w-40">
+                          <option value="">Select segment…</option>
+                          {segments.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                         </select>
                       </td>
                     )}
@@ -275,9 +304,11 @@ export default function ChargesPage() {
           <div>
             <h1 className="text-lg font-semibold text-text-primary">Charges Configuration</h1>
             <p className="text-xxs text-text-tertiary mt-0.5">
-              Priority: User &gt; Instrument &gt; Default. Higher priority overrides lower. If there are{' '}
-              <strong className="text-text-secondary">no enabled rules</strong> in any section, client commission is{' '}
-              <strong className="text-text-secondary">$0</strong> (no hidden defaults).
+              Priority (highest → lowest):{' '}
+              <strong className="text-text-secondary">Per-User → Per-Instrument → Per-Segment → Default</strong>.
+              A Per-Segment rule applies to <strong className="text-text-secondary">every instrument in
+              that segment</strong> unless a Per-Instrument or Per-User rule overrides it. If nothing
+              matches, client commission is <strong className="text-text-secondary">$0</strong>.
             </p>
           </div>
           <button onClick={saveAll} disabled={saving} className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-buy rounded-md hover:bg-buy-light disabled:opacity-50 transition-fast">
@@ -286,6 +317,7 @@ export default function ChargesPage() {
         </div>
 
         {renderTable('Default (All Instruments)', globalRows, 'default')}
+        {renderTable('Per Segment (e.g. Forex / Metals / Crypto — applies to every instrument in that segment)', segmentRows, 'segment')}
         {renderTable('Per Instrument', instrumentRows, 'instrument')}
         {renderTable('Per User (Override)', userRows, 'user')}
       </div>
