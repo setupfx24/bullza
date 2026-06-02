@@ -146,9 +146,16 @@ export default function AdvancedChart() {
       style: '1',                 // candles
       locale: 'en',
       enable_publishing: false,
-      // Allow the trader to flip symbol from inside the chart toolbar —
-      // they're not bound to the order panel's selection here.
-      allow_symbol_change: true,
+      // Symbol change LOCKED inside the chart — the widget is a sealed
+      // iframe, so a switch made from its own search box never reaches
+      // our trading store; the order panel keeps the OLD selection and
+      // the next BUY/SELL goes to the wrong instrument. Client report
+      // 2026-06-01: "trade me kuch bhi buy/sell kar raha hu, order
+      // gold pe hi lag raha hai" while the chart was on BTCUSD. The
+      // order panel's MARKETS button is now the only symbol picker —
+      // it updates the store, chart re-renders via tvSymbol prop, and
+      // every order goes to the same symbol the user is looking at.
+      allow_symbol_change: false,
       hide_side_toolbar: false,   // expose drawing tools
       withdateranges: true,
       hide_volume: false,
