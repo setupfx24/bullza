@@ -18,6 +18,18 @@ function buildWidgetEmbedUrl(
   interval: string,
 ): string {
   const tvSymbol = toTradingViewSymbol(symbol);
+  // Use the viewer's resolved timezone. Default fallback = Asia/Kolkata
+  // for SwisDex's India-based audience when the browser returns 'UTC'
+  // (UTC system clock / VPN). Matches the AdvancedChart fallback chain.
+  let viewerTz = 'Asia/Kolkata';
+  if (typeof window !== 'undefined') {
+    try {
+      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      if (tz && tz !== 'UTC' && tz !== 'Etc/UTC' && tz !== 'Etc/GMT') {
+        viewerTz = tz;
+      }
+    } catch { /* keep IST default */ }
+  }
   const params = new URLSearchParams({
     frameElementId: 'pt_tradingview_chart',
     symbol: tvSymbol,
@@ -31,7 +43,7 @@ function buildWidgetEmbedUrl(
     hideideas: '1',
     theme,
     style: '1',
-    timezone: 'Etc/UTC',
+    timezone: viewerTz,
     studies_overrides: '{}',
     overrides: '{}',
     enabled_features: '[]',

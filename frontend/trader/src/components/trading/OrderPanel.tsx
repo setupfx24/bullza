@@ -4,7 +4,7 @@ import { useState, useMemo, useEffect, useRef } from 'react';
 import { usePathname } from 'next/navigation';
 import { clsx } from 'clsx';
 import toast from 'react-hot-toast';
-import { Minus, Plus, ChevronDown, ChevronLeft, Wifi, WifiOff, Zap } from 'lucide-react';
+import { Minus, Plus, ChevronDown, ChevronLeft, Wifi, WifiOff } from 'lucide-react';
 import { useTradingStore, type TradingAccount } from '@/stores/tradingStore';
 import { useUIStore } from '@/stores/uiStore';
 import api from '@/lib/api/client';
@@ -25,8 +25,6 @@ export default function OrderPanel() {
   const {
     terminalMarketsOpen,
     toggleTerminalMarkets,
-    oneClickTrading,
-    setOneClickTrading,
   } = useUIStore();
 
   const {
@@ -344,21 +342,11 @@ export default function OrderPanel() {
                 />
                 <span className="text-[9px] font-extrabold uppercase tracking-wider">Markets</span>
               </button>
-              <button
-                type="button"
-                title={oneClickTrading ? 'One-click trading on' : 'One-click trading off'}
-                aria-label={oneClickTrading ? 'Disable one-click trading' : 'Enable one-click trading'}
-                aria-pressed={oneClickTrading}
-                onClick={() => setOneClickTrading(!oneClickTrading)}
-                className={clsx(
-                  'flex items-center justify-center w-8 h-8 rounded-md border transition-colors',
-                  oneClickTrading
-                    ? 'border-accent/50 bg-accent/15 text-accent'
-                    : 'border-border-secondary text-text-tertiary hover:text-text-primary hover:bg-bg-hover',
-                )}
-              >
-                <Zap size={15} strokeWidth={1.75} />
-              </button>
+              {/* One-click trading toggle removed 2026-06-01 — flag was
+                  stored in UIStore but handleSubmit never read it, so
+                  the button only changed its own colour and did nothing
+                  to order behaviour. Dropped until real one-click logic
+                  (confirmation-modal toggle) ships. */}
             </div>
           ) : null}
         </div>

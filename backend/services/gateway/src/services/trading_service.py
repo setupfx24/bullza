@@ -17,7 +17,9 @@ from packages.common.src.models import (
     TradeHistory, Transaction, CopyTrade, UserAuditLog, User,
     MasterAccount,
 )
-from packages.common.src.instrument_pricing import resolve_commission
+from packages.common.src.instrument_pricing import (
+    resolve_commission, resolve_spread_config, symmetric_quote_from_mid,
+)
 from packages.common.src.insurance.claims import maybe_pay as insurance_maybe_pay
 from . import rewards_service
 from packages.common.src.database import AsyncSessionLocal
@@ -199,6 +201,36 @@ async def place_order(
         raise HTTPException(status_code=400, detail=f"Lot size must be between {min_lot} and {max_lot}")
 
     bid, ask = await get_current_price(instrument.symbol)
+
+    # The broadcast bid/ask already has the INSTRUMENT-level admin spread
+    # baked in (market-data → spread_cache.widen). For per-user and
+    # per-account-type spread overrides to actually bite, we recompute
+    # the quote here from mid using resolve_spread_config with the
+    # caller's user_id + account_group_id. Client report 2026-06-01:
+    # "AllTick se jo spread aa rha hai usko zero kar do; admin apna jo
+    # lagayega account type / instrument / user".
+    try:
+        mid = (bid + ask) / Decimal("2")
+        sv, st, _pimp = await resolve_spread_config(
+            db, instrument,
+            user_id=user_id,
+            account_group_id=account.account_group_id,
+        )
+        if sv and sv > 0:
+            pip = Decimal(str(instrument.pip_size or "0.0001"))
+            digits = int(instrument.digits or 5)
+            new_bid, new_ask = symmetric_quote_from_mid(
+                mid, sv, st, pip, digits, Decimal("0"),
+            )
+            bid, ask = new_bid, new_ask
+    except Exception as _e:
+        # Per-user resolution failure should never block trading; fall
+        # back to the broadcast bid/ask which already has the default
+        # instrument spread applied.
+        logger.warning(
+            "Per-user spread resolution failed for %s (user=%s): %s",
+            instrument.symbol, user_id, _e,
+        )
 
     order = Order(
         account_id=account.id,

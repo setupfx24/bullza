@@ -22,6 +22,17 @@ export function TradingViewChart({ symbol, height = '100%' }: Props) {
     widgetDiv.style.width = '100%';
     container.appendChild(widgetDiv);
 
+    // Default fallback = Asia/Kolkata for SwisDex's India-based audience
+    // when the browser returns 'UTC' (UTC system clock / VPN). Matches
+    // the AdvancedChart fallback chain.
+    let viewerTz = 'Asia/Kolkata';
+    try {
+      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      if (tz && tz !== 'UTC' && tz !== 'Etc/UTC' && tz !== 'Etc/GMT') {
+        viewerTz = tz;
+      }
+    } catch { /* keep IST default */ }
+
     const script = document.createElement('script');
     script.type = 'text/javascript';
     script.src =
@@ -31,7 +42,7 @@ export function TradingViewChart({ symbol, height = '100%' }: Props) {
       autosize: true,
       symbol,
       interval: 'D',
-      timezone: 'Etc/UTC',
+      timezone: viewerTz,
       theme: 'dark',
       style: '1',
       locale: 'en',
