@@ -26,6 +26,12 @@ export interface Position {
   /** copy_trade | self_trade when API provides it (open positions / copy trading). */
   trade_type?: string;
   created_at: string;
+  // Insurance markers per position — null when no active policy. Used
+  // by PositionsPanel to render an "Insurance OK in 25s / Expires in
+  // 2h 15m" countdown chip next to the close button.
+  insurance_activated_at?: string | null;
+  insurance_eligible_at?: string | null;
+  insurance_expires_at?: string | null;
 }
 
 export interface PendingOrder {

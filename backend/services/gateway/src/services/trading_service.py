@@ -653,6 +653,34 @@ async def list_positions(account_id: UUID, user_id: UUID, status: str, db: Async
     result = await db.execute(query.order_by(Position.created_at.desc()))
     positions = result.scalars().all()
 
+    # Per-position insurance markers — needed so the trader-side
+    # positions panel can render an "Insurance OK in 25s / Expires
+    # in 2h 15m" countdown chip without a second request per row.
+    # Client report 2026-06-01: "insurance countdown to be shown here".
+    insurance_by_pos: dict = {}
+    insurance_min_secs = 0.0
+    insurance_validity_secs = 0.0
+    if positions:
+        try:
+            from packages.common.src.models import InsurancePolicy
+            from packages.common.src.insurance.config import load_config as _load_ins_cfg
+            cfg = await _load_ins_cfg()
+            insurance_min_secs = float(cfg.min_trade_duration_seconds or 0)
+            insurance_validity_secs = float(cfg.policy_validity_seconds or 0)
+            pol_rows = (await db.execute(
+                select(InsurancePolicy).where(
+                    InsurancePolicy.position_id.in_([p.id for p in positions]),
+                    InsurancePolicy.status == "active",
+                )
+            )).scalars().all()
+            for p in pol_rows:
+                insurance_by_pos[str(p.position_id)] = p
+        except Exception as _e:
+            # Insurance is best-effort metadata on the position list —
+            # never block the panel render if the config / table is
+            # unavailable.
+            logger.warning("Failed to attach insurance markers: %s", _e)
+
     response = []
     for pos in positions:
         current_price = None
@@ -675,6 +703,32 @@ async def list_positions(account_id: UUID, user_id: UUID, status: str, db: Async
         trade_type = "copy_trade" if copy_trade else "self_trade"
 
         pos_status_val = pos.status.value if hasattr(pos.status, 'value') else str(pos.status)
+
+        # Insurance countdown metadata. Frontend ticks each second
+        # against `activated_at + min_trade_duration` (claim-eligible
+        # at) and `activated_at + policy_validity` (expires at).
+        ins_pol = insurance_by_pos.get(str(pos.id))
+        ins_activated_iso = None
+        ins_eligible_at_iso = None
+        ins_expires_at_iso = None
+        if ins_pol is not None:
+            activated = ins_pol.activated_at
+            if activated is not None:
+                if activated.tzinfo is None:
+                    from datetime import timezone as _tz
+                    activated = activated.replace(tzinfo=_tz.utc)
+                ins_activated_iso = activated.isoformat()
+                if insurance_min_secs > 0:
+                    from datetime import timedelta as _td
+                    ins_eligible_at_iso = (
+                        activated + _td(seconds=insurance_min_secs)
+                    ).isoformat()
+                if insurance_validity_secs > 0:
+                    from datetime import timedelta as _td
+                    ins_expires_at_iso = (
+                        activated + _td(seconds=insurance_validity_secs)
+                    ).isoformat()
+
         response.append({
             "id": str(pos.id),
             "account_id": str(pos.account_id),
@@ -693,6 +747,11 @@ async def list_positions(account_id: UUID, user_id: UUID, status: str, db: Async
             "trade_type": trade_type,
             "created_at": pos.created_at.isoformat() if pos.created_at else None,
             "closed_at": pos.closed_at.isoformat() if getattr(pos, 'closed_at', None) else None,
+            # Insurance markers — null when the position has no active
+            # policy. UI shows a countdown only when these are set.
+            "insurance_activated_at": ins_activated_iso,
+            "insurance_eligible_at": ins_eligible_at_iso,
+            "insurance_expires_at": ins_expires_at_iso,
         })
 
     return response
