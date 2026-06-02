@@ -95,6 +95,33 @@ const TZ_ALIAS: Record<string, string> = {
   'Pacific/Truk':    'Pacific/Chuuk',
 };
 
+// Curated list for the manual picker — major financial-market hubs +
+// India + UAE + auto-detect. Each entry { value: IANA, label: human }.
+// User's choice persists in localStorage so it survives reloads.
+const TZ_OPTIONS: { value: string; label: string }[] = [
+  { value: '__auto', label: 'Auto (your local time)' },
+  { value: 'Asia/Kolkata',       label: 'India — Mumbai / Delhi (IST, UTC+5:30)' },
+  { value: 'Asia/Dubai',         label: 'UAE — Dubai (GST, UTC+4)' },
+  { value: 'Asia/Singapore',     label: 'Singapore (SGT, UTC+8)' },
+  { value: 'Asia/Hong_Kong',     label: 'Hong Kong (HKT, UTC+8)' },
+  { value: 'Asia/Tokyo',         label: 'Japan — Tokyo (JST, UTC+9)' },
+  { value: 'Asia/Shanghai',      label: 'China — Shanghai (CST, UTC+8)' },
+  { value: 'Asia/Bangkok',       label: 'Thailand — Bangkok (UTC+7)' },
+  { value: 'Asia/Karachi',       label: 'Pakistan — Karachi (UTC+5)' },
+  { value: 'Asia/Riyadh',        label: 'Saudi Arabia — Riyadh (UTC+3)' },
+  { value: 'Europe/London',      label: 'UK — London (GMT/BST)' },
+  { value: 'Europe/Frankfurt',   label: 'Germany — Frankfurt (CET)' },
+  { value: 'Europe/Zurich',      label: 'Switzerland — Zurich (CET)' },
+  { value: 'Europe/Moscow',      label: 'Russia — Moscow (MSK, UTC+3)' },
+  { value: 'America/New_York',   label: 'US East — New York (EST/EDT)' },
+  { value: 'America/Chicago',    label: 'US Central — Chicago (CST/CDT)' },
+  { value: 'America/Los_Angeles',label: 'US West — Los Angeles (PST/PDT)' },
+  { value: 'America/Sao_Paulo',  label: 'Brazil — São Paulo (BRT, UTC-3)' },
+  { value: 'Australia/Sydney',   label: 'Australia — Sydney (AEDT)' },
+  { value: 'Etc/UTC',            label: 'UTC (universal)' },
+];
+const TZ_STORAGE_KEY = 'swisdex.chart.tz';
+
 export default function AdvancedChart() {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const selectedSymbol = useTradingStore((s) => s.selectedSymbol);
@@ -102,6 +129,24 @@ export default function AdvancedChart() {
 
   const tvSymbol = useMemo(() => resolveTvSymbol(selectedSymbol), [selectedSymbol]);
   const tvTheme: 'dark' | 'light' = theme === 'light' ? 'light' : 'dark';
+
+  // User-picked timezone — '__auto' means follow Intl.DateTimeFormat
+  // resolution; any other value is a fixed IANA name. Persists in
+  // localStorage so the choice survives reloads.
+  const [userTz, setUserTz] = useState<string>('__auto');
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      const stored = window.localStorage.getItem(TZ_STORAGE_KEY);
+      if (stored) setUserTz(stored);
+    } catch { /* private mode — keep default */ }
+  }, []);
+  const persistTz = (value: string) => {
+    setUserTz(value);
+    setTzMenuOpen(false);
+    try { window.localStorage.setItem(TZ_STORAGE_KEY, value); } catch { /* ignore */ }
+  };
+  const [tzMenuOpen, setTzMenuOpen] = useState(false);
 
   // Fullscreen toggle — the embed widget has no fullscreen button of
   // its own, so we drive the browser Fullscreen API on our wrapper.
@@ -155,12 +200,18 @@ export default function AdvancedChart() {
     //      'UTC' / 'Etc/UTC' / 'Etc/GMT'.
     //   3. Etc/UTC as a last resort if anything throws.
     let viewerTz = 'Asia/Kolkata';
-    try {
-      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-      if (tz && tz !== 'UTC' && tz !== 'Etc/UTC' && tz !== 'Etc/GMT') {
-        viewerTz = TZ_ALIAS[tz] || tz;
-      }
-    } catch { /* keep IST default */ }
+    if (userTz && userTz !== '__auto') {
+      // User explicitly picked a timezone from the chart picker —
+      // honour that over the browser's resolved zone.
+      viewerTz = userTz;
+    } else {
+      try {
+        const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        if (tz && tz !== 'UTC' && tz !== 'Etc/UTC' && tz !== 'Etc/GMT') {
+          viewerTz = TZ_ALIAS[tz] || tz;
+        }
+      } catch { /* keep IST default */ }
+    }
 
     script.innerHTML = JSON.stringify({
       autosize: true,
@@ -193,7 +244,7 @@ export default function AdvancedChart() {
     return () => {
       try { container.innerHTML = ''; } catch { /* noop */ }
     };
-  }, [tvSymbol, tvTheme]);
+  }, [tvSymbol, tvTheme, userTz]);
 
   return (
     <div
@@ -205,6 +256,51 @@ export default function AdvancedChart() {
           The chart now ships with only the fullscreen toggle, sized to
           stay clear of TradingView's instrument-name watermark
           (top-left) and the right-edge controls. */}
+
+      {/* Timezone picker — click to open dropdown of common timezones.
+          Selection persists in localStorage and forces the widget to
+          rebuild (useEffect deps include userTz). Shows the active
+          zone label so the user always knows what timezone the chart
+          clock is in. Client report 2026-06-01: "us par click karunga
+          to multiple options dikhenge?". */}
+      <div className="absolute top-2 right-12 z-20">
+        <button
+          type="button"
+          onClick={() => setTzMenuOpen((v) => !v)}
+          title="Change chart timezone"
+          className="px-2 py-1.5 rounded-md bg-black/40 hover:bg-black/60 text-white/80 hover:text-white backdrop-blur-sm transition-colors text-[10px] font-bold uppercase tracking-wider flex items-center gap-1"
+        >
+          <span>🕐</span>
+          <span className="hidden sm:inline">
+            {userTz === '__auto'
+              ? 'Auto'
+              : (TZ_OPTIONS.find((o) => o.value === userTz)?.label.split(' — ')[0] || userTz.split('/').pop())}
+          </span>
+        </button>
+        {tzMenuOpen && (
+          <>
+            {/* Click-away catcher */}
+            <div
+              className="fixed inset-0 z-10"
+              onClick={() => setTzMenuOpen(false)}
+            />
+            <div className="absolute right-0 mt-1 z-20 w-72 max-h-80 overflow-y-auto rounded-md bg-bg-secondary border border-border-primary shadow-xl">
+              {TZ_OPTIONS.map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => persistTz(opt.value)}
+                  className={`w-full text-left px-3 py-2 text-xs hover:bg-bg-hover border-b border-border-primary/40 last:border-0 ${
+                    userTz === opt.value ? 'text-accent font-semibold' : 'text-text-secondary'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </>
+        )}
+      </div>
 
       <button
         type="button"
