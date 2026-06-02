@@ -202,35 +202,61 @@ async def place_order(
 
     bid, ask = await get_current_price(instrument.symbol)
 
-    # The broadcast bid/ask already has the INSTRUMENT-level admin spread
-    # baked in (market-data → spread_cache.widen). For per-user and
-    # per-account-type spread overrides to actually bite, we recompute
-    # the quote here from mid using resolve_spread_config with the
-    # caller's user_id + account_group_id. Client report 2026-06-01:
-    # "AllTick se jo spread aa rha hai usko zero kar do; admin apna jo
-    # lagayega account type / instrument / user".
-    try:
-        mid = (bid + ask) / Decimal("2")
-        sv, st, _pimp = await resolve_spread_config(
-            db, instrument,
-            user_id=user_id,
-            account_group_id=account.account_group_id,
-        )
-        if sv and sv > 0:
-            pip = Decimal(str(instrument.pip_size or "0.0001"))
-            digits = int(instrument.digits or 5)
+    # Spread resolution. The broadcast bid/ask already has INSTRUMENT-
+    # level admin spread baked in (market-data → spread_cache.widen).
+    # We recompute from mid here using a priority chain:
+    #
+    #   1. Master pool override — if this account is a MAM/PAMM pool
+    #      account AND admin set master.spread_markup_pips, treat that
+    #      as THE TOTAL spread (REPLACE the user's account-type spread
+    #      entirely). Client decision 2026-06-01: "PAMM/MAM ka spread
+    #      alag se lagayega, different not as per account type".
+    #
+    #   2. Per-user / per-account-type / per-instrument from
+    #      resolve_spread_config — for normal trading accounts.
+    #
+    # Anything outside both falls back to the broadcast bid/ask.
+    mid = (bid + ask) / Decimal("2")
+    pip = Decimal(str(instrument.pip_size or "0.0001"))
+    digits = int(instrument.digits or 5)
+
+    master_override = (await db.execute(
+        select(MasterAccount).where(MasterAccount.account_id == account.id)
+    )).scalar_one_or_none()
+
+    if master_override and master_override.spread_markup_pips:
+        # MAM/PAMM pool — master spread is the WHOLE spread, no
+        # additive layering. Whatever account_group the pool account
+        # was opened under is ignored on purpose.
+        try:
+            sv_master = Decimal(str(master_override.spread_markup_pips))
             new_bid, new_ask = symmetric_quote_from_mid(
-                mid, sv, st, pip, digits, Decimal("0"),
+                mid, sv_master, "pips", pip, digits, Decimal("0"),
             )
             bid, ask = new_bid, new_ask
-    except Exception as _e:
-        # Per-user resolution failure should never block trading; fall
-        # back to the broadcast bid/ask which already has the default
-        # instrument spread applied.
-        logger.warning(
-            "Per-user spread resolution failed for %s (user=%s): %s",
-            instrument.symbol, user_id, _e,
-        )
+        except Exception as _e:
+            logger.warning(
+                "Master pool spread re-widening failed for %s: %s",
+                instrument.symbol, _e,
+            )
+    else:
+        # Regular trading account — per-user / per-account-type wins.
+        try:
+            sv, st, _pimp = await resolve_spread_config(
+                db, instrument,
+                user_id=user_id,
+                account_group_id=account.account_group_id,
+            )
+            if sv and sv > 0:
+                new_bid, new_ask = symmetric_quote_from_mid(
+                    mid, sv, st, pip, digits, Decimal("0"),
+                )
+                bid, ask = new_bid, new_ask
+        except Exception as _e:
+            logger.warning(
+                "Per-user spread resolution failed for %s (user=%s): %s",
+                instrument.symbol, user_id, _e,
+            )
 
     order = Order(
         account_id=account.id,
@@ -249,20 +275,9 @@ async def place_order(
     if req.order_type == "market":
         fill_price = ask if req.side == "buy" else bid
 
-        # PAMM / MAM per-master trade-cost overrides. If this account is the
-        # pool account behind a master and admin set spread_markup_pips, layer
-        # the additional pips into fill_price (BUY pays more, SELL receives
-        # less). NULL = fall through to the standard SpreadConfig resolver.
-        master_override = (await db.execute(
-            select(MasterAccount).where(MasterAccount.account_id == account.id)
-        )).scalar_one_or_none()
-        if master_override and master_override.spread_markup_pips:
-            pip_size = instrument.pip_size or Decimal("0.0001")
-            markup = Decimal(str(master_override.spread_markup_pips)) * pip_size
-            if req.side == "buy":
-                fill_price = fill_price + markup
-            else:
-                fill_price = fill_price - markup
+        # Master spread is already baked into bid/ask above (REPLACE
+        # mode). The additive markup pass that used to live here is
+        # gone — it would have double-counted.
 
         if req.stop_loss:
             if req.side == "buy" and req.stop_loss >= fill_price:
