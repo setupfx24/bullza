@@ -172,8 +172,14 @@ export default function ReferralPage() {
               </Link>
             </div>
           </div>
-          {/* Plain black box placeholder — drop the final Referral illustration here */}
-          <div className="image-placeholder rounded-2xl min-h-[260px]" aria-hidden />
+          {/* Referral illustration — branded artwork dropped by the client. */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/images/refer_banner.png"
+            alt="Referral program illustration"
+            className="rounded-2xl w-full min-h-[260px] max-h-[340px] object-cover"
+            style={{ border: '1px solid hsl(99 55% 42% / 0.35)' }}
+          />
         </div>
       </section>
 
