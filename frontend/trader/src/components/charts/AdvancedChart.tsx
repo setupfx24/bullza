@@ -71,6 +71,30 @@ function resolveTvSymbol(sym: string | null | undefined): string {
   return SYMBOL_PREFIX[s] || `FX:${s}`;
 }
 
+// Legacy IANA aliases → canonical names. Some browsers still report
+// the pre-rename city ("Asia/Calcutta") and TradingView only honours
+// the canonical form ("Asia/Kolkata"), so without this map the clock
+// silently falls back to UTC. Confirmed culprit on the user's machine
+// 2026-06-01: console returned 'Asia/Calcutta'.
+const TZ_ALIAS: Record<string, string> = {
+  'Asia/Calcutta':   'Asia/Kolkata',
+  'Asia/Saigon':     'Asia/Ho_Chi_Minh',
+  'Asia/Katmandu':   'Asia/Kathmandu',
+  'Asia/Rangoon':    'Asia/Yangon',
+  'Asia/Chongqing':  'Asia/Shanghai',
+  'Asia/Harbin':     'Asia/Shanghai',
+  'Asia/Macao':      'Asia/Macau',
+  'Asia/Dacca':      'Asia/Dhaka',
+  'Europe/Kiev':     'Europe/Kyiv',
+  'Europe/Nicosia':  'Asia/Nicosia',
+  'America/Buenos_Aires':  'America/Argentina/Buenos_Aires',
+  'Australia/South':       'Australia/Adelaide',
+  'Australia/North':       'Australia/Darwin',
+  'Australia/Queensland':  'Australia/Brisbane',
+  'Pacific/Ponape':  'Pacific/Pohnpei',
+  'Pacific/Truk':    'Pacific/Chuuk',
+};
+
 export default function AdvancedChart() {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const selectedSymbol = useTradingStore((s) => s.selectedSymbol);
@@ -122,18 +146,19 @@ export default function AdvancedChart() {
     // the clock to whatever `timezone` we pass).
     //
     // Fallback chain:
-    //   1. Browser's resolved IANA zone if it's NOT UTC.
-    //   2. SwisDex's primary market — Asia/Kolkata (IST) — when the
-    //      browser returns UTC. That happens on systems with UTC
-    //      system clock or some VPN setups. Picking IST here means an
-    //      India-based trader still sees a sensible local clock even
-    //      when their browser hands us back 'UTC'.
+    //   1. Browser's resolved IANA zone, normalized through TZ_ALIAS
+    //      so legacy names (Asia/Calcutta, Asia/Saigon, ...) map to
+    //      the canonical TradingView expects (Asia/Kolkata, ...).
+    //      Client report 2026-06-01: browser returned 'Asia/Calcutta',
+    //      widget didn't recognise it, clock stuck on UTC.
+    //   2. Asia/Kolkata fallback when the browser hands us a literal
+    //      'UTC' / 'Etc/UTC' / 'Etc/GMT'.
     //   3. Etc/UTC as a last resort if anything throws.
     let viewerTz = 'Asia/Kolkata';
     try {
       const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
       if (tz && tz !== 'UTC' && tz !== 'Etc/UTC' && tz !== 'Etc/GMT') {
-        viewerTz = tz;
+        viewerTz = TZ_ALIAS[tz] || tz;
       }
     } catch { /* keep IST default */ }
 

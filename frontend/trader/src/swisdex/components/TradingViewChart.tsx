@@ -23,13 +23,22 @@ export function TradingViewChart({ symbol, height = '100%' }: Props) {
     container.appendChild(widgetDiv);
 
     // Default fallback = Asia/Kolkata for SwisDex's India-based audience
-    // when the browser returns 'UTC' (UTC system clock / VPN). Matches
-    // the AdvancedChart fallback chain.
+    // when the browser returns 'UTC'. ALIAS map normalises legacy IANA
+    // names so TradingView's widget recognises them (Asia/Calcutta →
+    // Asia/Kolkata, etc.) — mirrors the AdvancedChart fix.
+    const TZ_ALIAS: Record<string, string> = {
+      'Asia/Calcutta': 'Asia/Kolkata',
+      'Asia/Saigon': 'Asia/Ho_Chi_Minh',
+      'Asia/Katmandu': 'Asia/Kathmandu',
+      'Asia/Rangoon': 'Asia/Yangon',
+      'Asia/Dacca': 'Asia/Dhaka',
+      'Europe/Kiev': 'Europe/Kyiv',
+    };
     let viewerTz = 'Asia/Kolkata';
     try {
       const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
       if (tz && tz !== 'UTC' && tz !== 'Etc/UTC' && tz !== 'Etc/GMT') {
-        viewerTz = tz;
+        viewerTz = TZ_ALIAS[tz] || tz;
       }
     } catch { /* keep IST default */ }
 
