@@ -980,3 +980,18 @@ html[data-page="accounts"] header.h-\[65px\] + div,
 html[data-page="accounts"] div:has(> header.h-\[65px\]) {
   background: transparent !important;
 }
+
+/* ───────────────────────────────────────────────────────────── */
+/* SwisDex brand logo — the PNG ships with white / light lettering
+   on a transparent background, so it disappears against the white
+   card when the user flips to light theme (client report
+   2026-06-01: "user dashboard light theme me logo dikh nahi raha").
+   The attribute selector matches every <img src="/images/swisdex_png5.png">
+   in the app without needing to add a class everywhere. invert +
+   hue-rotate flips the luminance so the brand colours land roughly
+   where they were before — close enough to recognisable on white
+   backgrounds without a second asset.                               */
+/* ───────────────────────────────────────────────────────────── */
+[data-theme="light"] img[src*="swisdex_png5"] {
+  filter: invert(1) hue-rotate(180deg) saturate(1.4) brightness(0.9);
+}

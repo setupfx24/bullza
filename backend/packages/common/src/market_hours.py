@@ -19,12 +19,44 @@ UTC = timezone.utc
 # ---------------------------------------------------------------------------
 
 #: Crypto trades 24/7 — never blocked
-CRYPTO_SEGMENTS = {"crypto", "cryptocurrency"}
+CRYPTO_SEGMENTS = {"crypto", "cryptocurrency", "crypto currency", "digital assets"}
+#: Crypto base codes — used to detect any pair whose base is a known
+#: crypto (e.g. BTCUSDT / BTC_USD / BTC.USD / BTCUSD all match). Catches
+#: any symbol that STARTS with one of these prefixes so a misnamed
+#: segment in the DB ("forex" instead of "crypto") still gets the 24/7
+#: treatment. Client report 2026-06-01: "BTC not working on Sat/Sun".
+CRYPTO_BASES = {
+    "BTC", "ETH", "LTC", "XRP", "SOL", "BNB", "ADA", "DOT", "MATIC",
+    "AVAX", "LINK", "DOGE", "UNI", "ATOM", "XLM", "TRX", "XBT",
+    "USDT", "USDC", "DAI",  # stable-pair bases like USDTUSD edge case
+    "SHIB", "PEPE", "APT", "ARB", "OP", "NEAR", "FTM", "ALGO", "ICP",
+    "FIL", "SAND", "MANA", "AAVE", "MKR", "CRV", "SUSHI", "LDO", "RUNE",
+}
 CRYPTO_SYMBOLS = {
     "BTCUSD", "ETHUSD", "LTCUSD", "XRPUSD", "SOLUSD", "BNBUSD",
     "ADAUSD", "DOTUSD", "MATICUSD", "AVAXUSD", "LINKUSD", "DOGEUSD",
     "UNIUSD", "ATOMUSD", "XLMUSD", "TRXUSD",
 }
+
+
+def _looks_like_crypto(sym: str) -> bool:
+    """True if `sym` plausibly trades on crypto exchanges (and therefore
+    should be 24/7). Matches:
+      - explicit allow-list (CRYPTO_SYMBOLS)
+      - any pair whose base currency is in CRYPTO_BASES (BTCUSD, BTCUSDT,
+        BTC/USD, BTC_USD, XBTUSD, etc.)
+    Defensive against admins typoing the segment field — symbol-pattern
+    detection wins even when segment_name says "forex".
+    """
+    if sym in CRYPTO_SYMBOLS:
+        return True
+    # Strip common separators so BTC/USD, BTC_USD, BTC-USD all normalise
+    # to "BTCUSD" before the prefix check.
+    cleaned = sym.replace("/", "").replace("_", "").replace("-", "").replace(".", "")
+    for base in CRYPTO_BASES:
+        if cleaned.startswith(base):
+            return True
+    return False
 
 #: Forex pairs + precious metals + energy — follow forex session
 FOREX_SEGMENTS = {"forex", "fx", "foreign exchange"}
@@ -78,8 +110,10 @@ def is_market_open(
         if override is not None:
             return override
 
-    # 2. Crypto — 24 / 7
-    if seg in CRYPTO_SEGMENTS or sym in CRYPTO_SYMBOLS:
+    # 2. Crypto — 24 / 7. Detect by segment OR by symbol pattern so a
+    # mis-tagged instrument (segment="forex" on the DB row) still
+    # respects 24/7 — client report 2026-06-01: BTC blocked Sat/Sun.
+    if seg in CRYPTO_SEGMENTS or _looks_like_crypto(sym):
         return True, ""
 
     # 3. Forex  +  forex-like commodities (metals, energy)
@@ -183,7 +217,7 @@ def _is_index_symbol(sym: str) -> bool:
 def _describe_session(symbol: str, segment: Optional[str]) -> str:
     sym = symbol.upper()
     seg = (segment or "").lower()
-    if seg in CRYPTO_SEGMENTS or sym in CRYPTO_SYMBOLS:
+    if seg in CRYPTO_SEGMENTS or _looks_like_crypto(sym):
         return "24/7"
     if sym in US_INDEX_SYMBOLS:
         return "Mon–Fri 13:30–20:00 UTC"
