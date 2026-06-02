@@ -363,7 +363,8 @@ export default function MamPage() {
         commission_per_lot_usd: form.commission_per_lot_usd === '' ? null : Number(form.commission_per_lot_usd),
         max_drawdown_pct: form.max_drawdown_pct === '' ? null : Number(form.max_drawdown_pct),
         max_loss_per_trade_pct: form.max_loss_per_trade_pct === '' ? null : Number(form.max_loss_per_trade_pct),
-        insurance_enabled: !!form.insurance_enabled,
+        // Forced FALSE — insurance not available for MAM/PAMM (2026-06-01).
+        insurance_enabled: false,
       };
       const res = await adminApi.post<{ pool_account_number: string }>('/business/masters', body);
       toast.success(`MAM created — pool account ${res.pool_account_number}`);
@@ -394,7 +395,8 @@ export default function MamPage() {
         commission_per_lot_usd: form.commission_per_lot_usd === '' ? null : Number(form.commission_per_lot_usd),
         max_drawdown_pct: form.max_drawdown_pct === '' ? null : Number(form.max_drawdown_pct),
         max_loss_per_trade_pct: form.max_loss_per_trade_pct === '' ? null : Number(form.max_loss_per_trade_pct),
-        insurance_enabled: !!form.insurance_enabled,
+        // Forced FALSE — insurance not available for MAM/PAMM (2026-06-01).
+        insurance_enabled: false,
       };
       await adminApi.put(`/business/masters/${editTarget.id}`, body);
       toast.success('MAM updated');
@@ -802,20 +804,11 @@ export default function MamPage() {
                     <p className="text-xxs text-text-tertiary mt-1">Single-trade loss cap (% of pool equity).</p>
                   </div>
                 </div>
-                <label className="flex items-start gap-2 cursor-pointer select-none pt-1">
-                  <input
-                    type="checkbox"
-                    checked={form.insurance_enabled}
-                    onChange={(e) => setForm((s) => ({ ...s, insurance_enabled: e.target.checked }))}
-                    className="mt-0.5 h-4 w-4 accent-amber-500 cursor-pointer"
-                  />
-                  <span className="text-xxs text-text-primary">
-                    Allow investors to auto-insure copied trades on this master
-                    <span className="block text-xxs text-text-tertiary mt-0.5">
-                      Off = the trader-side invest modal hides the insurance opt-in checkbox.
-                    </span>
-                  </span>
-                </label>
+                {/* Insurance toggle removed 2026-06-01 — insurance is
+                    not available for MAM/PAMM accounts platform-wide.
+                    The column stays in master_accounts for record but
+                    is forced FALSE on create / update so legacy data
+                    can't surface the option to investors. */}
               </div>
 
               <div>
