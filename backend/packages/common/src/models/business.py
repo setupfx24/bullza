@@ -109,6 +109,12 @@ class MasterAccount(Base):
     # without touching the broader per-instrument commission ladder.
     spread_markup_pips = Column(Numeric(10, 5), nullable=True)
     commission_per_lot_usd = Column(Numeric(10, 5), nullable=True)
+    # Per-master swap overrides (Mig 0067). When set, replace the
+    # resolved swap rate (instrument / segment / default) for overnight
+    # positions on this pool account. NULL = fall through to the
+    # standard swap_configs resolver.
+    swap_long_pips = Column(Numeric(10, 4), nullable=True)
+    swap_short_pips = Column(Numeric(10, 4), nullable=True)
     max_investors = Column(Integer, default=100)
     description = Column(Text)
     strategy_info = Column(JSONB, default=None)

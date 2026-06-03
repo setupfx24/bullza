@@ -473,6 +473,10 @@ class MasterUpdateIn(BaseModel):
     max_drawdown_pct: float | None = None
     max_loss_per_trade_pct: float | None = None
     insurance_enabled: bool | None = None
+    # Mig 0067 per-master swap overrides. Same NULL-clears-the-override
+    # semantics as spread_markup_pips.
+    swap_long_pips: float | None = None
+    swap_short_pips: float | None = None
 
 
 @router.put("/masters/{master_id}")
