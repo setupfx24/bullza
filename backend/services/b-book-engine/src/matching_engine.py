@@ -178,7 +178,15 @@ class MatchingEngine:
         instrument = await db.get(Instrument, order.instrument_id)
         # Redis quotes already include platform spread (symmetric).
         fill_price = ask if order.side == OrderSide.BUY else bid
-        margin = (order.lots * instrument.contract_size * fill_price) / Decimal(str(account.leverage))
+        # Notional/leverage gives margin in the quote currency (JPY for
+        # NZDJPY etc.). Convert to account currency to match the value
+        # stored on `account.margin_used` and used by gateway open-paths.
+        from packages.common.src.trading_service import convert_to_account_currency
+        margin_raw = (order.lots * instrument.contract_size * fill_price) / Decimal(str(account.leverage))
+        margin = await convert_to_account_currency(
+            margin_raw,
+            getattr(instrument, "quote_currency", None),
+        )
 
         if margin > account.free_margin:
             order.status = OrderStatus.REJECTED

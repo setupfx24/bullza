@@ -76,7 +76,11 @@ def side_val(side) -> str:
     return side.value if hasattr(side, 'value') else str(side)
 
 
-from packages.common.src.trading_service import quote_to_account_pnl
+from packages.common.src.trading_service import (
+    quote_to_account_pnl,
+    quote_to_account_pnl_async,
+    convert_to_account_currency,
+)
 
 
 def calc_pnl(
@@ -316,11 +320,22 @@ async def place_order(
             min(int(account.leverage), int(ic_lev_cap))
             if ic_lev_cap else int(account.leverage)
         )
-        required_margin = calc_margin(req.lots, fill_price, contract_size, effective_leverage)
+        # Margin from calc_margin is in the instrument's quote currency
+        # (e.g. JPY for NZDJPY). Convert to the account currency (USD)
+        # before reserving against the balance, otherwise 1 JPY of margin
+        # gets reserved as $1 — historically over-charged by ~150× on JPY
+        # crosses and broke "Insufficient margin" gating on small lots.
+        required_margin_raw = calc_margin(req.lots, fill_price, contract_size, effective_leverage)
+        required_margin = await convert_to_account_currency(
+            required_margin_raw,
+            getattr(instrument, "quote_currency", None) or (instrument.symbol[3:6].upper() if instrument.symbol and len(instrument.symbol) >= 6 else None),
+        )
 
         unrealized_pnl = Decimal("0")
         open_pos_result = await db.execute(
-            select(Position).where(
+            select(Position)
+            .options(selectinload(Position.instrument))
+            .where(
                 Position.account_id == account.id,
                 Position.status == "open",
             )
@@ -352,10 +367,22 @@ async def place_order(
                 pos_side = pos.side.value if hasattr(pos.side, 'value') else str(pos.side)
                 cp = p_bid if pos_side == "buy" else p_ask
                 cs = pos.instrument.contract_size if pos.instrument else Decimal("100000")
-                if pos_side == "buy":
-                    unrealized_pnl += (cp - pos.open_price) * pos.lots * cs
-                else:
-                    unrealized_pnl += (pos.open_price - cp) * pos.lots * cs
+                raw_q = (
+                    (cp - pos.open_price) * pos.lots * cs
+                    if pos_side == "buy"
+                    else (pos.open_price - cp) * pos.lots * cs
+                )
+                # Convert quote-currency P&L to account currency (USD)
+                # so cross pairs like NZDJPY don't get JPY values treated
+                # as dollars when summing equity for the margin check.
+                unrealized_pnl += await quote_to_account_pnl_async(
+                    raw_q,
+                    getattr(pos.instrument, "base_currency", None),
+                    getattr(pos.instrument, "quote_currency", None),
+                    cp,
+                    "USD",
+                    symbol=sym,
+                )
         real_equity = (account.balance or Decimal("0")) + (account.credit or Decimal("0")) + unrealized_pnl
         real_free_margin = real_equity - (account.margin_used or Decimal("0"))
 
@@ -709,7 +736,23 @@ async def list_positions(account_id: UUID, user_id: UUID, status: str, db: Async
         if tick_data and pos_status == "open":
             tick = json.loads(tick_data)
             current_price = float(tick["bid"]) if sv == "buy" else float(tick["ask"])
-            profit = float(calc_pnl(pos.side, pos.open_price, Decimal(str(current_price)), pos.lots, contract_size, instrument=pos.instrument))
+            # Use the async P&L converter so cross pairs (NZDJPY etc.) get
+            # the JPY→USD conversion via live USDJPY tick. The sync version
+            # silently returns raw JPY for cross pairs which historically
+            # made losses/gains look ~125× too large in the positions panel.
+            raw_q = (
+                (Decimal(str(current_price)) - pos.open_price) * pos.lots * contract_size
+                if sv == "buy"
+                else (pos.open_price - Decimal(str(current_price))) * pos.lots * contract_size
+            )
+            profit = float(await quote_to_account_pnl_async(
+                raw_q,
+                getattr(pos.instrument, "base_currency", None),
+                getattr(pos.instrument, "quote_currency", None),
+                Decimal(str(current_price)),
+                "USD",
+                symbol=pos.instrument.symbol if pos.instrument else None,
+            ))
 
         copy_trade_q = await db.execute(
             select(CopyTrade).where(CopyTrade.investor_position_id == pos.id)
@@ -958,7 +1001,15 @@ async def close_position(position_id: UUID, req, user_id: UUID, db: AsyncSession
         db.add(history)
 
         account.balance += partial_profit
-        partial_margin = (close_lots * contract_size * pos.open_price) / Decimal(str(_effective_leverage_close))
+        # Margin is released in account currency, so the raw quote-currency
+        # notional must be converted back the same way it was reserved on
+        # open. Otherwise JPY/CHF-quoted pairs leak margin on every partial
+        # close (released $189 when only $1.20 was originally reserved).
+        partial_margin_raw = (close_lots * contract_size * pos.open_price) / Decimal(str(_effective_leverage_close))
+        partial_margin = await convert_to_account_currency(
+            partial_margin_raw,
+            getattr(pos.instrument, "quote_currency", None),
+        )
         account.margin_used = max(Decimal("0"), (account.margin_used or Decimal("0")) - partial_margin)
 
         result_msg = f"Partial close: {close_lots} lots"
@@ -987,7 +1038,12 @@ async def close_position(position_id: UUID, req, user_id: UUID, db: AsyncSession
         db.add(history)
 
         account.balance += full_profit
-        margin_release = (pos.lots * contract_size * pos.open_price) / Decimal(str(_effective_leverage_close))
+        # Same JPY/cross-pair correction as the partial-close path above.
+        margin_release_raw = (pos.lots * contract_size * pos.open_price) / Decimal(str(_effective_leverage_close))
+        margin_release = await convert_to_account_currency(
+            margin_release_raw,
+            getattr(pos.instrument, "quote_currency", None),
+        )
         account.margin_used = max(Decimal("0"), (account.margin_used or Decimal("0")) - margin_release)
 
         result_msg = "Position closed"

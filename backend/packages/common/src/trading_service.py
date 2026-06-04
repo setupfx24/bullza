@@ -91,6 +91,51 @@ async def get_instrument_config(instrument_id: UUID, db: AsyncSession) -> Instru
     return result.scalar_one_or_none()
 
 
+# ─── FX conversion ────────────────────────────────────────────────────────
+
+async def convert_to_account_currency(
+    amount: Decimal,
+    from_currency: str | None,
+    account_currency: str = "USD",
+) -> Decimal:
+    # Convert amount from `from_currency` to `account_currency` using live
+    # Redis ticks. Tries the direct pair {ACCT}{FROM} first (e.g. USDJPY
+    # for JPY→USD: divide), then reverse {FROM}{ACCT} (e.g. NZDUSD for
+    # NZD→USD: multiply). Returns `amount` unchanged with a warning when
+    # neither pair is quoted — caller should treat that as best-effort.
+    if amount is None or amount == 0:
+        return Decimal("0")
+    if not from_currency:
+        return amount
+    fc = from_currency.upper()
+    ac = (account_currency or "USD").upper()
+    if fc == ac:
+        return amount
+
+    async def _mid(symbol: str) -> Decimal | None:
+        raw = await redis_client.get(PriceChannel.tick_key(symbol))
+        if not raw:
+            return None
+        try:
+            t = json.loads(raw)
+            mid = (Decimal(str(t["bid"])) + Decimal(str(t["ask"]))) / Decimal("2")
+            return mid if mid > 0 else None
+        except (json.JSONDecodeError, KeyError, ValueError):
+            return None
+
+    direct = await _mid(f"{ac}{fc}")
+    if direct is not None:
+        return amount / direct
+    reverse = await _mid(f"{fc}{ac}")
+    if reverse is not None:
+        return amount * reverse
+
+    logger.warning(
+        "No FX rate available for %s→%s; returning raw amount %s", fc, ac, amount,
+    )
+    return amount
+
+
 # ─── Margin ───────────────────────────────────────────────────────────────
 
 def calc_margin(
@@ -99,8 +144,31 @@ def calc_margin(
     contract_size: Decimal,
     leverage: int,
 ) -> Decimal:
-    """Calculate required margin for a position."""
+    """Calculate required margin for a position in the instrument's quote
+    currency. Wrap with ``calc_margin_account`` (or convert via
+    ``convert_to_account_currency``) before storing on the account, otherwise
+    JPY-quoted pairs etc. get stored as USD by mistake."""
     return (lots * contract_size * price) / Decimal(str(leverage))
+
+
+async def calc_margin_account(
+    lots: Decimal,
+    price: Decimal,
+    contract_size: Decimal,
+    leverage: int,
+    quote_currency: str | None,
+    account_currency: str = "USD",
+    symbol: str | None = None,
+) -> Decimal:
+    # Margin in account currency. Computes the raw quote-currency notional
+    # via calc_margin then converts to USD using a live tick. Falls back to
+    # symbol-derived currency when DB columns are NULL.
+    raw_quote = calc_margin(lots, price, contract_size, leverage)
+    q = (quote_currency or "").upper()
+    if not q:
+        _, fb_q = _derive_currencies(symbol)
+        q = fb_q or ""
+    return await convert_to_account_currency(raw_quote, q, account_currency)
 
 
 def calc_free_margin(account: TradingAccount) -> Decimal:
@@ -157,8 +225,40 @@ def quote_to_account_pnl(
         if ref_price and ref_price != 0:
             return quote_pnl / ref_price
         return quote_pnl
-    # Cross pair: no cross rate available here; fall back to raw quote pnl.
+    # Cross pair (e.g. NZDJPY where account is USD): no live rate
+    # accessible from this sync helper. Callers that have access to an
+    # event loop should use ``quote_to_account_pnl_async`` instead.
     return quote_pnl
+
+
+async def quote_to_account_pnl_async(
+    quote_pnl: Decimal,
+    base_currency: str | None,
+    quote_currency: str | None,
+    ref_price: Decimal,
+    account_currency: str = "USD",
+    symbol: str | None = None,
+) -> Decimal:
+    # Async P&L converter that handles cross pairs (NZDJPY → USD etc.) by
+    # looking up the live USD/quote rate from Redis. Mirrors the sync
+    # version but falls through to ``convert_to_account_currency`` for the
+    # cross-pair case instead of silently returning raw JPY.
+    if quote_pnl == 0:
+        return quote_pnl
+    base = (base_currency or "").upper()
+    quote = (quote_currency or "").upper()
+    if not base or not quote:
+        fb_base, fb_quote = _derive_currencies(symbol)
+        base = base or (fb_base or "")
+        quote = quote or (fb_quote or "")
+    acct = (account_currency or "USD").upper()
+    if quote == acct or not quote:
+        return quote_pnl
+    if base == acct:
+        if ref_price and ref_price != 0:
+            return quote_pnl / ref_price
+        return quote_pnl
+    return await convert_to_account_currency(quote_pnl, quote, acct)
 
 
 def calc_position_pnl(
