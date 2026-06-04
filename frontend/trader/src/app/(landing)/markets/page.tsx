@@ -32,13 +32,13 @@ export default function MarketsPage() {
           What You Can Trade
         </div>
         <h2 className="mt-6 font-display uppercase tracking-tight leading-[0.95] text-foreground text-3xl sm:text-5xl md:text-6xl lg:text-7xl break-words">
-          One Account.
+          One Login.
           <br />
           <span className="text-primary">Every Market.</span>
         </h2>
         <p className="mt-7 mx-auto max-w-2xl text-foreground/70 text-base sm:text-lg leading-relaxed">
           SwisDex gives you direct access to the world's most traded financial instruments —
-          all from a single, unified account.
+          from a single SwisDex login. Open Standard, ECN, Pro, IB, or Demo accounts as you need them.
         </p>
       </section>
 

@@ -14,7 +14,7 @@ import { clsx } from 'clsx';
 import {
   ChevronDown, ArrowDownToLine, ArrowUpFromLine,
   TrendingUp, TrendingDown, ArrowRight, Gift,
-  ShieldCheck, ExternalLink, Loader2,
+  ShieldCheck, ExternalLink, Loader2, Calculator,
 } from 'lucide-react';
 import DashboardShell from '@/components/layout/DashboardShell';
 import api from '@/lib/api/client';
@@ -295,6 +295,13 @@ function AccountBalanceCard({
             style={{ border: '1px solid var(--border-primary)', color: 'var(--text-primary)' }}
           >
             Details
+          </Link>
+          <Link
+            href="/risk-management/calculator"
+            className="inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold transition-colors hover:bg-bg-hover"
+            style={{ border: '1px solid var(--border-primary)', color: 'var(--text-primary)' }}
+          >
+            <Calculator size={14} /> Risk Calc
           </Link>
         </div>
       </div>
