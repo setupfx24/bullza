@@ -956,7 +956,25 @@ async def close_position(position_id: UUID, req, user_id: UUID, db: AsyncSession
     close_lots = Decimal(str(req.lots)) if req.lots and Decimal(str(req.lots)) < pos.lots else pos.lots
     is_partial = close_lots < pos.lots
 
-    full_profit = calc_pnl(pos.side, pos.open_price, close_price, pos.lots, contract_size, instrument=pos.instrument)
+    # P&L must be in account currency before it touches the balance.
+    # The sync calc_pnl silently returns raw JPY for cross pairs
+    # (NZDJPY, EURGBP), so a -37 JPY loss came through as -$37 and
+    # nuked balances over a few trades. Use the async converter that
+    # looks up the live USD/quote rate from Redis.
+    sv_for_calc = side_val(pos.side)
+    raw_quote = (
+        (close_price - pos.open_price) * pos.lots * contract_size
+        if sv_for_calc == "buy"
+        else (pos.open_price - close_price) * pos.lots * contract_size
+    )
+    full_profit = await quote_to_account_pnl_async(
+        raw_quote,
+        getattr(pos.instrument, "base_currency", None),
+        getattr(pos.instrument, "quote_currency", None),
+        close_price,
+        "USD",
+        symbol=pos.instrument.symbol if pos.instrument else None,
+    )
 
     # If the market price has already crossed the position's SL/TP level, label
     # this close as SL/TP in trade history instead of "manual" — covers the case
