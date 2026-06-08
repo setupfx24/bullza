@@ -19,7 +19,7 @@ from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from packages.common.src.database import AsyncSessionLocal
-from packages.common.src.models import FixedReturnLock, User, Transaction
+from packages.common.src.models import FixedReturnLock, User, Transaction, Notification
 from packages.common.src.settings_store import (
     get_system_setting, get_float_setting, get_int_setting,
 )
@@ -148,24 +148,45 @@ def _tenure_to_months(tenure_days: int) -> int:
 
 
 def _snap_to_payout_window(
-    dt: datetime, *, payout_day: int = 25, advance_if_before: bool = False
+    dt: datetime,
+    *,
+    payout_day: int = 25,
+    advance_if_before: bool = False,  # kept for API compat; no longer used
+    window_start: int = 15,
+    window_end: int = 25,
 ) -> datetime:
-    """Snap a datetime to the admin-configured payout day-of-month.
+    """Pick the payout day-of-month for `dt`, respecting the [start,end]
+    window the admin has configured (default 15-25, per client request
+    2026-06-08).
 
-    Client spec: every interest cycle must land between the 25th and 30th
-    of the month. We canonicalize on the 25th (admin-tunable via
-    `fixed_return_payout_day_of_month`) and zero out the time so payouts
-    drop reliably at 00:00 UTC of that day.
+    Behavior (clamp-only — does NOT advance month):
+      • If `dt.day` is INSIDE the window, keep it as-is (so a lock
+        opened on day 18 keeps paying out every cycle on day 18).
+      • If `dt.day` > window_end, clamp DOWN to window_end (an
+        investment on day 27 → first cycle date 27/M+1 → snaps to
+        25/M+1, NOT 25/M+2 — callers already added cycle_months, so
+        the month is correct; we only ever clamp the day-of-month).
+      • If `dt.day` < window_start, clamp UP to window_start.
 
-    If `advance_if_before` is True and `dt.day > payout_day`, jump to the
-    payout day of the NEXT month instead — useful when the natural cycle
-    end-date already passed this month's window.
+    `advance_if_before` is accepted for backwards compatibility but
+    intentionally unused — every caller already computes cycle_end via
+    `_add_months(now, cycle_months)` which puts the date in the right
+    month, so a second advance was double-counting.
+
+    Returns the date at 00:00 UTC.
     """
-    payout_day = max(25, min(28, int(payout_day or 25)))
-    if advance_if_before and dt.day > payout_day:
-        dt = _add_months(dt, 1)
+    _ = advance_if_before  # acknowledged, unused
+    window_start = max(1, min(28, int(window_start or 15)))
+    window_end = max(window_start, min(28, int(window_end or 25)))
+
+    target_day = dt.day
+    if target_day > window_end:
+        target_day = window_end
+    elif target_day < window_start:
+        target_day = window_start
+
     return dt.replace(
-        day=payout_day, hour=0, minute=0, second=0, microsecond=0,
+        day=target_day, hour=0, minute=0, second=0, microsecond=0,
     )
 
 
@@ -222,16 +243,28 @@ async def create_lock(
     user.main_wallet_balance = balance - principal
 
     now = datetime.now(timezone.utc)
-    matures_at = _add_months(now, lock_months)
-    # Snap interest payouts to a fixed day-of-month window (25th by
-    # default) so users always see their interest land in the 25-30 of
-    # the month, regardless of lock day. Calendar-month cadence (1 / 3 /
-    # 6 / 12 / 24 months) keeps the day stable across cycles.
+    # Client spec 2026-06-08: maturity falls ONE day before the same
+    # calendar day N months out, so users can withdraw on the eve of
+    # their anniversary instead of waiting through the day itself.
+    # Lock 08-Jun-2026 → matures 07-Jun-2028.
+    matures_at = _add_months(now, lock_months) - timedelta(days=1)
+    # Client spec 2026-06-08: interest cycles open a withdrawal window
+    # of days 15-25 of the cycle month, and the user's first cycle day
+    # locks every subsequent cycle to the same day-of-month. So a lock
+    # opened on day 27 first pays day 25 of next month (clamped DOWN to
+    # window_end), and every cycle after that also lands on day 25.
+    # A lock opened on day 18 stays on day 18 every cycle.
     payout_dom = await get_int_setting("fixed_return_payout_day_of_month", 25)
+    window_start = await get_int_setting("fixed_return_payout_day_start", 15)
+    window_end = await get_int_setting("fixed_return_payout_day_end", 25)
     cycle_months = _tenure_to_months(tenure_days)
     cycle_end = _add_months(now, cycle_months)
     next_payout_at = _snap_to_payout_window(
-        cycle_end, payout_day=payout_dom, advance_if_before=True,
+        cycle_end,
+        payout_day=payout_dom,
+        advance_if_before=True,
+        window_start=window_start,
+        window_end=window_end,
     )
     # If the first cycle would land past maturity (e.g. 2-Year tenure
     # in a 24-month lock), clamp to maturity so the user receives
@@ -261,6 +294,144 @@ async def create_lock(
         balance_after=user.main_wallet_balance,
         description=f"Fixed Return lock — {tenure['label']} cycle @ {rate_pct}% / {lock_months}m",
     ))
+    await db.commit()
+    await db.refresh(lock)
+    return _serialize_lock(lock)
+
+
+async def admin_grant_lock(
+    user_id: UUID,
+    principal: Decimal,
+    tenure_label: str,
+    db: AsyncSession,
+    *,
+    rate_pct_override: Decimal | None = None,
+    lock_months_override: int | None = None,
+    source: str = "user_wallet",
+    note: str | None = None,
+) -> dict:
+    # Admin-side lock creation. Admin can:
+    #   • Pick the principal explicitly (no UI form for the trader).
+    #   • Override the rate% for this single lock — independent of the
+    #     per-user rate_matrix_pct override, since admin may want to
+    #     pin a one-off rate without altering the trader's whole matrix.
+    #   • Override the lock_months policy for this lock only — useful
+    #     for short promo/welcome locks.
+    #   • Choose where the principal comes from:
+    #       source="user_wallet" → debit user.main_wallet_balance
+    #         (admin acts on the user's behalf, same money flow as
+    #         the trader pressing Lock on the dashboard)
+    #       source="admin_grant" → no wallet debit; the principal is
+    #         tracked on the lock only. Use for promotional setups
+    #         where the broker funds the position.
+    if principal <= 0:
+        raise HTTPException(status_code=400, detail="Principal must be positive")
+    if source not in ("user_wallet", "admin_grant"):
+        raise HTTPException(status_code=400, detail="source must be 'user_wallet' or 'admin_grant'")
+
+    cfg = await get_config(user_id=user_id, db=db)
+    tiers = cfg["tiers"]
+    tenures = cfg["tenures"]
+    matrix = cfg["rate_matrix_pct"]
+    lock_months = int(lock_months_override or cfg.get("lock_months") or DEFAULT_LOCK_MONTHS)
+    if lock_months <= 0:
+        raise HTTPException(status_code=400, detail="lock_months must be positive")
+
+    tier_idx = _resolve_tier_index(principal, tiers)
+    if tier_idx < 0:
+        # Admin grants below the min-tier are allowed; we just stamp the
+        # lowest tier label so reports stay readable.
+        tier_idx = 0
+
+    tenure_idx = _resolve_tenure_index(tenure_label, tenures)
+    if tenure_idx < 0:
+        raise HTTPException(
+            status_code=400, detail=f"Unknown tenure '{tenure_label}'",
+        )
+
+    if rate_pct_override is not None:
+        if rate_pct_override < 0:
+            raise HTTPException(status_code=400, detail="rate_pct_override must be >= 0")
+        rate_pct = Decimal(str(rate_pct_override))
+    else:
+        rate_pct = Decimal(str(matrix[tenure_idx][tier_idx]))
+    tier = tiers[tier_idx]
+    tenure = tenures[tenure_idx]
+    tenure_days = int(tenure["days"])
+
+    user = (await db.execute(
+        select(User).where(User.id == user_id).with_for_update()
+    )).scalar_one_or_none()
+    if user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    if source == "user_wallet":
+        balance = Decimal(str(user.main_wallet_balance or 0))
+        if balance < principal:
+            raise HTTPException(
+                status_code=400,
+                detail=f"User wallet has ${balance:,.2f}, needs ${principal:,.2f}",
+            )
+        user.main_wallet_balance = balance - principal
+
+    now = datetime.now(timezone.utc)
+    # Client spec 2026-06-08: maturity falls ONE day before the same
+    # calendar day N months out, so users can withdraw on the eve of
+    # their anniversary instead of waiting through the day itself.
+    # Lock 08-Jun-2026 → matures 07-Jun-2028.
+    matures_at = _add_months(now, lock_months) - timedelta(days=1)
+    payout_dom = await get_int_setting("fixed_return_payout_day_of_month", 25)
+    cycle_months = _tenure_to_months(tenure_days)
+    next_payout_at = _snap_to_payout_window(
+        _add_months(now, cycle_months),
+        payout_day=payout_dom,
+        advance_if_before=True,
+    )
+    if next_payout_at > matures_at:
+        next_payout_at = matures_at
+
+    lock = FixedReturnLock(
+        user_id=user_id,
+        principal=principal,
+        tier_label=tier["label"],
+        tenure_label=tenure["label"],
+        tenure_days=tenure_days,
+        rate_pct=rate_pct,
+        locked_at=now,
+        matures_at=matures_at,
+        next_payout_at=next_payout_at,
+        lock_months_at_creation=lock_months,
+        state="active",
+    )
+    db.add(lock)
+
+    desc_extra = f" · note: {note}" if note else ""
+    if source == "user_wallet":
+        db.add(Transaction(
+            user_id=user_id,
+            type="fixed_return_lock_admin",
+            amount=-principal,
+            balance_after=user.main_wallet_balance,
+            description=(
+                f"Admin-created Fixed Return lock — {tenure['label']} cycle @ "
+                f"{rate_pct}% / {lock_months}m{desc_extra}"
+            ),
+        ))
+    else:
+        # Admin grant doesn't touch the wallet balance — log a $0
+        # Transaction so finance can still see the grant in the audit
+        # ledger.
+        db.add(Transaction(
+            user_id=user_id,
+            type="fixed_return_grant",
+            amount=Decimal("0"),
+            balance_after=Decimal(str(user.main_wallet_balance or 0)),
+            description=(
+                f"Admin-granted Fixed Return — principal ${principal:,.2f}, "
+                f"{tenure['label']} cycle @ {rate_pct}% / {lock_months}m"
+                f" (broker-funded){desc_extra}"
+            ),
+        ))
     await db.commit()
     await db.refresh(lock)
     return _serialize_lock(lock)
@@ -448,8 +619,14 @@ async def admin_reject_early_withdrawal(
 
     cycle_months = _tenure_to_months(int(lock.tenure_days or 0))
     payout_dom = await get_int_setting("fixed_return_payout_day_of_month", 25)
+    window_start = await get_int_setting("fixed_return_payout_day_start", 15)
+    window_end = await get_int_setting("fixed_return_payout_day_end", 25)
     next_payout = _snap_to_payout_window(
-        _add_months(now, cycle_months), payout_day=payout_dom, advance_if_before=True,
+        _add_months(now, cycle_months),
+        payout_day=payout_dom,
+        advance_if_before=True,
+        window_start=window_start,
+        window_end=window_end,
     )
     if matures_at and next_payout > matures_at:
         next_payout = matures_at
@@ -525,14 +702,15 @@ async def accrue_due_payouts(db: AsyncSession) -> int:
 
     Payout window: cycles whose next_payout_at has elapsed only credit
     when today's day-of-month is inside the admin-set range (default
-    25–30, matching the client's banking-cycle spec). Outside the
-    window the engine returns 0 — interest sits as a pending payout
+    15–25 per client request 2026-06-08; admin can tune via the
+    `fixed_return_payout_day_start` / `_end` system settings). Outside
+    the window the engine returns 0 — interest sits as a pending payout
     and lands the next time the engine ticks inside the window.
     """
     now = datetime.now(timezone.utc)
 
-    window_start = await get_int_setting("fixed_return_payout_day_start", 25)
-    window_end = await get_int_setting("fixed_return_payout_day_end", 30)
+    window_start = await get_int_setting("fixed_return_payout_day_start", 15)
+    window_end = await get_int_setting("fixed_return_payout_day_end", 25)
     if window_start < 1:
         window_start = 1
     if window_end > 31:
@@ -583,12 +761,13 @@ async def accrue_due_payouts(db: AsyncSession) -> int:
             )
             lock.payouts_count = int(lock.payouts_count or 0) + 1
 
-            # Advance the schedule by exactly one calendar cycle so the
-            # day-of-month stays stable across cycles (always lands on
-            # the configured 25-30 window). If the next cycle would
-            # land past maturity we mark the schedule done (next = NULL)
-            # — the principal is returned when the user calls withdraw
-            # after matures_at.
+            # Advance the schedule by exactly one calendar cycle. Per
+            # client spec 2026-06-08, the cycle day-of-month locks to
+            # whatever day the FIRST cycle credited on. After the first
+            # cycle pays out, _add_months preserves the day exactly so
+            # every subsequent cycle hits the same calendar day. No
+            # re-snap to a global day-of-month — that was the old
+            # 25-only behaviour we're moving away from.
             matures_at = lock.matures_at
             if matures_at and matures_at.tzinfo is None:
                 matures_at = matures_at.replace(tzinfo=timezone.utc)
@@ -597,16 +776,6 @@ async def accrue_due_payouts(db: AsyncSession) -> int:
                 nxt = nxt.replace(tzinfo=timezone.utc)
             cycle_months = _tenure_to_months(int(lock.tenure_days or 0))
             advanced = _add_months(nxt, cycle_months)
-            # Re-snap to the payout day-of-month — _add_months keeps the
-            # original day (already 25), so this is a no-op for normal
-            # cycles, but it self-heals if the row was created before
-            # this fix shipped.
-            payout_dom = await get_int_setting(
-                "fixed_return_payout_day_of_month", 25
-            )
-            advanced = _snap_to_payout_window(
-                advanced, payout_day=payout_dom, advance_if_before=False,
-            )
             if matures_at and advanced >= matures_at:
                 lock.next_payout_at = None
             else:
@@ -622,6 +791,28 @@ async def accrue_due_payouts(db: AsyncSession) -> int:
                     f"#{lock.payouts_count} ({lock.rate_pct}%)"
                 ),
             ))
+            # Notification: "you can withdraw" — informs the user the
+            # interest just landed in their main wallet and they're free
+            # to withdraw it (the wallet itself is always withdrawable).
+            # Best-effort — swallow exceptions so a notification glitch
+            # never blocks the credit.
+            try:
+                next_dt = lock.next_payout_at
+                next_iso = (
+                    next_dt.strftime("%d %b %Y")
+                    if next_dt else "after maturity"
+                )
+                db.add(Notification(
+                    user_id=lock.user_id,
+                    title="Fixed Return payout received",
+                    message=(
+                        f"${float(interest):,.2f} Fixed Return interest credited to your "
+                        f"main wallet. You can withdraw it any time. Next cycle: {next_iso}."
+                    ),
+                    type="fixed_return_interest",
+                ))
+            except Exception as _ne:
+                logger.warning("FR interest notification failed: %s", _ne)
             paid += 1
         except Exception as exc:
             logger.error("Fixed Return payout failed for lock %s: %s", lock.id, exc)

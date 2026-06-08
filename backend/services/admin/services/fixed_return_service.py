@@ -6,7 +6,7 @@ the two containers independently deployable.
 """
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from uuid import UUID
 
@@ -40,11 +40,28 @@ def _tenure_to_months(tenure_days: int) -> int:
     return 1
 
 
-def _snap_to_payout_window(dt: datetime, *, payout_day: int) -> datetime:
-    payout_day = max(25, min(28, int(payout_day or 25)))
-    if dt.day > payout_day:
-        dt = _add_months(dt, 1)
-    return dt.replace(day=payout_day, hour=0, minute=0, second=0, microsecond=0)
+def _snap_to_payout_window(
+    dt: datetime,
+    *,
+    payout_day: int,
+    window_start: int = 15,
+    window_end: int = 25,
+) -> datetime:
+    # Client spec 2026-06-08: cycles open between days [window_start,
+    # window_end] (default 15-25). The lock's own day-of-month locks in
+    # once it falls inside the window; values outside clamp to the
+    # nearest edge so an investment on day 27 first lands on the 25th
+    # of NEXT month (callers already added cycle_months, so month is
+    # correct — we only ever clamp the day) and stays on the 25th
+    # every cycle thereafter.
+    window_start = max(1, min(28, int(window_start or 15)))
+    window_end = max(window_start, min(28, int(window_end or 25)))
+    target_day = dt.day
+    if target_day > window_end:
+        target_day = window_end
+    elif target_day < window_start:
+        target_day = window_start
+    return dt.replace(day=target_day, hour=0, minute=0, second=0, microsecond=0)
 
 
 def _serialize(r: FixedReturnLock) -> dict:
@@ -71,6 +88,181 @@ def _serialize(r: FixedReturnLock) -> dict:
         "payout": float(r.payout) if r.payout is not None else None,
         "fee_paid": float(r.fee_paid) if r.fee_paid is not None else None,
     }
+
+
+async def admin_grant_lock(
+    user_id: UUID,
+    principal: Decimal,
+    tenure_label: str,
+    db: AsyncSession,
+    *,
+    rate_pct_override: Decimal | None = None,
+    lock_months_override: int | None = None,
+    source: str = "user_wallet",
+    note: str | None = None,
+) -> dict:
+    # Admin-side create. Mirrors the gateway's create_lock money flow
+    # but with three extra hooks: rate_pct_override pins the rate for
+    # this lock regardless of the global / per-user matrix;
+    # lock_months_override sets a one-off lock duration (default
+    # honours the global `fixed_return_lock_months`); source picks
+    # whether the principal debits the user's wallet ('user_wallet')
+    # or comes from the broker as a promo ('admin_grant').
+    if principal <= 0:
+        raise HTTPException(status_code=400, detail="Principal must be positive")
+    if source not in ("user_wallet", "admin_grant"):
+        raise HTTPException(status_code=400, detail="source must be 'user_wallet' or 'admin_grant'")
+
+    # Honour any per-user rate-matrix override the admin already set,
+    # then optionally pin a one-off rate via rate_pct_override.
+    from packages.common.src.settings_store import get_system_setting
+    raw = await get_system_setting("fixed_return_rates", None)
+    fallback_tiers = [
+        {"label": "$1K", "min_amount": 1000},
+        {"label": "$10K", "min_amount": 10000},
+        {"label": "$25K", "min_amount": 25000},
+        {"label": "$50K", "min_amount": 50000},
+        {"label": "$100K", "min_amount": 100000},
+    ]
+    fallback_tenures = [
+        {"label": "Month", "days": 30},
+        {"label": "Quarter", "days": 90},
+        {"label": "Half-Year", "days": 180},
+        {"label": "Year", "days": 365},
+        {"label": "2 Year", "days": 730},
+    ]
+    fallback_matrix = [
+        [1.0, 2.0, 2.5, 3.0, 4.0],
+        [2.0, 3.0, 3.0, 3.5, 4.5],
+        [3.0, 4.0, 4.5, 5.0, 5.0],
+        [4.0, 5.0, 5.5, 6.0, 5.5],
+        [5.0, 6.0, 6.5, 7.0, 7.0],
+    ]
+    if isinstance(raw, dict) and raw.get("tiers"):
+        tiers = raw["tiers"]
+        tenures = raw.get("tenures") or fallback_tenures
+        matrix = raw.get("rate_matrix_pct") or fallback_matrix
+    else:
+        tiers, tenures, matrix = fallback_tiers, fallback_tenures, fallback_matrix
+
+    user = (await db.execute(
+        select(User).where(User.id == user_id).with_for_update()
+    )).scalar_one_or_none()
+    if user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    # Per-user override shape: {"rate_matrix_pct": [[...], ...]}
+    override = user.fixed_return_rate_override
+    if isinstance(override, dict):
+        ov = override.get("rate_matrix_pct")
+        if (
+            isinstance(ov, list)
+            and len(ov) == len(tenures)
+            and all(isinstance(r, list) and len(r) == len(tiers) for r in ov)
+        ):
+            matrix = ov
+
+    lock_months_default = await get_int_setting("fixed_return_lock_months", 24)
+    lock_months = int(lock_months_override or lock_months_default)
+    if lock_months <= 0:
+        raise HTTPException(status_code=400, detail="lock_months must be positive")
+
+    # Tier resolution: pick the highest tier whose min_amount <= principal.
+    # Sub-min principals are allowed for admin grants — stamp the lowest tier.
+    tier_idx = -1
+    for i, t in enumerate(tiers):
+        if Decimal(str(t.get("min_amount") or 0)) <= principal:
+            tier_idx = i
+    if tier_idx < 0:
+        tier_idx = 0
+
+    tenure_idx = -1
+    for i, t in enumerate(tenures):
+        if (t.get("label") or "").lower() == tenure_label.lower():
+            tenure_idx = i
+            break
+    if tenure_idx < 0:
+        raise HTTPException(status_code=400, detail=f"Unknown tenure '{tenure_label}'")
+
+    if rate_pct_override is not None:
+        if rate_pct_override < 0:
+            raise HTTPException(status_code=400, detail="rate_pct_override must be >= 0")
+        rate_pct = Decimal(str(rate_pct_override))
+    else:
+        rate_pct = Decimal(str(matrix[tenure_idx][tier_idx]))
+    tier = tiers[tier_idx]
+    tenure = tenures[tenure_idx]
+    tenure_days = int(tenure["days"])
+
+    if source == "user_wallet":
+        balance = Decimal(str(user.main_wallet_balance or 0))
+        if balance < principal:
+            raise HTTPException(
+                status_code=400,
+                detail=f"User wallet has ${balance:,.2f}, needs ${principal:,.2f}",
+            )
+        user.main_wallet_balance = balance - principal
+
+    now = datetime.now(timezone.utc)
+    # Mature ONE day before the calendar anniversary so users can
+    # withdraw on the eve of their lock anniversary (client spec
+    # 2026-06-08). Mirrors the gateway create_lock path.
+    matures_at = _add_months(now, lock_months) - timedelta(days=1)
+    payout_dom = await get_int_setting("fixed_return_payout_day_of_month", 25)
+    window_start = await get_int_setting("fixed_return_payout_day_start", 15)
+    window_end = await get_int_setting("fixed_return_payout_day_end", 25)
+    cycle_months = _tenure_to_months(tenure_days)
+    next_payout_at = _snap_to_payout_window(
+        _add_months(now, cycle_months),
+        payout_day=payout_dom,
+        window_start=window_start,
+        window_end=window_end,
+    )
+    if next_payout_at > matures_at:
+        next_payout_at = matures_at
+
+    lock = FixedReturnLock(
+        user_id=user_id,
+        principal=principal,
+        tier_label=tier["label"],
+        tenure_label=tenure["label"],
+        tenure_days=tenure_days,
+        rate_pct=rate_pct,
+        locked_at=now,
+        matures_at=matures_at,
+        next_payout_at=next_payout_at,
+        lock_months_at_creation=lock_months,
+        state="active",
+    )
+    db.add(lock)
+
+    desc_extra = f" · note: {note}" if note else ""
+    if source == "user_wallet":
+        db.add(Transaction(
+            user_id=user_id,
+            type="fixed_return_lock_admin",
+            amount=-principal,
+            balance_after=user.main_wallet_balance,
+            description=(
+                f"Admin-created Fixed Return lock — {tenure['label']} cycle @ "
+                f"{rate_pct}% / {lock_months}m{desc_extra}"
+            ),
+        ))
+    else:
+        db.add(Transaction(
+            user_id=user_id,
+            type="fixed_return_grant",
+            amount=Decimal("0"),
+            balance_after=Decimal(str(user.main_wallet_balance or 0)),
+            description=(
+                f"Admin-granted Fixed Return — principal ${principal:,.2f}, "
+                f"{tenure['label']} cycle @ {rate_pct}% / {lock_months}m "
+                f"(broker-funded){desc_extra}"
+            ),
+        ))
+    await db.commit()
+    await db.refresh(lock)
+    return _serialize(lock)
 
 
 async def list_pending(db: AsyncSession) -> list[dict]:
@@ -181,8 +373,13 @@ async def reject(lock_id: UUID, db: AsyncSession, *, reason: str | None = None) 
         matures_at = matures_at.replace(tzinfo=timezone.utc)
     cycle_months = _tenure_to_months(int(lock.tenure_days or 0))
     payout_dom = await get_int_setting("fixed_return_payout_day_of_month", 25)
+    window_start = await get_int_setting("fixed_return_payout_day_start", 15)
+    window_end = await get_int_setting("fixed_return_payout_day_end", 25)
     next_payout = _snap_to_payout_window(
-        _add_months(now, cycle_months), payout_day=payout_dom,
+        _add_months(now, cycle_months),
+        payout_day=payout_dom,
+        window_start=window_start,
+        window_end=window_end,
     )
     if matures_at and next_payout > matures_at:
         next_payout = matures_at

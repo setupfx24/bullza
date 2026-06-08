@@ -201,6 +201,9 @@ export default function UserDetailPage() {
         {/* Fixed Return per-user rate override */}
         <FixedReturnOverrideCard userId={userId} />
 
+        {/* Fixed Return — admin grants a lock to this user with custom terms */}
+        <FixedReturnGrantCard userId={userId} />
+
         {/* Trading Accounts */}
         <div className="bg-bg-secondary border border-border-primary rounded-lg p-5">
           <h2 className="text-base font-bold text-text-primary mb-4">Trading Accounts ({accounts.length})</h2>
@@ -659,6 +662,163 @@ function Flag({ label, value, good }: { label: string; value: string; good: bool
         'text-sm font-bold mt-0.5',
         good ? 'text-success' : 'text-warning',
       )}>{value}</p>
+    </div>
+  );
+}
+
+// ─── Fixed Return — Admin grant ──────────────────────────────────────
+// Admin-side form that creates a Fixed Return lock for this user with
+// custom terms (principal, tenure, optional rate / lock-months override,
+// optional broker-funded source). Same engine path as a trader-self-
+// locked position — once created, the gateway interest engine drives
+// payouts the same way.
+const GRANT_TENURES = ['Month', 'Quarter', 'Half-Year', 'Year', '2 Year'] as const;
+
+function FixedReturnGrantCard({ userId }: { userId: string }) {
+  const [principal, setPrincipal] = useState('');
+  const [tenure, setTenure] = useState<typeof GRANT_TENURES[number]>('Year');
+  const [ratePctOverride, setRatePctOverride] = useState('');
+  const [lockMonthsOverride, setLockMonthsOverride] = useState('');
+  const [source, setSource] = useState<'user_wallet' | 'admin_grant'>('user_wallet');
+  const [note, setNote] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
+  const submit = async () => {
+    const p = parseFloat(principal);
+    if (!Number.isFinite(p) || p <= 0) {
+      toast.error('Enter a positive principal');
+      return;
+    }
+    setSubmitting(true);
+    try {
+      const body: Record<string, unknown> = {
+        principal: p,
+        tenure_label: tenure,
+        source,
+      };
+      const r = parseFloat(ratePctOverride);
+      if (ratePctOverride.trim() && Number.isFinite(r) && r >= 0) body.rate_pct_override = r;
+      const m = parseInt(lockMonthsOverride, 10);
+      if (lockMonthsOverride.trim() && Number.isFinite(m) && m > 0) body.lock_months_override = m;
+      if (note.trim()) body.note = note.trim();
+      await adminApi.post(`/fixed-return/users/${userId}/grant`, body);
+      toast.success('Fixed Return lock created');
+      setPrincipal('');
+      setRatePctOverride('');
+      setLockMonthsOverride('');
+      setNote('');
+    } catch (e: any) {
+      toast.error(e?.message || 'Grant failed');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="bg-bg-secondary border border-border-primary rounded-lg p-5">
+      <div className="mb-4">
+        <h2 className="text-base font-bold text-text-primary">Fixed Return — Grant a Lock</h2>
+        <p className="text-xs text-text-tertiary mt-0.5 max-w-2xl">
+          Create a Fixed Return position for this user with any rate, tenure, or
+          lock duration. Use <span className="text-text-primary font-semibold">User wallet</span>{' '}
+          to debit their main balance (admin acts on their behalf), or{' '}
+          <span className="text-text-primary font-semibold">Admin grant</span>{' '}
+          for a broker-funded promo (no wallet debit).
+        </p>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-3">
+        <label className="block">
+          <span className="block text-[10px] uppercase text-text-tertiary mb-1">Principal (USD)</span>
+          <input
+            type="number"
+            step="0.01"
+            min="0"
+            value={principal}
+            onChange={(e) => setPrincipal(e.target.value)}
+            placeholder="e.g. 10000"
+            className="w-full px-3 py-2 rounded-md bg-bg-tertiary border border-border-primary text-sm text-text-primary font-mono outline-none focus:border-accent/50"
+          />
+        </label>
+        <label className="block">
+          <span className="block text-[10px] uppercase text-text-tertiary mb-1">Tenure (payout cadence)</span>
+          <select
+            value={tenure}
+            onChange={(e) => setTenure(e.target.value as any)}
+            className="w-full px-3 py-2 rounded-md bg-bg-tertiary border border-border-primary text-sm text-text-primary outline-none focus:border-accent/50"
+          >
+            {GRANT_TENURES.map((t) => <option key={t} value={t}>{t}</option>)}
+          </select>
+        </label>
+        <label className="block">
+          <span className="block text-[10px] uppercase text-text-tertiary mb-1">Source</span>
+          <select
+            value={source}
+            onChange={(e) => setSource(e.target.value as any)}
+            className="w-full px-3 py-2 rounded-md bg-bg-tertiary border border-border-primary text-sm text-text-primary outline-none focus:border-accent/50"
+          >
+            <option value="user_wallet">User wallet (debit balance)</option>
+            <option value="admin_grant">Admin grant (broker-funded)</option>
+          </select>
+        </label>
+        <label className="block">
+          <span className="block text-[10px] uppercase text-text-tertiary mb-1">
+            Rate % override <span className="lowercase">(optional)</span>
+          </span>
+          <input
+            type="number"
+            step="0.01"
+            min="0"
+            value={ratePctOverride}
+            onChange={(e) => setRatePctOverride(e.target.value)}
+            placeholder="Leave blank to use matrix rate"
+            className="w-full px-3 py-2 rounded-md bg-bg-tertiary border border-border-primary text-sm text-text-primary font-mono outline-none focus:border-accent/50"
+          />
+        </label>
+        <label className="block">
+          <span className="block text-[10px] uppercase text-text-tertiary mb-1">
+            Lock months override <span className="lowercase">(optional)</span>
+          </span>
+          <input
+            type="number"
+            min="1"
+            max="240"
+            value={lockMonthsOverride}
+            onChange={(e) => setLockMonthsOverride(e.target.value)}
+            placeholder="Leave blank for global default"
+            className="w-full px-3 py-2 rounded-md bg-bg-tertiary border border-border-primary text-sm text-text-primary font-mono outline-none focus:border-accent/50"
+          />
+        </label>
+        <label className="block sm:col-span-2 lg:col-span-3">
+          <span className="block text-[10px] uppercase text-text-tertiary mb-1">
+            Note <span className="lowercase">(written to the audit ledger)</span>
+          </span>
+          <input
+            type="text"
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            placeholder="e.g. VIP onboarding promo"
+            maxLength={240}
+            className="w-full px-3 py-2 rounded-md bg-bg-tertiary border border-border-primary text-sm text-text-primary outline-none focus:border-accent/50"
+          />
+        </label>
+      </div>
+
+      <div className="flex justify-end">
+        <button
+          type="button"
+          disabled={submitting || !principal}
+          onClick={submit}
+          className={cn(
+            'inline-flex items-center gap-2 px-4 py-2 rounded-md text-sm font-bold transition-colors',
+            submitting || !principal
+              ? 'bg-bg-tertiary text-text-tertiary cursor-not-allowed'
+              : 'bg-buy text-white hover:bg-buy-light',
+          )}
+        >
+          {submitting ? 'Creating…' : 'Grant Fixed Return'}
+        </button>
+      </div>
     </div>
   );
 }

@@ -30,6 +30,11 @@ interface Settings {
   allow_new_registrations: boolean;
   allow_deposits: boolean;
   allow_withdrawals: boolean;
+  // Admin-controlled payment-method tabs in the trader wallet.
+  // Crypto (NOWPayments) is always on; these two toggle the
+  // remaining tabs in real time via /wallet/payment-methods.
+  'wallet.manual_enabled': boolean;
+  'wallet.p2p_enabled': boolean;
   [key: string]: number | boolean | string;
 }
 
@@ -57,6 +62,8 @@ const DEFAULT_SETTINGS: Settings = {
   allow_new_registrations: true,
   allow_deposits: true,
   allow_withdrawals: true,
+  'wallet.manual_enabled': true,
+  'wallet.p2p_enabled': false,
 };
 
 function rowsToSettings(rows: SystemSettingRow[]): Settings {
@@ -107,6 +114,8 @@ function rowsToSettings(rows: SystemSettingRow[]): Settings {
     allow_new_registrations: bool('allow_new_registrations', DEFAULT_SETTINGS.allow_new_registrations),
     allow_deposits: bool('allow_deposits', DEFAULT_SETTINGS.allow_deposits),
     allow_withdrawals: bool('allow_withdrawals', DEFAULT_SETTINGS.allow_withdrawals),
+    'wallet.manual_enabled': bool('wallet.manual_enabled', DEFAULT_SETTINGS['wallet.manual_enabled']),
+    'wallet.p2p_enabled': bool('wallet.p2p_enabled', DEFAULT_SETTINGS['wallet.p2p_enabled']),
   };
 }
 
@@ -133,6 +142,8 @@ function settingsToPayload(s: Settings): Record<string, unknown> {
     allow_new_registrations: s.allow_new_registrations,
     allow_deposits: s.allow_deposits,
     allow_withdrawals: s.allow_withdrawals,
+    'wallet.manual_enabled': s['wallet.manual_enabled'],
+    'wallet.p2p_enabled': s['wallet.p2p_enabled'],
   };
 }
 
@@ -318,6 +329,12 @@ export default function SettingsPage() {
                     { key: 'allow_new_registrations', label: 'Allow New Registrations', desc: 'Enable or disable new user sign-ups' },
                     { key: 'allow_deposits', label: 'Allow Deposits', desc: 'Enable or disable deposit functionality' },
                     { key: 'allow_withdrawals', label: 'Allow Withdrawals', desc: 'Enable or disable withdrawal requests' },
+                    // Per-method tabs in the trader wallet. Crypto (NOWPayments)
+                    // is always on; these two toggle the Manual + P2P tabs in
+                    // real time. Gateway also hard-rejects API calls on the
+                    // disabled rails so the gate is enforced server-side.
+                    { key: 'wallet.manual_enabled', label: 'Manual (Bank/UPI) Deposits + Withdrawals', desc: 'Show the Manual deposit tab and Bank withdrawal tab in the trader wallet' },
+                    { key: 'wallet.p2p_enabled', label: 'P2P Marketplace', desc: 'Show the P2P marketplace tab in both deposit and withdraw flows' },
                   ].map((toggle) => (
                     <div key={toggle.key} className={cn('flex items-center justify-between gap-4 p-3 rounded-md border', toggle.danger && settings[toggle.key] ? 'border-danger/30 bg-danger/5' : 'border-border-primary')}>
                       <div>
