@@ -15,7 +15,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { clsx } from 'clsx';
 import {
-  ArrowRightLeft, Filter, ShieldCheck, Star, Clock,
+  ArrowRightLeft, ShieldCheck, Star, Clock,
   CheckCircle2, Info, Search, Repeat, Wallet,
 } from 'lucide-react';
 import api from '@/lib/api/client';
