@@ -138,7 +138,22 @@ async def charge_due_positions(db: AsyncSession, now: Optional[datetime] = None)
         if instrument is None:
             continue
         contract_size = Decimal(str(instrument.contract_size or "100000"))
-        notional = Decimal(str(pos.lots or 0)) * Decimal(str(pos.open_price or 0)) * contract_size
+        notional_raw = Decimal(str(pos.lots or 0)) * Decimal(str(pos.open_price or 0)) * contract_size
+        if notional_raw <= 0:
+            pos.last_swap_at = now
+            continue
+
+        # The notional is in the instrument's QUOTE currency (JPY for
+        # NZDJPY etc.). Convert to USD before applying the daily rate
+        # so cross-pair positions aren't over-charged ~155× (which
+        # silently nuked balances to deep negative on positions held
+        # for weeks). Same fix pattern as commits c66e1e2 / 3284c59 /
+        # a058754 for trader / risk / copy engines.
+        from packages.common.src.trading_service import convert_to_account_currency
+        notional = await convert_to_account_currency(
+            notional_raw,
+            getattr(instrument, "quote_currency", None),
+        )
         if notional <= 0:
             pos.last_swap_at = now
             continue
