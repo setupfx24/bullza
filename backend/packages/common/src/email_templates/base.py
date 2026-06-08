@@ -24,38 +24,33 @@ _BORDER      = "#2a2a2a"
 def _header_brand_html() -> str:
     """Header brand block.
 
-    We ALWAYS render the CSS-only styled wordmark — it's HTML text,
-    can't break, and looks intentional in every client. If
-    EMAIL_LOGO_URL is set we render the logo image to its LEFT in the
-    same row; when Gmail's image proxy can't fetch the image (which is
-    what produced the broken-icon report 2026-06-01), the user still
-    sees the styled "SwisDex" wordmark instead of a lone broken icon.
+    Per client request 2026-06-08: when EMAIL_LOGO_URL is set, render
+    ONLY the logo image — no "SwisDex" wordmark alongside it. The
+    image already contains the brand wordmark, so the previous layout
+    duplicated it. The styled CSS wordmark is kept ONLY as a fallback
+    for the case when no EMAIL_LOGO_URL is configured at all.
 
-    The image sits in its own table cell so its alt-text fallback
-    doesn't push the wordmark out of alignment.
+    Sizing: height=48 with width=auto so the natural aspect ratio of
+    swisdex_png5.png renders correctly (the old 40×40 forced a square
+    crop, which made the wide brand logo collapse / look distorted).
+    `alt="SwisDex"` shows the brand name when the email client blocks
+    images, so we don't leave a lone broken icon.
     """
-    wordmark = (
+    logo = (getattr(get_settings(), "EMAIL_LOGO_URL", "") or "").strip()
+    if logo:
+        return (
+            f'<img src="{escape(logo, quote=True)}" alt="SwisDex" '
+            f'height="48" '
+            f'style="display:block;height:48px;width:auto;max-width:200px;'
+            f'border:0;outline:none;text-decoration:none;">'
+        )
+    # Fallback wordmark — only when EMAIL_LOGO_URL is unset.
+    return (
         f'<span style="font-weight:700;font-size:22px;letter-spacing:0.2px;'
         f'font-family:-apple-system,BlinkMacSystemFont,\'Segoe UI\',Helvetica,Arial,sans-serif;">'
         f'<span style="color:{_TEXT};">Swis</span>'
         f'<span style="color:{_BRAND};">Dex</span>'
         f'</span>'
-    )
-    logo = (getattr(get_settings(), "EMAIL_LOGO_URL", "") or "").strip()
-    if not logo:
-        return wordmark
-    return (
-        f'<table role="presentation" cellpadding="0" cellspacing="0" border="0">'
-        f'<tr>'
-        f'<td style="vertical-align:middle;padding-right:12px;">'
-        f'<img src="{escape(logo, quote=True)}" alt="" '
-        f'width="40" height="40" '
-        f'style="display:block;height:40px;width:40px;border:0;outline:none;'
-        f'text-decoration:none;border-radius:6px;">'
-        f'</td>'
-        f'<td style="vertical-align:middle;">{wordmark}</td>'
-        f'</tr>'
-        f'</table>'
     )
 
 
