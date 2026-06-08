@@ -62,6 +62,9 @@ export interface AccountGroupInfo {
   /** Smaller of max_leverage and the per-user KYC cap (50 for non-KYC). Use this
    *  to clamp the leverage picker — leverage_default is just a UI hint, not the cap. */
   effective_max_leverage?: number;
+  /** Cent-account display flag (Mig 0068). When true, the trader UI
+   *  multiplies visible balance / equity / P&L by 100 and renders ¢. */
+  is_cent_account?: boolean | null;
 }
 
 export interface TradingAccount {
