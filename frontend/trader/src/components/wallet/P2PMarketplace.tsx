@@ -93,7 +93,7 @@ export default function P2PMarketplace({ mode }: { mode: Side }) {
           ...(paymentMethod !== 'All' && { payment_method: paymentMethod }),
           ...(amount && Number(amount) > 0 && { amount }),
         });
-        const list = await api.get<P2PAd[]>(`/p2p/ads?${q.toString()}`, { signal });
+        const list = await api.get<P2PAd[]>(`/p2p/ads?${q.toString()}`, undefined, { signal });
         setAds(Array.isArray(list) ? list : []);
       } catch (e: any) {
         if (e?.name === 'AbortError') return;
