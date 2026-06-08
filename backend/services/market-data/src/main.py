@@ -239,7 +239,11 @@ class MarketDataService:
         sym_starts = self.aggregator._bar_timestamps.get(symbol)
         if not sym_bars or not sym_starts:
             return
-        for tf_name, bar in sym_bars.items():
+        # Snapshot the items so the aggregator can mutate the underlying
+        # dict (new bar period rollover) while we're awaiting publish.
+        # Without this, `RuntimeError: dictionary keys changed during
+        # iteration` crashes the tick processor on every bar boundary.
+        for tf_name, bar in list(sym_bars.items()):
             bar_start = sym_starts.get(tf_name)
             if bar_start is None:
                 continue
