@@ -400,8 +400,18 @@ class CopyTradeEngine:
             copy_lots = float(investor.max_lot_override)
 
         contract_size = float(instrument.contract_size or 100000)
-        required_margin = Decimal(
+        # Notional / leverage is in the instrument's QUOTE currency
+        # (JPY for NZDJPY etc.). Convert to USD before reserving against
+        # the investor's free margin, or cross-pair mirrors will
+        # over-reserve ~158× on tiny lots and fail the
+        # "Insufficient margin for copy" gate spuriously.
+        from packages.common.src.trading_service import convert_to_account_currency
+        required_margin_raw = Decimal(
             str(copy_lots * contract_size * float(master_pos.open_price) / investor_account.leverage)
+        )
+        required_margin = await convert_to_account_currency(
+            required_margin_raw,
+            getattr(instrument, "quote_currency", None),
         )
 
         if required_margin > (investor_account.free_margin or Decimal("0")):
@@ -546,8 +556,16 @@ class CopyTradeEngine:
             gross_profit = (close_price - investor_pos.open_price) * investor_pos.lots * contract_size
         else:
             gross_profit = (investor_pos.open_price - close_price) * investor_pos.lots * contract_size
-        from packages.common.src.trading_service import quote_to_account_pnl
-        gross_profit = quote_to_account_pnl(
+        # Async converter — the sync version silently returned raw JPY
+        # for cross pairs (NZDJPY, EURGBP, AUDCAD), which propagated to
+        # investor balances as JPY-treated-as-USD and nuked accounts
+        # (PT71101447 → −$12k, abhishek negi → −$1.6k). Use the live
+        # USD/quote tick from Redis instead.
+        from packages.common.src.trading_service import (
+            quote_to_account_pnl_async,
+            convert_to_account_currency,
+        )
+        gross_profit = await quote_to_account_pnl_async(
             gross_profit,
             getattr(instrument, "base_currency", None),
             getattr(instrument, "quote_currency", None),
@@ -586,8 +604,17 @@ class CopyTradeEngine:
         investor_account = await db.get(TradingAccount, investor_pos.account_id)
         if investor_account:
             investor_account.balance = (investor_account.balance or Decimal("0")) + net_profit
-            margin_release = (investor_pos.lots * contract_size * investor_pos.open_price) / Decimal(
+            # Margin release in USD too — `(lots × cs × price) / leverage`
+            # returns notional in quote currency, so for NZDJPY etc. that
+            # value is JPY, not USD. Same fix the trader-side close path
+            # got in commit c66e1e2. Without this, mirrored cross-pair
+            # closes leak margin every cycle.
+            margin_release_raw = (investor_pos.lots * contract_size * investor_pos.open_price) / Decimal(
                 str(investor_account.leverage)
+            )
+            margin_release = await convert_to_account_currency(
+                margin_release_raw,
+                getattr(instrument, "quote_currency", None),
             )
             investor_account.margin_used = max(
                 Decimal("0"), (investor_account.margin_used or Decimal("0")) - margin_release
