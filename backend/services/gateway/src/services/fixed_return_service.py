@@ -151,43 +151,63 @@ def _snap_to_payout_window(
     dt: datetime,
     *,
     payout_day: int = 25,
-    advance_if_before: bool = False,  # kept for API compat; no longer used
-    window_start: int = 15,
-    window_end: int = 25,
+    advance_if_before: bool = False,
+    window_start: int = 25,
+    window_end: int = 30,
 ) -> datetime:
-    """Pick the payout day-of-month for `dt`, respecting the [start,end]
-    window the admin has configured (default 15-25, per client request
-    2026-06-08).
+    """Snap a datetime to the admin-configured payout day (default 25).
 
-    Behavior (clamp-only — does NOT advance month):
-      • If `dt.day` is INSIDE the window, keep it as-is (so a lock
-        opened on day 18 keeps paying out every cycle on day 18).
-      • If `dt.day` > window_end, clamp DOWN to window_end (an
-        investment on day 27 → first cycle date 27/M+1 → snaps to
-        25/M+1, NOT 25/M+2 — callers already added cycle_months, so
-        the month is correct; we only ever clamp the day-of-month).
-      • If `dt.day` < window_start, clamp UP to window_start.
+    Client spec 2026-06-08 (revised): every cycle credits between
+    days 25 and 30. We canonicalize on day 25 (admin-tunable via
+    `fixed_return_payout_day_of_month`), zero out the time so payouts
+    land at 00:00 UTC.
 
-    `advance_if_before` is accepted for backwards compatibility but
-    intentionally unused — every caller already computes cycle_end via
-    `_add_months(now, cycle_months)` which puts the date in the right
-    month, so a second advance was double-counting.
+    `advance_if_before` jumps to NEXT month if `dt.day > payout_day`
+    so a date already past this month's window doesn't collapse onto
+    a past date.
 
-    Returns the date at 00:00 UTC.
+    `window_start` / `window_end` are accepted for API compat but only
+    the legacy single payout_day is used here; the engine itself reads
+    the start/end settings to gate cycle firing.
     """
-    _ = advance_if_before  # acknowledged, unused
-    window_start = max(1, min(28, int(window_start or 15)))
-    window_end = max(window_start, min(28, int(window_end or 25)))
-
-    target_day = dt.day
-    if target_day > window_end:
-        target_day = window_end
-    elif target_day < window_start:
-        target_day = window_start
-
+    _ = (window_start, window_end)  # acknowledged, used elsewhere
+    payout_day = max(25, min(28, int(payout_day or 25)))
+    if advance_if_before and dt.day > payout_day:
+        dt = _add_months(dt, 1)
     return dt.replace(
-        day=target_day, hour=0, minute=0, second=0, microsecond=0,
+        day=payout_day, hour=0, minute=0, second=0, microsecond=0,
     )
+
+
+def _first_payout_date(lock_dt: datetime, cycle_months: int, payout_day: int = 25) -> datetime:
+    """Pick the first payout date for a brand-new lock.
+
+    Rule (client spec 2026-06-08, "first day 25 strictly AFTER lock"):
+      • Monthly tenure (cycle_months = 1): first 25 strictly after lock.
+        - Lock 8 Jul → 25 Jul (same month)
+        - Lock 25 Jul → 25 Aug (next month)
+        - Lock 28 Jul → 25 Aug (next month)
+      • Longer tenures (Quarterly / Year / etc): cycle_months later from
+        lock, snapped to day 25 — same as before. The proration logic in
+        accrue_due_payouts handles any partial-month edge cleanly.
+    """
+    payout_day = max(25, min(28, int(payout_day or 25)))
+    if cycle_months <= 1:
+        candidate = lock_dt.replace(
+            day=payout_day, hour=0, minute=0, second=0, microsecond=0,
+        )
+        if candidate <= lock_dt:
+            candidate = _add_months(candidate, 1)
+        return candidate
+    # Multi-month tenure: shift forward by the full cycle, then snap to
+    # the next day 25 strictly after that date.
+    target = _add_months(lock_dt, cycle_months)
+    candidate = target.replace(
+        day=payout_day, hour=0, minute=0, second=0, microsecond=0,
+    )
+    if candidate <= target:
+        candidate = _add_months(candidate, 1)
+    return candidate
 
 
 # ─── Lock flow ───────────────────────────────────────────────────────
@@ -243,29 +263,18 @@ async def create_lock(
     user.main_wallet_balance = balance - principal
 
     now = datetime.now(timezone.utc)
-    # Client spec 2026-06-08: maturity falls ONE day before the same
-    # calendar day N months out, so users can withdraw on the eve of
-    # their anniversary instead of waiting through the day itself.
-    # Lock 08-Jun-2026 → matures 07-Jun-2028.
+    # Maturity = anniversary − 1 day (Mig 0067 / client spec 2026-06-08)
+    # so users can withdraw on the eve of their lock anniversary.
     matures_at = _add_months(now, lock_months) - timedelta(days=1)
-    # Client spec 2026-06-08: interest cycles open a withdrawal window
-    # of days 15-25 of the cycle month, and the user's first cycle day
-    # locks every subsequent cycle to the same day-of-month. So a lock
-    # opened on day 27 first pays day 25 of next month (clamped DOWN to
-    # window_end), and every cycle after that also lands on day 25.
-    # A lock opened on day 18 stays on day 18 every cycle.
+    # Client spec 2026-06-08 (revised): payouts credit on day 25 (within
+    # the 25–30 window). FIRST payout date is the first day-25 strictly
+    # AFTER lock for Monthly tenure; longer tenures shift cycle_months
+    # forward first. The interest amount for that first cycle is
+    # PRORATED by the actual days between lock and credit — handled
+    # inside accrue_due_payouts.
     payout_dom = await get_int_setting("fixed_return_payout_day_of_month", 25)
-    window_start = await get_int_setting("fixed_return_payout_day_start", 15)
-    window_end = await get_int_setting("fixed_return_payout_day_end", 25)
     cycle_months = _tenure_to_months(tenure_days)
-    cycle_end = _add_months(now, cycle_months)
-    next_payout_at = _snap_to_payout_window(
-        cycle_end,
-        payout_day=payout_dom,
-        advance_if_before=True,
-        window_start=window_start,
-        window_end=window_end,
-    )
+    next_payout_at = _first_payout_date(now, cycle_months, payout_day=payout_dom)
     # If the first cycle would land past maturity (e.g. 2-Year tenure
     # in a 24-month lock), clamp to maturity so the user receives
     # exactly one cycle at the end.
@@ -619,14 +628,10 @@ async def admin_reject_early_withdrawal(
 
     cycle_months = _tenure_to_months(int(lock.tenure_days or 0))
     payout_dom = await get_int_setting("fixed_return_payout_day_of_month", 25)
-    window_start = await get_int_setting("fixed_return_payout_day_start", 15)
-    window_end = await get_int_setting("fixed_return_payout_day_end", 25)
     next_payout = _snap_to_payout_window(
         _add_months(now, cycle_months),
         payout_day=payout_dom,
         advance_if_before=True,
-        window_start=window_start,
-        window_end=window_end,
     )
     if matures_at and next_payout > matures_at:
         next_payout = matures_at
@@ -702,15 +707,13 @@ async def accrue_due_payouts(db: AsyncSession) -> int:
 
     Payout window: cycles whose next_payout_at has elapsed only credit
     when today's day-of-month is inside the admin-set range (default
-    15–25 per client request 2026-06-08; admin can tune via the
-    `fixed_return_payout_day_start` / `_end` system settings). Outside
-    the window the engine returns 0 — interest sits as a pending payout
-    and lands the next time the engine ticks inside the window.
+    25–30 per client spec revision 2026-06-08; admin can still tune via
+    the `fixed_return_payout_day_start` / `_end` settings).
     """
     now = datetime.now(timezone.utc)
 
-    window_start = await get_int_setting("fixed_return_payout_day_start", 15)
-    window_end = await get_int_setting("fixed_return_payout_day_end", 25)
+    window_start = await get_int_setting("fixed_return_payout_day_start", 25)
+    window_end = await get_int_setting("fixed_return_payout_day_end", 30)
     if window_start < 1:
         window_start = 1
     if window_end > 31:
@@ -738,17 +741,35 @@ async def accrue_due_payouts(db: AsyncSession) -> int:
                 lock.next_payout_at = None
                 continue
 
-            # Rate matrix cell is a PER-MONTH percentage (client spec
-            # 2026-05-26). Tenure decides cadence; each payout bundles
-            # `months_per_cycle` months of accrual into a single credit.
-            # Example: $1000 quarterly at 2% → 2% × 3 months = $60.
+            # Rate matrix cell is a PER-MONTH percentage. Tenure decides
+            # cadence; each cycle bundles `months_per_cycle` months of
+            # accrual into one credit.
             months_per_cycle = _tenure_to_months(int(lock.tenure_days or 0))
-            interest = (
-                Decimal(str(lock.principal or 0))
-                * Decimal(str(lock.rate_pct or 0))
-                * Decimal(str(months_per_cycle))
-                / Decimal("100")
-            ).quantize(Decimal("0.01"))
+
+            # Client spec 2026-06-08 (revised): the FIRST cycle is
+            # PRORATED by the actual days between lock_at and now. So a
+            # user who invests on the 8th and gets paid on the 25th
+            # receives 17/30 of one month's interest, not a full month.
+            # Subsequent cycles credit the full `months_per_cycle × rate`.
+            if int(lock.payouts_count or 0) == 0:
+                locked_at = lock.locked_at
+                if locked_at and locked_at.tzinfo is None:
+                    locked_at = locked_at.replace(tzinfo=timezone.utc)
+                days_locked = max(1, (now.date() - locked_at.date()).days) if locked_at else 30
+                interest = (
+                    Decimal(str(lock.principal or 0))
+                    * Decimal(str(lock.rate_pct or 0))
+                    * Decimal(str(days_locked))
+                    / Decimal("100")
+                    / Decimal("30")
+                ).quantize(Decimal("0.01"))
+            else:
+                interest = (
+                    Decimal(str(lock.principal or 0))
+                    * Decimal(str(lock.rate_pct or 0))
+                    * Decimal(str(months_per_cycle))
+                    / Decimal("100")
+                ).quantize(Decimal("0.01"))
             if interest <= 0:
                 lock.next_payout_at = None
                 continue

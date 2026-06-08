@@ -40,28 +40,34 @@ def _tenure_to_months(tenure_days: int) -> int:
     return 1
 
 
-def _snap_to_payout_window(
-    dt: datetime,
-    *,
-    payout_day: int,
-    window_start: int = 15,
-    window_end: int = 25,
-) -> datetime:
-    # Client spec 2026-06-08: cycles open between days [window_start,
-    # window_end] (default 15-25). The lock's own day-of-month locks in
-    # once it falls inside the window; values outside clamp to the
-    # nearest edge so an investment on day 27 first lands on the 25th
-    # of NEXT month (callers already added cycle_months, so month is
-    # correct — we only ever clamp the day) and stays on the 25th
-    # every cycle thereafter.
-    window_start = max(1, min(28, int(window_start or 15)))
-    window_end = max(window_start, min(28, int(window_end or 25)))
-    target_day = dt.day
-    if target_day > window_end:
-        target_day = window_end
-    elif target_day < window_start:
-        target_day = window_start
-    return dt.replace(day=target_day, hour=0, minute=0, second=0, microsecond=0)
+def _snap_to_payout_window(dt: datetime, *, payout_day: int) -> datetime:
+    # Snap to single payout day (default 25). Mirrors the gateway helper
+    # so admin-grant locks share the same first-payout date as
+    # trader-self locks.
+    payout_day = max(25, min(28, int(payout_day or 25)))
+    if dt.day > payout_day:
+        dt = _add_months(dt, 1)
+    return dt.replace(day=payout_day, hour=0, minute=0, second=0, microsecond=0)
+
+
+def _first_payout_date(lock_dt: datetime, cycle_months: int, payout_day: int = 25) -> datetime:
+    # First payout = first day 25 strictly after lock_dt for Monthly
+    # tenure; for longer tenures, shift cycle_months forward first.
+    payout_day = max(25, min(28, int(payout_day or 25)))
+    if cycle_months <= 1:
+        candidate = lock_dt.replace(
+            day=payout_day, hour=0, minute=0, second=0, microsecond=0,
+        )
+        if candidate <= lock_dt:
+            candidate = _add_months(candidate, 1)
+        return candidate
+    target = _add_months(lock_dt, cycle_months)
+    candidate = target.replace(
+        day=payout_day, hour=0, minute=0, second=0, microsecond=0,
+    )
+    if candidate <= target:
+        candidate = _add_months(candidate, 1)
+    return candidate
 
 
 def _serialize(r: FixedReturnLock) -> dict:
@@ -204,20 +210,11 @@ async def admin_grant_lock(
         user.main_wallet_balance = balance - principal
 
     now = datetime.now(timezone.utc)
-    # Mature ONE day before the calendar anniversary so users can
-    # withdraw on the eve of their lock anniversary (client spec
-    # 2026-06-08). Mirrors the gateway create_lock path.
+    # Mature ONE day before the calendar anniversary (client spec).
     matures_at = _add_months(now, lock_months) - timedelta(days=1)
     payout_dom = await get_int_setting("fixed_return_payout_day_of_month", 25)
-    window_start = await get_int_setting("fixed_return_payout_day_start", 15)
-    window_end = await get_int_setting("fixed_return_payout_day_end", 25)
     cycle_months = _tenure_to_months(tenure_days)
-    next_payout_at = _snap_to_payout_window(
-        _add_months(now, cycle_months),
-        payout_day=payout_dom,
-        window_start=window_start,
-        window_end=window_end,
-    )
+    next_payout_at = _first_payout_date(now, cycle_months, payout_day=payout_dom)
     if next_payout_at > matures_at:
         next_payout_at = matures_at
 
@@ -373,13 +370,8 @@ async def reject(lock_id: UUID, db: AsyncSession, *, reason: str | None = None) 
         matures_at = matures_at.replace(tzinfo=timezone.utc)
     cycle_months = _tenure_to_months(int(lock.tenure_days or 0))
     payout_dom = await get_int_setting("fixed_return_payout_day_of_month", 25)
-    window_start = await get_int_setting("fixed_return_payout_day_start", 15)
-    window_end = await get_int_setting("fixed_return_payout_day_end", 25)
     next_payout = _snap_to_payout_window(
-        _add_months(now, cycle_months),
-        payout_day=payout_dom,
-        window_start=window_start,
-        window_end=window_end,
+        _add_months(now, cycle_months), payout_day=payout_dom,
     )
     if matures_at and next_payout > matures_at:
         next_payout = matures_at
