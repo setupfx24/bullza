@@ -35,6 +35,10 @@ interface Settings {
   // remaining tabs in real time via /wallet/payment-methods.
   'wallet.manual_enabled': boolean;
   'wallet.p2p_enabled': boolean;
+  // Relationship-manager email — where the "Request to RM" deposit /
+  // withdraw form delivers the user's request. Must be set before
+  // wallet.p2p_enabled becomes useful; gateway returns 503 otherwise.
+  'wallet.rm_email': string;
   [key: string]: number | boolean | string;
 }
 
@@ -64,6 +68,7 @@ const DEFAULT_SETTINGS: Settings = {
   allow_withdrawals: true,
   'wallet.manual_enabled': true,
   'wallet.p2p_enabled': false,
+  'wallet.rm_email': '',
 };
 
 function rowsToSettings(rows: SystemSettingRow[]): Settings {
@@ -116,6 +121,10 @@ function rowsToSettings(rows: SystemSettingRow[]): Settings {
     allow_withdrawals: bool('allow_withdrawals', DEFAULT_SETTINGS.allow_withdrawals),
     'wallet.manual_enabled': bool('wallet.manual_enabled', DEFAULT_SETTINGS['wallet.manual_enabled']),
     'wallet.p2p_enabled': bool('wallet.p2p_enabled', DEFAULT_SETTINGS['wallet.p2p_enabled']),
+    'wallet.rm_email': (() => {
+      const v = map['wallet.rm_email'];
+      return typeof v === 'string' ? v : DEFAULT_SETTINGS['wallet.rm_email'];
+    })(),
   };
 }
 
@@ -144,6 +153,7 @@ function settingsToPayload(s: Settings): Record<string, unknown> {
     allow_withdrawals: s.allow_withdrawals,
     'wallet.manual_enabled': s['wallet.manual_enabled'],
     'wallet.p2p_enabled': s['wallet.p2p_enabled'],
+    'wallet.rm_email': s['wallet.rm_email'],
   };
 }
 
@@ -334,7 +344,7 @@ export default function SettingsPage() {
                     // real time. Gateway also hard-rejects API calls on the
                     // disabled rails so the gate is enforced server-side.
                     { key: 'wallet.manual_enabled', label: 'Manual (Bank/UPI) Deposits + Withdrawals', desc: 'Show the Manual deposit tab and Bank withdrawal tab in the trader wallet' },
-                    { key: 'wallet.p2p_enabled', label: 'P2P Marketplace', desc: 'Show the P2P marketplace tab in both deposit and withdraw flows' },
+                    { key: 'wallet.p2p_enabled', label: 'Request to RM (Manual Mail Flow)', desc: 'Show the "Request to RM" tab in deposit + withdraw — user form submits via email to the relationship manager. Set the RM email below before enabling.' },
                   ].map((toggle) => (
                     <div key={toggle.key} className={cn('flex items-center justify-between gap-4 p-3 rounded-md border', toggle.danger && settings[toggle.key] ? 'border-danger/30 bg-danger/5' : 'border-border-primary')}>
                       <div>
@@ -352,6 +362,27 @@ export default function SettingsPage() {
                       </button>
                     </div>
                   ))}
+
+                  {/* RM email — destination address for the "Request to RM"
+                      deposit/withdraw form. Gateway returns 503 to the
+                      trader if this is blank, so admins are nudged to
+                      set it before flipping the toggle above. */}
+                  <div className="p-3 rounded-md border border-border-primary">
+                    <label className="text-xs font-medium text-text-primary block">
+                      Relationship Manager email
+                    </label>
+                    <p className="text-xxs text-text-tertiary mt-0.5 mb-2">
+                      Where the "Request to RM" form emails the user's name,
+                      amount, and phone. Required when the toggle above is on.
+                    </p>
+                    <input
+                      type="email"
+                      value={typeof settings['wallet.rm_email'] === 'string' ? (settings['wallet.rm_email'] as string) : ''}
+                      onChange={(e) => setSettings((s) => s ? { ...s, 'wallet.rm_email': e.target.value } : null)}
+                      placeholder="rm@yourbroker.com"
+                      className="w-full text-xs py-2 px-3 bg-bg-input border border-border-primary rounded-md outline-none focus:border-accent/50"
+                    />
+                  </div>
                 </div>
               </div>
             </div>

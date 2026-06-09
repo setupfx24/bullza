@@ -1167,7 +1167,7 @@ function WalletPageContent() {
                             ? 'Crypto (NOWPayments)'
                             : method === 'manual'
                             ? 'Manual (Bank/UPI)'
-                            : 'P2P'}
+                            : 'Request to RM'}
                         </button>
                       );
                     })}
@@ -1479,7 +1479,7 @@ function WalletPageContent() {
                             : 'text-text-tertiary hover:text-text-primary',
                         )}
                       >
-                        {m === 'crypto' ? 'Crypto' : m === 'bank' ? 'Bank' : 'P2P'}
+                        {m === 'crypto' ? 'Crypto' : m === 'bank' ? 'Bank' : 'Request to RM'}
                       </button>
                     ))}
                   </div>
