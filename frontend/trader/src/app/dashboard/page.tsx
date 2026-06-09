@@ -519,9 +519,14 @@ function BannerStrip({ banners }: { banners: Banner[] }) {
   }, [banners.length]);
   if (banners.length === 0) return null;
   const b = banners[index];
+  // Fixed 5:1 aspect ratio everywhere a banner shows (dashboard +
+  // admin preview list). Previously the dashboard used height-only
+  // classes (h-44/h-52/h-60) which gave a different aspect ratio at
+  // every breakpoint — same banner looked 2:1 on mobile and 5:1 on
+  // desktop, breaking the design. Recommended upload size: 1500×300.
   return (
     <div className="relative w-full rounded-2xl overflow-hidden" style={{ border: '1px solid var(--border-primary)' }}>
-      <div className="relative w-full h-44 sm:h-52 md:h-60 bg-bg-secondary">
+      <div className="relative w-full aspect-[5/1] bg-bg-secondary">
         {b.link_url ? (
           <a href={b.link_url} target="_blank" rel="noopener noreferrer" className="absolute inset-0 block">
             <img src={b.image_url} alt={b.title || 'Banner'} className="w-full h-full object-cover" />
