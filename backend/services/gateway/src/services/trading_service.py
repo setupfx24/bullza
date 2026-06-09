@@ -320,12 +320,22 @@ async def place_order(
             min(int(account.leverage), int(ic_lev_cap))
             if ic_lev_cap else int(account.leverage)
         )
+        # Cent-account lot scaling (Mig 0069). Standard / ECN / VIP all
+        # have multiplier=1 so this is a no-op for them; Cent group has
+        # 0.01 so trader's submitted 0.01 lots become 0.0001 effective
+        # lots persisted on the Position. Every downstream engine sees
+        # the scaled value and does plain math on it — risk, margin,
+        # P&L all naturally scale 100× down without per-engine logic.
+        ag_mult = Decimal(str(
+            getattr(account.account_group, "lot_size_multiplier", None) or 1
+        ))
+        effective_lots = Decimal(str(req.lots)) * ag_mult
         # Margin from calc_margin is in the instrument's quote currency
         # (e.g. JPY for NZDJPY). Convert to the account currency (USD)
         # before reserving against the balance, otherwise 1 JPY of margin
         # gets reserved as $1 — historically over-charged by ~150× on JPY
         # crosses and broke "Insufficient margin" gating on small lots.
-        required_margin_raw = calc_margin(req.lots, fill_price, contract_size, effective_leverage)
+        required_margin_raw = calc_margin(effective_lots, fill_price, contract_size, effective_leverage)
         required_margin = await convert_to_account_currency(
             required_margin_raw,
             getattr(instrument, "quote_currency", None) or (instrument.symbol[3:6].upper() if instrument.symbol and len(instrument.symbol) >= 6 else None),
@@ -402,7 +412,12 @@ async def place_order(
             instrument_id=instrument.id,
             order_id=order.id,
             side=req.side,
-            lots=req.lots,
+            # Persist the SCALED lots so every downstream engine
+            # (margin, P&L, swap, SLTP, copy, risk) sees the cent-
+            # adjusted value. The trader-side UI multiplies back by
+            # (1 / multiplier) before display so the table still shows
+            # the value they typed.
+            lots=effective_lots,
             open_price=fill_price,
             stop_loss=req.stop_loss,
             take_profit=req.take_profit,
@@ -677,14 +692,25 @@ async def cancel_order(order_id: UUID, user_id: UUID, db: AsyncSession) -> dict:
 # ─── Positions ────────────────────────────────────────────────────────────
 
 async def list_positions(account_id: UUID, user_id: UUID, status: str, db: AsyncSession) -> list[dict]:
+    # Load the account WITH its group so we know the lot scaling
+    # multiplier for the display swap below. Cent accounts persist
+    # lots scaled DOWN (Mig 0069 — trader's 0.01 stored as 0.0001);
+    # we multiply UP here so the trader sees their original value.
     result = await db.execute(
-        select(TradingAccount).where(
+        select(TradingAccount)
+        .options(selectinload(TradingAccount.account_group))
+        .where(
             TradingAccount.id == account_id,
             TradingAccount.user_id == user_id,
         )
     )
-    if not result.scalar_one_or_none():
+    account_row = result.scalar_one_or_none()
+    if not account_row:
         raise HTTPException(status_code=404, detail="Account not found")
+    _lot_mult = Decimal(str(
+        getattr(account_row.account_group, "lot_size_multiplier", None) or 1
+    ))
+    _lot_unscale = (Decimal("1") / _lot_mult) if _lot_mult > 0 else Decimal("1")
 
     query = select(Position).where(Position.account_id == account_id)
     if status == "open":
@@ -792,7 +818,9 @@ async def list_positions(account_id: UUID, user_id: UUID, status: str, db: Async
             "account_id": str(pos.account_id),
             "symbol": pos.instrument.symbol if pos.instrument else "",
             "side": sv,
-            "lots": float(pos.lots),
+            # Multiply back by 1/multiplier so cent-account traders see
+            # the 0.01 they entered, even though storage holds 0.0001.
+            "lots": float(Decimal(str(pos.lots)) * _lot_unscale),
             "open_price": float(pos.open_price),
             "current_price": current_price,
             "stop_loss": float(pos.stop_loss) if pos.stop_loss else None,
@@ -905,7 +933,9 @@ async def close_position(position_id: UUID, req, user_id: UUID, db: AsyncSession
         raise HTTPException(status_code=404, detail="Position not found")
 
     acct_result = await db.execute(
-        select(TradingAccount).where(
+        select(TradingAccount)
+        .options(selectinload(TradingAccount.account_group))
+        .where(
             TradingAccount.id == pos.account_id,
             TradingAccount.user_id == user_id,
         )
@@ -953,7 +983,19 @@ async def close_position(position_id: UUID, req, user_id: UUID, db: AsyncSession
         if _ic_lev_cap else int(account.leverage)
     )
 
-    close_lots = Decimal(str(req.lots)) if req.lots and Decimal(str(req.lots)) < pos.lots else pos.lots
+    # Trader sends `req.lots` in user-facing units (e.g. 0.01 on a
+    # cent account). pos.lots is in engine units (0.0001 after the
+    # 0.01 multiplier). Scale the user value DOWN by the account
+    # group's multiplier before comparing so the partial-close gate
+    # works correctly on cent accounts. Standard accounts have
+    # multiplier=1 so the path is unchanged.
+    _close_mult = Decimal(str(
+        getattr(account.account_group, "lot_size_multiplier", None) or 1
+    ))
+    _close_req_scaled = (
+        Decimal(str(req.lots)) * _close_mult if req.lots else None
+    )
+    close_lots = _close_req_scaled if _close_req_scaled and _close_req_scaled < pos.lots else pos.lots
     is_partial = close_lots < pos.lots
 
     # P&L must be in account currency before it touches the balance.
