@@ -2,6 +2,13 @@ import { FileText } from 'lucide-react'
 
 export const metadata = { title: 'Terms and Conditions — SwisDex' }
 
+/**
+ * Terms & Conditions — content sourced from the client-supplied PDF
+ * "terms and condition.pdf" delivered 2026-06-09. Wording preserved
+ * verbatim from the legal text; only the formatting + numbering follows
+ * the existing SwisDex page layout. The Risk Disclaimer block at the
+ * bottom is kept as the platform's standard trader-facing warning.
+ */
 export default function TermsPage() {
   return (
     <div className="min-h-screen" style={{ background: 'var(--bg-primary)' }}>
@@ -14,88 +21,169 @@ export default function TermsPage() {
           <h1 className="text-3xl font-bold text-text-primary">Terms and Conditions</h1>
         </div>
 
-        <p className="text-lg font-semibold text-text-primary mt-8 mb-1">SwisDex — Terms and Conditions</p>
-        <p className="text-sm text-text-secondary mb-10">Last updated: February 2026</p>
+        <p className="text-lg font-semibold text-text-primary mt-8 mb-1">Swisdex — Terms and Conditions</p>
+        <p className="text-sm text-text-secondary mb-10">Last updated: June 2026</p>
 
         <div className="space-y-8">
           <Section title="1. Acceptance of Terms">
-            By creating an account and using the SwisDex platform, you acknowledge that you have read, understood, and agree to be bound by these Terms and Conditions. If you do not agree with any part of these terms, you must not use our services.
-          </Section>
-
-          <Section title="2. Eligibility">
-            You must be at least 18 years of age and legally permitted to engage in financial trading in your jurisdiction. You are responsible for ensuring compliance with all applicable laws and regulations.
-          </Section>
-
-          <Section title="3. Account Responsibilities">
-            You are solely responsible for maintaining the confidentiality of your account credentials. All activities conducted under your account are your responsibility. You agree to provide accurate and truthful information during registration and to keep your information up to date.
-          </Section>
-
-          <Section title="4. Trading Risks">
-            Trading forex and other financial instruments involves substantial risk of loss and is not suitable for all investors. Past performance is not indicative of future results. You should carefully consider your financial situation and risk tolerance before trading.
-          </Section>
-
-          <Section title="5. Deposits and Withdrawals">
-            All deposits are subject to the platform&apos;s processing policies. Cryptocurrency deposits are subject to a 2.5% processing fee. Withdrawals require email verification for security purposes. Processing times may vary depending on the payment method.
-          </Section>
-
-          <Section title="6. Bonus Terms">
-            Promotional bonuses, including the welcome bonus, are subject to specific terms and conditions. Bonus funds may have trading volume requirements and withdrawal restrictions. SwisDex reserves the right to modify or discontinue bonus programs at any time.
-          </Section>
-
-          <Section title="7. Prohibited Conduct">
-            You agree not to engage in any of the following:
-            <List items={[
-              'Market manipulation, fraud, or any form of abusive trading practices.',
-              'Using the platform for money laundering or any illegal activity.',
-              'Attempting to exploit system vulnerabilities or interfere with platform operations.',
-              'Creating multiple accounts to circumvent platform rules or bonus limitations.',
-              'Engaging in defamatory, malicious, or harmful attacks against SwisDex, its brand, employees, partners, or other users. This includes but is not limited to spreading false information, making threatening communications, filing fraudulent complaints, or conducting coordinated campaigns intended to damage the company\u2019s reputation.',
-              'Making false or unsubstantiated accusations against SwisDex, including but not limited to publicly or privately labeling the platform as a \u201cscam,\u201d \u201cfraud,\u201d or similar defamatory terms without legitimate basis. Such conduct undermines trust and will not be tolerated, and may result in immediate account suspension or termination.',
-            ]} />
-          </Section>
-
-          <Section title="8. Account Suspension and Termination">
-            SwisDex reserves the right to suspend, restrict, or terminate any account at its sole discretion, including but not limited to cases where a user:
-            <List items={[
-              'Violates any provision of these Terms and Conditions.',
-              'Engages in malicious conduct against the brand, its affiliates, or other users.',
-              'Provides false or misleading information.',
-              'Is suspected of fraudulent or illegal activity.',
-            ]} />
-            <p className="mt-3">Upon suspension or termination, access to trading and withdrawal functions may be restricted pending investigation.</p>
-          </Section>
-
-          <Section title="9. Affiliate Program">
-            Participation in the affiliate program is subject to additional terms. Affiliates must promote SwisDex responsibly and in compliance with all applicable advertising standards. Commissions are subject to review and may be adjusted or revoked in cases of abuse.
-          </Section>
-
-          <Section title="10. PAMM Investments">
-            PAMM (Percentage Allocation Management Module) investments carry inherent risks. Past performance of a PAMM manager does not guarantee future results. Investors should conduct their own due diligence before allocating funds.
-          </Section>
-
-          <Section title="11. Privacy and Data Protection">
-            Your personal data is processed in accordance with our Privacy Policy. By using our services, you consent to the collection, processing, and storage of your data as described therein. We implement industry-standard security measures to protect your information.
-          </Section>
-
-          <Section title="12. Limitation of Liability">
-            SwisDex shall not be liable for any indirect, incidental, special, or consequential damages arising from your use of the platform. Our total liability shall not exceed the amount of funds deposited in your account.
-          </Section>
-
-          <Section title="13. Modifications">
-            SwisDex reserves the right to modify these Terms and Conditions at any time. Continued use of the platform after changes are posted constitutes acceptance of the revised terms. Users will be notified of material changes via email or platform notification.
-          </Section>
-
-          <Section title="14. Governing Law">
-            These Terms and Conditions shall be governed by and construed in accordance with applicable laws. Any disputes shall be resolved through the appropriate legal channels.
-          </Section>
-
-          <div className="pt-4 border-t" style={{ borderColor: 'var(--border-primary)' }}>
-            <p className="text-text-secondary text-sm leading-relaxed">
-              By checking the box and creating your account, you confirm that you have read, understood, and agree to these Terms and Conditions in their entirety.
+            <p>
+              <b className="text-text-primary">1.1</b> By accessing or using any services, products, platforms, or tools offered by Swisdex (hereinafter referred to as &quot;Swisdex&quot;), you agree to be bound by these Terms &amp; Conditions. If you do not agree with any part of these terms, you should not access or use any Swisdex services.
             </p>
-          </div>
+            <p>
+              <b className="text-text-primary">1.2</b> These Terms &amp; Conditions apply to all users, clients, visitors, and customers of Swisdex, whether registered or unregistered. By accessing or using the platform, you acknowledge and accept these Terms &amp; Conditions.
+            </p>
+          </Section>
 
-          {/* Risk Disclaimer */}
+          <Section title="2. Binding Agreement">
+            <p>
+              <b className="text-text-primary">2.1</b> By registering for an account or using Swisdex services, you enter into a legally binding agreement with Swisdex.
+            </p>
+            <p>
+              <b className="text-text-primary">2.2</b> You acknowledge that your continued use of Swisdex services constitutes acceptance of these Terms &amp; Conditions and any additional policies, agreements, disclosures, or legal documentation published by Swisdex.
+            </p>
+          </Section>
+
+          <Section title="3. Eligibility and Age Requirement">
+            <p>
+              <b className="text-text-primary">3.1</b> To use Swisdex services, you must be at least eighteen (18) years old or the legal age required to enter into a binding agreement in your jurisdiction.
+            </p>
+            <p>
+              <b className="text-text-primary">3.2</b> By opening an account, you confirm that all information provided is accurate and that you meet the eligibility requirements.
+            </p>
+            <p>
+              <b className="text-text-primary">3.3</b> Providing false information regarding your identity, age, or residency is strictly prohibited and may result in immediate account suspension or termination.
+            </p>
+          </Section>
+
+          <Section title="4. Trading Risk Disclosure">
+            <p>
+              <b className="text-text-primary">4.1</b> Forex, commodities, cryptocurrencies, indices, and CFD trading involve substantial risk and may not be suitable for all investors.
+            </p>
+            <p>
+              <b className="text-text-primary">4.2</b> You acknowledge that you may lose part or all of your deposited funds and that past performance does not guarantee future results.
+            </p>
+            <p>
+              <b className="text-text-primary">4.3</b> Swisdex does not guarantee profits, returns, or successful trading outcomes unless explicitly stated under a specific promotional program governed by separate terms.
+            </p>
+            <p>
+              <b className="text-text-primary">4.4</b> Clients are solely responsible for their trading decisions and investment activities.
+            </p>
+          </Section>
+
+          <Section title="5. Account Registration and Security">
+            <p>
+              <b className="text-text-primary">5.1</b> Clients must provide accurate, complete, and up-to-date information during registration.
+            </p>
+            <p>
+              <b className="text-text-primary">5.2</b> You are responsible for maintaining the confidentiality of your account credentials, passwords, and security information.
+            </p>
+            <p>
+              <b className="text-text-primary">5.3</b> Swisdex shall not be liable for losses arising from unauthorized access resulting from your failure to protect account credentials.
+            </p>
+          </Section>
+
+          <Section title="6. Deposits and Withdrawals">
+            <p>
+              <b className="text-text-primary">6.1</b> Clients may fund their accounts using payment methods approved by Swisdex.
+            </p>
+            <p>
+              <b className="text-text-primary">6.2</b> Withdrawal requests are subject to verification, compliance checks, and anti-money laundering (AML) procedures.
+            </p>
+            <p>
+              <b className="text-text-primary">6.3</b> Swisdex reserves the right to request additional identification documents before processing withdrawals.
+            </p>
+            <p>
+              <b className="text-text-primary">6.4</b> Processing times may vary depending on the selected payment method and verification requirements.
+            </p>
+          </Section>
+
+          <Section title="7. Bonuses, Promotions, and Trade Insurance">
+            <p>
+              <b className="text-text-primary">7.1</b> Any bonuses, deposit promotions, referral rewards, trade insurance programs, or special offers are subject to separate promotional terms.
+            </p>
+            <p>
+              <b className="text-text-primary">7.2</b> Swisdex reserves the right to modify, suspend, or cancel promotional programs at any time without prior notice.
+            </p>
+            <p>
+              <b className="text-text-primary">7.3</b> Abuse, manipulation, arbitrage, or fraudulent use of promotional programs may result in cancellation of rewards and account restrictions.
+            </p>
+          </Section>
+
+          <Section title="8. Referral and Introducing Broker (IB) Program">
+            <p>
+              <b className="text-text-primary">8.1</b> Participants in the Referral Program and IB Program must comply with all applicable laws and ethical marketing standards.
+            </p>
+            <p>
+              <b className="text-text-primary">8.2</b> Swisdex reserves the right to adjust, withhold, or revoke commissions generated through fraudulent, misleading, or prohibited activities.
+            </p>
+            <p>
+              <b className="text-text-primary">8.3</b> Referral and IB commissions are subject to qualification requirements outlined in the relevant program documentation.
+            </p>
+          </Section>
+
+          <Section title="9. Anti-Money Laundering (AML) and Compliance">
+            <p>
+              <b className="text-text-primary">9.1</b> Swisdex maintains strict AML and Know Your Customer (KYC) procedures.
+            </p>
+            <p>
+              <b className="text-text-primary">9.2</b> Clients may be required to provide identification documents, proof of address, and other verification materials.
+            </p>
+            <p>
+              <b className="text-text-primary">9.3</b> Swisdex reserves the right to suspend or terminate accounts involved in suspicious, illegal, or non-compliant activities.
+            </p>
+          </Section>
+
+          <Section title="10. Limitation of Liability">
+            <p>
+              <b className="text-text-primary">10.1</b> Swisdex shall not be liable for any indirect, incidental, consequential, or special damages arising from the use of its services.
+            </p>
+            <p>
+              <b className="text-text-primary">10.2</b> Swisdex is not responsible for losses resulting from market volatility, technical failures, internet disruptions, third-party service interruptions, or force majeure events.
+            </p>
+          </Section>
+
+          <Section title="11. Suspension and Termination">
+            <p>
+              <b className="text-text-primary">11.1</b> Swisdex reserves the right to suspend, restrict, or terminate any account that violates these Terms &amp; Conditions or applicable regulations.
+            </p>
+            <p>
+              <b className="text-text-primary">11.2</b> Upon termination, clients must immediately cease using Swisdex services.
+            </p>
+          </Section>
+
+          <Section title="12. Amendments">
+            <p>
+              <b className="text-text-primary">12.1</b> Swisdex reserves the right to modify, update, or replace these Terms &amp; Conditions at any time.
+            </p>
+            <p>
+              <b className="text-text-primary">12.2</b> Continued use of Swisdex services after updates become effective constitutes acceptance of the revised Terms &amp; Conditions.
+            </p>
+          </Section>
+
+          <Section title="13. Governing Law">
+            <p>
+              <b className="text-text-primary">13.1</b> These Terms &amp; Conditions shall be governed by and interpreted in accordance with the laws applicable to the jurisdiction under which Swisdex operates.
+            </p>
+            <p>
+              <b className="text-text-primary">13.2</b> Any disputes arising from these Terms &amp; Conditions shall be subject to the exclusive jurisdiction of the relevant courts or arbitration authorities.
+            </p>
+          </Section>
+
+          <Section title="14. Contact Information">
+            <p>For any questions, support requests, or concerns regarding these Terms &amp; Conditions, please contact:</p>
+            <div
+              className="rounded-xl p-4 mt-3 text-sm space-y-1"
+              style={{ background: 'var(--bg-card)', border: '1px solid var(--border-primary)' }}
+            >
+              <p className="font-semibold text-text-primary">Swisdex Support Team</p>
+              <p>Email: <a href="mailto:support@swisdex.com" className="text-[#55a630] hover:underline">support@swisdex.com</a></p>
+            </div>
+            <p className="mt-4">
+              By registering for an account and using Swisdex services, you confirm that you have read, understood, and agreed to these Terms &amp; Conditions.
+            </p>
+          </Section>
+
+          {/* Risk Disclaimer — kept as the platform's standard warning */}
           <div
             className="rounded-xl p-6"
             style={{ background: 'var(--bg-card)', border: '1px solid var(--border-primary)' }}
@@ -117,13 +205,5 @@ function Section({ title, children }: { title: string; children: React.ReactNode
       <h2 className="text-lg font-bold text-text-primary mb-3">{title}</h2>
       <div className="text-text-secondary text-sm leading-relaxed space-y-2">{children}</div>
     </div>
-  )
-}
-
-function List({ items }: { items: string[] }) {
-  return (
-    <ul className="list-disc list-inside space-y-2 mt-3 text-text-secondary text-sm">
-      {items.map((item, i) => <li key={i}>{item}</li>)}
-    </ul>
   )
 }
