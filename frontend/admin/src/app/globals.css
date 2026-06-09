@@ -9,6 +9,11 @@
    ═══════════════════════════════════════════════════════════ */
 
 /* —— Dark theme (default) —— */
+/* Client report 2026-06-09: dim text across admin pages (IB Tiers, Fixed
+   Return matrix, etc.) made input values + labels hard to read on dark
+   surfaces. Raised every text token by ~30% luminance and bumped input
+   font-weight from 400 → 500 globally so every admin page surfaces
+   readable text without per-page edits. */
 :root {
   color-scheme: dark;
   --c-bg-page: 5 7 7;
@@ -23,9 +28,9 @@
   --c-border-secondary: 45 45 45;
   --c-border-accent: 60 60 60;
   --c-border-glass: 255 255 255;
-  --c-text-primary: 240 240 240;
-  --c-text-secondary: 160 165 175;
-  --c-text-tertiary: 100 105 115;
+  --c-text-primary: 250 250 250;     /* was 240 — push to near-pure white for max contrast */
+  --c-text-secondary: 200 205 215;   /* was 160 — table header / label readable on bg-secondary */
+  --c-text-tertiary: 150 155 165;    /* was 100 — helper text + placeholders no longer disappear */
   --c-text-inverse: 10 10 10;
   --shadow-modal: 0 8px 40px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.05);
   --shadow-dropdown: 0 4px 20px rgba(0, 0, 0, 0.5);
@@ -46,9 +51,9 @@ html.light, [data-theme='light'] {
   --c-border-secondary: 210 210 210;
   --c-border-accent: 180 180 180;
   --c-border-glass: 0 0 0;
-  --c-text-primary: 20 20 20;
-  --c-text-secondary: 80 80 80;
-  --c-text-tertiary: 130 130 130;
+  --c-text-primary: 15 15 15;        /* was 20 — slightly darker for crisp on white */
+  --c-text-secondary: 60 65 75;      /* was 80 — table labels readable on bg-secondary */
+  --c-text-tertiary: 105 110 120;    /* was 130 — helper text visible against light bg */
   --c-text-inverse: 255 255 255;
   --shadow-modal: 0 8px 40px rgba(0, 0, 0, 0.12);
   --shadow-dropdown: 0 4px 20px rgba(0, 0, 0, 0.08);
@@ -73,23 +78,51 @@ html, body {
 ::-webkit-scrollbar-thumb { background: rgb(var(--c-border-secondary) / 0.6); border-radius: 4px; }
 ::-webkit-scrollbar-thumb:hover { background: rgb(var(--c-border-accent) / 0.8); }
 
-/* ── Inputs ── */
+/* ── Inputs ──
+   Bumped to 14px + weight 500 + tabular-nums so the value the admin
+   typed actually stands out from the input chrome. Numeric admin tables
+   (IB tiers, Fixed Return matrix, charges, spreads) read as data, not
+   placeholder text. */
 input, select, textarea {
   background-color: rgb(var(--c-bg-input) / 1);
   border: 1px solid rgb(var(--c-border-primary) / 1);
   color: rgb(var(--c-text-primary) / 1);
   border-radius: 8px;
   padding: 8px 12px;
-  font-size: 13px;
+  font-size: 14px;
+  font-weight: 500;
   font-family: inherit;
+  font-variant-numeric: tabular-nums;
   outline: none;
   transition: border-color 200ms ease, box-shadow 200ms ease;
+}
+input::placeholder, textarea::placeholder {
+  color: rgb(var(--c-text-tertiary) / 1);
+  font-weight: 400;
 }
 input:focus, select:focus, textarea:focus {
   border-color: rgba(85,166,48, 0.5);
   box-shadow: 0 0 0 3px rgba(85,166,48, 0.1), inset 0 1px 2px rgba(0, 0, 0, 0.2);
 }
 input:disabled, select:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* ── Tables ── Bolden table cells so the data row pops over the
+   header. Per-page table classes still apply; this is the global
+   fallback so untouched pages benefit too. */
+table th {
+  color: rgb(var(--c-text-secondary) / 1);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+table td {
+  color: rgb(var(--c-text-primary) / 1);
+  font-weight: 500;
+}
+/* Helper / footnote prose under tables / forms — was --text-tertiary
+   at 100/100/115 which faded to a smudge on dark bg. The bumped
+   tertiary value already helps; this rule pins the floor so a page
+   that wraps notes in <p class="text-text-tertiary"> still reads. */
+p, label, span { font-weight: inherit; }
 
 ::selection { background-color: rgba(85,166,48, 0.2); }
 
