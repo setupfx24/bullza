@@ -143,8 +143,14 @@ class SLTPEngine:
             profit = (close_price - pos.open_price) * pos.lots * contract_size
         else:
             profit = (pos.open_price - close_price) * pos.lots * contract_size
-        from ..services.trading_service import quote_to_account_pnl
-        profit = quote_to_account_pnl(
+        # Cross-pair fix — same family as commits c66e1e2, 3284c59,
+        # a058754, 4b5771a. Sync `quote_to_account_pnl` short-circuits
+        # cross pairs (NZDJPY, EURGBP) to raw quote currency, so SL/TP
+        # triggers on those instruments credited JPY-as-USD profit and
+        # nuked balances silently. Use the async converter that pulls
+        # the live USD/quote rate from Redis.
+        from packages.common.src.trading_service import quote_to_account_pnl_async
+        profit = await quote_to_account_pnl_async(
             profit,
             getattr(pos.instrument, "base_currency", None),
             getattr(pos.instrument, "quote_currency", None),
@@ -163,7 +169,16 @@ class SLTPEngine:
         )
         account = acct_result.scalar_one_or_none()
         if account:
-            margin_release = (pos.lots * contract_size * pos.open_price) / Decimal(str(account.leverage))
+            # Cross-pair margin release fix — same as the trader-side
+            # close path. Raw `lots × cs × price / leverage` is in the
+            # quote currency; on cross pairs that's JPY etc. Convert to
+            # USD before releasing or margin_used leaks every SL/TP fire.
+            from packages.common.src.trading_service import convert_to_account_currency
+            margin_release_raw = (pos.lots * contract_size * pos.open_price) / Decimal(str(account.leverage))
+            margin_release = await convert_to_account_currency(
+                margin_release_raw,
+                getattr(pos.instrument, "quote_currency", None),
+            )
             account.balance += profit
             account.margin_used = max(Decimal("0"), (account.margin_used or Decimal("0")) - margin_release)
             account.equity = account.balance + (account.credit or Decimal("0"))
