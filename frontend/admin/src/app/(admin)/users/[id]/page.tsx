@@ -35,6 +35,10 @@ interface UserDetail {
     status: string;
     kyc_status: string;
     is_demo: boolean;
+    // Security / verification flags surfaced 2026-06-01 (#5) — admin
+    // uses these to decide whether to trigger a reset / revoke sessions.
+    email_verified?: boolean;
+    two_factor_enabled?: boolean;
     created_at: string | null;
   };
   accounts: {
@@ -191,8 +195,14 @@ export default function UserDetailPage() {
           </div>
         </div>
 
+        {/* Account security & sessions — Reset Password, Revoke, list */}
+        <SecurityCard userId={userId} user={user} />
+
         {/* Fixed Return per-user rate override */}
         <FixedReturnOverrideCard userId={userId} />
+
+        {/* Fixed Return — admin grants a lock to this user with custom terms */}
+        <FixedReturnGrantCard userId={userId} />
 
         {/* Trading Accounts */}
         <div className="bg-bg-secondary border border-border-primary rounded-lg p-5">
@@ -452,6 +462,363 @@ function FixedReturnOverrideCard({ userId }: { userId: string }) {
           No personal rates set — this user sees the global ladder.
         </div>
       )}
+    </div>
+  );
+}
+
+
+// ─── Account security & sessions ─────────────────────────────────────
+
+interface UserSession {
+  id: string;
+  ip_address: string | null;
+  user_agent: string | null;
+  created_at: string | null;
+  expires_at: string | null;
+}
+
+function SecurityCard({
+  userId,
+  user,
+}: {
+  userId: string;
+  user: UserDetail['user'];
+}) {
+  const [sessions, setSessions] = useState<UserSession[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [resetting, setResetting] = useState(false);
+  const [revoking, setRevoking] = useState<string | null>(null);
+  const [revokingAll, setRevokingAll] = useState(false);
+
+  const loadSessions = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await adminApi.get<{ items: UserSession[] }>(
+        `/users/${userId}/sessions`,
+      );
+      setSessions(res.items || []);
+    } catch {
+      setSessions([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [userId]);
+
+  useEffect(() => { loadSessions(); }, [loadSessions]);
+
+  const triggerReset = async () => {
+    if (!window.confirm(
+      `Send a password reset email to ${user.email}?\n\nThe user will receive a one-time 15-minute link to set a new password. You will NOT see the plain password — it's never stored in readable form anywhere in the system.`,
+    )) return;
+    setResetting(true);
+    try {
+      const res = await adminApi.post<{ message: string; sent: boolean }>(
+        `/users/${userId}/reset-password`, {},
+      );
+      toast.success(res.message || 'Reset email sent');
+    } catch (e: any) {
+      toast.error(e?.message || 'Failed to trigger reset');
+    } finally {
+      setResetting(false);
+    }
+  };
+
+  const revokeOne = async (sid: string) => {
+    if (!window.confirm('Revoke this session? The user will be logged out from that device.')) return;
+    setRevoking(sid);
+    try {
+      await adminApi.delete(`/users/${userId}/sessions/${sid}`);
+      toast.success('Session revoked');
+      loadSessions();
+    } catch (e: any) {
+      toast.error(e?.message || 'Failed to revoke');
+    } finally {
+      setRevoking(null);
+    }
+  };
+
+  const revokeAll = async () => {
+    if (!window.confirm(`Revoke ALL ${sessions.length} active session(s) for ${user.email}?\n\nThe user will be forced to re-authenticate on every device.`)) return;
+    setRevokingAll(true);
+    try {
+      await adminApi.post(`/users/${userId}/sessions/revoke-all`, {});
+      toast.success('All sessions revoked');
+      loadSessions();
+    } catch (e: any) {
+      toast.error(e?.message || 'Failed to revoke');
+    } finally {
+      setRevokingAll(false);
+    }
+  };
+
+  return (
+    <div className="bg-bg-secondary border border-border-primary rounded-lg p-5 space-y-4">
+      <div className="flex items-start justify-between gap-3 flex-wrap">
+        <div className="min-w-0">
+          <h2 className="text-base font-bold text-text-primary">Account Security</h2>
+          <p className="text-xs text-text-tertiary mt-0.5 max-w-2xl">
+            Passwords are stored as <span className="text-text-secondary">bcrypt hashes</span> —
+            plain text is never retrievable, even by admins. Use the actions
+            below to help users regain access or to lock out suspicious sessions.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={triggerReset}
+          disabled={resetting}
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-buy rounded-md hover:bg-buy-light disabled:opacity-50 shrink-0"
+        >
+          {resetting ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
+          Send Password Reset Email
+        </button>
+      </div>
+
+      {/* Flags row — email verified, 2FA */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-1">
+        <Flag
+          label="Email verified"
+          value={user.email_verified ? 'Yes' : 'No'}
+          good={!!user.email_verified}
+        />
+        <Flag
+          label="Two-factor (2FA)"
+          value={user.two_factor_enabled ? 'Enabled' : 'Disabled'}
+          good={!!user.two_factor_enabled}
+        />
+        <Flag label="Account status" value={user.status} good={user.status === 'active'} />
+        <Flag label="KYC" value={user.kyc_status || '—'} good={['verified', 'approved'].includes((user.kyc_status || '').toLowerCase())} />
+      </div>
+
+      {/* Sessions */}
+      <div className="pt-2">
+        <div className="flex items-center justify-between mb-2">
+          <h3 className="text-sm font-bold text-text-primary">
+            Active Sessions ({sessions.length})
+          </h3>
+          {sessions.length > 0 && (
+            <button
+              type="button"
+              onClick={revokeAll}
+              disabled={revokingAll}
+              className="text-xs text-danger hover:underline disabled:opacity-50"
+            >
+              {revokingAll ? 'Revoking…' : 'Revoke all'}
+            </button>
+          )}
+        </div>
+        {loading ? (
+          <div className="py-4 text-center"><Loader2 size={16} className="animate-spin text-text-tertiary inline-block" /></div>
+        ) : sessions.length === 0 ? (
+          <div className="text-xs text-text-tertiary py-3 text-center border border-dashed border-border-primary rounded-md">
+            No active sessions
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[480px]">
+              <thead>
+                <tr className="border-b border-border-primary text-text-tertiary text-xxs uppercase tracking-wide">
+                  <th className="text-left py-2">IP</th>
+                  <th className="text-left py-2">User agent</th>
+                  <th className="text-left py-2">Created</th>
+                  <th className="text-right py-2">Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {sessions.map((s) => (
+                  <tr key={s.id} className="border-b border-border-primary/40 last:border-0">
+                    <td className="py-2 text-xs font-mono text-text-secondary">{s.ip_address || '—'}</td>
+                    <td className="py-2 text-xs text-text-tertiary truncate max-w-[280px]" title={s.user_agent || ''}>
+                      {s.user_agent || '—'}
+                    </td>
+                    <td className="py-2 text-xxs text-text-tertiary">
+                      {s.created_at ? new Date(s.created_at).toLocaleString() : '—'}
+                    </td>
+                    <td className="py-2 text-right">
+                      <button
+                        type="button"
+                        onClick={() => revokeOne(s.id)}
+                        disabled={revoking === s.id}
+                        className="text-xxs text-danger hover:underline disabled:opacity-50"
+                      >
+                        {revoking === s.id ? 'Revoking…' : 'Revoke'}
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function Flag({ label, value, good }: { label: string; value: string; good: boolean }) {
+  return (
+    <div className="rounded-md border border-border-primary bg-bg-tertiary/30 px-3 py-2">
+      <p className="text-[10px] uppercase text-text-tertiary tracking-wide">{label}</p>
+      <p className={cn(
+        'text-sm font-bold mt-0.5',
+        good ? 'text-success' : 'text-warning',
+      )}>{value}</p>
+    </div>
+  );
+}
+
+// ─── Fixed Return — Admin grant ──────────────────────────────────────
+// Admin-side form that creates a Fixed Return lock for this user with
+// custom terms (principal, tenure, optional rate / lock-months override,
+// optional broker-funded source). Same engine path as a trader-self-
+// locked position — once created, the gateway interest engine drives
+// payouts the same way.
+const GRANT_TENURES = ['Month', 'Quarter', 'Half-Year', 'Year', '2 Year'] as const;
+
+function FixedReturnGrantCard({ userId }: { userId: string }) {
+  const [principal, setPrincipal] = useState('');
+  const [tenure, setTenure] = useState<typeof GRANT_TENURES[number]>('Year');
+  const [ratePctOverride, setRatePctOverride] = useState('');
+  const [lockMonthsOverride, setLockMonthsOverride] = useState('');
+  const [source, setSource] = useState<'user_wallet' | 'admin_grant'>('user_wallet');
+  const [note, setNote] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
+  const submit = async () => {
+    const p = parseFloat(principal);
+    if (!Number.isFinite(p) || p <= 0) {
+      toast.error('Enter a positive principal');
+      return;
+    }
+    setSubmitting(true);
+    try {
+      const body: Record<string, unknown> = {
+        principal: p,
+        tenure_label: tenure,
+        source,
+      };
+      const r = parseFloat(ratePctOverride);
+      if (ratePctOverride.trim() && Number.isFinite(r) && r >= 0) body.rate_pct_override = r;
+      const m = parseInt(lockMonthsOverride, 10);
+      if (lockMonthsOverride.trim() && Number.isFinite(m) && m > 0) body.lock_months_override = m;
+      if (note.trim()) body.note = note.trim();
+      await adminApi.post(`/fixed-return/users/${userId}/grant`, body);
+      toast.success('Fixed Return lock created');
+      setPrincipal('');
+      setRatePctOverride('');
+      setLockMonthsOverride('');
+      setNote('');
+    } catch (e: any) {
+      toast.error(e?.message || 'Grant failed');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="bg-bg-secondary border border-border-primary rounded-lg p-5">
+      <div className="mb-4">
+        <h2 className="text-base font-bold text-text-primary">Fixed Return — Grant a Lock</h2>
+        <p className="text-xs text-text-tertiary mt-0.5 max-w-2xl">
+          Create a Fixed Return position for this user with any rate, tenure, or
+          lock duration. Use <span className="text-text-primary font-semibold">User wallet</span>{' '}
+          to debit their main balance (admin acts on their behalf), or{' '}
+          <span className="text-text-primary font-semibold">Admin grant</span>{' '}
+          for a broker-funded promo (no wallet debit).
+        </p>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-3">
+        <label className="block">
+          <span className="block text-[10px] uppercase text-text-tertiary mb-1">Principal (USD)</span>
+          <input
+            type="number"
+            step="0.01"
+            min="0"
+            value={principal}
+            onChange={(e) => setPrincipal(e.target.value)}
+            placeholder="e.g. 10000"
+            className="w-full px-3 py-2 rounded-md bg-bg-tertiary border border-border-primary text-sm text-text-primary font-mono outline-none focus:border-accent/50"
+          />
+        </label>
+        <label className="block">
+          <span className="block text-[10px] uppercase text-text-tertiary mb-1">Tenure (payout cadence)</span>
+          <select
+            value={tenure}
+            onChange={(e) => setTenure(e.target.value as any)}
+            className="w-full px-3 py-2 rounded-md bg-bg-tertiary border border-border-primary text-sm text-text-primary outline-none focus:border-accent/50"
+          >
+            {GRANT_TENURES.map((t) => <option key={t} value={t}>{t}</option>)}
+          </select>
+        </label>
+        <label className="block">
+          <span className="block text-[10px] uppercase text-text-tertiary mb-1">Source</span>
+          <select
+            value={source}
+            onChange={(e) => setSource(e.target.value as any)}
+            className="w-full px-3 py-2 rounded-md bg-bg-tertiary border border-border-primary text-sm text-text-primary outline-none focus:border-accent/50"
+          >
+            <option value="user_wallet">User wallet (debit balance)</option>
+            <option value="admin_grant">Admin grant (broker-funded)</option>
+          </select>
+        </label>
+        <label className="block">
+          <span className="block text-[10px] uppercase text-text-tertiary mb-1">
+            Rate % override <span className="lowercase">(optional)</span>
+          </span>
+          <input
+            type="number"
+            step="0.01"
+            min="0"
+            value={ratePctOverride}
+            onChange={(e) => setRatePctOverride(e.target.value)}
+            placeholder="Leave blank to use matrix rate"
+            className="w-full px-3 py-2 rounded-md bg-bg-tertiary border border-border-primary text-sm text-text-primary font-mono outline-none focus:border-accent/50"
+          />
+        </label>
+        <label className="block">
+          <span className="block text-[10px] uppercase text-text-tertiary mb-1">
+            Lock months override <span className="lowercase">(optional)</span>
+          </span>
+          <input
+            type="number"
+            min="1"
+            max="240"
+            value={lockMonthsOverride}
+            onChange={(e) => setLockMonthsOverride(e.target.value)}
+            placeholder="Leave blank for global default"
+            className="w-full px-3 py-2 rounded-md bg-bg-tertiary border border-border-primary text-sm text-text-primary font-mono outline-none focus:border-accent/50"
+          />
+        </label>
+        <label className="block sm:col-span-2 lg:col-span-3">
+          <span className="block text-[10px] uppercase text-text-tertiary mb-1">
+            Note <span className="lowercase">(written to the audit ledger)</span>
+          </span>
+          <input
+            type="text"
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            placeholder="e.g. VIP onboarding promo"
+            maxLength={240}
+            className="w-full px-3 py-2 rounded-md bg-bg-tertiary border border-border-primary text-sm text-text-primary outline-none focus:border-accent/50"
+          />
+        </label>
+      </div>
+
+      <div className="flex justify-end">
+        <button
+          type="button"
+          disabled={submitting || !principal}
+          onClick={submit}
+          className={cn(
+            'inline-flex items-center gap-2 px-4 py-2 rounded-md text-sm font-bold transition-colors',
+            submitting || !principal
+              ? 'bg-bg-tertiary text-text-tertiary cursor-not-allowed'
+              : 'bg-buy text-white hover:bg-buy-light',
+          )}
+        >
+          {submitting ? 'Creating…' : 'Grant Fixed Return'}
+        </button>
+      </div>
     </div>
   );
 }

@@ -980,3 +980,22 @@ html[data-page="accounts"] header.h-\[65px\] + div,
 html[data-page="accounts"] div:has(> header.h-\[65px\]) {
   background: transparent !important;
 }
+
+/* ───────────────────────────────────────────────────────────── */
+/* SwisDex brand logo — the PNG ships with white / light lettering
+   on a transparent background, so it disappears against the white
+   card when the user flips to light theme (client report
+   2026-06-01: "user dashboard light theme me logo dikh nahi raha").
+   Earlier attempt used invert+hue-rotate which flipped brand
+   colours to magenta — looked off (client follow-up: "logo ka
+   colour change ho gya"). New approach: wrap the logo in a tight
+   dark padding/background so the white letters always sit on a
+   dark canvas regardless of the surrounding page theme. No filter,
+   colours preserved exactly as designed.                            */
+/* ───────────────────────────────────────────────────────────── */
+[data-theme="light"] img[src*="swisdex_png5"] {
+  background-color: #0a0a0a;
+  border-radius: 6px;
+  padding: 4px 6px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+}

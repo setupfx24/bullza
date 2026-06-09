@@ -9,7 +9,12 @@ export type TransactionKind =
   | 'profit'
   | 'loss'
   | 'adjustment'
-  | 'credit';
+  | 'credit'
+  // Fixed Return: lock, interest payouts, matured returns, early
+  // withdrawal payouts/requests, admin grants — all carry their own
+  // semantics so they render with a Fixed-Return label + are
+  // filterable as a single category.
+  | 'fixed_return';
 
 export interface Transaction {
   id: string;
@@ -86,6 +91,11 @@ export function mapLedgerToTransaction(row: WalletLedgerItem): Transaction {
   else if (raw === 'loss') uiType = 'loss';
   else if (raw === 'credit') uiType = 'credit';
   else if (raw === 'adjustment') uiType = 'adjustment';
+  // Every Fixed Return ledger entry the backend emits starts with the
+  // `fixed_return` prefix — lock / interest / matured / early /
+  // early_request / early_rejected / lock_admin / grant. Bucket them
+  // into a single UI kind so users see "Fixed Return" as a category.
+  else if (raw.startsWith('fixed_return')) uiType = 'fixed_return';
   const amt = Number(row.amount) || 0;
   return {
     id: `ledger-${row.id}`,
@@ -94,6 +104,9 @@ export function mapLedgerToTransaction(row: WalletLedgerItem): Transaction {
     signedAmount: amt,
     currency: row.currency || 'USD',
     status: normalizeStatus(row.status || 'completed'),
+    // For fixed_return rows the backend method is the raw type name
+    // (e.g. "Fixed Return Interest"). Keep it so the row sub-label
+    // tells the user exactly which sub-event this is.
     method: row.method || formatMethod(raw),
     created_at: row.created_at || new Date(0).toISOString(),
     description: row.description?.trim() || undefined,
@@ -131,7 +144,7 @@ export function mergeWalletHistory(
 
 export function transactionMatchesTypeFilter(
   tx: Transaction,
-  f: 'all' | 'deposit' | 'withdrawal' | 'transfer' | 'trading' | 'adjustment' | 'commission',
+  f: 'all' | 'deposit' | 'withdrawal' | 'transfer' | 'trading' | 'adjustment' | 'commission' | 'fixed_return',
 ): boolean {
   if (f === 'all') return true;
   if (f === 'deposit') return tx.type === 'deposit';
@@ -139,6 +152,7 @@ export function transactionMatchesTypeFilter(
   if (f === 'transfer') return tx.type === 'transfer';
   if (f === 'trading') return tx.type === 'profit' || tx.type === 'loss';
   if (f === 'commission') return tx.type === 'credit' || tx.method.toLowerCase().includes('commission');
+  if (f === 'fixed_return') return tx.type === 'fixed_return';
   if (f === 'adjustment')
     return (
       tx.type === 'adjustment' ||
@@ -169,9 +183,27 @@ export function transactionTitle(tx: Transaction): string {
       return 'Bonus';
     case 'correction':
       return 'Correction';
+    case 'fixed_return':
+      // The backend method is e.g. "Fixed Return Lock Admin" / "Fixed
+      // Return Interest" / "Fixed Return Matured" — read that to pick
+      // a precise label instead of a generic "Fixed Return" everywhere.
+      // Falls back to a generic when the method is empty.
+      return fixedReturnLabel(tx.method);
     default:
       return 'Transaction';
   }
+}
+
+function fixedReturnLabel(method: string): string {
+  const m = (method || '').toLowerCase();
+  if (m.includes('interest')) return 'Fixed Return — Interest';
+  if (m.includes('matured')) return 'Fixed Return — Matured';
+  if (m.includes('early_request') || m.includes('early request')) return 'Fixed Return — Early withdrawal requested';
+  if (m.includes('early_rejected') || m.includes('early rejected')) return 'Fixed Return — Early withdrawal rejected';
+  if (m.includes('early')) return 'Fixed Return — Early withdrawal';
+  if (m.includes('grant')) return 'Fixed Return — Admin grant';
+  if (m.includes('lock')) return 'Fixed Return — Lock';
+  return 'Fixed Return';
 }
 
 export const PAGE_SIZES = [10, 25, 50] as const;

@@ -48,6 +48,13 @@ def _user_to_out(u: User) -> dict:
         "trading_blocked_until": u.trading_blocked_until,
         "created_at": u.created_at,
         "updated_at": u.updated_at,
+        # Security / account-state fields — surfaced to the admin
+        # user-detail page so the support team can see verification
+        # state at a glance without crossing tabs. Client request
+        # 2026-06-01 (#5) — admin wants to see full user details
+        # so they can decide whether to reset / revoke sessions.
+        "email_verified": bool(getattr(u, "email_verified", False)),
+        "two_factor_enabled": bool(getattr(u, "two_factor_enabled", False)),
     }
 
 
@@ -838,3 +845,150 @@ async def delete_user(
     await db.commit()
 
     return {"message": f"User {user_email} permanently deleted"}
+
+
+# ─── Account-security helpers (admin-triggered) ──────────────────────
+
+
+async def trigger_password_reset(
+    user_id: uuid.UUID, admin_id: uuid.UUID,
+    ip_address: str | None, db: AsyncSession,
+) -> dict:
+    """Admin asks the system to email the user a password reset link.
+
+    Plain passwords are never stored (bcrypt at rest) so we can't show
+    one to the admin — but we CAN issue a one-time 15-min token, drop
+    a row in password_reset_tokens, and ship the user the standard
+    reset email. The user then sets the new password themselves and
+    nobody (including admin) ever sees the plaintext.
+    """
+    import secrets
+    import hashlib
+    from datetime import timezone
+
+    u = (await db.execute(select(User).where(User.id == user_id))).scalar_one_or_none()
+    if not u:
+        raise HTTPException(status_code=404, detail="User not found")
+    if u.status in ("banned",):
+        raise HTTPException(status_code=403, detail="Cannot reset password for a banned account")
+
+    # Same token shape the gateway's forgot-password flow uses — 32-byte
+    # url-safe random, sha256 stored. Token is only ever returned to the
+    # user via email; admin never sees it.
+    raw = secrets.token_urlsafe(32)
+    token_hash = hashlib.sha256(raw.encode("utf-8")).hexdigest()
+    expires_at = datetime.now(timezone.utc) + timedelta(minutes=15)
+    db.add(PasswordResetToken(
+        user_id=u.id, token_hash=token_hash, expires_at=expires_at, used=False,
+    ))
+
+    # Email — best-effort. If SMTP is unconfigured (dev) we log instead.
+    settings = get_settings()
+    base = settings.TRADER_APP_URL.rstrip("/")
+    link = f"{base}/auth/reset-password?token={raw}"
+    sent = False
+    try:
+        from packages.common.src.smtp_mail import send_password_reset_email, smtp_configured
+        if smtp_configured():
+            sent = await send_password_reset_email(u.email, link)
+    except Exception:
+        sent = False
+
+    await write_audit_log(
+        db, admin_id, "admin_trigger_reset", "user", user_id,
+        new_values={"email": u.email, "delivery": "email" if sent else "logged"},
+        ip_address=ip_address,
+    )
+    await db.commit()
+
+    return {
+        "message": (
+            f"Reset link emailed to {u.email}"
+            if sent else
+            "Reset token created; SMTP unconfigured — check server logs"
+        ),
+        "sent": bool(sent),
+        # Only surface the link in non-prod; prod admins must rely on
+        # the email so the token doesn't leak to the audit log UI.
+        "reset_link": link if settings.ENVIRONMENT != "production" else None,
+    }
+
+
+async def list_user_sessions(user_id: uuid.UUID, db: AsyncSession) -> dict:
+    """Active (non-expired, is_active) login sessions for the user."""
+    now = datetime.utcnow()
+    rows = (await db.execute(
+        select(UserSession).where(
+            UserSession.user_id == user_id,
+            UserSession.is_active.is_(True),
+            UserSession.expires_at > now,
+        ).order_by(UserSession.created_at.desc())
+    )).scalars().all()
+
+    items = []
+    for s in rows:
+        items.append({
+            "id": str(s.id),
+            "ip_address": str(s.ip_address) if s.ip_address else None,
+            "user_agent": s.user_agent,
+            "device_info": s.device_info,
+            "created_at": s.created_at.isoformat() if s.created_at else None,
+            "expires_at": s.expires_at.isoformat() if s.expires_at else None,
+        })
+    return {"items": items, "total": len(items)}
+
+
+async def revoke_user_session(
+    user_id: uuid.UUID, session_id: uuid.UUID,
+    admin_id: uuid.UUID, ip_address: str | None, db: AsyncSession,
+) -> dict:
+    s = (await db.execute(
+        select(UserSession).where(
+            UserSession.id == session_id,
+            UserSession.user_id == user_id,
+        )
+    )).scalar_one_or_none()
+    if not s:
+        raise HTTPException(status_code=404, detail="Session not found")
+    s.is_active = False
+    await write_audit_log(
+        db, admin_id, "revoke_session", "user_session", session_id,
+        new_values={"user_id": str(user_id)},
+        ip_address=ip_address,
+    )
+    await db.commit()
+    return {"message": "Session revoked"}
+
+
+async def revoke_all_user_sessions(
+    user_id: uuid.UUID, admin_id: uuid.UUID,
+    ip_address: str | None, db: AsyncSession,
+) -> dict:
+    rows = (await db.execute(
+        select(UserSession).where(
+            UserSession.user_id == user_id,
+            UserSession.is_active.is_(True),
+        )
+    )).scalars().all()
+    count = 0
+    for s in rows:
+        s.is_active = False
+        count += 1
+    # Also kill any refresh tokens so the user can't slide back in via
+    # the rotate path.
+    rt_rows = (await db.execute(
+        select(UserRefreshToken).where(
+            UserRefreshToken.user_id == user_id,
+            UserRefreshToken.revoked_at.is_(None),
+        )
+    )).scalars().all()
+    for rt in rt_rows:
+        rt.revoked_at = datetime.utcnow()
+
+    await write_audit_log(
+        db, admin_id, "revoke_all_sessions", "user", user_id,
+        new_values={"sessions_revoked": count, "refresh_tokens_revoked": len(rt_rows)},
+        ip_address=ip_address,
+    )
+    await db.commit()
+    return {"message": f"Revoked {count} session(s)", "sessions_revoked": count}

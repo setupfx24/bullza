@@ -76,7 +76,11 @@ def side_val(side) -> str:
     return side.value if hasattr(side, 'value') else str(side)
 
 
-from packages.common.src.trading_service import quote_to_account_pnl
+from packages.common.src.trading_service import (
+    quote_to_account_pnl,
+    quote_to_account_pnl_async,
+    convert_to_account_currency,
+)
 
 
 def calc_pnl(
@@ -202,35 +206,61 @@ async def place_order(
 
     bid, ask = await get_current_price(instrument.symbol)
 
-    # The broadcast bid/ask already has the INSTRUMENT-level admin spread
-    # baked in (market-data → spread_cache.widen). For per-user and
-    # per-account-type spread overrides to actually bite, we recompute
-    # the quote here from mid using resolve_spread_config with the
-    # caller's user_id + account_group_id. Client report 2026-06-01:
-    # "AllTick se jo spread aa rha hai usko zero kar do; admin apna jo
-    # lagayega account type / instrument / user".
-    try:
-        mid = (bid + ask) / Decimal("2")
-        sv, st, _pimp = await resolve_spread_config(
-            db, instrument,
-            user_id=user_id,
-            account_group_id=account.account_group_id,
-        )
-        if sv and sv > 0:
-            pip = Decimal(str(instrument.pip_size or "0.0001"))
-            digits = int(instrument.digits or 5)
+    # Spread resolution. The broadcast bid/ask already has INSTRUMENT-
+    # level admin spread baked in (market-data → spread_cache.widen).
+    # We recompute from mid here using a priority chain:
+    #
+    #   1. Master pool override — if this account is a MAM/PAMM pool
+    #      account AND admin set master.spread_markup_pips, treat that
+    #      as THE TOTAL spread (REPLACE the user's account-type spread
+    #      entirely). Client decision 2026-06-01: "PAMM/MAM ka spread
+    #      alag se lagayega, different not as per account type".
+    #
+    #   2. Per-user / per-account-type / per-instrument from
+    #      resolve_spread_config — for normal trading accounts.
+    #
+    # Anything outside both falls back to the broadcast bid/ask.
+    mid = (bid + ask) / Decimal("2")
+    pip = Decimal(str(instrument.pip_size or "0.0001"))
+    digits = int(instrument.digits or 5)
+
+    master_override = (await db.execute(
+        select(MasterAccount).where(MasterAccount.account_id == account.id)
+    )).scalar_one_or_none()
+
+    if master_override and master_override.spread_markup_pips:
+        # MAM/PAMM pool — master spread is the WHOLE spread, no
+        # additive layering. Whatever account_group the pool account
+        # was opened under is ignored on purpose.
+        try:
+            sv_master = Decimal(str(master_override.spread_markup_pips))
             new_bid, new_ask = symmetric_quote_from_mid(
-                mid, sv, st, pip, digits, Decimal("0"),
+                mid, sv_master, "pips", pip, digits, Decimal("0"),
             )
             bid, ask = new_bid, new_ask
-    except Exception as _e:
-        # Per-user resolution failure should never block trading; fall
-        # back to the broadcast bid/ask which already has the default
-        # instrument spread applied.
-        logger.warning(
-            "Per-user spread resolution failed for %s (user=%s): %s",
-            instrument.symbol, user_id, _e,
-        )
+        except Exception as _e:
+            logger.warning(
+                "Master pool spread re-widening failed for %s: %s",
+                instrument.symbol, _e,
+            )
+    else:
+        # Regular trading account — per-user / per-account-type wins.
+        try:
+            sv, st, _pimp = await resolve_spread_config(
+                db, instrument,
+                user_id=user_id,
+                account_group_id=account.account_group_id,
+            )
+            if sv and sv > 0:
+                new_bid, new_ask = symmetric_quote_from_mid(
+                    mid, sv, st, pip, digits, Decimal("0"),
+                )
+                bid, ask = new_bid, new_ask
+        except Exception as _e:
+            logger.warning(
+                "Per-user spread resolution failed for %s (user=%s): %s",
+                instrument.symbol, user_id, _e,
+            )
 
     order = Order(
         account_id=account.id,
@@ -249,20 +279,9 @@ async def place_order(
     if req.order_type == "market":
         fill_price = ask if req.side == "buy" else bid
 
-        # PAMM / MAM per-master trade-cost overrides. If this account is the
-        # pool account behind a master and admin set spread_markup_pips, layer
-        # the additional pips into fill_price (BUY pays more, SELL receives
-        # less). NULL = fall through to the standard SpreadConfig resolver.
-        master_override = (await db.execute(
-            select(MasterAccount).where(MasterAccount.account_id == account.id)
-        )).scalar_one_or_none()
-        if master_override and master_override.spread_markup_pips:
-            pip_size = instrument.pip_size or Decimal("0.0001")
-            markup = Decimal(str(master_override.spread_markup_pips)) * pip_size
-            if req.side == "buy":
-                fill_price = fill_price + markup
-            else:
-                fill_price = fill_price - markup
+        # Master spread is already baked into bid/ask above (REPLACE
+        # mode). The additive markup pass that used to live here is
+        # gone — it would have double-counted.
 
         if req.stop_loss:
             if req.side == "buy" and req.stop_loss >= fill_price:
@@ -301,11 +320,22 @@ async def place_order(
             min(int(account.leverage), int(ic_lev_cap))
             if ic_lev_cap else int(account.leverage)
         )
-        required_margin = calc_margin(req.lots, fill_price, contract_size, effective_leverage)
+        # Margin from calc_margin is in the instrument's quote currency
+        # (e.g. JPY for NZDJPY). Convert to the account currency (USD)
+        # before reserving against the balance, otherwise 1 JPY of margin
+        # gets reserved as $1 — historically over-charged by ~150× on JPY
+        # crosses and broke "Insufficient margin" gating on small lots.
+        required_margin_raw = calc_margin(req.lots, fill_price, contract_size, effective_leverage)
+        required_margin = await convert_to_account_currency(
+            required_margin_raw,
+            getattr(instrument, "quote_currency", None) or (instrument.symbol[3:6].upper() if instrument.symbol and len(instrument.symbol) >= 6 else None),
+        )
 
         unrealized_pnl = Decimal("0")
         open_pos_result = await db.execute(
-            select(Position).where(
+            select(Position)
+            .options(selectinload(Position.instrument))
+            .where(
                 Position.account_id == account.id,
                 Position.status == "open",
             )
@@ -337,10 +367,22 @@ async def place_order(
                 pos_side = pos.side.value if hasattr(pos.side, 'value') else str(pos.side)
                 cp = p_bid if pos_side == "buy" else p_ask
                 cs = pos.instrument.contract_size if pos.instrument else Decimal("100000")
-                if pos_side == "buy":
-                    unrealized_pnl += (cp - pos.open_price) * pos.lots * cs
-                else:
-                    unrealized_pnl += (pos.open_price - cp) * pos.lots * cs
+                raw_q = (
+                    (cp - pos.open_price) * pos.lots * cs
+                    if pos_side == "buy"
+                    else (pos.open_price - cp) * pos.lots * cs
+                )
+                # Convert quote-currency P&L to account currency (USD)
+                # so cross pairs like NZDJPY don't get JPY values treated
+                # as dollars when summing equity for the margin check.
+                unrealized_pnl += await quote_to_account_pnl_async(
+                    raw_q,
+                    getattr(pos.instrument, "base_currency", None),
+                    getattr(pos.instrument, "quote_currency", None),
+                    cp,
+                    "USD",
+                    symbol=sym,
+                )
         real_equity = (account.balance or Decimal("0")) + (account.credit or Decimal("0")) + unrealized_pnl
         real_free_margin = real_equity - (account.margin_used or Decimal("0"))
 
@@ -653,6 +695,34 @@ async def list_positions(account_id: UUID, user_id: UUID, status: str, db: Async
     result = await db.execute(query.order_by(Position.created_at.desc()))
     positions = result.scalars().all()
 
+    # Per-position insurance markers — needed so the trader-side
+    # positions panel can render an "Insurance OK in 25s / Expires
+    # in 2h 15m" countdown chip without a second request per row.
+    # Client report 2026-06-01: "insurance countdown to be shown here".
+    insurance_by_pos: dict = {}
+    insurance_min_secs = 0.0
+    insurance_validity_secs = 0.0
+    if positions:
+        try:
+            from packages.common.src.models import InsurancePolicy
+            from packages.common.src.insurance.config import load_config as _load_ins_cfg
+            cfg = await _load_ins_cfg()
+            insurance_min_secs = float(cfg.min_trade_duration_seconds or 0)
+            insurance_validity_secs = float(cfg.policy_validity_seconds or 0)
+            pol_rows = (await db.execute(
+                select(InsurancePolicy).where(
+                    InsurancePolicy.position_id.in_([p.id for p in positions]),
+                    InsurancePolicy.status == "active",
+                )
+            )).scalars().all()
+            for p in pol_rows:
+                insurance_by_pos[str(p.position_id)] = p
+        except Exception as _e:
+            # Insurance is best-effort metadata on the position list —
+            # never block the panel render if the config / table is
+            # unavailable.
+            logger.warning("Failed to attach insurance markers: %s", _e)
+
     response = []
     for pos in positions:
         current_price = None
@@ -666,7 +736,23 @@ async def list_positions(account_id: UUID, user_id: UUID, status: str, db: Async
         if tick_data and pos_status == "open":
             tick = json.loads(tick_data)
             current_price = float(tick["bid"]) if sv == "buy" else float(tick["ask"])
-            profit = float(calc_pnl(pos.side, pos.open_price, Decimal(str(current_price)), pos.lots, contract_size, instrument=pos.instrument))
+            # Use the async P&L converter so cross pairs (NZDJPY etc.) get
+            # the JPY→USD conversion via live USDJPY tick. The sync version
+            # silently returns raw JPY for cross pairs which historically
+            # made losses/gains look ~125× too large in the positions panel.
+            raw_q = (
+                (Decimal(str(current_price)) - pos.open_price) * pos.lots * contract_size
+                if sv == "buy"
+                else (pos.open_price - Decimal(str(current_price))) * pos.lots * contract_size
+            )
+            profit = float(await quote_to_account_pnl_async(
+                raw_q,
+                getattr(pos.instrument, "base_currency", None),
+                getattr(pos.instrument, "quote_currency", None),
+                Decimal(str(current_price)),
+                "USD",
+                symbol=pos.instrument.symbol if pos.instrument else None,
+            ))
 
         copy_trade_q = await db.execute(
             select(CopyTrade).where(CopyTrade.investor_position_id == pos.id)
@@ -675,6 +761,32 @@ async def list_positions(account_id: UUID, user_id: UUID, status: str, db: Async
         trade_type = "copy_trade" if copy_trade else "self_trade"
 
         pos_status_val = pos.status.value if hasattr(pos.status, 'value') else str(pos.status)
+
+        # Insurance countdown metadata. Frontend ticks each second
+        # against `activated_at + min_trade_duration` (claim-eligible
+        # at) and `activated_at + policy_validity` (expires at).
+        ins_pol = insurance_by_pos.get(str(pos.id))
+        ins_activated_iso = None
+        ins_eligible_at_iso = None
+        ins_expires_at_iso = None
+        if ins_pol is not None:
+            activated = ins_pol.activated_at
+            if activated is not None:
+                if activated.tzinfo is None:
+                    from datetime import timezone as _tz
+                    activated = activated.replace(tzinfo=_tz.utc)
+                ins_activated_iso = activated.isoformat()
+                if insurance_min_secs > 0:
+                    from datetime import timedelta as _td
+                    ins_eligible_at_iso = (
+                        activated + _td(seconds=insurance_min_secs)
+                    ).isoformat()
+                if insurance_validity_secs > 0:
+                    from datetime import timedelta as _td
+                    ins_expires_at_iso = (
+                        activated + _td(seconds=insurance_validity_secs)
+                    ).isoformat()
+
         response.append({
             "id": str(pos.id),
             "account_id": str(pos.account_id),
@@ -693,6 +805,11 @@ async def list_positions(account_id: UUID, user_id: UUID, status: str, db: Async
             "trade_type": trade_type,
             "created_at": pos.created_at.isoformat() if pos.created_at else None,
             "closed_at": pos.closed_at.isoformat() if getattr(pos, 'closed_at', None) else None,
+            # Insurance markers — null when the position has no active
+            # policy. UI shows a countdown only when these are set.
+            "insurance_activated_at": ins_activated_iso,
+            "insurance_eligible_at": ins_eligible_at_iso,
+            "insurance_expires_at": ins_expires_at_iso,
         })
 
     return response
@@ -839,7 +956,25 @@ async def close_position(position_id: UUID, req, user_id: UUID, db: AsyncSession
     close_lots = Decimal(str(req.lots)) if req.lots and Decimal(str(req.lots)) < pos.lots else pos.lots
     is_partial = close_lots < pos.lots
 
-    full_profit = calc_pnl(pos.side, pos.open_price, close_price, pos.lots, contract_size, instrument=pos.instrument)
+    # P&L must be in account currency before it touches the balance.
+    # The sync calc_pnl silently returns raw JPY for cross pairs
+    # (NZDJPY, EURGBP), so a -37 JPY loss came through as -$37 and
+    # nuked balances over a few trades. Use the async converter that
+    # looks up the live USD/quote rate from Redis.
+    sv_for_calc = side_val(pos.side)
+    raw_quote = (
+        (close_price - pos.open_price) * pos.lots * contract_size
+        if sv_for_calc == "buy"
+        else (pos.open_price - close_price) * pos.lots * contract_size
+    )
+    full_profit = await quote_to_account_pnl_async(
+        raw_quote,
+        getattr(pos.instrument, "base_currency", None),
+        getattr(pos.instrument, "quote_currency", None),
+        close_price,
+        "USD",
+        symbol=pos.instrument.symbol if pos.instrument else None,
+    )
 
     # If the market price has already crossed the position's SL/TP level, label
     # this close as SL/TP in trade history instead of "manual" — covers the case
@@ -884,7 +1019,15 @@ async def close_position(position_id: UUID, req, user_id: UUID, db: AsyncSession
         db.add(history)
 
         account.balance += partial_profit
-        partial_margin = (close_lots * contract_size * pos.open_price) / Decimal(str(_effective_leverage_close))
+        # Margin is released in account currency, so the raw quote-currency
+        # notional must be converted back the same way it was reserved on
+        # open. Otherwise JPY/CHF-quoted pairs leak margin on every partial
+        # close (released $189 when only $1.20 was originally reserved).
+        partial_margin_raw = (close_lots * contract_size * pos.open_price) / Decimal(str(_effective_leverage_close))
+        partial_margin = await convert_to_account_currency(
+            partial_margin_raw,
+            getattr(pos.instrument, "quote_currency", None),
+        )
         account.margin_used = max(Decimal("0"), (account.margin_used or Decimal("0")) - partial_margin)
 
         result_msg = f"Partial close: {close_lots} lots"
@@ -913,7 +1056,12 @@ async def close_position(position_id: UUID, req, user_id: UUID, db: AsyncSession
         db.add(history)
 
         account.balance += full_profit
-        margin_release = (pos.lots * contract_size * pos.open_price) / Decimal(str(_effective_leverage_close))
+        # Same JPY/cross-pair correction as the partial-close path above.
+        margin_release_raw = (pos.lots * contract_size * pos.open_price) / Decimal(str(_effective_leverage_close))
+        margin_release = await convert_to_account_currency(
+            margin_release_raw,
+            getattr(pos.instrument, "quote_currency", None),
+        )
         account.margin_used = max(Decimal("0"), (account.margin_used or Decimal("0")) - margin_release)
 
         result_msg = "Position closed"

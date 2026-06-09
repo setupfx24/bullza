@@ -286,12 +286,8 @@ export default function PammPage() {
   // every copy trade, ignoring volume scaling entirely.
   const [investLotMultiplier, setInvestLotMultiplier] = useState('');
   const [investMode, setInvestMode] = useState<'scaling' | 'multiplier'>('scaling');
-  // Use bonus credit alongside cash. Forfeit on withdraw per the
-  // welcome-bonus contract.
-  const [investUseBonus, setInvestUseBonus] = useState(false);
-  // Opt-in to auto-insurance on copied trades. Only visible when
-  // master.insurance_enabled is true (admin gate, Mig 0066).
-  const [investInsuranceOptIn, setInvestInsuranceOptIn] = useState(false);
+  // Bonus + Insurance opt-in state removed 2026-06-01 — those features
+  // are not available on MAM/PAMM allocations any more.
   const [investing, setInvesting] = useState(false);
   const [walletBalance, setWalletBalance] = useState(0);
   const [walletBonus, setWalletBonus] = useState(0);
@@ -408,15 +404,10 @@ export default function PammPage() {
     const amount = parseFloat(investAmount);
     if (!investAccount || isNaN(amount) || amount <= 0) { toast.error('Enter a valid amount'); return; }
     if (amount < investTarget.min_investment) { toast.error(`Minimum investment is $${investTarget.min_investment}`); return; }
-    // With use_bonus on, the available pool is balance + bonus. Without
-    // it we still only spend cash. Same UX guard either way.
-    const available = walletBalance + (investUseBonus ? walletBonus : 0);
-    if (amount > available) {
-      toast.error(
-        investUseBonus
-          ? `Insufficient available funds — cash $${walletBalance.toFixed(2)} + bonus $${walletBonus.toFixed(2)}`
-          : 'Insufficient wallet balance',
-      );
+    // Bonus + Insurance are NOT allowed on MAM/PAMM — client decision
+    // 2026-06-01. Cash-only validation; UI no longer shows the opt-ins.
+    if (amount > walletBalance) {
+      toast.error('Insufficient cash balance — bonus credit is not usable on MAM/PAMM');
       return;
     }
     setInvesting(true);
@@ -439,26 +430,17 @@ export default function PammPage() {
           params.set('volume_scaling_pct', investScaling);
         }
       }
-      if (investUseBonus) params.set('use_bonus', 'true');
-      if (investInsuranceOptIn && investTarget.insurance_enabled !== false) {
-        params.set('insurance_opt_in', 'true');
-      }
-      const res = await api.post<{
-        top_up?: number; cash_used?: number; bonus_used?: number;
-      }>(`/social/mamm-pamm/${investTarget.id}/invest?${params.toString()}`, {});
-      const breakdown = res?.bonus_used && res.bonus_used > 0
-        ? ` ($${(res.cash_used ?? 0).toFixed(2)} cash + $${res.bonus_used.toFixed(2)} bonus)`
-        : '';
+      const res = await api.post<{ top_up?: number }>(
+        `/social/mamm-pamm/${investTarget.id}/invest?${params.toString()}`, {},
+      );
       toast.success(
         res?.top_up
-          ? `Top-up of $${res.top_up.toFixed(2)} added${breakdown}`
-          : `Investment started${breakdown}`,
+          ? `Top-up of $${res.top_up.toFixed(2)} added`
+          : 'Investment started',
       );
       setInvestTarget(null);
       setInvestLotMultiplier('');
       setInvestMode('scaling');
-      setInvestUseBonus(false);
-      setInvestInsuranceOptIn(false);
       fetchBrowse();
       fetchWallet();
       if (activeTab === 'investments') fetchAllocations();
@@ -686,21 +668,9 @@ export default function PammPage() {
                       <span className="flex items-center gap-1"><DollarSign size={11} /> Min: <span className="text-text-primary font-semibold">${a.min_investment.toLocaleString()}</span></span>
                     </div>
 
-                    {/* Feature badges — make it obvious that this master
-                        accepts bonus credit and (optionally) auto-insures
-                        copied trades. The user-asked-three-times-for-this
-                        moment from 2026-06-01: bonus + insurance need to
-                        be visible up-front, not buried in the invest modal. */}
-                    <div className="flex flex-wrap items-center gap-1.5 mt-3">
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/30 text-[10px] font-semibold text-amber-400">
-                        Bonus accepted
-                      </span>
-                      {a.insurance_enabled !== false && (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#55a630]/10 border border-[#55a630]/30 text-[10px] font-semibold text-[#55a630]">
-                          Insurance available
-                        </span>
-                      )}
-                    </div>
+                    {/* Bonus / Insurance badges removed 2026-06-01 —
+                        client decision: bonus credit and insurance are
+                        NOT available for MAM/PAMM accounts. */}
                   </div>
                 ))}
               </div>
@@ -857,20 +827,9 @@ export default function PammPage() {
                           {/* Bonus + insurance status — confirms what the
                               user opted into at invest time so they can
                               spot misconfiguration before withdrawing. */}
-                          {((a.bonus_portion ?? 0) > 0 || a.insurance_opt_in) && (
-                            <div className="flex flex-wrap items-center gap-1.5 pt-1">
-                              {(a.bonus_portion ?? 0) > 0 && (
-                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/15 border border-amber-500/30 text-[10px] font-semibold text-amber-400">
-                                  Bonus: ${fmt(a.bonus_portion ?? 0)}
-                                </span>
-                              )}
-                              {a.insurance_opt_in && (
-                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#55a630]/15 border border-[#55a630]/30 text-[10px] font-semibold text-[#55a630]">
-                                  Auto-insurance ON
-                                </span>
-                              )}
-                            </div>
-                          )}
+                          {/* Bonus + Auto-insurance pills removed
+                              2026-06-01 — neither feature applies to
+                              MAM/PAMM allocations any more. */}
                         </div>
 
                         <div className="flex items-center justify-between mt-3 pt-3 border-t border-border-primary text-[10px] text-text-tertiary">
@@ -1355,51 +1314,15 @@ export default function PammPage() {
 
             {/* Auto-insurance opt-in — only visible when the master
                 allows insurance (admin gate, Mig 0066). Off by default. */}
-            {investTarget.insurance_enabled !== false && (
-              <label className="flex items-start gap-2 rounded-lg bg-bg-secondary border border-border-primary p-3 cursor-pointer select-none">
-                <input
-                  type="checkbox"
-                  checked={investInsuranceOptIn}
-                  onChange={(e) => setInvestInsuranceOptIn(e.target.checked)}
-                  className="mt-0.5 h-4 w-4 accent-accent cursor-pointer"
-                />
-                <span className="text-[11px] text-text-secondary">
-                  Auto-insure copied trades on this allocation
-                  <span className="block text-[10px] text-text-tertiary mt-0.5">
-                    Each mirrored position opens with a default-tier insurance policy.
-                    Fees are charged per-trade from your investor sub-account credit.
-                  </span>
-                </span>
-              </label>
-            )}
+            {/* Auto-insurance + Use-bonus checkboxes removed 2026-06-01 —
+                client decision: bonus credit and insurance are NOT
+                allowed on MAM/PAMM allocations. */}
 
-            {/* Bonus opt-in — visible only when the user actually has
-                bonus credit. Off by default so existing flows aren't
-                disturbed and so the user has to consent to the
-                "forfeit on withdraw" tradeoff explicitly. */}
-            {walletBonus > 0 && (
-              <label className="flex items-start gap-2 rounded-lg bg-bg-secondary border border-border-primary p-3 cursor-pointer select-none">
-                <input
-                  type="checkbox"
-                  checked={investUseBonus}
-                  onChange={(e) => setInvestUseBonus(e.target.checked)}
-                  className="mt-0.5 h-4 w-4 accent-accent cursor-pointer"
-                />
-                <span className="text-[11px] text-text-secondary">
-                  Use my bonus balance (${walletBonus.toFixed(2)}) first
-                  <span className="block text-[10px] text-text-tertiary mt-0.5">
-                    Bonus credit is tradable but non-withdrawable — the bonus portion is forfeited when you exit the investment.
-                  </span>
-                </span>
-              </label>
-            )}
-
-            {/* Available funds summary — bonus is added only when the
-                opt-in is on, so the total always matches what the
-                backend will accept. */}
             <div className="text-[11px] text-text-tertiary">
-              Available: <span className="text-text-primary font-mono tabular-nums">${(walletBalance + (investUseBonus ? walletBonus : 0)).toFixed(2)}</span>
-              <span className="text-text-tertiary/70"> (cash ${walletBalance.toFixed(2)}{investUseBonus ? ` + bonus $${walletBonus.toFixed(2)}` : ''})</span>
+              Available cash: <span className="text-text-primary font-mono tabular-nums">${walletBalance.toFixed(2)}</span>
+              {walletBonus > 0 && (
+                <span className="text-text-tertiary/70"> · bonus ${walletBonus.toFixed(2)} (not usable for MAM/PAMM)</span>
+              )}
             </div>
 
             <div className="flex gap-2 pt-1">

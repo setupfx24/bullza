@@ -25,7 +25,7 @@ const Contact = () => {
   const [isChatOpen, setIsChatOpen] = useState(false)
   const [chatInput, setChatInput] = useState('')
   const [messages, setMessages] = useState([
-    { from: 'agent', text: 'Hi there! 👋 I\'m Sarah from SwisDex Support. How can I help you today?', time: 'now' }
+    { from: 'agent', text: 'Hi there! 👋 I\'m SwisBot, your SwisDex assistant. How can I help you today?', time: 'now' }
   ])
   const chatEndRef = useRef(null)
 
@@ -83,8 +83,8 @@ const Contact = () => {
       icon: MapPin,
       title: 'Visit Us',
       content: 'Office 23US, 18 Young St, UNIT LGE 1/1, Edinburgh EH2 4JB, Scotland',
-      link: '#'
-    }
+      link: 'https://www.google.com/maps/search/?api=1&query=18+Young+Street+Edinburgh+EH2+4JB',
+    },
   ]
 
   return (
@@ -102,7 +102,7 @@ const Contact = () => {
 
       <section className="section-padding bg-primary-secondary">
         <div className="container-custom">
-          <ScrollRevealGroup className="grid md:grid-cols-3 gap-8 mb-16">
+          <ScrollRevealGroup className="grid md:grid-cols-3 gap-8 mb-12">
             {contactInfo.map((info, index) => (
               <ScrollRevealItem key={index}>
                 <Card className="text-center p-8">
@@ -120,6 +120,39 @@ const Contact = () => {
               </ScrollRevealItem>
             ))}
           </ScrollRevealGroup>
+
+          {/* UK office pin — Google Maps embed for Edinburgh HQ */}
+          <ScrollReveal variant="fadeUp">
+            <div className="mb-16 rounded-2xl overflow-hidden border border-white/10 shadow-2xl">
+              <div className="bg-white/[0.03] px-6 py-4 flex items-center gap-3">
+                <MapPin className="w-5 h-5 text-primary-accent" />
+                <div>
+                  <div className="text-white font-semibold text-sm">SwisDex UK Office</div>
+                  <div className="text-text-secondary text-xs">
+                    18 Young St, Edinburgh EH2 4JB, Scotland
+                  </div>
+                </div>
+                <a
+                  href="https://www.google.com/maps/search/?api=1&query=18+Young+Street+Edinburgh+EH2+4JB"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="ml-auto text-xs text-primary-accent hover:underline"
+                >
+                  Open in Google Maps →
+                </a>
+              </div>
+              <iframe
+                title="SwisDex UK office location"
+                src="https://www.google.com/maps?q=18+Young+Street+Edinburgh+EH2+4JB&output=embed"
+                width="100%"
+                height="360"
+                style={{ border: 0 }}
+                loading="lazy"
+                referrerPolicy="no-referrer-when-downgrade"
+                allowFullScreen
+              />
+            </div>
+          </ScrollReveal>
 
           <div className="grid lg:grid-cols-2 gap-12">
             <ScrollReveal variant="fadeLeft">
@@ -245,7 +278,7 @@ const Contact = () => {
                   <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-400 rounded-full border-2 border-white"></div>
                 </div>
                 <div>
-                  <div className="font-semibold text-white">Sarah — Support</div>
+                  <div className="font-semibold text-white">SwisBot — Support</div>
                   <div className="text-xs text-white/80">Online • Typically replies instantly</div>
                 </div>
               </div>

@@ -26,6 +26,12 @@ export interface Position {
   /** copy_trade | self_trade when API provides it (open positions / copy trading). */
   trade_type?: string;
   created_at: string;
+  // Insurance markers per position — null when no active policy. Used
+  // by PositionsPanel to render an "Insurance OK in 25s / Expires in
+  // 2h 15m" countdown chip next to the close button.
+  insurance_activated_at?: string | null;
+  insurance_eligible_at?: string | null;
+  insurance_expires_at?: string | null;
 }
 
 export interface PendingOrder {
@@ -56,6 +62,9 @@ export interface AccountGroupInfo {
   /** Smaller of max_leverage and the per-user KYC cap (50 for non-KYC). Use this
    *  to clamp the leverage picker — leverage_default is just a UI hint, not the cap. */
   effective_max_leverage?: number;
+  /** Cent-account display flag (Mig 0068). When true, the trader UI
+   *  multiplies visible balance / equity / P&L by 100 and renders ¢. */
+  is_cent_account?: boolean | null;
 }
 
 export interface TradingAccount {

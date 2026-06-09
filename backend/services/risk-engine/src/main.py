@@ -92,8 +92,12 @@ class RiskEngine:
                                 pnl = (current_price - pos.open_price) * pos.lots * pos.instrument.contract_size
                             else:
                                 pnl = (pos.open_price - current_price) * pos.lots * pos.instrument.contract_size
-                            from packages.common.src.trading_service import quote_to_account_pnl
-                            pnl = quote_to_account_pnl(
+                            # Async converter so cross pairs (NZDJPY, EURGBP) get
+                            # the proper FX leg from Redis instead of being
+                            # treated as already-USD — otherwise margin-call /
+                            # stop-out triggers fire on phantom losses.
+                            from packages.common.src.trading_service import quote_to_account_pnl_async
+                            pnl = await quote_to_account_pnl_async(
                                 pnl,
                                 getattr(pos.instrument, "base_currency", None),
                                 getattr(pos.instrument, "quote_currency", None),
@@ -175,8 +179,11 @@ class RiskEngine:
                 profit = (close_price - pos.open_price) * pos.lots * pos.instrument.contract_size
             else:
                 profit = (pos.open_price - close_price) * pos.lots * pos.instrument.contract_size
-            from packages.common.src.trading_service import quote_to_account_pnl
-            profit = quote_to_account_pnl(
+            from packages.common.src.trading_service import (
+                quote_to_account_pnl_async,
+                convert_to_account_currency,
+            )
+            profit = await quote_to_account_pnl_async(
                 profit,
                 getattr(pos.instrument, "base_currency", None),
                 getattr(pos.instrument, "quote_currency", None),
@@ -190,7 +197,14 @@ class RiskEngine:
             pos.closed_at = datetime.now(timezone.utc)
 
             account.balance += profit
-            margin_release = (pos.lots * pos.instrument.contract_size * pos.open_price) / Decimal(str(account.leverage))
+            # Release margin in account currency to mirror the USD-converted
+            # value used on open. Otherwise stop-outs under-release on JPY
+            # crosses, leaving phantom margin_used after every liquidation.
+            margin_release_raw = (pos.lots * pos.instrument.contract_size * pos.open_price) / Decimal(str(account.leverage))
+            margin_release = await convert_to_account_currency(
+                margin_release_raw,
+                getattr(pos.instrument, "quote_currency", None),
+            )
             account.margin_used = max(Decimal("0"), account.margin_used - margin_release)
             account.equity = account.balance + account.credit
             account.free_margin = account.equity - account.margin_used

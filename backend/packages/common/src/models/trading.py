@@ -36,6 +36,14 @@ class AccountGroup(Base):
     swap_free = Column(Boolean, default=False)
     is_demo = Column(Boolean, default=False)
     is_active = Column(Boolean, default=True)
+    # Cent account display flag (Mig 0068). When TRUE the trader UI
+    # multiplies visible balance / equity / P&L / margin numbers by 100
+    # and renders ¢ instead of $. Trading engine + ledger keep USD
+    # internally — this is a display-only switch so beginners see
+    # meaningful-looking numbers on small deposits.
+    is_cent_account = Column(
+        Boolean, nullable=False, default=False, server_default="false",
+    )
     created_at = Column(DateTime(timezone=True), default=datetime.utcnow)
 
 

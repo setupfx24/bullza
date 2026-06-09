@@ -19,16 +19,18 @@ export default function GoogleTranslate() {
 
     // 1. Define the init callback Google Translate expects.
     //
-    // Curated language list — kept short on purpose. The previous build
-    // shipped 40+ languages, which made the picker noisy and slow to
-    // render. This trimmed set covers the platform's largest live-traffic
-    // markets across Europe, Asia, MENA, and LATAM.
+    // Must include every code the LanguageSwitcher offers — Google
+    // silently no-ops when the user picks a language outside this list,
+    // so the picker UI worked but nothing actually translated for the
+    // missing ones. List is kept in sync with LanguageSwitcher.LANGUAGES.
     (window as any).googleTranslateElementInit = () => {
       new (window as any).google.translate.TranslateElement(
         {
           pageLanguage: 'en',
           includedLanguages:
-            'en,es,fr,de,pt,it,ru,ar,zh-CN,ja,ko,hi,tr,vi,id',
+            'en,ms,zh-CN,zh-TW,el,hu,ru,id,fr,it,sv,de,pl,ar,es,ko,pt,vi,'
+            + 'th,fil,nl,cs,bn,ur,tr,hi,si,uz,mn,ja,ta,te,mr,gu,pa,fa,iw,'
+            + 'uk,ro,no,da,fi,sw',
           autoDisplay: false,
         },
         'google_translate_element',

@@ -43,6 +43,16 @@ async def create_manual_deposit(
     bonus_code: Optional[str] = Form(default=None),
 ):
     """Bank / UPI manual deposit: user pays admin bank (see bank-details), uploads proof + reference."""
+    # UI gating alone is bypassable, so the same admin flag the
+    # /payment-methods endpoint exposes also hard-rejects API calls
+    # when manual is disabled.
+    from fastapi import HTTPException
+    from packages.common.src.settings_store import get_bool_setting
+    if not await get_bool_setting("wallet.manual_enabled", True):
+        raise HTTPException(
+            status_code=403,
+            detail="Manual deposits are currently disabled. Please use the crypto channel.",
+        )
     return await wallet_service.create_manual_deposit(
         user_id=current_user["user_id"],
         account_id=account_id, amount=amount,
@@ -137,6 +147,13 @@ async def create_manual_withdrawal(
     file: UploadFile | None = File(default=None),
 ):
     """Manual payout: user provides UPI ID and/or a QR image for finance to pay out (main wallet)."""
+    from fastapi import HTTPException
+    from packages.common.src.settings_store import get_bool_setting
+    if not await get_bool_setting("wallet.manual_enabled", True):
+        raise HTTPException(
+            status_code=403,
+            detail="Manual withdrawals are currently disabled. Please use the crypto channel.",
+        )
     return await wallet_service.create_manual_withdrawal(
         user_id=current_user["user_id"],
         amount=amount, upi_id=upi_id, payout_notes=payout_notes,
@@ -250,6 +267,27 @@ async def get_bank_info(
     db: AsyncSession = Depends(get_db),
 ):
     return await wallet_service.get_bank_info(amount=amount, db=db)
+
+
+@router.get("/payment-methods")
+async def get_payment_methods():
+    # Public flags driving which tabs the trader UI shows. Crypto
+    # (NOWPayments) is always enabled — it's the primary funding rail
+    # and shouldn't be admin-toggleable. Manual (bank/UPI) and P2P are
+    # both admin-gated via system settings, so admin can switch them
+    # off temporarily without a code deploy.
+    #
+    # Setting keys:
+    #   wallet.manual_enabled  → 'manual' tab on deposit + 'bank' tab on withdraw
+    #   wallet.p2p_enabled     → 'p2p' tab on both deposit + withdraw
+    # Defaults: manual = True (preserves existing behaviour), p2p = False
+    # (P2P marketplace is still being onboarded — admin opts in when ready).
+    from packages.common.src.settings_store import get_bool_setting
+    return {
+        "crypto": True,
+        "manual": await get_bool_setting("wallet.manual_enabled", True),
+        "p2p": await get_bool_setting("wallet.p2p_enabled", False),
+    }
 
 
 @router.get("/bonus/overview")

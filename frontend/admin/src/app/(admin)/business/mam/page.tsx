@@ -37,6 +37,8 @@ interface Master {
   description: string | null;
   spread_markup_pips: number | null;
   commission_per_lot_usd: number | null;
+  swap_long_pips?: number | null;
+  swap_short_pips?: number | null;
   // Admin-set risk controls (Mig 0066).
   max_drawdown_pct: number;
   max_loss_per_trade_pct: number | null;
@@ -95,6 +97,8 @@ interface MamFormState {
   description: string;
   spread_markup_pips: string;
   commission_per_lot_usd: string;
+  swap_long_pips: string;
+  swap_short_pips: string;
   status: string;
   // Mig 0066: admin-owned risk controls + insurance gate.
   max_drawdown_pct: string;
@@ -113,6 +117,8 @@ const EMPTY_FORM: MamFormState = {
   description: '',
   spread_markup_pips: '',
   commission_per_lot_usd: '',
+  swap_long_pips: '',
+  swap_short_pips: '',
   status: 'approved',
   max_drawdown_pct: '',
   max_loss_per_trade_pct: '',
@@ -329,6 +335,8 @@ export default function MamPage() {
       description: m.description || '',
       spread_markup_pips: m.spread_markup_pips != null ? String(m.spread_markup_pips) : '',
       commission_per_lot_usd: m.commission_per_lot_usd != null ? String(m.commission_per_lot_usd) : '',
+      swap_long_pips: m.swap_long_pips != null ? String(m.swap_long_pips) : '',
+      swap_short_pips: m.swap_short_pips != null ? String(m.swap_short_pips) : '',
       status: m.status,
       max_drawdown_pct: m.max_drawdown_pct != null && m.max_drawdown_pct > 0 ? String(m.max_drawdown_pct) : '',
       max_loss_per_trade_pct: m.max_loss_per_trade_pct != null ? String(m.max_loss_per_trade_pct) : '',
@@ -361,9 +369,12 @@ export default function MamPage() {
         description: form.description || null,
         spread_markup_pips: form.spread_markup_pips === '' ? null : Number(form.spread_markup_pips),
         commission_per_lot_usd: form.commission_per_lot_usd === '' ? null : Number(form.commission_per_lot_usd),
+        swap_long_pips: form.swap_long_pips === '' ? null : Number(form.swap_long_pips),
+        swap_short_pips: form.swap_short_pips === '' ? null : Number(form.swap_short_pips),
         max_drawdown_pct: form.max_drawdown_pct === '' ? null : Number(form.max_drawdown_pct),
         max_loss_per_trade_pct: form.max_loss_per_trade_pct === '' ? null : Number(form.max_loss_per_trade_pct),
-        insurance_enabled: !!form.insurance_enabled,
+        // Forced FALSE — insurance not available for MAM/PAMM (2026-06-01).
+        insurance_enabled: false,
       };
       const res = await adminApi.post<{ pool_account_number: string }>('/business/masters', body);
       toast.success(`MAM created — pool account ${res.pool_account_number}`);
@@ -392,9 +403,12 @@ export default function MamPage() {
         description: form.description || null,
         spread_markup_pips: form.spread_markup_pips === '' ? null : Number(form.spread_markup_pips),
         commission_per_lot_usd: form.commission_per_lot_usd === '' ? null : Number(form.commission_per_lot_usd),
+        swap_long_pips: form.swap_long_pips === '' ? null : Number(form.swap_long_pips),
+        swap_short_pips: form.swap_short_pips === '' ? null : Number(form.swap_short_pips),
         max_drawdown_pct: form.max_drawdown_pct === '' ? null : Number(form.max_drawdown_pct),
         max_loss_per_trade_pct: form.max_loss_per_trade_pct === '' ? null : Number(form.max_loss_per_trade_pct),
-        insurance_enabled: !!form.insurance_enabled,
+        // Forced FALSE — insurance not available for MAM/PAMM (2026-06-01).
+        insurance_enabled: false,
       };
       await adminApi.put(`/business/masters/${editTarget.id}`, body);
       toast.success('MAM updated');
@@ -743,7 +757,7 @@ export default function MamPage() {
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-xxs text-text-tertiary uppercase mb-1">Spread Markup (pips)</label>
+                    <label className="block text-xxs text-text-tertiary uppercase mb-1">Spread (pips)</label>
                     <input
                       type="number"
                       step="0.1"
@@ -752,7 +766,7 @@ export default function MamPage() {
                       onChange={(e) => setForm((s) => ({ ...s, spread_markup_pips: e.target.value }))}
                       className="w-full px-3 py-2 text-xs font-mono bg-bg-tertiary border border-border-primary rounded-md focus:outline-none focus:border-accent"
                     />
-                    <p className="text-xxs text-text-tertiary mt-1">Added to resolved spread.</p>
+                    <p className="text-xxs text-text-tertiary mt-1">REPLACES resolved spread (account-type ignored on pool fills).</p>
                   </div>
                   <div>
                     <label className="block text-xxs text-text-tertiary uppercase mb-1">Commission $/lot</label>
@@ -765,6 +779,35 @@ export default function MamPage() {
                       className="w-full px-3 py-2 text-xs font-mono bg-bg-tertiary border border-border-primary rounded-md focus:outline-none focus:border-accent"
                     />
                     <p className="text-xxs text-text-tertiary mt-1">Replaces resolved commission.</p>
+                  </div>
+                </div>
+                {/* Swap overrides — Mig 0067. Daily long / short pips
+                    charged on overnight positions; NULL falls through
+                    to swap_configs. */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xxs text-text-tertiary uppercase mb-1">Swap Long (pips/day)</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      placeholder="e.g. -2.5"
+                      value={form.swap_long_pips}
+                      onChange={(e) => setForm((s) => ({ ...s, swap_long_pips: e.target.value }))}
+                      className="w-full px-3 py-2 text-xs font-mono bg-bg-tertiary border border-border-primary rounded-md focus:outline-none focus:border-accent"
+                    />
+                    <p className="text-xxs text-text-tertiary mt-1">Overnight charge on BUY positions.</p>
+                  </div>
+                  <div>
+                    <label className="block text-xxs text-text-tertiary uppercase mb-1">Swap Short (pips/day)</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      placeholder="e.g. -1.3"
+                      value={form.swap_short_pips}
+                      onChange={(e) => setForm((s) => ({ ...s, swap_short_pips: e.target.value }))}
+                      className="w-full px-3 py-2 text-xs font-mono bg-bg-tertiary border border-border-primary rounded-md focus:outline-none focus:border-accent"
+                    />
+                    <p className="text-xxs text-text-tertiary mt-1">Overnight charge on SELL positions.</p>
                   </div>
                 </div>
               </div>
@@ -802,20 +845,11 @@ export default function MamPage() {
                     <p className="text-xxs text-text-tertiary mt-1">Single-trade loss cap (% of pool equity).</p>
                   </div>
                 </div>
-                <label className="flex items-start gap-2 cursor-pointer select-none pt-1">
-                  <input
-                    type="checkbox"
-                    checked={form.insurance_enabled}
-                    onChange={(e) => setForm((s) => ({ ...s, insurance_enabled: e.target.checked }))}
-                    className="mt-0.5 h-4 w-4 accent-amber-500 cursor-pointer"
-                  />
-                  <span className="text-xxs text-text-primary">
-                    Allow investors to auto-insure copied trades on this master
-                    <span className="block text-xxs text-text-tertiary mt-0.5">
-                      Off = the trader-side invest modal hides the insurance opt-in checkbox.
-                    </span>
-                  </span>
-                </label>
+                {/* Insurance toggle removed 2026-06-01 — insurance is
+                    not available for MAM/PAMM accounts platform-wide.
+                    The column stays in master_accounts for record but
+                    is forced FALSE on create / update so legacy data
+                    can't surface the option to investors. */}
               </div>
 
               <div>

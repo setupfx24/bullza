@@ -14,11 +14,12 @@ import { clsx } from 'clsx';
 import {
   ChevronDown, ArrowDownToLine, ArrowUpFromLine,
   TrendingUp, TrendingDown, ArrowRight, Gift,
-  ShieldCheck, ExternalLink, Loader2,
+  ShieldCheck, ExternalLink, Loader2, Calculator,
 } from 'lucide-react';
 import DashboardShell from '@/components/layout/DashboardShell';
 import api from '@/lib/api/client';
 import toast from 'react-hot-toast';
+import { fmtAccountMoney, isCentAccount } from '@/lib/wallet/centDisplay';
 
 interface AccountRow {
   id: string;
@@ -31,6 +32,12 @@ interface AccountRow {
   is_demo: boolean;
   swap_free?: boolean;
   account_group_name?: string | null;
+  // Cent-account display flag (Mig 0068). Populated from
+  // `account_group.is_cent_account` on the backend payload. Use
+  // fmtAccountMoney(value, isCentAccount(account)) on every visible
+  // money figure so balances render in ¢ for cent groups.
+  account_group?: { is_cent_account?: boolean | null } | null;
+  is_cent_account?: boolean | null;
 }
 
 interface Banner {
@@ -254,7 +261,9 @@ function AccountBalanceCard({
                     {acc.is_demo ? 'Demo' : 'Real'}
                   </span>
                   <span className="font-semibold tabular-nums">#{acc.account_number}</span>
-                  <span className="ml-auto text-xs text-text-tertiary tabular-nums">{fmtUsd(acc.balance)}</span>
+                  <span className="ml-auto text-xs text-text-tertiary tabular-nums">
+                    {fmtAccountMoney(acc.balance, isCentAccount(acc))}
+                  </span>
                 </button>
               ))}
             </div>
@@ -296,15 +305,22 @@ function AccountBalanceCard({
           >
             Details
           </Link>
+          <Link
+            href="/risk-management/calculator"
+            className="inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold transition-colors hover:bg-bg-hover"
+            style={{ border: '1px solid var(--border-primary)', color: 'var(--text-primary)' }}
+          >
+            <Calculator size={14} /> Risk Calc
+          </Link>
         </div>
       </div>
 
       <div className="mt-6 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-x-6 gap-y-4 md:gap-x-8">
-        <Stat label="Balance" value={fmtUsd(a?.balance ?? 0)} highlight />
-        <Stat label="Free margin" value={fmtUsd(a?.free_margin ?? 0)} />
-        <Stat label="Equity" value={fmtUsd(a?.equity ?? 0)} />
+        <Stat label="Balance" value={fmtAccountMoney(a?.balance ?? 0, isCentAccount(a))} highlight />
+        <Stat label="Free margin" value={fmtAccountMoney(a?.free_margin ?? 0, isCentAccount(a))} />
+        <Stat label="Equity" value={fmtAccountMoney(a?.equity ?? 0, isCentAccount(a))} />
         <Stat label="Leverage" value={a ? `1:${a.leverage}` : '—'} />
-        <Stat label="Server" value="—" />
+        <Stat label="Server" value={isCentAccount(a) ? 'Cent' : '—'} />
         <Stat label="No swap" value={a?.swap_free ? 'Yes' : 'No'} />
       </div>
     </div>

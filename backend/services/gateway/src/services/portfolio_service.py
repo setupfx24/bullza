@@ -230,9 +230,16 @@ async def portfolio_performance(
             total_wins += 1
         elif trade.profit < 0:
             total_losses += 1
+        # Frontend (portfolio Equity Growth chart) reads `date`. The
+        # previous payload used `time` and the chart's filter silently
+        # dropped every row, which produced the "empty equity graph"
+        # report. Emit both keys so historical clients still resolve.
+        ts_iso = trade.closed_at.isoformat() if trade.closed_at else None
         equity_curve.append({
-            "time": trade.closed_at.isoformat() if trade.closed_at else None,
-            "equity": float(running_equity), "profit": float(trade.profit),
+            "date": ts_iso,
+            "time": ts_iso,
+            "equity": float(running_equity),
+            "profit": float(trade.profit),
         })
         if trade.closed_at:
             daily_returns.append(float(trade.profit))

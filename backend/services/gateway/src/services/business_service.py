@@ -456,62 +456,93 @@ async def ib_tree(user_id: UUID, max_depth: int, db: AsyncSession) -> dict:
     if not profile:
         raise HTTPException(status_code=404, detail="IB profile not found")
 
+    # Walk users.referred_by_user_id (NOT just ib_profiles.parent_ib_id).
+    # Old query only counted sub-IBs, which left the network empty for
+    # any IB whose downline is regular traders who never became IBs
+    # themselves (client report 2026-06-01: "members nahi dikh rahe" with
+    # $0.46 already earned). Now every referred user shows up, IB or
+    # not. Sub-IB profile info is LEFT-joined so the existing UI
+    # (referral_code, sub-IB level, total_earned per node) keeps
+    # rendering when the downline node IS an IB.
     cte_query = text("""
-        WITH RECURSIVE ib_tree AS (
+        WITH RECURSIVE network AS (
             SELECT
-                ip.id, ip.user_id, ip.parent_ib_id, ip.referral_code,
-                ip.level, ip.total_earned, ip.is_active,
+                u.id AS user_id,
+                u.referred_by_user_id AS parent_user_id,
                 u.email, u.first_name, u.last_name,
+                ip.id AS ib_profile_id,
+                ip.referral_code, ip.level AS ib_level,
+                COALESCE(ip.total_earned, 0) AS total_earned,
+                COALESCE(ip.is_active, true) AS is_active,
                 1 AS depth
-            FROM ib_profiles ip
-            JOIN users u ON ip.user_id = u.id
-            WHERE ip.parent_ib_id = :root_id
+            FROM users u
+            LEFT JOIN ib_profiles ip ON ip.user_id = u.id
+            WHERE u.referred_by_user_id = :root_user_id
 
             UNION ALL
 
             SELECT
-                ip.id, ip.user_id, ip.parent_ib_id, ip.referral_code,
-                ip.level, ip.total_earned, ip.is_active,
+                u.id, u.referred_by_user_id,
                 u.email, u.first_name, u.last_name,
-                t.depth + 1
-            FROM ib_profiles ip
-            JOIN users u ON ip.user_id = u.id
-            JOIN ib_tree t ON ip.parent_ib_id = t.id
-            WHERE t.depth < :max_depth
+                ip.id,
+                ip.referral_code, ip.level,
+                COALESCE(ip.total_earned, 0),
+                COALESCE(ip.is_active, true),
+                n.depth + 1
+            FROM users u
+            LEFT JOIN ib_profiles ip ON ip.user_id = u.id
+            JOIN network n ON u.referred_by_user_id = n.user_id
+            WHERE n.depth < :max_depth
         )
-        SELECT * FROM ib_tree ORDER BY depth, email
+        SELECT * FROM network ORDER BY depth, email
     """)
 
-    result = await db.execute(cte_query, {"root_id": str(profile.id), "max_depth": max_depth})
+    result = await db.execute(
+        cte_query,
+        {"root_user_id": str(user_id), "max_depth": max_depth},
+    )
     rows = result.fetchall()
 
-    nodes_by_parent = {}
+    nodes_by_parent: dict = {}
     for row in rows:
-        parent_id = str(row.parent_ib_id) if row.parent_ib_id else None
+        parent = str(row.parent_user_id) if row.parent_user_id else None
         node = {
-            "id": str(row.id), "user_id": str(row.user_id),
+            # Node id = the user's id; the UI uses it as the React key.
+            "id": str(row.user_id),
+            "user_id": str(row.user_id),
             "email": row.email,
             "name": f"{row.first_name or ''} {row.last_name or ''}".strip(),
-            "referral_code": row.referral_code, "level": row.level,
-            "depth": row.depth, "total_earned": float(row.total_earned),
-            "is_active": row.is_active, "children": [],
+            # Sub-IB-only fields. NULL when the downline user never became
+            # an IB themselves — the UI already handles undefined here.
+            "ib_profile_id": str(row.ib_profile_id) if row.ib_profile_id else None,
+            "referral_code": row.referral_code,
+            "level": row.ib_level,
+            "depth": row.depth,
+            "total_earned": float(row.total_earned),
+            "is_active": row.is_active,
+            "children": [],
         }
-        nodes_by_parent.setdefault(parent_id, []).append(node)
+        nodes_by_parent.setdefault(parent, []).append(node)
 
     def build_tree(parent_id: str) -> list:
         children = nodes_by_parent.get(parent_id, [])
         for child in children:
-            child["children"] = build_tree(child["id"])
+            child["children"] = build_tree(child["user_id"])
         return children
 
-    tree = build_tree(str(profile.id))
+    tree = build_tree(str(user_id))
 
     return {
         "root": {
-            "id": str(profile.id), "referral_code": profile.referral_code,
-            "level": profile.level, "total_earned": float(profile.total_earned),
+            "id": str(profile.id),
+            "referral_code": profile.referral_code,
+            "level": profile.level,
+            "total_earned": float(profile.total_earned),
         },
-        "tree": tree, "total_nodes": len(rows),
+        "tree": tree,
+        # Total downline size — anyone whose referral chain leads back
+        # to this user, sub-IB or not.
+        "total_nodes": len(rows),
     }
 
 

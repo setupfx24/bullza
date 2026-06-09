@@ -1110,6 +1110,9 @@ async def list_masters(
             "description": master.description,
             "spread_markup_pips": float(master.spread_markup_pips) if master.spread_markup_pips is not None else None,
             "commission_per_lot_usd": float(master.commission_per_lot_usd) if master.commission_per_lot_usd is not None else None,
+            # Per-master swap overrides (Mig 0067).
+            "swap_long_pips": float(master.swap_long_pips) if master.swap_long_pips is not None else None,
+            "swap_short_pips": float(master.swap_short_pips) if master.swap_short_pips is not None else None,
             # Mig 0066 risk + insurance fields — admin form reads
             # these on edit so the inputs hydrate with the persisted
             # values instead of defaulting to blank.
@@ -1620,6 +1623,7 @@ async def update_master(
         "performance_fee_pct", "management_fee_pct", "admin_commission_pct",
         "min_investment", "spread_markup_pips", "commission_per_lot_usd",
         "max_drawdown_pct", "max_loss_per_trade_pct",
+        "swap_long_pips", "swap_short_pips",
     )
     int_fields = ("max_investors",)
     str_fields = ("description", "master_type", "status")

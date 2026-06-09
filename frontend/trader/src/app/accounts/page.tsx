@@ -28,6 +28,7 @@ import {
 } from '@/lib/tradingNav';
 import Modal from '@/components/ui/Modal';
 import AccountTypePickerModal from '@/components/accounts/AccountTypePickerModal';
+import { fmtAccountMoney, isCentAccount } from '@/lib/wallet/centDisplay';
 
 const ALIAS_PREFIX = 'ptd-account-alias:';
 
@@ -59,6 +60,15 @@ interface AccountRow {
 
 function fmt(n: number, currency = 'USD') {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency, minimumFractionDigits: 2 }).format(n);
+}
+
+// Cent-aware wrapper: every visible money figure on this page should
+// flow through this so cent-group accounts render in ¢. Wallet-side
+// USD totals (transfer flows) still use fmt() since the main wallet
+// is always USD regardless of which trading-account currency we're
+// moving funds to.
+function fmtRow(row: { account_group?: AccountGroupInfo | null } | null | undefined, n: number) {
+  return fmtAccountMoney(n, isCentAccount(row ?? null));
 }
 
 function readAlias(id: string): string {
@@ -1222,14 +1232,14 @@ function AccountCard({
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-4 sm:gap-x-6 gap-y-2 sm:gap-y-3">
             <div className="min-w-0">
               <p className="text-[10px] sm:text-[11px] text-text-tertiary font-medium mb-0.5">Balance</p>
-              <p className="text-sm sm:text-lg font-bold text-text-primary tabular-nums font-mono truncate">{fmt(row.balance, row.currency)}</p>
+              <p className="text-sm sm:text-lg font-bold text-text-primary tabular-nums font-mono truncate">{fmtRow(row, row.balance)}</p>
             </div>
             <div className="min-w-0">
               <p className="text-[10px] sm:text-[11px] text-text-tertiary font-medium mb-0.5">Equity</p>
-              <p className="text-sm sm:text-lg font-bold text-text-primary tabular-nums font-mono truncate">{fmt(row.equity, row.currency)}</p>
+              <p className="text-sm sm:text-lg font-bold text-text-primary tabular-nums font-mono truncate">{fmtRow(row, row.equity)}</p>
               {(row.credit || 0) > 0 && (
                 <p className="text-[10px] sm:text-[11px] text-amber-400/80 font-medium tabular-nums mt-0.5 truncate">
-                  incl. {fmt(row.credit, row.currency)} credit
+                  incl. {fmtRow(row, row.credit)} credit
                 </p>
               )}
             </div>
@@ -1245,7 +1255,7 @@ function AccountCard({
                   {/* Lifetime P&L is exact (equity − allocation), so drop
                       the "~ approximation" prefix that the floating-only
                       path uses. */}
-                  {row.is_managed_account ? '' : '~ '}{pnlPositive ? '+' : ''}{fmt(pnl, row.currency)}
+                  {row.is_managed_account ? '' : '~ '}{pnlPositive ? '+' : ''}{fmtRow(row, pnl)}
                 </span>
               </div>
               <p className={clsx('text-[10px] sm:text-xs font-semibold tabular-nums', pnlPositive ? 'text-[#55a630]/70' : 'text-red-400/70')}>
@@ -1281,7 +1291,7 @@ function AccountCard({
               <div className="grid grid-cols-2 gap-x-4 sm:gap-x-6 gap-y-3 sm:gap-y-4">
                 <div>
                   <p className="text-[11px] text-text-tertiary font-medium mb-0.5">Free Margin</p>
-                  <p className="text-base font-bold text-text-primary font-mono tabular-nums">{fmt(row.free_margin, row.currency)}</p>
+                  <p className="text-base font-bold text-text-primary font-mono tabular-nums">{fmtRow(row, row.free_margin)}</p>
                 </div>
                 <div>
                   <p className="text-[11px] text-text-tertiary font-medium mb-0.5">Margin Level</p>
@@ -1292,7 +1302,7 @@ function AccountCard({
                 <div>
                   <p className="text-[11px] text-text-tertiary font-medium mb-0.5">Credit</p>
                   <p className="text-base font-bold font-mono tabular-nums text-amber-400">
-                    {fmt(row.credit || 0, row.currency)}
+                    {fmtRow(row, row.credit || 0)}
                   </p>
                   <p className="text-[10px] text-text-tertiary mt-0.5 leading-tight">
                     Bonus / insurance — tradeable, not withdrawable
@@ -1405,7 +1415,13 @@ function AccountCard({
             <li>Pending orders will be cancelled.</li>
             {row.balance + (row.equity - row.balance) > 0 ? (
               <li>
-                <span className="text-text-secondary font-semibold">{fmt(row.balance, row.currency)}</span> will transfer to your main wallet.
+                <span className="text-text-secondary font-semibold">{fmtRow(row, row.balance)}</span>
+                {isCentAccount(row) && (
+                  <span className="text-text-tertiary">
+                    {' '}(={fmt(row.balance, 'USD')} in your wallet)
+                  </span>
+                )}{' '}
+                will transfer to your main wallet.
               </li>
             ) : null}
             {isPoolAccount ? (

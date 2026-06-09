@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { BannerPlaceholder } from '@/swisdex/components/BannerPlaceholder';
 import { FixedReturnRateTable } from '@/swisdex/components/FixedReturnRateTable';
+import { FixedReturnCalculator } from '@/swisdex/components/FixedReturnCalculator';
 
 export default function FixedReturnInsurancePage() {
   return (
@@ -49,6 +50,9 @@ export default function FixedReturnInsurancePage() {
 
       {/* Fixed Return rate matrix */}
       <FixedReturnRateTable />
+
+      {/* Interactive payout calculator — pulls from the same rate matrix */}
+      <FixedReturnCalculator />
 
       {/* How it works timeline */}
       <section id="how" className="mx-auto max-w-[1200px] px-[var(--gutter)] py-12 sm:py-16">

@@ -30,23 +30,40 @@ export function SwisDexWordmark({
           className,
         )}
       >
-        <img src="/images/swisdex_png5.png" alt="SwisDex" className="w-7 h-7 object-contain" />
+        {/* Rail logo: image in dark, S monogram in light — the raster
+            logo has a dark background baked in that looks awkward on
+            the light theme's white surface. */}
+        <img src="/images/swisdex_png5.png" alt="SwisDex" className="w-7 h-7 object-contain hidden dark:block" />
+        <span
+          aria-hidden="true"
+          className="dark:hidden inline-flex items-center justify-center font-display font-bold text-base leading-none"
+          style={{ color: '#55a630' }}
+        >
+          S
+        </span>
       </Link>
     );
   }
 
-  // Text wordmark removed per brand decision — the raster logo already
-  // contains the "SwisDex" lettering, so rendering it twice was noisy.
-  // `textClassName` is kept in the prop signature for callers that still
-  // pass it; it's a no-op now.
+  // Theme-aware mark: raster image in dark mode (image already carries
+  // its own dark background + "SwisDex" lettering), and a CSS-only
+  // wordmark in light mode so we don't dump an embedded dark rectangle
+  // onto a white surface.
   void textClassName;
   const mark = (
     <span className={cn('inline-flex items-center select-none', className)}>
       <img
         src="/images/swisdex_png5.png"
         alt="SwisDex"
-        className="h-9 sm:h-10 w-auto object-contain shrink-0"
+        className="h-9 sm:h-10 w-auto object-contain shrink-0 hidden dark:block"
       />
+      <span
+        aria-hidden="true"
+        className="dark:hidden font-display font-bold tracking-tight text-2xl sm:text-[26px] leading-none"
+      >
+        <span style={{ color: '#0a0a0a' }}>Swis</span>
+        <span style={{ color: '#55a630' }}>dex</span>
+      </span>
     </span>
   );
 

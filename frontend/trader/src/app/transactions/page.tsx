@@ -55,7 +55,7 @@ export default function TransactionsPage() {
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [typeFilter, setTypeFilter] = useState<
-    'all' | 'deposit' | 'withdrawal' | 'transfer' | 'trading' | 'adjustment' | 'commission'
+    'all' | 'deposit' | 'withdrawal' | 'transfer' | 'trading' | 'adjustment' | 'commission' | 'fixed_return'
   >('all');
   const [statusFilter, setStatusFilter] = useState<'all' | 'completed' | 'pending' | 'failed'>('all');
   const [page, setPage] = useState(1);
@@ -352,6 +352,7 @@ export default function TransactionsPage() {
                     ['deposit', 'Deposits'],
                     ['withdrawal', 'Withdrawals'],
                     ['transfer', 'Transfers'],
+                    ['fixed_return', 'Fixed Return'],
                     ['commission', 'IB Commissions'],
                   ] as const
                 ).map(([t, label]) => (
@@ -456,6 +457,11 @@ export default function TransactionsPage() {
                       'bg-buy/15 text-buy',
                     (tx.type === 'loss' || tx.type === 'correction') && 'bg-sell/15 text-sell',
                     tx.type === 'adjustment' && 'bg-bg-tertiary/40 text-text-secondary',
+                    // Fixed Return: amber tone so it reads distinctly from
+                    // deposit/withdraw/profit-loss colours. Sign already drives
+                    // the +/- amount color on the right, so the icon stays
+                    // neutral-amber regardless of credit vs debit.
+                    tx.type === 'fixed_return' && 'bg-amber-500/15 text-amber-400',
                   );
                   return (
                     <div
@@ -473,6 +479,8 @@ export default function TransactionsPage() {
                           <TrendingUp className="w-4 h-4 sm:w-5 sm:h-5" />
                         ) : tx.type === 'loss' || tx.type === 'correction' ? (
                           <TrendingDown className="w-4 h-4 sm:w-5 sm:h-5" />
+                        ) : tx.type === 'fixed_return' ? (
+                          <Hourglass className="w-4 h-4 sm:w-5 sm:h-5" />
                         ) : (
                           <Shield className="w-4 h-4 sm:w-5 sm:h-5" />
                         )}

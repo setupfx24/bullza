@@ -1269,6 +1269,7 @@ export default function PositionsPanel({ variant = 'default' }: PositionsPanelPr
                                   <Pencil className="w-2.5 h-2.5 inline ml-1 opacity-0 group-hover:opacity-60 text-text-tertiary transition-opacity" />
                                 </button>
                               )}
+                              <InsuranceCountdown pos={pos} />
                             </td>
                             <td className={clsx(td, 'text-right pr-2')}>
                               <div className="inline-flex items-center gap-1.5">
@@ -2010,6 +2011,67 @@ export default function PositionsPanel({ variant = 'default' }: PositionsPanelPr
         position={sharePosition}
         leverage={Number(activeAccount?.leverage) || 100}
       />
+    </div>
+  );
+}
+
+
+// ─── Insurance countdown chip ───────────────────────────────────────
+// Renders three states based on the backend's per-position insurance
+// markers (insurance_eligible_at + insurance_expires_at):
+//   • Pre-min: amber "Insurance OK in 25s"  (claim NOT yet eligible)
+//   • Mid:     green  "✓ Insured · 2h 15m left"
+//   • Expired: gray   "Insurance expired"
+// Nothing renders when the position has no active policy. The chip
+// ticks every second via a local clock so users see the countdown move.
+function InsuranceCountdown({ pos }: { pos: Position }) {
+  const [now, setNow] = useState(() => Date.now());
+  const eligibleAt = pos.insurance_eligible_at ? new Date(pos.insurance_eligible_at).getTime() : null;
+  const expiresAt = pos.insurance_expires_at ? new Date(pos.insurance_expires_at).getTime() : null;
+  const hasInsurance = !!pos.insurance_activated_at;
+
+  useEffect(() => {
+    if (!hasInsurance) return;
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, [hasInsurance]);
+
+  if (!hasInsurance) return null;
+
+  const fmtRemaining = (ms: number): string => {
+    if (ms < 0) ms = 0;
+    const total = Math.ceil(ms / 1000);
+    if (total < 60) return `${total}s`;
+    const m = Math.floor(total / 60);
+    const s = total % 60;
+    if (m < 60) return `${m}m ${s}s`;
+    const h = Math.floor(m / 60);
+    const mm = m % 60;
+    return `${h}h ${mm}m`;
+  };
+
+  // Pre-min state — not yet claim-eligible.
+  if (eligibleAt && now < eligibleAt) {
+    return (
+      <div className="mt-1 inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-semibold bg-amber-500/15 text-amber-400 border border-amber-500/30">
+        Insurance OK in {fmtRemaining(eligibleAt - now)}
+      </div>
+    );
+  }
+
+  // Mid state — eligible AND inside validity window.
+  if (expiresAt && now < expiresAt) {
+    return (
+      <div className="mt-1 inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-semibold bg-buy/15 text-buy border border-buy/30" title="Claim-eligible if this trade closes in loss">
+        ✓ Insured · {fmtRemaining(expiresAt - now)} left
+      </div>
+    );
+  }
+
+  // Expired state — past validity window.
+  return (
+    <div className="mt-1 inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-semibold bg-text-tertiary/10 text-text-tertiary border border-text-tertiary/20">
+      Insurance expired
     </div>
   );
 }

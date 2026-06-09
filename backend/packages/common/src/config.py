@@ -137,7 +137,26 @@ class Settings(BaseSettings):
     # Get a site/secret pair at https://dash.cloudflare.com → Turnstile.
     CLOUDFLARE_TURNSTILE_SECRET_KEY: str = ""
 
-    # ─── AllTick — primary market-data provider ─────────────────────────
+    # ─── InfoWay — market-data provider (preferred when set) ────────────
+    # https://docs.infoway.io — REST + WebSocket for forex / metals /
+    # crypto / commodities / equities. Auth via `apikey` URL query param.
+    # When INFOWAY_TOKEN is set, market-data picks InfoWay before AllTick
+    # and before the simulator. Channel: depth (10003 → 10005) for best
+    # bid/ask; falls back to trade ticks (10000 → 10002) when depth is
+    # not licensed on the symbol. Heartbeat 10010 every ~30s.
+    INFOWAY_TOKEN: str = ""
+    INFOWAY_WS_URL: str = "wss://data.infoway.io/ws"
+    # Business segment for the WS URL (?business=common). InfoWay routes
+    # forex / crypto / commodities under "common"; equities have separate
+    # business codes per their docs. Override only if the account requires it.
+    INFOWAY_BUSINESS: str = "common"
+    # Subscribe channel: "depth" uses 10003/10005 (best bid + best ask);
+    # "trade" uses 10000/10002 (last trade price, mid-only — bid==ask).
+    # Depth is preferred where available; trade is the fallback that's
+    # licensed on every plan.
+    INFOWAY_CHANNEL: str = "depth"
+
+    # ─── AllTick — market-data provider (used when InfoWay is empty) ────
     # Real-time forex / metals / crypto / indices CFD ticks via WebSocket.
     # Get a token at https://alltick.co (paid plan required for full
     # symbol coverage; free tier limits to 5 symbols / 1 connection).

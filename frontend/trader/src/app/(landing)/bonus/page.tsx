@@ -321,9 +321,10 @@ export default function BonusPage() {
       <section id="faq" className="mx-auto max-w-[800px] px-[var(--gutter)] py-12 sm:py-16">
         <h2 className="text-center font-display uppercase text-2xl sm:text-3xl tracking-tight mb-8">FAQ</h2>
         <div className="space-y-3">
-          <FaqItem q="Do I need a promo code?">
-            No. The welcome bonus is applied automatically based on the size of your first deposit. Deposit
-            Deposit $100 → $100 bonus; $500 → $500 bonus; $1,000 or more → full $1,000 match — every tier is a true 100% match, capped at the tier ceiling.
+          <FaqItem q="What is the minimum deposit to claim the welcome bonus?">
+            Only $50. Make a first deposit of $50 or more and the matching welcome bonus is credited
+            to your account automatically — no promo code needed. Larger deposits unlock higher
+            bonus tiers up to the full match.
           </FaqItem>
           <FaqItem q="Can I withdraw the bonus immediately?">
             Your profits from trading the bonus are withdrawable at any time. The bonus equity itself

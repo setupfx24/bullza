@@ -105,12 +105,24 @@ export default function AppSidebar() {
         )}
       >
         <div className="flex items-center justify-between px-4 pt-4 pb-3 gap-2">
-          <Link href="/dashboard" className="flex items-center min-w-0">
+          <Link href="/dashboard" className="flex items-center min-w-0" aria-label="SwisDex home">
+            {/* Logo: raster in dark mode (image already has its own dark
+                background baked in); a clean text wordmark in light mode
+                so the embedded dark rectangle doesn't sit awkwardly on
+                a white background. Both render at the same visual height
+                so layout stays stable across theme toggles. */}
             <img
               src="/images/swisdex_png5.png"
               alt="SwisDex"
-              className="h-9 w-auto object-contain shrink-0"
+              className="h-9 w-auto object-contain shrink-0 hidden dark:block"
             />
+            <span
+              aria-hidden="true"
+              className="dark:hidden inline-flex items-center select-none font-display font-bold tracking-tight text-2xl leading-none"
+            >
+              <span style={{ color: '#0a0a0a' }}>Swis</span>
+              <span style={{ color: '#55a630' }}>dex</span>
+            </span>
           </Link>
           <button
             type="button"

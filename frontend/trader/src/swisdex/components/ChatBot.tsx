@@ -98,13 +98,13 @@ const RULES: { keys: string[]; reply: string; cta?: { label: string; href: strin
   {
     keys: ['platform', 'mt4', 'mt5', 'app', 'mobile', 'web platform'],
     reply:
-      'SwisDex runs on a fast web platform plus dedicated iOS and Android apps. All platforms sync to one account — positions, alerts, and watchlists stay in sync across every device.',
+      'SwisDex runs on a fast web platform plus dedicated iOS and Android apps. One login keeps your positions, alerts, and watchlists in sync across every device.',
     cta: [{ label: 'See platforms', href: '/platforms' }],
   },
   {
     keys: ['market', 'instruments', 'forex', 'crypto', 'indices', 'commodities', 'stocks', 'pairs'],
     reply:
-      'You can trade forex (60+ pairs), indices (US500, NAS100, DAX, FTSE…), commodities (gold, silver, oil, gas), stocks (Apple, Amazon, Microsoft…), and crypto (BTC, ETH, SOL, and more) — all from one account.',
+      'You can trade forex (60+ pairs), indices (US500, NAS100, DAX, FTSE…), commodities (gold, silver, oil, gas), stocks (Apple, Amazon, Microsoft…), and crypto (BTC, ETH, SOL, and more) — all from a single SwisDex login.',
     cta: [{ label: 'Browse markets', href: '/markets' }],
   },
   {

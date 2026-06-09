@@ -116,6 +116,10 @@ async def list_openable_account_groups(
             "commission_per_lot": float(g.commission_default or 0),
             "commission_pct": float(g.commission_pct) if g.commission_pct is not None else None,
             "swap_free": bool(g.swap_free),
+            # Cent-account display flag — frontend uses this to render
+            # balance / equity / P&L in ¢ on the New Account picker
+            # and on every account-detail surface.
+            "is_cent_account": bool(getattr(g, "is_cent_account", False)),
         })
     return {"items": items, "user_is_islamic": bool(getattr(user, "is_islamic", False))}
 
@@ -163,37 +167,42 @@ async def open_live_account(
     if want_demo:
         # Demo accounts get a starter virtual balance; use min_deposit if set,
         # else $10,000. Real-user demos follow the same rule — no live balance
-        # is touched, so the existing-live transfer block below doesn't run.
+        # is touched, so the main-wallet debit below doesn't run.
         new_balance = min_d if min_d > 0 else Decimal("10000")
     else:
-        live_q = await db.execute(
-            select(TradingAccount).where(
-                TradingAccount.user_id == user_id,
-                TradingAccount.is_demo == False,
-            )
-        )
-        existing_live = list(live_q.scalars().all())
-        if min_d > 0 and existing_live:
-            total = sum((a.balance or Decimal("0")) for a in existing_live)
-            if total < min_d:
+        # Client request 2026-06-08: the starting balance for a new live
+        # account must come from the user's MAIN WALLET, not from existing
+        # live accounts. The previous "drain existing accounts" path
+        # confused traders ("why is account A losing money when I open
+        # account B?") and produced misleading errors when a user had
+        # funded the main wallet but not yet transferred into trading.
+        #
+        # New flow: debit user.main_wallet_balance (+ bonus credit) by
+        # the group's min_deposit and seed the new account with that
+        # amount. min_deposit=0 means free-to-open, no debit.
+        # Track separately so the new account's balance vs. credit
+        # columns reflect the source (cash → balance, bonus → credit).
+        from_cash = Decimal("0")
+        from_bonus = Decimal("0")
+        if min_d > 0:
+            cash = Decimal(str(user.main_wallet_balance or 0))
+            bonus = Decimal(str(user.main_wallet_bonus or 0))
+            available = cash + bonus
+            if available < min_d:
                 raise HTTPException(
                     status_code=400,
                     detail=(
-                        f"You need at least ${float(min_d):.2f} across your existing live accounts "
-                        "to open this account type. Deposit or add funds first."
+                        f"You need ${float(min_d):.2f} in your main wallet to open this "
+                        "account type. Deposit funds first, then try again."
                     ),
                 )
-            remaining = min_d
-            for acc in sorted(existing_live, key=lambda x: x.balance or Decimal("0"), reverse=True):
-                if remaining <= 0:
-                    break
-                bal = acc.balance or Decimal("0")
-                take = min(bal, remaining)
-                if take > 0:
-                    acc.balance = bal - take
-                    acc.equity = acc.balance
-                    acc.free_margin = acc.balance
-                    remaining -= take
+            # Spend cash first, then dip into bonus credit — keeps the
+            # withdrawal contract honest (bonus is non-withdrawable, so
+            # consuming it as trading capital is fine).
+            from_cash = min(cash, min_d)
+            from_bonus = min_d - from_cash
+            user.main_wallet_balance = cash - from_cash
+            user.main_wallet_bonus = bonus - from_bonus
             new_balance = min_d
 
     num = generate_account_number()
@@ -211,13 +220,25 @@ async def open_live_account(
     else:
         # Default to the group's headline leverage clamped by the user cap.
         lev = min(int(group.leverage_default or max_lev), max_lev)
+    # For live accounts funded from the main wallet, split the seed:
+    # cash → balance (withdrawable), bonus → credit (non-withdrawable
+    # trading capital). Demo accounts get the whole virtual seed as
+    # balance — there's no real money involved.
+    if want_demo:
+        seed_balance = new_balance
+        seed_credit = Decimal("0")
+    else:
+        seed_balance = from_cash if min_d > 0 else Decimal("0")
+        seed_credit = from_bonus if min_d > 0 else Decimal("0")
+
     new_acc = TradingAccount(
         user_id=user_id,
         account_group_id=group.id,
         account_number=num,
-        balance=new_balance,
-        equity=new_balance,
-        free_margin=new_balance,
+        balance=seed_balance,
+        credit=seed_credit,
+        equity=seed_balance + seed_credit,
+        free_margin=seed_balance + seed_credit,
         margin_used=Decimal("0"),
         leverage=lev,
         currency="USD",
@@ -225,6 +246,21 @@ async def open_live_account(
         is_active=True,
     )
     db.add(new_acc)
+    # Audit ledger: explain where the seed came from. Skipped for
+    # demo / free-to-open accounts (no money moved).
+    if not want_demo and min_d > 0:
+        bonus_note = f" (incl. ${float(from_bonus):.2f} bonus credit)" if from_bonus > 0 else ""
+        db.add(Transaction(
+            user_id=user_id,
+            account_id=None,  # main-wallet side; account_id reserved for trading-account txns
+            type="account_open_transfer",
+            amount=-min_d,
+            balance_after=user.main_wallet_balance,
+            description=(
+                f"Opened {group.name} account {num} — seeded ${float(min_d):.2f}"
+                f"{bonus_note} from main wallet"
+            ),
+        ))
     await db.commit()
     await db.refresh(new_acc)
     return {
@@ -343,6 +379,7 @@ async def list_accounts(user_id: UUID, db: AsyncSession) -> dict:
                 "commission_pct": float(g.commission_pct) if g.commission_pct is not None else None,
                 "minimum_deposit": float(g.minimum_deposit or 0),
                 "swap_free": bool(g.swap_free),
+                "is_cent_account": bool(getattr(g, "is_cent_account", False)),
                 "leverage_default": int(g.leverage_default or 100),
                 "max_leverage": int(g.max_leverage or g.leverage_default or 100),
                 "effective_max_leverage": int(effective_cap),

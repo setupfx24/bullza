@@ -174,6 +174,60 @@ async def login_as_user(
     )
 
 
+@router.post("/{user_id}/reset-password")
+async def trigger_password_reset(
+    user_id: uuid.UUID,
+    request: Request,
+    admin: User = Depends(require_permission("users.view")),
+    db: AsyncSession = Depends(get_db),
+):
+    """Admin triggers a password reset for the user — creates a one-time
+    token + sends them the reset email. Plain password is never returned
+    or stored anywhere (hashed at rest). 2026-06-01 #5."""
+    return await user_service.trigger_password_reset(
+        user_id=user_id, admin_id=admin.id,
+        ip_address=request.client.host if request.client else None, db=db,
+    )
+
+
+@router.get("/{user_id}/sessions")
+async def list_user_sessions(
+    user_id: uuid.UUID,
+    admin: User = Depends(require_permission("users.view")),
+    db: AsyncSession = Depends(get_db),
+):
+    """Active login sessions for this user — IP / user-agent / created /
+    expires. Admin uses this to spot suspicious sessions + revoke."""
+    return await user_service.list_user_sessions(user_id=user_id, db=db)
+
+
+@router.delete("/{user_id}/sessions/{session_id}")
+async def revoke_user_session(
+    user_id: uuid.UUID,
+    session_id: uuid.UUID,
+    request: Request,
+    admin: User = Depends(require_permission("users.view")),
+    db: AsyncSession = Depends(get_db),
+):
+    return await user_service.revoke_user_session(
+        user_id=user_id, session_id=session_id, admin_id=admin.id,
+        ip_address=request.client.host if request.client else None, db=db,
+    )
+
+
+@router.post("/{user_id}/sessions/revoke-all")
+async def revoke_all_user_sessions(
+    user_id: uuid.UUID,
+    request: Request,
+    admin: User = Depends(require_permission("users.view")),
+    db: AsyncSession = Depends(get_db),
+):
+    return await user_service.revoke_all_user_sessions(
+        user_id=user_id, admin_id=admin.id,
+        ip_address=request.client.host if request.client else None, db=db,
+    )
+
+
 @router.delete("/{user_id}")
 async def delete_user(
     user_id: uuid.UUID,

@@ -53,6 +53,19 @@ export default function SwapsPage() {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
+  // Unique segments derived from the instruments list. Powers the
+  // Per-Segment dropdown so admin can set one swap rule per asset
+  // class (forex / metals / crypto / indices).
+  const segments = (() => {
+    const seen = new Map<string, string>();
+    for (const i of instruments) {
+      if (i.segment_id && !seen.has(i.segment_id)) {
+        seen.set(i.segment_id, i.segment || i.segment_id.slice(0, 8));
+      }
+    }
+    return Array.from(seen, ([id, name]) => ({ id, name }));
+  })();
+
   const addRow = (scope: string) => setRows(prev => [...prev, { _key: newKey(), scope, instrument_id: null, segment_id: null, user_id: null, swap_long: -5, swap_short: -3, triple_swap_day: 2, swap_free: false, is_enabled: true }]);
   const updateRow = (key: string, field: string, val: any) => {
     setRows(prev => prev.map(r => {
@@ -66,7 +79,11 @@ export default function SwapsPage() {
     const next = rows.filter(r => r._key !== key);
     setRows(next);
     try {
-      const cleaned = next.filter(r => !(r.scope === 'user' && !r.user_id) && !(r.scope === 'instrument' && !r.instrument_id));
+      const cleaned = next.filter(r =>
+        !(r.scope === 'user' && !r.user_id)
+        && !(r.scope === 'instrument' && !r.instrument_id)
+        && !(r.scope === 'segment' && !r.segment_id),
+      );
       await adminApi.put('/config/swaps', {
         configs: cleaned.map(r => ({ scope: r.scope, instrument_id: r.instrument_id, segment_id: r.segment_id, user_id: r.user_id, swap_long: r.swap_long, swap_short: r.swap_short, triple_swap_day: r.triple_swap_day, swap_free: r.swap_free, is_enabled: r.is_enabled })),
       });
@@ -90,7 +107,12 @@ export default function SwapsPage() {
   const saveAll = async () => {
     const badUser = rows.find(r => r.scope === 'user' && !r.user_id);
     if (badUser) { toast.error('Pick a user for every Per-User rule or remove that row.'); return; }
-    const cleaned = rows.filter(r => !(r.scope === 'instrument' && !r.instrument_id));
+    const badSegment = rows.find(r => r.scope === 'segment' && !r.segment_id);
+    if (badSegment) { toast.error('Pick a segment for every Per-Segment rule or remove that row.'); return; }
+    const cleaned = rows.filter(r =>
+      !(r.scope === 'instrument' && !r.instrument_id)
+      && !(r.scope === 'segment' && !r.segment_id),
+    );
     setSaving(true);
     try {
       await adminApi.put('/config/swaps', { configs: cleaned.map(r => ({ scope: r.scope, instrument_id: r.instrument_id, segment_id: r.segment_id, user_id: r.user_id, swap_long: r.swap_long, swap_short: r.swap_short, triple_swap_day: r.triple_swap_day, swap_free: r.swap_free, is_enabled: r.is_enabled })) });
@@ -101,6 +123,7 @@ export default function SwapsPage() {
   if (loading) return <><div className="flex items-center justify-center h-96"><Loader2 size={20} className="animate-spin text-text-tertiary" /></div></>;
 
   const globalRows = rows.filter(r => r.scope === 'default');
+  const segmentRows = rows.filter(r => r.scope === 'segment');
   const instrumentRows = rows.filter(r => r.scope === 'instrument');
   const userRows = rows.filter(r => r.scope === 'user');
 
@@ -113,7 +136,7 @@ export default function SwapsPage() {
         <div className="overflow-visible">
           <table className="w-full">
             <thead><tr className="border-b border-border-primary bg-bg-tertiary/40">
-              {(scopeType === 'instrument' ? ['Instrument'] : scopeType === 'user' ? ['User', 'Instrument'] : []).concat(['Long', 'Short', 'Triple', 'Free', 'On', '']).map(c => (
+              {(scopeType === 'instrument' ? ['Instrument'] : scopeType === 'segment' ? ['Segment'] : scopeType === 'user' ? ['User', 'Instrument'] : []).concat(['Long', 'Short', 'Triple', 'Free', 'On', '']).map(c => (
                 <th key={c} className="text-left px-3 py-2 text-xxs font-medium text-text-tertiary uppercase tracking-wide">{c}</th>
               ))}
             </tr></thead>
@@ -141,6 +164,9 @@ export default function SwapsPage() {
                     {(scopeType === 'instrument' || scopeType === 'user') && (
                       <td className="px-3 py-2"><select value={r.instrument_id || ''} onChange={e => updateRow(k, 'instrument_id', e.target.value || null)} className="text-xs py-1 pl-2 pr-6 appearance-none bg-bg-input border border-border-primary rounded text-text-primary w-28"><option value="">All</option>{instruments.map(i => <option key={i.id} value={i.id}>{i.symbol}</option>)}</select></td>
                     )}
+                    {scopeType === 'segment' && (
+                      <td className="px-3 py-2"><select value={r.segment_id || ''} onChange={e => updateRow(k, 'segment_id', e.target.value || null)} className="text-xs py-1 pl-2 pr-6 appearance-none bg-bg-input border border-border-primary rounded text-text-primary w-36"><option value="">Select segment…</option>{segments.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</select></td>
+                    )}
                     <td className="px-3 py-2"><input type="number" step="0.01" value={r.swap_long} onChange={e => updateRow(k, 'swap_long', parseFloat(e.target.value) || 0)} className="w-16 px-1.5 py-1 text-xs bg-bg-input border border-border-primary rounded font-mono tabular-nums text-text-primary" /></td>
                     <td className="px-3 py-2"><input type="number" step="0.01" value={r.swap_short} onChange={e => updateRow(k, 'swap_short', parseFloat(e.target.value) || 0)} className="w-16 px-1.5 py-1 text-xs bg-bg-input border border-border-primary rounded font-mono tabular-nums text-text-primary" /></td>
                     <td className="px-3 py-2"><select value={r.triple_swap_day} onChange={e => updateRow(k, 'triple_swap_day', parseInt(e.target.value))} className="text-xs py-1 pl-1.5 pr-5 appearance-none bg-bg-input border border-border-primary rounded text-text-primary w-16">{DAYS.map((d, i) => <option key={i} value={i}>{d}</option>)}</select></td>
@@ -162,13 +188,18 @@ export default function SwapsPage() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-lg font-semibold text-text-primary">Swap Configuration</h1>
-            <p className="text-xxs text-text-tertiary mt-0.5">Priority: User &gt; Instrument &gt; Default. Applied daily at 21:00 UTC.</p>
+            <p className="text-xxs text-text-tertiary mt-0.5">
+              Priority (highest → lowest):{' '}
+              <strong className="text-text-secondary">Per-User → Per-Instrument → Per-Segment → Default</strong>.
+              Applied daily at 21:00 UTC.
+            </p>
           </div>
           <button onClick={saveAll} disabled={saving} className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-buy rounded-md hover:bg-buy-light disabled:opacity-50 transition-fast">
             {saving ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />} Save All
           </button>
         </div>
         {renderTable('Default (All Instruments)', globalRows, 'default')}
+        {renderTable('Per Segment (e.g. Forex / Metals / Crypto — applies to every instrument in that segment)', segmentRows, 'segment')}
         {renderTable('Per Instrument', instrumentRows, 'instrument')}
         {renderTable('Per User (Override)', userRows, 'user')}
       </div>

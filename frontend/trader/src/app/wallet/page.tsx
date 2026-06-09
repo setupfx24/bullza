@@ -11,6 +11,7 @@ import DemoLockGate from '@/components/demo/DemoLockGate';
 import { useAuthStore } from '@/stores/authStore';
 import api from '@/lib/api/client';
 import WalletDepositModal from '@/components/wallet/WalletDepositModal';
+import P2PMarketplace from '@/components/wallet/P2PMarketplace';
 import {
   ArrowUpRight,
   ArrowDownLeft,
@@ -151,7 +152,7 @@ const CRYPTO_ASSETS = [
 
 // 'crypto' = automated provider flow (NOWPayments for deposits, OxaPay-style
 // payout details for withdrawals). 'manual' = legacy bank/UPI manual path.
-type FundingChannel = 'crypto' | 'manual';
+type FundingChannel = 'crypto' | 'manual' | 'p2p';
 
 interface ManualBankDetailsResponse {
   bank_name?: string;
@@ -182,8 +183,28 @@ function WalletPageContent() {
   const fundPanelRef = useRef<HTMLDivElement>(null);
 
   const [fundMainTab, setFundMainTab] = useState<'deposit' | 'withdraw'>('deposit');
-  const [depositUiSection, setDepositUiSection] = useState<'crypto' | 'manual'>('crypto');
-  const [withdrawUiSection, setWithdrawUiSection] = useState<'crypto' | 'bank'>('crypto');
+  const [depositUiSection, setDepositUiSection] = useState<'crypto' | 'manual' | 'p2p'>('crypto');
+  const [withdrawUiSection, setWithdrawUiSection] = useState<'crypto' | 'bank' | 'p2p'>('crypto');
+  // Admin-gated payment-method flags. Crypto is always on; Manual + P2P
+  // are dynamic so finance can toggle them off without a redeploy.
+  // Source: GET /wallet/payment-methods. Defaults match the backend's
+  // get_bool_setting defaults so the UI behaves sanely while the call
+  // is in flight.
+  const [methodFlags, setMethodFlags] = useState<{
+    crypto: boolean; manual: boolean; p2p: boolean;
+  }>({ crypto: true, manual: true, p2p: false });
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const r = await api.get<{ crypto: boolean; manual: boolean; p2p: boolean }>(
+          '/wallet/payment-methods',
+        );
+        if (!cancelled && r) setMethodFlags(r);
+      } catch { /* keep defaults if endpoint is briefly unavailable */ }
+    })();
+    return () => { cancelled = true; };
+  }, []);
   const [selectedCryptoDeposit, setSelectedCryptoDeposit] = useState<string>(CRYPTO_ASSETS[0].id);
   const [selectedCryptoWithdraw, setSelectedCryptoWithdraw] = useState<string>(CRYPTO_ASSETS[0].id);
 
@@ -373,12 +394,32 @@ function WalletPageContent() {
   const selectedWithdrawCrypto = CRYPTO_ASSETS.find((c) => c.id === selectedCryptoWithdraw) ?? CRYPTO_ASSETS[0];
 
   useEffect(() => {
-    setDepositChannel(depositUiSection === 'crypto' ? 'crypto' : 'manual');
+    setDepositChannel(
+      depositUiSection === 'crypto' ? 'crypto'
+      : depositUiSection === 'p2p' ? 'p2p'
+      : 'manual',
+    );
   }, [depositUiSection]);
 
   useEffect(() => {
-    setWithdrawChannel(withdrawUiSection === 'crypto' ? 'crypto' : 'manual');
+    setWithdrawChannel(
+      withdrawUiSection === 'crypto' ? 'crypto'
+      : withdrawUiSection === 'p2p' ? 'p2p'
+      : 'manual',
+    );
   }, [withdrawUiSection]);
+
+  // If admin disables the section the user is currently on (e.g. they
+  // had P2P open and admin just turned P2P off), snap them back to
+  // Crypto so they're not staring at hidden content.
+  useEffect(() => {
+    if (depositUiSection === 'manual' && !methodFlags.manual) setDepositUiSection('crypto');
+    if (depositUiSection === 'p2p' && !methodFlags.p2p) setDepositUiSection('crypto');
+  }, [methodFlags, depositUiSection]);
+  useEffect(() => {
+    if (withdrawUiSection === 'bank' && !methodFlags.manual) setWithdrawUiSection('crypto');
+    if (withdrawUiSection === 'p2p' && !methodFlags.p2p) setWithdrawUiSection('crypto');
+  }, [methodFlags, withdrawUiSection]);
 
   const loadManualBankDetails = useCallback(async () => {
     try {
@@ -962,7 +1003,28 @@ function WalletPageContent() {
                         </p>
                         <p className="text-sm sm:text-lg md:text-xl font-bold tabular-nums font-mono text-text-primary truncate">{line}</p>
                       </div>
-                      {!isManaged ? (
+                      {isManaged ? (
+                        // CF / IF investor sub-account — engine-driven,
+                        // user can't manually shuffle funds in/out.
+                        <div className="flex items-center justify-center rounded-xl border py-2 text-[10px] font-bold tracking-wide"
+                          style={{ borderColor: `rgba(${ac.r},0.15)`, color: `rgba(${ac.r},0.5)`, background: `rgba(${ac.r},0.04)` }}
+                        >
+                          Managed
+                        </div>
+                      ) : isPool ? (
+                        // PM / CT / MM master pool — funds belong to
+                        // investors, master cannot drain to main wallet
+                        // (backend also enforces; this just hides the
+                        // useless / dangerous button). Client report
+                        // 2026-06-01: "pamm master fund transfer kar pa
+                        // raha hai... pool amount sab withdraw le lega".
+                        <div className="flex items-center justify-center rounded-xl border py-2 text-[10px] font-bold tracking-wide"
+                          style={{ borderColor: `rgba(${ac.r},0.15)`, color: `rgba(${ac.r},0.5)`, background: `rgba(${ac.r},0.04)` }}
+                          title="Pool funds belong to investors — not transferable to your main wallet"
+                        >
+                          Pool (held for investors)
+                        </div>
+                      ) : (
                         <div className="flex gap-2">
                           <button
                             type="button"
@@ -982,12 +1044,6 @@ function WalletPageContent() {
                           >
                             <ArrowUpFromLine className="h-3 w-3" strokeWidth={2.25} />
                           </button>
-                        </div>
-                      ) : (
-                        <div className="flex items-center justify-center rounded-xl border py-2 text-[10px] font-bold tracking-wide"
-                          style={{ borderColor: `rgba(${ac.r},0.15)`, color: `rgba(${ac.r},0.5)`, background: `rgba(${ac.r},0.04)` }}
-                        >
-                          Managed
                         </div>
                       )}
                     </div>
@@ -1089,9 +1145,11 @@ function WalletPageContent() {
                     </button>
                   </div>
 
-                  {/* Deposit Method Tabs */}
-                  <div className="flex gap-2 border-b border-border-glass">
-                    {(['crypto', 'manual'] as const).map((method) => {
+                  {/* Deposit Method Tabs — manual + p2p are admin-gated */}
+                  <div className="flex gap-2 border-b border-border-glass overflow-x-auto">
+                    {(['crypto', 'manual', 'p2p'] as const)
+                      .filter((m) => m === 'crypto' || methodFlags[m])
+                      .map((method) => {
                       const active = depositUiSection === method;
                       return (
                         <button
@@ -1099,19 +1157,25 @@ function WalletPageContent() {
                           type="button"
                           onClick={() => setDepositUiSection(method)}
                           className={clsx(
-                            'px-4 py-2.5 text-sm font-semibold transition-all border-b-2',
+                            'px-4 py-2.5 text-sm font-semibold transition-all border-b-2 whitespace-nowrap',
                             active
                               ? 'border-accent text-accent'
                               : 'border-transparent text-text-tertiary hover:text-text-primary'
                           )}
                         >
-                          {method === 'crypto' ? 'Crypto (NOWPayments)' : 'Manual (Bank/UPI)'}
+                          {method === 'crypto'
+                            ? 'Crypto (NOWPayments)'
+                            : method === 'manual'
+                            ? 'Manual (Bank/UPI)'
+                            : 'P2P'}
                         </button>
                       );
                     })}
                   </div>
 
-                  {depositUiSection === 'crypto' ? (
+                  {depositUiSection === 'p2p' ? (
+                    <P2PMarketplace mode="buy" />
+                  ) : depositUiSection === 'crypto' ? (
                     <>
                       {/* Crypto deposit via NOWPayments wallet-connect modal */}
                       <div className="space-y-1">
@@ -1390,35 +1454,39 @@ function WalletPageContent() {
                       </div>
                     )}
 
-                  {/* Payment method sub-tabs */}
+                  {/* Payment method sub-tabs — bank + p2p are admin-gated.
+                      'bank' maps to the same wallet.manual_enabled flag as
+                      the deposit-side 'manual' since both consume the same
+                      finance-team manual rail. */}
                   <div className="flex gap-1 p-1 rounded-xl bg-bg-secondary border border-border-secondary">
-                    <button
-                      type="button"
-                      onClick={() => setWithdrawUiSection('crypto')}
-                      className={clsx(
-                        'flex-1 py-2.5 text-xs font-bold rounded-lg transition-all duration-200',
-                        withdrawUiSection === 'crypto'
-                          ? 'bg-accent text-white'
-                          : 'text-text-tertiary hover:text-text-primary',
-                      )}
-                    >
-                      Crypto
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setWithdrawUiSection('bank')}
-                      className={clsx(
-                        'flex-1 py-2.5 text-xs font-bold rounded-lg transition-all duration-200',
-                        withdrawUiSection === 'bank'
-                          ? 'bg-accent text-white'
-                          : 'text-text-tertiary hover:text-text-primary',
-                      )}
-                    >
-                      Bank
-                    </button>
+                    {(['crypto', 'bank', 'p2p'] as const)
+                      .filter((m) =>
+                        m === 'crypto'
+                          ? true
+                          : m === 'bank'
+                          ? methodFlags.manual
+                          : methodFlags.p2p,
+                      )
+                      .map((m) => (
+                      <button
+                        key={m}
+                        type="button"
+                        onClick={() => setWithdrawUiSection(m)}
+                        className={clsx(
+                          'flex-1 py-2.5 text-xs font-bold rounded-lg transition-all duration-200',
+                          withdrawUiSection === m
+                            ? 'bg-accent text-white'
+                            : 'text-text-tertiary hover:text-text-primary',
+                        )}
+                      >
+                        {m === 'crypto' ? 'Crypto' : m === 'bank' ? 'Bank' : 'P2P'}
+                      </button>
+                    ))}
                   </div>
 
-                  {withdrawUiSection === 'crypto' ? (
+                  {withdrawUiSection === 'p2p' ? (
+                    <P2PMarketplace mode="sell" />
+                  ) : withdrawUiSection === 'crypto' ? (
                     <>
                       <div>
                         <p className="text-xs text-text-tertiary mb-3 font-medium uppercase tracking-wide">Payment Method</p>
