@@ -162,6 +162,7 @@ function formatLotsInput(n: number): string {
 function TerminalPositionStaticCard({
   pos,
   digits,
+  isCent,
   marginExposureLine,
   swapsFeeLine,
   onCloseFull,
@@ -169,6 +170,7 @@ function TerminalPositionStaticCard({
 }: {
   pos: Position;
   digits: number;
+  isCent: boolean;
   marginExposureLine: string;
   swapsFeeLine: string;
   onCloseFull: () => void;
@@ -204,7 +206,7 @@ function TerminalPositionStaticCard({
                 : 'bg-red-500/10 border-red-500/20 text-[#ff5252]',
             )}
           >
-            {pnl >= 0 ? '+' : ''}${pnl.toFixed(2)}
+            {pnl >= 0 ? '+' : ''}{fmtAccountMoney(pnl, isCent)}
           </div>
           <div className="flex justify-end gap-0.5 mt-1">
             <span className="text-[8px] font-semibold uppercase px-1 py-0.5 rounded bg-bg-secondary text-text-tertiary">
@@ -1005,22 +1007,29 @@ export default function PositionsPanel({ variant = 'default' }: PositionsPanelPr
                           const inst = instruments.find((i) => i.symbol === pos.symbol);
                           const notional =
                             inst != null ? pos.lots * inst.contract_size * pos.open_price : null;
+                          // Cent-aware money strings for the card view.
+                          // Notional stays in raw $ (it's the symbol's
+                          // contract value, not the user's wallet), but
+                          // margin, swap, and commission are wallet money
+                          // and follow the account's currency.
+                          const _isCent = isCentAccount(activeAccount);
                           const marginExposureLine =
                             m != null && notional != null
-                              ? `$${m.toFixed(2)} / $${notional.toLocaleString('en-US', { maximumFractionDigits: 0 })}`
+                              ? `${fmtAccountMoney(m, _isCent)} / $${notional.toLocaleString('en-US', { maximumFractionDigits: 0 })}`
                               : notional != null
                                 ? `— / $${notional.toLocaleString('en-US', { maximumFractionDigits: 0 })}`
                                 : '— / —';
                           const swapsFeeLine =
                             pos.swap === 0
-                              ? `— / $${pos.commission.toFixed(2)}`
-                              : `$${pos.swap.toFixed(2)} / $${pos.commission.toFixed(2)}`;
+                              ? `— / ${fmtAccountMoney(pos.commission, _isCent)}`
+                              : `${fmtAccountMoney(pos.swap, _isCent)} / ${fmtAccountMoney(pos.commission, _isCent)}`;
 
                           return (
                             <TerminalPositionStaticCard
                               key={pos.id}
                               pos={pos}
                               digits={d}
+                              isCent={isCentAccount(activeAccount)}
                               marginExposureLine={marginExposureLine}
                               swapsFeeLine={swapsFeeLine}
                               onCloseFull={() =>
@@ -1214,10 +1223,10 @@ export default function PositionsPanel({ variant = 'default' }: PositionsPanelPr
                               {pos.current_price != null ? pos.current_price.toFixed(d) : '—'}
                             </td>
                             <td className={clsx(td, 'font-mono font-bold tabular-nums')} style={{ color: pnl >= 0 ? '#2962FF' : '#FF2440' }}>
-                              {pnl >= 0 ? '+' : ''}${pnl.toFixed(2)}
+                              {pnl >= 0 ? '+' : ''}{fmtAccountMoney(pnl, isCentAccount(activeAccount))}
                             </td>
                             <td className={clsx(td, 'font-mono tabular-nums', charges < 0 ? 'text-sell' : 'text-text-secondary')}>
-                              {charges === 0 ? '$0.00' : (charges > 0 ? '+' : '-') + '$' + Math.abs(charges).toFixed(2)}
+                              {charges === 0 ? fmtAccountMoney(0, isCentAccount(activeAccount)) : (charges > 0 ? '+' : '-') + fmtAccountMoney(Math.abs(charges), isCentAccount(activeAccount)).replace('-', '')}
                             </td>
                             <td className={clsx(td, 'text-[10px]')}>
                               {sltpEdit && sltpEdit.positionId === pos.id ? (

@@ -248,7 +248,7 @@ export default function OrderPanel() {
       if (insuranceChoice && resp?.position_id) {
         try {
           await insuranceApi.activate(resp.position_id, insuranceChoice.tier);
-          toast.success(`Insured ($${insuranceChoice.fee.toFixed(2)} fee)`);
+          toast.success(`Insured (${fmtAccountMoney(insuranceChoice.fee, isCentAccount(activeAccount))} fee)`);
         } catch (e: any) {
           const detail = e?.response?.data?.detail || e?.message || 'insurance_failed';
           toast.error(`Insurance not activated: ${detail}`);
@@ -621,6 +621,7 @@ export default function OrderPanel() {
                 stopLoss={slEnabled && stopLoss ? parseFloat(stopLoss) : undefined}
                 takeProfit={tpEnabled && takeProfit ? parseFloat(takeProfit) : undefined}
                 onSelect={setInsuranceSelection}
+                isCent={isCentAccount(activeAccount)}
               />
             </div>
           )}

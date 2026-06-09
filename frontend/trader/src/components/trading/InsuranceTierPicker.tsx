@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { ShieldCheck, Loader2 } from 'lucide-react';
 import { insuranceApi, type InsuranceTier, type QuoteRequest, type TierQuote } from '@/lib/api/insurance';
+import { fmtAccountMoney } from '@/lib/wallet/centDisplay';
 
 interface Props {
   accountId: string | undefined;
@@ -13,6 +14,9 @@ interface Props {
   stopLoss?: number;
   takeProfit?: number;
   onSelect: (selection: { tier: InsuranceTier; fee: number } | null) => void;
+  /** Cent-account display flag — when true, fees and caps render as
+   *  ¢ instead of $ (× 100), matching the rest of the trader UI. */
+  isCent?: boolean;
 }
 
 /** Render a tier label sent by the backend. Legacy mode sends
@@ -28,10 +32,15 @@ function formatTierLabel(raw: string): string {
 }
 
 export default function InsuranceTierPicker(props: Props) {
-  const { accountId, symbol, side, lots, leverage, stopLoss, takeProfit, onSelect } = props;
+  const { accountId, symbol, side, lots, leverage, stopLoss, takeProfit, onSelect, isCent } = props;
   const [enabled, setEnabled] = useState(false);
   const [tier, setTier] = useState<InsuranceTier | null>(null);
   const [quotes, setQuotes] = useState<TierQuote[] | null>(null);
+  // Once quotes arrive AND the picker is enabled, default-pick the
+  // CHEAPEST tier so a user who flips the toggle on actually gets
+  // insurance without having to click a card. Client report 2026-06-09:
+  // traders kept turning the toggle on then placing the order and
+  // wondering why no countdown appeared on the position.
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -70,6 +79,15 @@ export default function InsuranceTierPicker(props: Props) {
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
   }, [enabled, accountId, symbol, side, lots, leverage, stopLoss, takeProfit]);
+
+  /* Auto-select cheapest tier when quotes arrive and nothing is
+   * picked yet. Without this, the toggle was effectively a no-op
+   * unless the user clicked a card too. */
+  useEffect(() => {
+    if (!enabled || tier || !quotes || quotes.length === 0) return;
+    const cheapest = [...quotes].sort((a, b) => a.fee - b.fee)[0];
+    if (cheapest) setTier(cheapest.tier);
+  }, [enabled, tier, quotes]);
 
   /* Bubble selection up. Reset on disable. */
   useEffect(() => {
@@ -146,17 +164,17 @@ export default function InsuranceTierPicker(props: Props) {
                   >
                     <p className="text-[10px] uppercase tracking-wider text-text-tertiary">{formatTierLabel(q.tier)}</p>
                     <p className="mt-1 text-sm font-bold tabular-nums" style={{ color: 'var(--text-primary)' }}>
-                      ${q.fee.toFixed(2)}
+                      {fmtAccountMoney(q.fee, !!isCent)}
                     </p>
                     <p className="text-[10px] text-[#55a630] mt-0.5 font-semibold">
                       {q.coverage_pct.toFixed(0)}% covered
                     </p>
                     <p className="text-[10px] text-text-tertiary mt-0.5">
-                      Max ${q.max_cap.toFixed(0)}
+                      Max {fmtAccountMoney(q.max_cap, !!isCent, { decimals: 0 })}
                     </p>
                     {q.estimated_refund > 0 && (
                       <p className="text-[10px] text-text-secondary mt-0.5">
-                        ~${q.estimated_refund.toFixed(2)} if SL hits
+                        ~{fmtAccountMoney(q.estimated_refund, !!isCent)} if SL hits
                       </p>
                     )}
                   </button>
