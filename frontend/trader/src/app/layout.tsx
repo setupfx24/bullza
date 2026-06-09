@@ -10,6 +10,7 @@ import NotificationListener from '@/components/NotificationListener';
 import ProfileCompleteGate from '@/components/profile/ProfileCompleteGate';
 import TopLoader from '@/components/TopLoader';
 import GoogleTranslate from '@/components/GoogleTranslate';
+import SplashScreen from '@/components/SplashScreen';
 
 export const metadata: Metadata = {
   title: 'SwisDex',
@@ -39,6 +40,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 
       </head>
       <body className="min-h-full" suppressHydrationWarning>
+        {/* Branded splash — full-page logo overlay that fades on first paint
+            of every full page load / refresh. Client component; auto-unmounts
+            after ~650 ms so it never blocks clicks. */}
+        <SplashScreen />
         {/* Google Translate — loaded client-side after hydration to avoid DOM mismatch */}
         <GoogleTranslate />
         <Suspense fallback={null}>

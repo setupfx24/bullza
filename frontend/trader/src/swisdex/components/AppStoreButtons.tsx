@@ -1,16 +1,15 @@
 'use client';
 
-import { Apple, Play } from 'lucide-react';
-
 /**
- * Twin "Download on the App Store" / "Android App" pill buttons.
- * Sits just above the TrustBadges row on every public landing page.
- * Currently the hrefs are placeholders — swap them when the iOS and
- * Android builds land in their respective stores.
+ * Twin Apple / Google Play store badge images — public landing page CTA
+ * row sitting just above TrustBadges. The badge artwork (with its store
+ * wordmark baked in) lives at /public/images/app_store.png and
+ * /public/images/google_play.png. Replace the hrefs with real store
+ * links when the apps ship.
  */
 const STORES = [
-  { Icon: Apple, top: 'Download on the', bottom: 'App Store',  href: '#' },
-  { Icon: Play,  top: 'Download our',    bottom: 'Android App', href: '#' },
+  { alt: 'Download on the App Store', src: '/images/app_store.png',  href: '#' },
+  { alt: 'Get it on Google Play',     src: '/images/google_play.png', href: '#' },
 ];
 
 export function AppStoreButtons() {
@@ -27,30 +26,29 @@ export function AppStoreButtons() {
           paddingRight: 'var(--gutter)',
         }}
       >
-        {/* Section eyebrow — matches the "Trusted By" label styling below */}
         <p className="text-center text-[11px] uppercase tracking-[0.24em] text-foreground/55 mb-7 font-semibold">
           Download Now
         </p>
         <div className="flex flex-wrap items-center justify-center gap-3 sm:gap-4">
-        {STORES.map(({ Icon, top, bottom, href }) => (
-          <a
-            key={bottom}
-            href={href}
-            className="inline-flex items-center gap-3 rounded-2xl px-5 py-2.5 bg-black/85 hover:bg-black border border-foreground/20 hover:border-primary/50 transition-colors min-w-[200px]"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Icon className="size-8 shrink-0 text-foreground" aria-hidden />
-            <div className="flex flex-col leading-tight text-left">
-              <span className="text-[10px] uppercase tracking-[0.16em] text-foreground/65">
-                {top}
-              </span>
-              <span className="font-display text-lg tracking-tight text-foreground">
-                {bottom}
-              </span>
-            </div>
-          </a>
-        ))}
+          {STORES.map(({ alt, src, href }) => (
+            <a
+              key={src}
+              href={href}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-block transition-transform hover:scale-[1.03]"
+              aria-label={alt}
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={src}
+                alt={alt}
+                className="h-14 sm:h-16 w-auto object-contain"
+                loading="lazy"
+                decoding="async"
+              />
+            </a>
+          ))}
         </div>
       </div>
     </section>

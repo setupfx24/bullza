@@ -101,7 +101,7 @@ export const INSTRUMENTS = [
 export const WHY_US = [
   { icon: 'Network',      title: 'Decentralized Exchange',            body: 'Trade directly from your own wallet with non-custodial, on-chain execution — no intermediaries, no counterparty risk. Your keys, your funds.' },
   { icon: 'ShieldCheck',  title: 'Insurance for Traders',             body: 'Every trade is policy-backed with on-chain insurance. If the market moves against you beyond defined thresholds, your insured amount is protected.' },
-  { icon: 'Gift',         title: 'Bonus & Rewards',                   body: 'Get a 100% welcome bonus up to $1,000 on your first deposit — credited within minutes and fully tradeable on a decentralized exchange with insured trades. Stacks with referral commissions and trading cashback.' },
+  { icon: 'Gift',         title: 'Bonus & Rewards',                   body: 'Get a 100% welcome bonus up to $200 on your first deposit — credited within minutes and fully tradeable on a decentralized exchange with insured trades. Stacks with referral commissions and trading cashback.' },
   { icon: 'Lock',         title: 'Fixed Rate Return',                 body: 'Lock in guaranteed fixed returns with our structured investment plans — predictable income with transparent terms and no hidden fees.' },
   { icon: 'Brain',        title: 'AI Trading Software — 90% Accuracy', body: 'Our proprietary AI engine analyses thousands of market signals per second, achieving a verified 90% accuracy rate across forex and crypto pairs.' },
   { icon: 'ShieldPlus',   title: 'Insured Trading',                   body: 'All positions carry built-in trade insurance. Your capital is safeguarded with multi-layer protection — cold storage, encryption, and smart-contract coverage.' },
@@ -148,7 +148,7 @@ export const TESTIMONIALS = [
 export const FAQ = [
   {
     q: 'What is the minimum deposit required to start trading?',
-    a: 'The minimum deposit depends on the account type: Standard $50, ECN $200, and IB partner account $500. A free Demo account with $100,000 in virtual funds is also available — no commitment, identical execution conditions to a live account. Every new trader also receives a 100% Welcome Bonus on the first deposit.',
+    a: 'Only $50. A first deposit of $50 unlocks the Standard live account; ECN ($200) and IB partner ($500) accounts have their own minimums. A free Demo account with $100,000 in virtual funds is also available — no commitment. Every first deposit also receives a 100% Welcome Bonus (up to $200).',
   },
   {
     q: 'How do I get the 100% Welcome Bonus?',
@@ -156,7 +156,7 @@ export const FAQ = [
   },
   {
     q: 'Which deposit and withdrawal methods are available, and how long do they take?',
-    a: 'We support bank wire transfers, Visa/Mastercard, Skrill, Neteller, cryptocurrency, and local bank options including UPI. Card and e-wallet deposits are typically instant; bank wires and crypto withdrawals usually settle within 1–3 business days.',
+    a: 'We support bank wire transfers, Visa/Mastercard, Skrill, Neteller, and cryptocurrency. UPI is supported as a deposit payment option for traders in India. Card and e-wallet deposits are typically instant; bank wires and crypto withdrawals usually settle within 1–3 business days.',
   },
   {
     q: 'Which trading platforms and devices are supported?',
