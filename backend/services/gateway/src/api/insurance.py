@@ -58,6 +58,21 @@ async def quote(
     if cfg.atr_ceiling is not None and atr > cfg.atr_ceiling:
         raise HTTPException(status_code=409, detail="vol_too_high")
 
+    # Max-insurable-lots gate — MUST mirror the same check in /activate.
+    # Previously only /activate enforced it, so the picker happily showed
+    # tiers for an over-cap position that then failed activation, leaving
+    # the trade "Not insured" with no explanation. Now the picker hides
+    # (frontend treats this 409 as "no tiers") so the user never sees a
+    # tier they can't actually buy. req.lots here is the EFFECTIVE
+    # (cent-scaled) lots the frontend sends, matching the pos.lots the
+    # activate endpoint compares.
+    if cfg.max_lots_insurable and cfg.max_lots_insurable > 0:
+        if float(req.lots or 0) > float(cfg.max_lots_insurable):
+            raise HTTPException(
+                status_code=409,
+                detail=f"max_lots_exceeded:{cfg.max_lots_insurable}",
+            )
+
     # Trade-size in USD ≈ lots × contract_size × price.
     bid, ask = await trading_service.get_current_price(req.symbol)
     price = (bid + ask) / Decimal("2") if (bid and ask) else Decimal("1")

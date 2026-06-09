@@ -130,11 +130,20 @@ export default function InsuranceTierPicker(props: Props) {
             </div>
           )}
           {error && !loading && (
-            <p className="text-xs text-red-400">
+            <p className="text-xs text-amber-400">
               {error === 'insurance_disabled' && 'Insurance is currently disabled.'}
+              {error === 'insurance_disabled_for_account_type' && 'Insurance is not available for this account type.'}
               {error === 'news_blackout' && 'Insurance is paused during the active news window.'}
               {error === 'vol_too_low' && 'Volatility too low — insurance unavailable for this instrument.'}
-              {!['insurance_disabled', 'news_blackout', 'vol_too_low'].includes(error) && 'Could not get a quote — try again.'}
+              {error === 'vol_too_high' && 'Volatility too high — insurance unavailable right now.'}
+              {error === 'hour_blackout' && 'Insurance is paused during this hour window.'}
+              {error.startsWith('max_lots_exceeded')
+                && `This trade is too large to insure. Max insurable size is ${error.split(':')[1] || 'lower'} lots — reduce volume to insure it.`}
+              {![
+                'insurance_disabled', 'insurance_disabled_for_account_type',
+                'news_blackout', 'vol_too_low', 'vol_too_high', 'hour_blackout',
+              ].includes(error) && !error.startsWith('max_lots_exceeded')
+                && 'Could not get a quote — try again.'}
             </p>
           )}
           {quotes && !loading && (
