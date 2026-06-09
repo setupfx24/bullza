@@ -79,10 +79,19 @@ export default function OrderPanel() {
   const execPrice = tick ? (side === 'buy' ? tick.ask : tick.bid) : 0;
   const lotsNum = parseFloat(lots) || 0;
 
+  // Cent-account lot scaling (Mig 0069). The backend persists the
+  // position at (typed lots × multiplier), so the margin preview +
+  // the "Insufficient margin" gate must use the SAME effective lots,
+  // or a cent account shows a 100×-too-high margin and falsely blocks
+  // the trade. Standard accounts have multiplier=1 so this is a no-op.
+  const lotMultiplier =
+    (activeAccount?.account_group?.lot_size_multiplier as number | undefined) ?? 1;
+  const effectiveLots = lotsNum * lotMultiplier;
+
   const marginRequired = useMemo(() => {
     if (!execPrice || !activeAccount) return 0;
-    return (lotsNum * contractSize * execPrice) / activeAccount.leverage;
-  }, [execPrice, lotsNum, activeAccount, contractSize]);
+    return (effectiveLots * contractSize * execPrice) / activeAccount.leverage;
+  }, [execPrice, effectiveLots, activeAccount, contractSize]);
 
   const freeMargin = activeAccount?.free_margin || 0;
   const hasEnoughMargin = freeMargin >= marginRequired;
@@ -616,7 +625,11 @@ export default function OrderPanel() {
                 accountId={activeAccount.id}
                 symbol={selectedSymbol}
                 side={side}
-                lots={lotsNum}
+                // Quote on EFFECTIVE (cent-scaled) lots so the fee + the
+                // coverage cap line up with the actual position the
+                // backend opens. Display-side ¢ conversion is handled by
+                // the picker's isCent prop.
+                lots={effectiveLots}
                 leverage={(activeAccount as any).leverage || 100}
                 stopLoss={slEnabled && stopLoss ? parseFloat(stopLoss) : undefined}
                 takeProfit={tpEnabled && takeProfit ? parseFloat(takeProfit) : undefined}

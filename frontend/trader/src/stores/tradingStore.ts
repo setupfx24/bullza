@@ -65,6 +65,11 @@ export interface AccountGroupInfo {
   /** Cent-account display flag (Mig 0068). When true, the trader UI
    *  multiplies visible balance / equity / P&L by 100 and renders ¢. */
   is_cent_account?: boolean | null;
+  /** Lot scaling factor (Mig 0069). 1 = no scaling. 0.01 = cent group:
+   *  the order panel multiplies the margin preview + insurance quote
+   *  lots by this so the displayed margin + the "Insufficient margin"
+   *  gate match what the backend actually charges. */
+  lot_size_multiplier?: number | null;
 }
 
 export interface TradingAccount {

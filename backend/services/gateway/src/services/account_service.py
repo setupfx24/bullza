@@ -120,6 +120,11 @@ async def list_openable_account_groups(
             # balance / equity / P&L in ¢ on the New Account picker
             # and on every account-detail surface.
             "is_cent_account": bool(getattr(g, "is_cent_account", False)),
+            # Lot scaling factor (Mig 0069). Frontend multiplies the
+            # margin preview + insurance quote lots by this so the
+            # "Insufficient margin" gate matches what the engine will
+            # actually charge on a cent account.
+            "lot_size_multiplier": float(getattr(g, "lot_size_multiplier", None) or 1),
         })
     return {"items": items, "user_is_islamic": bool(getattr(user, "is_islamic", False))}
 
@@ -380,6 +385,7 @@ async def list_accounts(user_id: UUID, db: AsyncSession) -> dict:
                 "minimum_deposit": float(g.minimum_deposit or 0),
                 "swap_free": bool(g.swap_free),
                 "is_cent_account": bool(getattr(g, "is_cent_account", False)),
+                "lot_size_multiplier": float(getattr(g, "lot_size_multiplier", None) or 1),
                 "leverage_default": int(g.leverage_default or 100),
                 "max_leverage": int(g.max_leverage or g.leverage_default or 100),
                 "effective_max_leverage": int(effective_cap),
