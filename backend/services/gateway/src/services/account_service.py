@@ -386,6 +386,7 @@ async def list_accounts(user_id: UUID, db: AsyncSession) -> dict:
                 "swap_free": bool(g.swap_free),
                 "is_cent_account": bool(getattr(g, "is_cent_account", False)),
                 "lot_size_multiplier": float(getattr(g, "lot_size_multiplier", None) or 1),
+                "insurance_enabled": bool(getattr(g, "insurance_enabled", True)),
                 "leverage_default": int(g.leverage_default or 100),
                 "max_leverage": int(g.max_leverage or g.leverage_default or 100),
                 "effective_max_leverage": int(effective_cap),

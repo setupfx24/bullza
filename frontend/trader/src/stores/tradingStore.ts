@@ -70,6 +70,9 @@ export interface AccountGroupInfo {
    *  lots by this so the displayed margin + the "Insufficient margin"
    *  gate match what the backend actually charges. */
   lot_size_multiplier?: number | null;
+  /** Per-account-type insurance gate (Mig 0070). False = hide the
+   *  Trade Insurance picker for accounts of this type. */
+  insurance_enabled?: boolean | null;
 }
 
 export interface TradingAccount {

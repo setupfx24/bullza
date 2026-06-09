@@ -80,6 +80,17 @@ async def quote(
     if acct_row is not None:
         acct_group_id = acct_row[0]
 
+    # Per-account-type insurance gate (Mig 0070). If admin turned
+    # insurance off for this account type, return empty quotes so the
+    # trader UI shows nothing to buy.
+    if acct_group_id is not None:
+        from packages.common.src.models import AccountGroup
+        grp_ins = (await db.execute(
+            select(AccountGroup.insurance_enabled).where(AccountGroup.id == acct_group_id)
+        )).scalar_one_or_none()
+        if grp_ins is False:
+            raise HTTPException(status_code=409, detail="insurance_disabled_for_account_type")
+
     quotes = await quote_all_tiers(
         cfg=cfg,
         leverage=float(req.leverage),
@@ -143,6 +154,18 @@ async def activate(
     )).scalar_one_or_none()
     if acct is None or acct.user_id != user_id:
         raise HTTPException(status_code=403, detail="not_your_position")
+
+    # Per-account-type insurance gate (Mig 0070) — hard-block activation
+    # if admin disabled insurance for this account's type, even if the
+    # client somehow sent the request (UI hides the picker but the
+    # endpoint can't trust that).
+    if acct.account_group_id is not None:
+        from packages.common.src.models import AccountGroup
+        grp_ins = (await db.execute(
+            select(AccountGroup.insurance_enabled).where(AccountGroup.id == acct.account_group_id)
+        )).scalar_one_or_none()
+        if grp_ins is False:
+            raise HTTPException(status_code=409, detail="insurance_disabled_for_account_type")
 
     # Already insured?
     existing = (await db.execute(

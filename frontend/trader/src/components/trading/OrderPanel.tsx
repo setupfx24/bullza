@@ -618,8 +618,12 @@ export default function OrderPanel() {
             </div>
           )}
 
-          {/* Trade Insurance — only on market orders */}
-          {orderTab === 'market' && activeAccount && (
+          {/* Trade Insurance — only on market orders, and only when the
+              account's TYPE has insurance enabled (admin per-type gate,
+              Mig 0070). Default true when the flag is absent so legacy
+              payloads keep showing the picker. */}
+          {orderTab === 'market' && activeAccount &&
+            (activeAccount.account_group?.insurance_enabled ?? true) && (
             <div className="pt-2">
               <InsuranceTierPicker
                 accountId={activeAccount.id}

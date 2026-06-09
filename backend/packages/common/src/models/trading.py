@@ -53,6 +53,14 @@ class AccountGroup(Base):
     lot_size_multiplier = Column(
         Numeric(10, 6), nullable=False, default=1, server_default="1",
     )
+    # Per-account-type Trade Insurance gate (Mig 0070). Default TRUE so
+    # every type keeps offering insurance. Admin flips off per type to
+    # block insurance for e.g. VIP accounts. Checked by the insurance
+    # /quote + /activate endpoints on top of the global + per-master
+    # gates.
+    insurance_enabled = Column(
+        Boolean, nullable=False, default=True, server_default="true",
+    )
     created_at = Column(DateTime(timezone=True), default=datetime.utcnow)
 
 
