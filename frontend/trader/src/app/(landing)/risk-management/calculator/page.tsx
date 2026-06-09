@@ -48,18 +48,39 @@ export default function CalculatorPage() {
   const pair = PAIRS.find((p) => p.symbol === pairSymbol) ?? PAIRS[0];
 
   const result = useMemo(() => {
-    const balanceInUsd      = balance * CURRENCY_TO_USD[accountCurrency];
-    const riskAmountUsd     = balanceInUsd * (riskPct / 100);
+    const ccyRate           = CURRENCY_TO_USD[accountCurrency] ?? 1;
+    const safeBalance       = Math.max(0, Number.isFinite(balance) ? balance : 0);
+    const safeRiskPct       = Math.max(0, Math.min(100, Number.isFinite(riskPct) ? riskPct : 0));
+    const safeStopPips      = Math.max(0, Number.isFinite(stopPips)   ? stopPips   : 0);
+    const safeTargetPips    = Math.max(0, Number.isFinite(targetPips) ? targetPips : 0);
+
+    // 1. Risk in account currency = balance × risk%. The previous version
+    //    converted to USD and back, which introduced a tiny round-trip
+    //    error for non-USD accounts (and inflated the rendered value by
+    //    the conversion-rate quantisation). Compute it in account
+    //    currency directly — that's what the user actually risks.
+    const moneyAtRiskAccount = safeBalance * (safeRiskPct / 100);
+
+    // 2. Convert to USD for the lot calc, since pip values are USD-quoted.
+    const riskAmountUsd     = moneyAtRiskAccount * ccyRate;
     const pipValuePerLotUsd = pair.pipValuePerStandardLotUSD;
-    // Lot size (standard lots) = risk$ / (stopPips × pipValuePerLot$)
-    const stdLotsRaw  = stopPips > 0 ? riskAmountUsd / (stopPips * pipValuePerLotUsd) : 0;
+
+    // 3. Lot size (standard lots) = risk$ / (stopPips × pipValuePerLot$)
+    const stdLotsRaw  = safeStopPips > 0 && pipValuePerLotUsd > 0
+      ? riskAmountUsd / (safeStopPips * pipValuePerLotUsd)
+      : 0;
     const stdLots     = Math.max(0, stdLotsRaw);
     const miniLots    = stdLots * 10;
     const microLots   = stdLots * 100;
     const positionUnits = stdLots * 100_000;
-    const moneyAtRiskAccount = riskAmountUsd / CURRENCY_TO_USD[accountCurrency];
-    const potentialProfitAccount = ((targetPips * pipValuePerLotUsd * stdLots) / CURRENCY_TO_USD[accountCurrency]);
-    const rr = stopPips > 0 ? targetPips / stopPips : 0;
+
+    // 4. Profit in USD then back to account currency. ccyRate ≥ 0 always.
+    const profitUsd  = safeTargetPips * pipValuePerLotUsd * stdLots;
+    const potentialProfitAccount = ccyRate > 0 ? profitUsd / ccyRate : 0;
+
+    // 5. Reward-to-risk.
+    const rr = safeStopPips > 0 ? safeTargetPips / safeStopPips : 0;
+
     return {
       stdLots,
       miniLots,
@@ -125,8 +146,11 @@ export default function CalculatorPage() {
             <Field label={`Risk per Trade (${riskPct}%)`}>
               {/* Brand-green slider with a visible thumb. We compute the
                   fill width manually so the track shows the brand colour
-                  on every browser (Tailwind's accent-* doesn't reach the
-                  full filled portion in Webkit). */}
+                  on every browser. The fill maps the slider's full
+                  0%-to-5% range so 0.1% renders ~2% filled (not 0) and
+                  5% renders fully — the previous formula clipped the
+                  bottom 0.1 of the range and made the meter look stuck
+                  at the high end for low-risk picks. */}
               <div className="relative h-6 flex items-center">
                 <div
                   aria-hidden
@@ -135,7 +159,7 @@ export default function CalculatorPage() {
                 <div
                   aria-hidden
                   className="absolute h-1.5 rounded-full bg-primary"
-                  style={{ width: `${((riskPct - 0.1) / (5 - 0.1)) * 100}%` }}
+                  style={{ width: `${Math.min(100, (riskPct / 5) * 100)}%` }}
                 />
                 <input
                   type="range"
@@ -182,6 +206,12 @@ export default function CalculatorPage() {
               <div className="flex justify-between text-[10px] text-foreground/45 mt-2">
                 <span>0.1%</span><span>1%</span><span>2%</span><span>5%</span>
               </div>
+
+              {/* Visual risk barometer — colour-coded zones so the user
+                  can see at a glance whether their risk-per-trade is
+                  Conservative, Moderate, Aggressive, or Extreme without
+                  parsing the percent number. Marker glides with riskPct. */}
+              <RiskGauge riskPct={riskPct} />
             </Field>
 
             <div className="grid grid-cols-2 gap-4">
@@ -351,6 +381,69 @@ function InfoCard({
       <h3 className="font-display text-lg uppercase tracking-tight mb-2">{title}</h3>
       <p className="text-sm text-foreground/65 leading-relaxed">{body}</p>
     </article>
+  );
+}
+
+/**
+ * Visual risk-per-trade barometer. Splits the 0–5% slider range into four
+ * zones — Safe (≤1%), Moderate (1–2%), Aggressive (2–3%), Extreme (>3%) —
+ * with a moving needle showing where the user currently sits. The zone
+ * boundaries match the FAQ guidance ("0.5–1% is professional, >2% is
+ * gambling") so the visual + the educational copy stay in sync.
+ */
+function RiskGauge({ riskPct }: { riskPct: number }) {
+  const clamped = Math.max(0, Math.min(5, Number.isFinite(riskPct) ? riskPct : 0));
+  const pct = (clamped / 5) * 100;
+
+  let zone: { label: string; tone: string; color: string };
+  if (clamped <= 1)       zone = { label: 'Safe',        tone: 'safe',       color: '#55a630' };
+  else if (clamped <= 2)  zone = { label: 'Moderate',    tone: 'moderate',   color: '#e8b923' };
+  else if (clamped <= 3)  zone = { label: 'Aggressive',  tone: 'aggressive', color: '#f97316' };
+  else                    zone = { label: 'Extreme',     tone: 'extreme',    color: '#d00000' };
+
+  return (
+    <div className="mt-4">
+      <div
+        className="relative h-2.5 rounded-full overflow-hidden"
+        style={{
+          background:
+            'linear-gradient(to right, #55a630 0% 20%, #e8b923 20% 40%, #f97316 40% 60%, #d00000 60% 100%)',
+        }}
+        role="meter"
+        aria-label="Risk level"
+        aria-valuemin={0}
+        aria-valuemax={5}
+        aria-valuenow={clamped}
+      >
+        {/* Needle — sits above the gradient track, scales with riskPct. */}
+        <div
+          aria-hidden
+          className="absolute top-1/2 -translate-y-1/2 size-4 rounded-full border-2 border-white shadow-md transition-[left] duration-150 ease-out"
+          style={{
+            left: `calc(${pct}% - 8px)`,
+            background: zone.color,
+            boxShadow: `0 0 0 2px ${zone.color}40, 0 1px 3px rgba(0,0,0,0.25)`,
+          }}
+        />
+      </div>
+      <div className="mt-2 flex items-center justify-between text-[10px] uppercase tracking-[0.16em]">
+        <span className="text-foreground/40">Safe</span>
+        <span className="text-foreground/40">Mod</span>
+        <span className="text-foreground/40">Aggr</span>
+        <span className="text-foreground/40">Extreme</span>
+      </div>
+      <p
+        className="mt-2 text-xs font-semibold"
+        style={{ color: zone.color }}
+      >
+        {zone.label} · {clamped.toFixed(1)}%
+        {clamped > 2 && (
+          <span className="ml-1 text-foreground/55 normal-case font-normal">
+            — above 2% per trade compounds drawdowns brutally.
+          </span>
+        )}
+      </p>
+    </div>
   );
 }
 
