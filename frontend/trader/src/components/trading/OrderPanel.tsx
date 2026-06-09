@@ -15,6 +15,7 @@ import { wsManager } from '@/lib/ws/wsManager';
 import OrderPanelSymbolPicker from '@/components/trading/OrderPanelSymbolPicker';
 import InsuranceTierPicker from '@/components/trading/InsuranceTierPicker';
 import { insuranceApi, type InsuranceTier } from '@/lib/api/insurance';
+import { fmtAccountMoney, isCentAccount } from '@/lib/wallet/centDisplay';
 
 type OrderSide = 'buy' | 'sell';
 type OrderType = 'market' | 'pending';
@@ -638,8 +639,11 @@ export default function OrderPanel() {
                       : (execPrice > 0 ? execPrice.toFixed(digits) : '—'),
                     color: 'var(--text-primary)',
                   },
-                  { label: 'Margin Required', value: `$${marginRequired.toFixed(2)}`, color: !hasEnoughMargin ? '#ef5350' : 'var(--text-secondary)' },
-                  { label: 'Free Margin', value: `$${freeMargin.toFixed(2)}`, color: !hasEnoughMargin ? '#ef5350' : '#55a630' },
+                  // Cent-account display rebrand — Mig 0068. Same helper
+                  // the dashboard + terminal status bar use so a cent
+                  // account sees ¢ here too.
+                  { label: 'Margin Required', value: fmtAccountMoney(marginRequired, isCentAccount(activeAccount)), color: !hasEnoughMargin ? '#ef5350' : 'var(--text-secondary)' },
+                  { label: 'Free Margin', value: fmtAccountMoney(freeMargin, isCentAccount(activeAccount)), color: !hasEnoughMargin ? '#ef5350' : '#55a630' },
                   { label: 'Feed', value: isConnected ? '● Connected' : '○ Disconnected', color: isConnected ? '#55a630' : '#f57c00' },
                 ].map((row) => (
                   <div key={row.label} className="flex items-center justify-between">
@@ -692,9 +696,9 @@ export default function OrderPanel() {
               </span>
             </div>
             <div className="flex items-center justify-between gap-1 px-1 text-[9px] text-text-tertiary">
-              <span className="truncate">Mrgn ${marginRequired.toFixed(2)}</span>
+              <span className="truncate">Mrgn {fmtAccountMoney(marginRequired, isCentAccount(activeAccount))}</span>
               <span className={clsx('shrink-0 font-mono', hasEnoughMargin ? 'text-[#55a630]' : 'text-[#ef5350]')}>
-                Free ${freeMargin.toFixed(2)}
+                Free {fmtAccountMoney(freeMargin, isCentAccount(activeAccount))}
               </span>
               <span
                 className={clsx('shrink-0 font-mono', isConnected ? 'text-[#55a630]' : 'text-[#f57c00]')}
