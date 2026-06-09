@@ -63,6 +63,13 @@ function VerifyEmailContent() {
               <img
                 src="/images/swisdex_png5.png"
                 alt="SwisDex"
+                className="hidden dark:block"
+                style={{ width: 64, height: 64, objectFit: 'contain', margin: '0 auto 24px' }}
+              />
+              <img
+                src="/images/swisdex_logo_white.png"
+                alt="SwisDex"
+                className="dark:hidden"
                 style={{ width: 64, height: 64, objectFit: 'contain', margin: '0 auto 24px' }}
               />
               {state === 'loading' && (

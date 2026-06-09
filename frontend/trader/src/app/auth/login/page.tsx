@@ -291,10 +291,18 @@ function LoginContent() {
                 {activeStep === 1 && (
                   <form className="auth-form" onSubmit={handleSignIn} noValidate>
                     <motion.div {...fadeUp(0.25)} className="flex justify-center mb-1">
+                      {/* Theme-aware swap so the white-bg friendly logo
+                          renders on light mode and the original raster
+                          on dark mode. */}
                       <img
                         src="/images/swisdex_png5.png"
                         alt="SwisDex"
-                        className="w-12 h-12 object-contain"
+                        className="w-12 h-12 object-contain hidden dark:block"
+                      />
+                      <img
+                        src="/images/swisdex_logo_white.png"
+                        alt="SwisDex"
+                        className="w-12 h-12 object-contain dark:hidden"
                       />
                     </motion.div>
                     <motion.div {...fadeUp(0.3)}>

@@ -33,8 +33,12 @@ export default function SplashScreen() {
       <img src="/images/feb.png" alt="" className="swisdex-splash__bg" />
 
       <div className="swisdex-splash__inner">
+        {/* Theme-aware swap: original raster on dark mode, white-bg
+            variant on light mode. */}
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/images/swisdex_png5.png" alt="SwisDex" className="swisdex-splash__logo" />
+        <img src="/images/swisdex_png5.png" alt="SwisDex" className="swisdex-splash__logo hidden dark:block" />
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/images/swisdex_logo_white.png" alt="SwisDex" className="swisdex-splash__logo dark:hidden" />
       </div>
     </div>
   );

@@ -296,7 +296,12 @@ function RegisterContent() {
                     <img
                       src="/images/swisdex_png5.png"
                       alt="SwisDex"
-                      className="w-12 h-12 object-contain"
+                      className="w-12 h-12 object-contain hidden dark:block"
+                    />
+                    <img
+                      src="/images/swisdex_logo_white.png"
+                      alt="SwisDex"
+                      className="w-12 h-12 object-contain dark:hidden"
                     />
                   </motion.div>
                   <motion.div {...fadeUp(0.3)}>
