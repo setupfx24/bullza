@@ -821,6 +821,12 @@ async def list_positions(account_id: UUID, user_id: UUID, status: str, db: Async
             # Multiply back by 1/multiplier so cent-account traders see
             # the 0.01 they entered, even though storage holds 0.0001.
             "lots": float(Decimal(str(pos.lots)) * _lot_unscale),
+            # Raw stored lots (engine units, e.g. 0.0001 on cent). The
+            # frontend MUST use this — not the display `lots` above —
+            # when recomputing live P&L on each tick, or a cent position
+            # shows P&L 100× too large and jumps wildly. Standard
+            # accounts: effective_lots == lots (multiplier 1).
+            "effective_lots": float(pos.lots),
             "open_price": float(pos.open_price),
             "current_price": current_price,
             "stop_loss": float(pos.stop_loss) if pos.stop_loss else None,

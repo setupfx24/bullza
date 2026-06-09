@@ -100,7 +100,11 @@ function estimatePositionMargin(
 ): number | null {
   const inst = instruments.find((i) => i.symbol === pos.symbol);
   if (!inst || !leverage) return null;
-  const notional = pos.lots * inst.contract_size * pos.open_price;
+  // Use engine lots (effective_lots) so the margin / notional estimate
+  // matches the backend for cent accounts. Display lots would overstate
+  // it 100×. Falls back to display lots when absent (standard accounts).
+  const engineLots = pos.effective_lots ?? pos.lots;
+  const notional = engineLots * inst.contract_size * pos.open_price;
   return notional / leverage;
 }
 
@@ -1005,8 +1009,11 @@ export default function PositionsPanel({ variant = 'default' }: PositionsPanelPr
                           const lev = activeAccount?.leverage ?? 100;
                           const m = estimatePositionMargin(pos, instruments, lev);
                           const inst = instruments.find((i) => i.symbol === pos.symbol);
+                          // Engine lots for notional so cent positions
+                          // don't show a 100×-inflated contract value.
+                          const _engineLots = pos.effective_lots ?? pos.lots;
                           const notional =
-                            inst != null ? pos.lots * inst.contract_size * pos.open_price : null;
+                            inst != null ? _engineLots * inst.contract_size * pos.open_price : null;
                           // Cent-aware money strings for the card view.
                           // Notional stays in raw $ (it's the symbol's
                           // contract value, not the user's wallet), but

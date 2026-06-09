@@ -15,7 +15,14 @@ export interface Position {
   account_id: string;
   symbol: string;
   side: 'buy' | 'sell';
+  /** Display lots — what the trader typed (e.g. 0.01 on a cent
+   *  account). Shown in the QTY column. */
   lots: number;
+  /** Raw engine lots (e.g. 0.0001 on a cent account, multiplier 0.01).
+   *  MUST be used for live P&L recompute — using `lots` overstates a
+   *  cent position's P&L 100×. Falls back to `lots` when absent
+   *  (standard accounts where the two are equal). */
+  effective_lots?: number;
   open_price: number;
   current_price?: number;
   stop_loss?: number;
@@ -296,9 +303,14 @@ export const useTradingStore = create<TradingState>()((set, get) => ({
           state.instruments.find((i) => i.symbol === sym) ||
           state.instruments.find((i) => String(i.symbol).toUpperCase() === sym);
         const cs = inst?.contract_size || 100000;
+        // Use ENGINE lots (effective_lots), not the display lots, so a
+        // cent position's live P&L matches the backend instead of
+        // jumping 100× on every tick. Falls back to display lots for
+        // standard accounts / legacy payloads where they're equal.
+        const pnlLots = pos.effective_lots ?? pos.lots;
         let pnl = pos.side === 'buy'
-          ? (cp - pos.open_price) * pos.lots * cs
-          : (pos.open_price - cp) * pos.lots * cs;
+          ? (cp - pos.open_price) * pnlLots * cs
+          : (pos.open_price - cp) * pnlLots * cs;
         // Forex P&L formula yields a value in the QUOTE currency. Convert to
         // the account currency (USD) so e.g. USDJPY shows ~$0.006 instead of
         // 1 JPY rendered as "$1". For pairs already quoted in USD (EURUSD,
