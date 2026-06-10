@@ -1,6 +1,7 @@
 import Link from 'next/link'
-import { Facebook, Instagram, Linkedin, Youtube, Mail } from 'lucide-react'
+import { Facebook, Instagram, Linkedin, Youtube, Mail, Cookie } from 'lucide-react'
 import ScrollReveal from './animations/ScrollReveal'
+import { openCookieSettings } from '@/swisdex/components/CookieConsent'
 
 const columns = {
   Trading: [
@@ -194,11 +195,18 @@ export default function Footer() {
           <p className="text-xs" style={{ color: 'var(--fx-text-3)' }}>
             © {year} SwisDex Ltd. All rights reserved. · Founded in 2010
           </p>
-          <div className="flex flex-wrap gap-x-5 gap-y-2 text-xs" style={{ color: 'var(--fx-text-3)' }}>
-            <Link href="/privacy" className="hover:underline">Privacy Policy</Link>
-            <Link href="/terms" className="hover:underline">Terms of Service</Link>
-            <Link href="/risk" className="hover:underline">Risk Disclosure</Link>
-          </div>
+          {/* Cookie Settings — surfaces the consent modal even after
+              the user has already accepted/saved a preference, so the
+              choice stays revisable per GDPR. */}
+          <button
+            type="button"
+            onClick={openCookieSettings}
+            className="inline-flex items-center gap-1.5 text-xs hover:underline transition-colors"
+            style={{ color: 'var(--fx-text-2)' }}
+            aria-label="Open cookie settings"
+          >
+            <Cookie size={13} /> Cookie Settings
+          </button>
         </div>
       </div>
     </footer>

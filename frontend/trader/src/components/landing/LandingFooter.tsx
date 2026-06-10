@@ -1,5 +1,6 @@
 import Link from 'next/link'
-import { Phone } from 'lucide-react'
+import { Phone, Cookie } from 'lucide-react'
+import { openCookieSettings } from '@/swisdex/components/CookieConsent'
 
 /**
  * Dark-themed landing footer.
@@ -122,6 +123,14 @@ export default function LandingFooter() {
             <Link href="/privacy" className="hover:text-[#55a630] transition-colors">Privacy Policy</Link>
             <Link href="/terms" className="hover:text-[#55a630] transition-colors">Terms of Service</Link>
             <Link href="/risk" className="hover:text-[#55a630] transition-colors">Risk Disclosure</Link>
+            <button
+              type="button"
+              onClick={openCookieSettings}
+              className="inline-flex items-center gap-1.5 hover:text-[#55a630] transition-colors"
+              aria-label="Open cookie settings"
+            >
+              <Cookie className="w-3.5 h-3.5" /> Cookie Settings
+            </button>
           </div>
         </div>
       </div>
