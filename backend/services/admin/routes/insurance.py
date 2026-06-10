@@ -8,7 +8,7 @@ from pydantic import BaseModel
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from dependencies import get_current_admin
+from dependencies import get_current_admin, require_permission
 from packages.common.src.database import get_db
 from packages.common.src.models import (
     InsurancePolicy, InsuranceClaim, SystemSetting, User,
@@ -76,7 +76,10 @@ class InsuranceSettingsUpdate(BaseModel):
 @router.put("/settings")
 async def update_settings(
     body: InsuranceSettingsUpdate,
-    admin: User = Depends(get_current_admin),
+    # Insurance tunables drive fee/payout economics — gate behind
+    # insurance.manage (no employee role holds it → super_admin only)
+    # (audit M3).
+    admin: User = Depends(require_permission("insurance.manage")),
     db: AsyncSession = Depends(get_db),
 ) -> dict:
     """Upsert any subset of `INSURANCE_KEYS`. Anything not in the allowlist

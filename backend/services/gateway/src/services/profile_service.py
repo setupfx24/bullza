@@ -52,12 +52,26 @@ async def _read_upload_file(upload: UploadFile, label: str) -> tuple[bytes, str]
             detail=f"File type not allowed for {label}. Upload JPG, PNG, PDF, or WEBP.",
         )
     content = await upload.read()
+    if not content:
+        raise HTTPException(status_code=400, detail=f"Empty file ({label})")
     if len(content) > MAX_FILE_BYTES:
         raise HTTPException(
             status_code=400,
             detail=f"File too large for {label}. Maximum size is 10 MB.",
         )
-    return content, suffix
+    # Magic-byte validation (security review F1): extension + Content-Type
+    # are attacker-controlled, so verify the actual bytes are a real
+    # image/PDF before we store a trader-supplied file that an admin will
+    # later open. Adopt the detected canonical suffix as the stored one.
+    from packages.common.src.upload_safety import assert_matches, UnsafeUploadError
+    try:
+        kind = assert_matches(content, declared_suffix=suffix, allowed_suffixes=ALLOWED_EXTENSIONS)
+    except UnsafeUploadError as e:
+        raise HTTPException(
+            status_code=400,
+            detail=f"File content does not match its type for {label}. Upload a valid JPG, PNG, PDF, or WEBP.",
+        ) from e
+    return content, kind.suffix
 
 
 # ─── Profile ──────────────────────────────────────────────────────────────

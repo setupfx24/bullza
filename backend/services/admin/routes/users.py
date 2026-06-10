@@ -165,7 +165,10 @@ async def kill_switch(
 async def login_as_user(
     user_id: uuid.UUID,
     request: Request,
-    admin: User = Depends(require_permission("users.view")),
+    # Impersonation mints a full trader session = account takeover. Gate
+    # it behind a dedicated high-trust permission that no employee role
+    # holds, so effectively only super_admin can impersonate (audit H1).
+    admin: User = Depends(require_permission("users.impersonate")),
     db: AsyncSession = Depends(get_db),
 ):
     return await user_service.login_as_user(
@@ -232,7 +235,10 @@ async def revoke_all_user_sessions(
 async def delete_user(
     user_id: uuid.UUID,
     request: Request,
-    admin: User = Depends(require_permission("users.add_fund")),
+    # Irreversible destruction of a user + their entire financial ledger.
+    # Dedicated permission held by no employee role → super_admin only
+    # (audit H2; was wrongly gated on the finance 'users.add_fund').
+    admin: User = Depends(require_permission("users.delete")),
     db: AsyncSession = Depends(get_db),
 ):
     """Permanently delete a user. Closes all open positions/orders, deletes

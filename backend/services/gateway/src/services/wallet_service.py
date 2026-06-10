@@ -1258,8 +1258,18 @@ async def create_manual_withdrawal(
         if suffix not in DEPOSIT_PROOF_EXT:
             raise HTTPException(status_code=400, detail="Allowed file types for QR: JPG, PNG, PDF, WEBP")
         content = await file.read()
+        if not content:
+            raise HTTPException(status_code=400, detail="Empty file")
         if len(content) > MAX_PROOF_BYTES:
             raise HTTPException(status_code=400, detail="File too large (max 10 MB)")
+        # Magic-byte validation (security review F1) — don't trust the
+        # extension; verify the bytes are a real image/PDF.
+        from packages.common.src.upload_safety import assert_matches, UnsafeUploadError
+        try:
+            _kind = assert_matches(content, declared_suffix=suffix, allowed_suffixes=DEPOSIT_PROOF_EXT)
+            suffix = _kind.suffix
+        except UnsafeUploadError as e:
+            raise HTTPException(status_code=400, detail="File content does not match its type. Upload a valid JPG, PNG, PDF, or WEBP.") from e
         try:
             user_dir = safe_join_under_base(_wallet_upload_root(), "withdrawals", str(user_id))
         except PathTraversalError:
