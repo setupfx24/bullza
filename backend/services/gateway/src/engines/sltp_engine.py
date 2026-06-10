@@ -52,8 +52,15 @@ class SLTPEngine:
         logger.info("SL/TP engine stopped")
 
     async def _run(self):
+        from packages.common.src.redis_client import acquire_leader_lock
         while self._running:
             try:
+                # Cluster leader lock — under uvicorn --workers N only one
+                # worker runs the SL/TP sweep, else each worker would
+                # close the same position (audit C1/C3). Lock TTL > tick.
+                if not await acquire_leader_lock("engine:sltp:lock", 5):
+                    await asyncio.sleep(CHECK_INTERVAL)
+                    continue
                 await self._load_prices()
                 await self._check_positions()
                 await asyncio.sleep(CHECK_INTERVAL)
@@ -136,6 +143,18 @@ class SLTPEngine:
     async def _close_position(
         self, db: AsyncSession, pos: Position, close_price: Decimal, reason: str
     ):
+        # Idempotent close guard — the b-book matching engine ALSO closes
+        # on SL/TP (audit C2). Atomically flip status open→closed and
+        # only proceed if THIS call won the flip; otherwise another
+        # closer already booked it, so bail before double-crediting.
+        from sqlalchemy import update as _sa_update
+        won = await db.execute(
+            _sa_update(Position)
+            .where(Position.id == pos.id, Position.status == "open")
+            .values(status="closed")
+        )
+        if (won.rowcount or 0) == 0:
+            return  # already closed by another closer — no double booking
         side = _side_val(pos.side)
         contract_size = pos.instrument.contract_size if pos.instrument else Decimal("100000")
 

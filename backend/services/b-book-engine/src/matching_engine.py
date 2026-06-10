@@ -283,13 +283,31 @@ class MatchingEngine:
             await asyncio.sleep(0.1)
 
     async def _close_position(self, pos: Position, close_price: Decimal, reason: str, db: AsyncSession):
-        from packages.common.src.trading_service import quote_to_account_pnl
+        # Idempotent close guard (audit C2) — the gateway sltp_engine
+        # also closes on SL/TP. Atomically flip status open→closed and
+        # bail if another closer already won, so we never double-book
+        # P&L / TradeHistory.
+        from sqlalchemy import update as _sa_update
+        won = await db.execute(
+            _sa_update(Position)
+            .where(Position.id == pos.id, Position.status == PositionStatus.OPEN)
+            .values(status=PositionStatus.CLOSED)
+        )
+        if (won.rowcount or 0) == 0:
+            return
+        # Async converters (audit JPY/cross-pair family) — the sync
+        # quote_to_account_pnl returns raw quote currency for cross
+        # pairs, so NZDJPY etc. would credit JPY-as-USD. Convert P&L
+        # AND margin-release to account currency via live Redis rate.
+        from packages.common.src.trading_service import (
+            quote_to_account_pnl_async, convert_to_account_currency,
+        )
         instrument = pos.instrument
         if pos.side == OrderSide.BUY:
             profit = (close_price - pos.open_price) * pos.lots * instrument.contract_size
         else:
             profit = (pos.open_price - close_price) * pos.lots * instrument.contract_size
-        profit = quote_to_account_pnl(
+        profit = await quote_to_account_pnl_async(
             profit,
             getattr(instrument, "base_currency", None),
             getattr(instrument, "quote_currency", None),
@@ -306,7 +324,11 @@ class MatchingEngine:
         account = await db.get(TradingAccount, pos.account_id)
         if account:
             account.balance += profit
-            margin_release = (pos.lots * instrument.contract_size * pos.open_price) / Decimal(str(account.leverage))
+            margin_release_raw = (pos.lots * instrument.contract_size * pos.open_price) / Decimal(str(account.leverage))
+            margin_release = await convert_to_account_currency(
+                margin_release_raw,
+                getattr(instrument, "quote_currency", None),
+            )
             account.margin_used = max(Decimal("0"), account.margin_used - margin_release)
             account.equity = account.balance + account.credit
             account.free_margin = account.equity - account.margin_used

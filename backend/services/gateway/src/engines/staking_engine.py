@@ -34,11 +34,18 @@ class StakingEngine:
         self._running = False
 
     async def _run(self):
+        from packages.common.src.redis_client import acquire_leader_lock
         while self._running:
             try:
                 now = datetime.now(timezone.utc)
                 today_key = now.strftime("%Y-%m-%d")
                 if self._last_run_day != today_key:
+                    # Leader lock — only one worker accrues staking
+                    # (the in-memory _last_run_day guard is per-process,
+                    # so without this each worker accrues once = duplicate).
+                    if not await acquire_leader_lock("engine:staking:lock", 60):
+                        await asyncio.sleep(TICK_INTERVAL)
+                        continue
                     async with AsyncSessionLocal() as db:
                         inserted = await staking_service.accrue_daily(db)
                         await db.commit()

@@ -34,8 +34,14 @@ class FixedReturnEngine:
         self._running = False
 
     async def _run(self):
+        from packages.common.src.redis_client import acquire_leader_lock
         while self._running:
             try:
+                # Leader lock — only one worker accrues interest, else
+                # double-payout under --workers N (audit C1/C3).
+                if not await acquire_leader_lock("engine:fixed_return:lock", 50):
+                    await asyncio.sleep(TICK_INTERVAL)
+                    continue
                 async with AsyncSessionLocal() as db:
                     paid = await fixed_return_service.accrue_due_payouts(db)
                 if paid:
