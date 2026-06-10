@@ -80,23 +80,27 @@ export default function InsuranceTierPicker(props: Props) {
     };
   }, [enabled, accountId, symbol, side, lots, leverage, stopLoss, takeProfit]);
 
-  /* Auto-select cheapest tier when quotes arrive and nothing is
-   * picked yet. Without this, the toggle was effectively a no-op
-   * unless the user clicked a card too. */
+  /* Single effect: auto-pick the cheapest tier AND bubble the selection
+   * up in the SAME render. Splitting these into two effects left a
+   * window where `tier` was set but onSelect hadn't fired yet — if the
+   * user clicked BUY in that window the order went out with no
+   * insurance selection and the trade opened "Not insured". Doing both
+   * here closes that race. */
   useEffect(() => {
-    if (!enabled || tier || !quotes || quotes.length === 0) return;
-    const cheapest = [...quotes].sort((a, b) => a.fee - b.fee)[0];
-    if (cheapest) setTier(cheapest.tier);
-  }, [enabled, tier, quotes]);
-
-  /* Bubble selection up. Reset on disable. */
-  useEffect(() => {
-    if (!enabled || !tier || !quotes) {
+    if (!enabled || !quotes || quotes.length === 0) {
       onSelect(null);
       return;
     }
-    const q = quotes.find((x) => x.tier === tier);
-    if (q) onSelect({ tier, fee: q.fee });
+    // Honour an explicit pick; otherwise default to the cheapest tier.
+    const picked = tier
+      ? quotes.find((x) => x.tier === tier)
+      : [...quotes].sort((a, b) => a.fee - b.fee)[0];
+    if (!picked) {
+      onSelect(null);
+      return;
+    }
+    if (!tier) setTier(picked.tier);
+    onSelect({ tier: picked.tier, fee: picked.fee });
   }, [enabled, tier, quotes, onSelect]);
 
   return (
