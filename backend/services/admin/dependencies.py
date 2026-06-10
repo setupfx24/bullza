@@ -94,6 +94,16 @@ async def get_current_admin(
     if admin is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Admin user not found or inactive")
 
+    # Revoke-on-password-change (audit H2): the token carries a `pe`
+    # fingerprint of the password hash it was minted against. A mismatch
+    # means the password has since changed, so this token is stale.
+    # Tokens minted before this claim existed have no `pe` — accept those
+    # so the rollout doesn't log every admin out; they age out naturally.
+    from packages.common.src.auth import password_epoch
+    tok_pe = payload.get("pe")
+    if tok_pe is not None and tok_pe != password_epoch(admin.password_hash):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Session revoked, please log in again")
+
     return admin
 
 

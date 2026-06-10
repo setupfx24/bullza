@@ -47,12 +47,12 @@ async def admin_login(
 ):
     # Brute-force throttle (audit C4) — admin accounts move funds, so
     # cap login attempts per IP + per submitted email. 5 attempts / 5 min.
-    # Trusts the proxy-set client IP; falls back to the socket peer.
+    # Uses the spoof-resistant client IP (X-Real-IP set by our nginx, not
+    # the forgeable left-most X-Forwarded-For — audit H3).
     from fastapi import HTTPException
     from packages.common.src.redis_client import throttle
-    xff = (request.headers.get("x-forwarded-for") or "").split(",")
-    client_ip = (xff[0].strip() if xff and xff[0].strip()
-                 else (request.client.host if request.client else "unknown"))
+    from packages.common.src.rate_limit import client_key
+    client_ip = client_key(request)
     email_id = (body.email or "").strip().lower()
     for ident in (f"ip:{client_ip}", f"email:{email_id}"):
         if not await throttle("admin_login", ident, max_hits=5, window_sec=300):
@@ -86,15 +86,23 @@ async def admin_logout(response: Response):
 @router.post("/change-password")
 async def change_admin_password(
     body: ChangePasswordRequest,
+    request: Request,
+    response: Response,
     admin: User = Depends(get_current_admin),
     db: AsyncSession = Depends(get_db),
 ):
-    return await auth_service.change_admin_password(
+    out = await auth_service.change_admin_password(
         admin=admin,
         current_password=body.current_password,
         new_password=body.new_password,
         db=db,
     )
+    # Refresh THIS session's cookie to the re-minted token so the admin
+    # who changed their password isn't bounced (audit H2). All other
+    # outstanding tokens are now revoked by the password-epoch change.
+    if out.get("access_token"):
+        _set_admin_cookie(response, request, out["access_token"])
+    return out
 
 
 @router.get("/me")

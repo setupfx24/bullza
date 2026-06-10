@@ -91,10 +91,18 @@ def assert_same_origin(request: Request) -> None:
 
 
 def client_ip_for_inet(request: Request) -> str | None:
-    """Return a value PostgreSQL INET accepts, or None."""
+    """Return a value PostgreSQL INET accepts, or None. Prefers the
+    non-forgeable X-Real-IP (set by our nginx) then the right-most
+    X-Forwarded-For hop, so audit rows record the real client rather than
+    a value a client prepended to the header (audit H3)."""
+    real = request.headers.get("x-real-ip") or request.headers.get("X-Real-IP")
+    if real:
+        got = _parse_one_ip(real)
+        if got:
+            return got
     ff = request.headers.get("x-forwarded-for") or request.headers.get("X-Forwarded-For")
     if ff:
-        for part in ff.split(","):
+        for part in reversed(ff.split(",")):
             got = _parse_one_ip(part)
             if got:
                 return got

@@ -19,13 +19,27 @@ logger = logging.getLogger(__name__)
 
 
 def client_key(request: Request) -> str:
-    """Derive a stable per-caller key. Prefers X-Forwarded-For (left-most
-    public IP, set by our nginx) then falls back to the socket peer."""
+    """Derive a spoof-resistant per-caller IP key (audit H3).
+
+    Trust order:
+      1. X-Real-IP — our nginx sets this to $remote_addr (the true client,
+         resolved from Cloudflare's CF-Connecting-IP within trusted CF
+         ranges). nginx OVERWRITES any client-supplied value, so it cannot
+         be forged.
+      2. The RIGHT-MOST X-Forwarded-For entry — the hop our own nginx
+         appended. The left-most entries are attacker-controlled (a client
+         can prepend `X-Forwarded-For: 1.2.3.4` to mint a fresh rate-limit
+         bucket per fake IP and bypass the limit), so we must NOT use them.
+      3. The socket peer.
+    """
+    real = request.headers.get("x-real-ip") or request.headers.get("X-Real-IP")
+    if real and real.strip():
+        return real.strip()
     ff = request.headers.get("x-forwarded-for") or request.headers.get("X-Forwarded-For")
     if ff:
-        first = ff.split(",")[0].strip()
-        if first:
-            return first
+        parts = [p.strip() for p in ff.split(",") if p.strip()]
+        if parts:
+            return parts[-1]  # right-most = appended by our trusted proxy
     if request.client and request.client.host:
         return request.client.host
     return "unknown"
