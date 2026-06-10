@@ -9,7 +9,7 @@ export default function LandingFooter() {
         <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-10 mb-10">
           <div className="lg:col-span-2">
             {/* Footer is hard-coded white — use the white-bg variant. */}
-            <img src="/images/swisdex_logo_white.png" alt="SwisDex" className="h-9 w-auto mb-4" />
+            <img src="/images/swisdex_png.png" alt="SwisDex" className="h-9 w-auto mb-4" />
             <p className="text-gray-500 text-sm leading-relaxed mb-3 max-w-sm">
               Professional multi-asset trading platform. Licensed under Investment Dealer Licence No. MAK21098161, St. Lucia.
             </p>

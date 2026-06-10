@@ -333,7 +333,7 @@ export default function AdvancedChart() {
           className="pointer-events-none w-[40%] max-w-[480px] min-w-[200px] object-contain opacity-[0.07] hidden dark:block"
         />
         <img
-          src="/images/swisdex_logo_white.png"
+          src="/images/swisdex_png.png"
           alt=""
           className="pointer-events-none w-[40%] max-w-[480px] min-w-[200px] object-contain opacity-[0.10] dark:hidden"
         />

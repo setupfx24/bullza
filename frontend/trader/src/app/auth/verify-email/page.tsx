@@ -67,7 +67,7 @@ function VerifyEmailContent() {
                 style={{ width: 64, height: 64, objectFit: 'contain', margin: '0 auto 24px' }}
               />
               <img
-                src="/images/swisdex_logo_white.png"
+                src="/images/swisdex_png.png"
                 alt="SwisDex"
                 className="dark:hidden"
                 style={{ width: 64, height: 64, objectFit: 'contain', margin: '0 auto 24px' }}

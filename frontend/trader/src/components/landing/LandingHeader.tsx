@@ -12,7 +12,7 @@ export default function LandingHeader() {
             {/* LandingHeader sits on a hard-coded white bar, so the
                 white-bg friendly logo variant is the right default
                 here regardless of the user's chosen theme. */}
-            <img src="/images/swisdex_logo_white.png" alt="SwisDex" className="h-9 sm:h-10 w-auto object-contain" />
+            <img src="/images/swisdex_png.png" alt="SwisDex" className="h-9 sm:h-10 w-auto object-contain" />
             <span className="font-bold italic tracking-tight text-lg select-none">
               <span className="text-gray-800">Swis</span><span className="text-[#55a630]">Dex</span>
             </span>

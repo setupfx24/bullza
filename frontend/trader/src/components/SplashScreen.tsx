@@ -38,7 +38,7 @@ export default function SplashScreen() {
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/images/swisdex_png5.png" alt="SwisDex" className="swisdex-splash__logo hidden dark:block" />
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/images/swisdex_logo_white.png" alt="SwisDex" className="swisdex-splash__logo dark:hidden" />
+        <img src="/images/swisdex_png.png" alt="SwisDex" className="swisdex-splash__logo dark:hidden" />
       </div>
     </div>
   );
