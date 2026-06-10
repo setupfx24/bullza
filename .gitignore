@@ -77,6 +77,13 @@ build/
 *.zip
 *.tar
 *.tar.gz
+
+# Exception — public-facing legal PDFs the Terms page links to. Anything
+# inside this exact folder is shipped with the site so the View / Download
+# buttons under /terms actually resolve. Other PDFs across the repo stay
+# ignored.
+!frontend/trader/public/pdfs/terms/
+!frontend/trader/public/pdfs/terms/*.pdf
 *.tgz
 *.7z
 *.rar

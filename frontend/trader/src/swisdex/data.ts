@@ -47,6 +47,15 @@ export const NAV_ITEMS: NavItem[] = [
   },
   { label: 'About',        href: '/company/about' },
   { label: 'Contact',      href: '/company/contact' },
+  {
+    label: 'Legal',
+    href: '/terms',
+    children: [
+      { label: 'Terms & Conditions', href: '/terms' },
+      { label: 'Privacy Policy',     href: '/privacy' },
+      { label: 'Risk Disclaimer',    href: '/risk' },
+    ],
+  },
 ];
 
 export const HERO = {
@@ -101,7 +110,7 @@ export const INSTRUMENTS = [
 export const WHY_US = [
   { icon: 'Network',      title: 'Decentralized Exchange',            body: 'Trade directly from your own wallet with non-custodial, on-chain execution — no intermediaries, no counterparty risk. Your keys, your funds.' },
   { icon: 'ShieldCheck',  title: 'Insurance for Traders',             body: 'Every trade is policy-backed with on-chain insurance. If the market moves against you beyond defined thresholds, your insured amount is protected.' },
-  { icon: 'Gift',         title: 'Bonus & Rewards',                   body: 'Get a 100% welcome bonus up to $1,000 on your first deposit — credited within minutes and fully tradeable on a decentralized exchange with insured trades. Stacks with referral commissions and trading cashback.' },
+  { icon: 'Gift',         title: 'Bonus & Rewards',                   body: 'Get a 100% welcome bonus up to $200 on your first deposit — credited within minutes and fully tradeable on a decentralized exchange with insured trades. Stacks with referral commissions and trading cashback.' },
   { icon: 'Lock',         title: 'Fixed Rate Return',                 body: 'Lock in guaranteed fixed returns with our structured investment plans — predictable income with transparent terms and no hidden fees.' },
   { icon: 'Brain',        title: 'AI Trading Software — 90% Accuracy', body: 'Our proprietary AI engine analyses thousands of market signals per second, achieving a verified 90% accuracy rate across forex and crypto pairs.' },
   { icon: 'ShieldPlus',   title: 'Insured Trading',                   body: 'All positions carry built-in trade insurance. Your capital is safeguarded with multi-layer protection — cold storage, encryption, and smart-contract coverage.' },
@@ -124,31 +133,37 @@ export const STATS = [
 ] as const;
 
 /**
- * Investor portraits sourced from randomuser.me — free curated headshot
- * service that returns consistent, professional-looking photos. Each
- * entry is pinned to a specific portrait ID so the same person always
- * shows the same face. When real branded photos are available, drop
- * them at /public/images/testimonials/<slug>.webp and swap the URL —
- * Testimonials.tsx falls back to initials if the image fails to load.
+ * Investor avatars use UI Avatars (ui-avatars.com) — an initials-only,
+ * ethnicity-neutral generator. Each avatar shows the testimonial author's
+ * own initials on a brand-green disc, so the name and country always
+ * match the visual (no more random portraits whose ethnicity clashes
+ * with the name).
+ *
+ * Drop a real branded photo at /public/images/testimonials/<slug>.webp
+ * and replace the URL when curated images are available — Testimonials.tsx
+ * still falls back to text-only initials if the image ever fails to load.
  */
+const avatar = (name: string) =>
+  `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=55a630&color=ffffff&size=200&font-size=0.42&bold=true&format=png`;
+
 export const TESTIMONIALS = [
-  { name: 'Aarav Sharma',   role: 'India',                avatar: 'https://randomuser.me/api/portraits/men/32.jpg',    quote: 'The interface is clean and easy to navigate.' },
-  { name: 'Maria Lopez',    role: 'Spain',                avatar: 'https://randomuser.me/api/portraits/women/44.jpg',  quote: 'Account setup was straightforward and quick.' },
-  { name: 'Hiroshi Tanaka', role: 'Japan',                avatar: 'https://randomuser.me/api/portraits/men/45.jpg',    quote: 'I like how simple the trading dashboard feels.' },
-  { name: 'Sofia Müller',   role: 'Germany',              avatar: 'https://randomuser.me/api/portraits/women/22.jpg',  quote: 'The platform performance has been smooth so far.' },
-  { name: 'Liam O\'Connor', role: 'Ireland',              avatar: 'https://randomuser.me/api/portraits/men/12.jpg',    quote: 'Good mobile experience and responsive layout.' },
-  { name: 'Priya Iyer',     role: 'India',                avatar: 'https://randomuser.me/api/portraits/women/63.jpg',  quote: 'Transactions appeared quickly in the dashboard.' },
-  { name: 'Tunde Okafor',   role: 'Nigeria',              avatar: 'https://randomuser.me/api/portraits/men/56.jpg',    quote: 'Customer support replied within a reasonable time.' },
-  { name: 'Emma Wilson',    role: 'United Kingdom',       avatar: 'https://randomuser.me/api/portraits/women/8.jpg',   quote: 'The verification process was simple to complete.' },
-  { name: 'Daniel Roberts', role: 'Canada',               avatar: 'https://randomuser.me/api/portraits/men/77.jpg',    quote: 'Professional interface with a strong focus on usability.' },
-  { name: 'Aisha Khan',     role: 'United Arab Emirates', avatar: 'https://randomuser.me/api/portraits/women/55.jpg',  quote: 'Efficient execution and a polished trading environment.' },
-  { name: 'Marco Rossi',    role: 'Italy',                avatar: 'https://randomuser.me/api/portraits/men/85.jpg',    quote: 'A modern platform built with simplicity in mind.' },
+  { name: 'Aarav Sharma',   role: 'India',                avatar: avatar('Aarav Sharma'),   quote: 'The interface is clean and easy to navigate.' },
+  { name: 'Maria Lopez',    role: 'Spain',                avatar: avatar('Maria Lopez'),    quote: 'Account setup was straightforward and quick.' },
+  { name: 'Hiroshi Tanaka', role: 'Japan',                avatar: avatar('Hiroshi Tanaka'), quote: 'I like how simple the trading dashboard feels.' },
+  { name: 'Sofia Müller',   role: 'Germany',              avatar: avatar('Sofia Muller'),   quote: 'The platform performance has been smooth so far.' },
+  { name: 'Liam O\'Connor', role: 'Ireland',              avatar: avatar('Liam OConnor'),   quote: 'Good mobile experience and responsive layout.' },
+  { name: 'Priya Iyer',     role: 'India',                avatar: avatar('Priya Iyer'),     quote: 'Transactions appeared quickly in the dashboard.' },
+  { name: 'Tunde Okafor',   role: 'Nigeria',              avatar: avatar('Tunde Okafor'),   quote: 'Customer support replied within a reasonable time.' },
+  { name: 'Emma Wilson',    role: 'United Kingdom',       avatar: avatar('Emma Wilson'),    quote: 'The verification process was simple to complete.' },
+  { name: 'Daniel Roberts', role: 'Canada',               avatar: avatar('Daniel Roberts'), quote: 'Professional interface with a strong focus on usability.' },
+  { name: 'Aisha Khan',     role: 'United Arab Emirates', avatar: avatar('Aisha Khan'),     quote: 'Efficient execution and a polished trading environment.' },
+  { name: 'Marco Rossi',    role: 'Italy',                avatar: avatar('Marco Rossi'),    quote: 'A modern platform built with simplicity in mind.' },
 ] as const;
 
 export const FAQ = [
   {
     q: 'What is the minimum deposit required to start trading?',
-    a: 'The minimum deposit depends on the account type: Standard $50, ECN $200, and IB partner account $500. A free Demo account with $100,000 in virtual funds is also available — no commitment, identical execution conditions to a live account. Every new trader also receives a 100% Welcome Bonus on the first deposit.',
+    a: 'Only $50. A first deposit of $50 unlocks the Standard live account; ECN ($200) and IB partner ($500) accounts have their own minimums. A free Demo account with $100,000 in virtual funds is also available — no commitment. Every first deposit also receives a 100% Welcome Bonus (up to $200).',
   },
   {
     q: 'How do I get the 100% Welcome Bonus?',
@@ -156,7 +171,7 @@ export const FAQ = [
   },
   {
     q: 'Which deposit and withdrawal methods are available, and how long do they take?',
-    a: 'We support bank wire transfers, Visa/Mastercard, Skrill, Neteller, cryptocurrency, and local bank options including UPI. Card and e-wallet deposits are typically instant; bank wires and crypto withdrawals usually settle within 1–3 business days.',
+    a: 'We support bank wire transfers, Visa/Mastercard, Skrill, Neteller, and cryptocurrency. UPI is supported as a deposit payment option for traders in India. Card and e-wallet deposits are typically instant; bank wires and crypto withdrawals usually settle within 1–3 business days.',
   },
   {
     q: 'Which trading platforms and devices are supported?',
@@ -207,10 +222,11 @@ export const FOOTER_SERVICES = [
   { label: 'ICO Investments',       href: '/services/ico-coming-soon' },
 ];
 
-export const FOOTER_LINKS = [
-  { label: 'Privacy Policy',   href: '/privacy' },
-  { label: 'Terms of Service', href: '/terms' },
-  { label: 'Risk Disclaimer',  href: '/risk' },
+/* Legal links are now surfaced via the Legal dropdown in NAV_ITEMS.
+   FOOTER_LINKS kept empty so we don't double-list the same routes
+   on the home-page footer bottom bar. */
+export const FOOTER_LINKS: { label: string; href: string }[] = [
+  // intentionally empty — legal nav now lives in the Legal dropdown
 ];
 
 export const COPYRIGHT = `© ${new Date().getFullYear()} SwisDex. All Rights Reserved. · Founded in 2010`;

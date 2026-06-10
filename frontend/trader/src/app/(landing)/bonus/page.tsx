@@ -73,44 +73,43 @@ function adaptApi(t: ApiTier): Tier {
   };
 }
 
-// Fallback that mirrors the original design — renders when the API is
-// unreachable or no active tiers are configured by admin yet. Keeps the
-// page populated rather than going blank on a fresh install.
+// Fallback tiers — bonus matches dollar-for-dollar up to a $200 ceiling.
+// Render this when the admin API is unreachable so the page never goes blank.
 const FALLBACK_TIERS: Tier[] = [
   {
-    range: '$100 – $499',
+    range: '$50 – $99',
     percent: '100%',
-    cap: 'Up to $100',
+    cap: 'Up to $99',
     features: [
       'Auto-credited within minutes',
       'Tradeable on all instruments',
       'Email + chat support',
     ],
-    cta: 'Deposit $100',
+    cta: 'Deposit $50',
   },
   {
-    range: '$500 – $999',
+    range: '$100 – $199',
     percent: '100%',
-    cap: 'Up to $500',
+    cap: 'Up to $199',
     features: [
       'Auto-credited within minutes',
       'Tradeable on all instruments',
       'Priority chat support',
       'Free risk-management webinar',
     ],
-    cta: 'Deposit $500',
+    cta: 'Deposit $100',
   },
   {
-    range: '$1,000+',
+    range: '$200+',
     percent: '100%',
-    cap: 'Up to $1,000',
+    cap: 'Up to $200',
     popular: true,
     features: [
       'Auto-credited within minutes',
       'Tradeable on all instruments',
       'Dedicated account manager',
     ],
-    cta: 'Claim Full $1,000',
+    cta: 'Claim Full $200',
   },
 ];
 
@@ -177,7 +176,7 @@ export default function BonusPage() {
             </h2>
             <p className="mt-4 text-foreground/70 text-sm sm:text-base leading-relaxed max-w-xl">
               SwisDex matches your first deposit with bonus equity that lands in your account within minutes.
-              The bigger the tier you hit, the larger the matched amount — up to a full <span className="text-primary font-semibold">$1,000</span> credited on a $1,000 deposit.
+              The bigger the tier you hit, the larger the matched amount — up to a full <span className="text-primary font-semibold">$200</span> credited on a $200 deposit.
             </p>
             <div className="mt-7 flex flex-wrap gap-3">
               <Link href={SIGNUP_HREF} className="inline-flex items-center gap-2 rounded-full bg-primary text-white px-6 py-3 text-sm font-semibold uppercase tracking-wider hover:opacity-90">
@@ -279,7 +278,7 @@ export default function BonusPage() {
         <ol className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
           {[
             { n: '01', icon: Wallet,      title: 'Open Account',    body: 'Sign up in under 3 minutes. KYC verification is automated and usually completes within 24 hours.' },
-            { n: '02', icon: Gift,        title: 'Make First Deposit', body: 'Deposit at least $100 via crypto, wire, or card. Tier is set automatically based on amount.' },
+            { n: '02', icon: Gift,        title: 'Make First Deposit', body: 'Deposit at least $50 via crypto, wire, or card. Tier is set automatically based on amount.' },
             { n: '03', icon: Zap,         title: 'Bonus Credited',   body: 'Matching bonus lands in your bonus-equity balance within minutes — no manual claim needed.' },
             { n: '04', icon: CheckCircle2, title: 'Trade & Withdraw', body: 'Use the bonus equity to open positions. Withdraw your profits at any time — no holding period.' },
           ].map(({ n, icon: Icon, title, body }) => (

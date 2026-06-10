@@ -64,6 +64,10 @@ const LANGUAGES: Language[] = [
   { code: 'gu',    label: 'ગુજરાતી',        country: 'in' },
   { code: 'pa',    label: 'ਪੰਜਾਬੀ',          country: 'in' },
   { code: 'fa',    label: 'فارسی',         country: 'ir' },
+  // Hebrew: Google Translate still accepts both 'iw' (legacy) and 'he'.
+  // We use 'iw' because the cookie format (`/en/iw`) is what Google
+  // Translate's own dropdown emits, and switching to 'he' breaks the
+  // cookie round-trip with the older Element JS.
   { code: 'iw',    label: 'עברית',         country: 'il' },
   { code: 'uk',    label: 'Українська',   country: 'ua' },
   { code: 'ro',    label: 'Română',       country: 'ro' },
@@ -133,16 +137,18 @@ export function LanguageSwitcher() {
   const pick = useCallback((code: string) => {
     setActive(code);
     setActiveLang(code);
-    // Drive Google's hidden select. If not yet present (initial visit), set
-    // the cookie + reload so Google honours the target language on boot.
-    const select = document.querySelector<HTMLSelectElement>('.goog-te-combo');
-    if (select) {
-      select.value = code;
-      select.dispatchEvent(new Event('change'));
-    } else {
+    setOpen(false);
+
+    // Always reload after setting the cookie. Empirically the most reliable
+    // way to make EVERY language switch take effect — programmatically
+    // dispatching `change` on `.goog-te-combo` works for some target
+    // languages but silently fails for others (Google's widget caches
+    // the previously-selected source/target pair and skips the swap).
+    // A full reload boots Google Translate fresh against the new cookie,
+    // so every language in the picker translates the same way.
+    if (typeof window !== 'undefined') {
       window.location.reload();
     }
-    setOpen(false);
   }, []);
 
   const activeLang  = LANGUAGES.find((l) => l.code === active);
@@ -159,6 +165,12 @@ export function LanguageSwitcher() {
         aria-label={`Change language. Current: ${activeLabel}`}
         className="inline-flex items-center gap-1.5 rounded-full liquid-glass px-3 py-1.5 text-xs font-semibold text-foreground/85 hover:text-foreground transition-colors notranslate"
         translate="no"
+        // Browser extensions (form fillers, password managers, etc.) inject
+        // `fdprocessedid` onto interactive elements after the server HTML
+        // ships but before React hydrates — React then complains about the
+        // attribute mismatch. Suppressing the warning here is the canonical
+        // fix; the attribute is harmless and React still hydrates correctly.
+        suppressHydrationWarning
       >
         <Globe className="size-4" />
         <Flag country={activeCountry} className="hidden sm:inline-block" />

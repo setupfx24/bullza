@@ -31,22 +31,22 @@ const RULES: { keys: string[]; reply: string; cta?: { label: string; href: strin
   {
     keys: ['bonus', 'welcome bonus', '100%', 'promo', 'first deposit bonus'],
     reply:
-      'The 100% Welcome Bonus is applied automatically on your first deposit — no promo code needed. Every tier is a true 100% match, capped at the tier ceiling: $100 deposit → $100 bonus, $500 → $500 bonus, $1,000 or more → full $1,000 match. Maximum bonus is $1,000.',
+      'The 100% Welcome Bonus is applied automatically on your first deposit — no promo code needed. Every tier is a true 100% match capped at $200: $50 deposit → $50 bonus, $100 → $100 bonus, $200 or more → full $200 match. Maximum bonus is $200.',
     cta: [{ label: 'See bonus details', href: '/bonus' }],
   },
   {
     keys: ['minimum deposit', 'min deposit', 'minimum', 'start with', 'how much to start', 'deposit kitna'],
     reply:
-      'Minimum deposit depends on the account type: Standard $50 · ECN $100 · IB $500. A free Demo account with $100,000 virtual funds is also available — no commitment.',
+      'Minimum deposit depends on the account type: Standard $50 · ECN $200 · IB $500. A free Demo account with $100,000 virtual funds is also available — no commitment.',
     cta: [
       { label: 'Compare accounts', href: '/account-types' },
       { label: 'Open account',     href: '/auth/register' },
     ],
   },
   {
-    keys: ['account type', 'accounts', 'standard account', 'ecn', 'demo account', 'pro account'],
+    keys: ['account type', 'accounts', 'standard account', 'ecn', 'demo account', 'pro account', 'swap account', 'islamic account'],
     reply:
-      'We offer 4 account types: Standard ($50 min, beginner-friendly), ECN ($100 min, raw spreads from 0.0 pips), IB ($500 min, partner program), and Demo ($100K virtual). All same platform, same execution.',
+      'We offer 4 account types: Standard ($50 min, beginner-friendly), ECN ($200 min, raw spreads from 0.0 pips), IB ($500 min, partner program), and Swap ($200 min, Sharia-compliant, zero overnight swap). A free Demo with $100K virtual funds is also available.',
     cta: [{ label: 'View all accounts', href: '/account-types' }],
   },
   {
@@ -114,12 +114,13 @@ const RULES: { keys: string[]; reply: string; cta?: { label: string; href: strin
     cta: [{ label: 'Open calculator', href: '/risk-management/calculator' }],
   },
   {
-    keys: ['support', 'help', 'human', 'agent', 'contact', 'live chat', 'speak to someone'],
+    keys: ['support', 'help', 'human', 'agent', 'contact', 'live chat', 'speak to someone', 'whatsapp', 'phone', 'call'],
     reply:
-      "I'm happy to help with anything I can. For a live agent or anything sensitive, please reach our support team directly — they reply within minutes.",
+      "For anything I can't help with, a live agent is one tap away. Pick whichever's easiest — they all reach our 24/7 support team.\n\n💬 WhatsApp: +44 7737119978\n📧 Email: info@swisdex.com\n📍 Office: 18 Young St, Edinburgh EH2 4JB, Scotland, United Kingdom",
     cta: [
-      { label: 'Contact support', href: '/company/contact' },
+      { label: 'WhatsApp us',      href: 'https://wa.me/447737119978' },
       { label: 'Email us',         href: 'mailto:info@swisdex.com' },
+      { label: 'Contact page',     href: '/company/contact' },
     ],
   },
   {

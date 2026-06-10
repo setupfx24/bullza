@@ -81,8 +81,8 @@ const Contact = () => {
     },
     {
       icon: MapPin,
-      title: 'Visit Us',
-      content: 'Office 23US, 18 Young St, UNIT LGE 1/1, Edinburgh EH2 4JB, Scotland',
+      title: '📍 Visit Us — United Kingdom',
+      content: 'Office 23US, 18 Young St, UNIT LGE 1/1, Edinburgh EH2 4JB, Scotland, United Kingdom 🇬🇧',
       link: 'https://www.google.com/maps/search/?api=1&query=18+Young+Street+Edinburgh+EH2+4JB',
     },
   ]
@@ -256,12 +256,40 @@ const Contact = () => {
               Need Immediate Assistance?
             </h2>
             <p className="text-xl text-text-secondary mb-8 max-w-2xl mx-auto">
-              Our live chat support is available 24/7 to answer your questions instantly.
+              Our 24/7 support team is one tap away — WhatsApp, in-app chat, or email.
             </p>
-            <Button variant="primary" onClick={() => setIsChatOpen(true)}>
-              <MessageCircle className="w-5 h-5" />
-              Start Live Chat
-            </Button>
+
+            {/* WhatsApp number details — surfaced alongside the live-chat CTA
+                so visitors don't have to dig through the cards above. */}
+            <div className="mb-6 inline-flex flex-col items-center gap-2">
+              <a
+                href="https://wa.me/447737119978"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-3 px-6 py-3 rounded-2xl bg-[#25D366] text-white font-semibold text-base sm:text-lg shadow-lg hover:opacity-90 transition"
+                aria-label="WhatsApp +44 7737 119978"
+              >
+                <WhatsAppIcon className="w-6 h-6" />
+                WhatsApp: +44 7737 119978
+              </a>
+              <span className="text-xs text-text-secondary">
+                Reply usually within minutes · Available 24/7
+              </span>
+            </div>
+
+            <div className="flex flex-wrap justify-center gap-3">
+              <Button variant="primary" onClick={() => setIsChatOpen(true)}>
+                <MessageCircle className="w-5 h-5" />
+                Start Live Chat
+              </Button>
+              <a
+                href="mailto:info@swisdex.com"
+                className="inline-flex items-center gap-2 px-6 py-3 rounded-xl border border-white/20 text-white font-semibold hover:bg-white/5 transition"
+              >
+                <Mail className="w-5 h-5" />
+                Email us
+              </a>
+            </div>
           </ScrollReveal>
         </div>
       </section>
