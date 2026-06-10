@@ -644,7 +644,12 @@ async def reject_deposit(
 async def approve_withdrawal(
     withdrawal_id: uuid.UUID, admin_id: uuid.UUID, ip_address: str | None, db: AsyncSession,
 ) -> dict:
-    result = await db.execute(select(Withdrawal).where(Withdrawal.id == withdrawal_id))
+    # Lock the withdrawal row FOR UPDATE so two admins (or one
+    # double-click) can't both pass the status==pending check and
+    # debit the user twice (audit finding C3).
+    result = await db.execute(
+        select(Withdrawal).where(Withdrawal.id == withdrawal_id).with_for_update()
+    )
     withdrawal = result.scalar_one_or_none()
     if not withdrawal:
         raise HTTPException(status_code=404, detail="Withdrawal not found")
@@ -652,8 +657,10 @@ async def approve_withdrawal(
         raise HTTPException(status_code=400, detail="Withdrawal is not pending")
 
     if withdrawal.account_id:
+        # Lock the trading account so the balance check + debit are
+        # serialized against concurrent trades / other withdrawals.
         acc_q = await db.execute(
-            select(TradingAccount).where(TradingAccount.id == withdrawal.account_id)
+            select(TradingAccount).where(TradingAccount.id == withdrawal.account_id).with_for_update()
         )
         account = acc_q.scalar_one_or_none()
         if account:
@@ -675,7 +682,9 @@ async def approve_withdrawal(
             )
             db.add(txn)
     else:
-        uw = await db.execute(select(User).where(User.id == withdrawal.user_id))
+        uw = await db.execute(
+            select(User).where(User.id == withdrawal.user_id).with_for_update()
+        )
         user_row = uw.scalar_one_or_none()
         if not user_row:
             raise HTTPException(status_code=400, detail="User not found")

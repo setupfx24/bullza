@@ -1394,12 +1394,14 @@ async def internal_wallet_transfer(req, user_id: UUID, db: AsyncSession) -> dict
 async def transfer_trading_to_main(req, user_id: UUID, db: AsyncSession) -> dict:
     amt = Decimal(str(req.amount))
 
+    # Lock the trading account row so concurrent withdrawals-to-main
+    # can't both pass the free-balance check (audit finding C2).
     acc_q = await db.execute(
         select(TradingAccount).where(
             TradingAccount.id == req.from_account_id,
             TradingAccount.user_id == user_id,
             TradingAccount.is_demo == False,
-        )
+        ).with_for_update()
     )
     account = acc_q.scalar_one_or_none()
     if not account:
@@ -1440,7 +1442,9 @@ async def transfer_trading_to_main(req, user_id: UUID, db: AsyncSession) -> dict
             ),
         )
 
-    user_q = await db.execute(select(User).where(User.id == user_id))
+    user_q = await db.execute(
+        select(User).where(User.id == user_id).with_for_update()
+    )
     user_row = user_q.scalar_one_or_none()
     if not user_row:
         raise HTTPException(status_code=404, detail="User not found")
@@ -1473,7 +1477,12 @@ async def transfer_trading_to_main(req, user_id: UUID, db: AsyncSession) -> dict
 async def transfer_main_to_trading(req, user_id: UUID, db: AsyncSession) -> dict:
     amt = Decimal(str(req.amount))
 
-    user_q = await db.execute(select(User).where(User.id == user_id))
+    # Lock the user row FOR UPDATE so concurrent transfers can't each
+    # pass the balance check and move more than the user holds (audit
+    # finding C2 — double-spend / minting tradeable balance).
+    user_q = await db.execute(
+        select(User).where(User.id == user_id).with_for_update()
+    )
     user_row = user_q.scalar_one_or_none()
     if not user_row:
         raise HTTPException(status_code=404, detail="User not found")

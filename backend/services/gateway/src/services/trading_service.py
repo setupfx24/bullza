@@ -279,6 +279,20 @@ async def place_order(
     if req.order_type == "market":
         fill_price = ask if req.side == "buy" else bid
 
+        # Lock the account row FOR UPDATE before the free-margin check +
+        # balance/margin mutation, so two concurrent market orders can't
+        # both pass `required_margin > free_margin` and over-leverage the
+        # account (audit finding C1). Re-read the locked row so the
+        # margin math below operates on the serialized state.
+        locked_acc = (await db.execute(
+            select(TradingAccount)
+            .options(selectinload(TradingAccount.account_group))
+            .where(TradingAccount.id == account.id)
+            .with_for_update()
+        )).scalar_one_or_none()
+        if locked_acc is not None:
+            account = locked_acc
+
         # Master spread is already baked into bid/ask above (REPLACE
         # mode). The additive markup pass that used to live here is
         # gone — it would have double-counted.
@@ -933,7 +947,13 @@ async def modify_position(position_id: UUID, req, user_id: UUID, db: AsyncSessio
 
 
 async def close_position(position_id: UUID, req, user_id: UUID, db: AsyncSession) -> dict:
-    result = await db.execute(select(Position).where(Position.id == position_id))
+    # Lock the position row FOR UPDATE so two concurrent close calls
+    # can't both pass the status==open check and double-credit P&L /
+    # double-release margin (audit finding C1). The lock is held until
+    # this function's commit/rollback.
+    result = await db.execute(
+        select(Position).where(Position.id == position_id).with_for_update()
+    )
     pos = result.scalar_one_or_none()
     if not pos:
         raise HTTPException(status_code=404, detail="Position not found")
@@ -945,6 +965,7 @@ async def close_position(position_id: UUID, req, user_id: UUID, db: AsyncSession
             TradingAccount.id == pos.account_id,
             TradingAccount.user_id == user_id,
         )
+        .with_for_update()
     )
     account = acct_result.scalar_one_or_none()
     if not account:
