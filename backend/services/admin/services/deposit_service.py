@@ -135,19 +135,38 @@ async def list_all_withdrawals(page: int, per_page: int, status: str | None, db:
 
 async def approve_deposit(
     deposit_id: uuid.UUID, admin_id: uuid.UUID, ip_address: str | None, db: AsyncSession,
+    verified_amount: Decimal | None = None,
 ) -> dict:
-    result = await db.execute(select(Deposit).where(Deposit.id == deposit_id))
+    # Lock the deposit row so a double-click / two admins can't both
+    # approve and credit twice.
+    result = await db.execute(
+        select(Deposit).where(Deposit.id == deposit_id).with_for_update()
+    )
     deposit = result.scalar_one_or_none()
     if not deposit:
         raise HTTPException(status_code=404, detail="Deposit not found")
     if deposit.status != "pending":
         raise HTTPException(status_code=400, detail="Deposit is not pending")
 
+    # Manual deposits carry the amount the USER typed in the form, which
+    # may not match their uploaded proof (audit finding H1 — user claims
+    # $10k on a $100 transfer). When the admin passes a verified_amount
+    # on approval, credit THAT (the amount finance actually confirmed),
+    # not the user-claimed value. Overwrite deposit.amount so every
+    # downstream (bonus brackets, ledger) uses the verified figure.
+    if verified_amount is not None:
+        vamt = Decimal(str(verified_amount))
+        if vamt <= 0:
+            raise HTTPException(status_code=400, detail="Verified amount must be positive")
+        deposit.amount = vamt
+
     deposit.status = "approved"
     deposit.approved_by = admin_id
     deposit.approved_at = datetime.utcnow()
 
-    user_q = await db.execute(select(User).where(User.id == deposit.user_id))
+    user_q = await db.execute(
+        select(User).where(User.id == deposit.user_id).with_for_update()
+    )
     user_row = user_q.scalar_one_or_none()
     if not user_row:
         raise HTTPException(status_code=400, detail="User not found for deposit")

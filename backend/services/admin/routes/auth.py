@@ -45,6 +45,21 @@ async def admin_login(
     response: Response,
     db: AsyncSession = Depends(get_db),
 ):
+    # Brute-force throttle (audit C4) — admin accounts move funds, so
+    # cap login attempts per IP + per submitted email. 5 attempts / 5 min.
+    # Trusts the proxy-set client IP; falls back to the socket peer.
+    from fastapi import HTTPException
+    from packages.common.src.redis_client import throttle
+    xff = (request.headers.get("x-forwarded-for") or "").split(",")
+    client_ip = (xff[0].strip() if xff and xff[0].strip()
+                 else (request.client.host if request.client else "unknown"))
+    email_id = (body.email or "").strip().lower()
+    for ident in (f"ip:{client_ip}", f"email:{email_id}"):
+        if not await throttle("admin_login", ident, max_hits=5, window_sec=300):
+            raise HTTPException(
+                status_code=429,
+                detail="Too many login attempts. Try again in a few minutes.",
+            )
     out = await auth_service.admin_login(body=body, db=db)
     _set_admin_cookie(response, request, out.access_token)
     return out

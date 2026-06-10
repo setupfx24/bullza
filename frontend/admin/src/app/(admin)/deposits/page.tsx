@@ -237,6 +237,7 @@ export default function DepositsPage() {
   const [actionModal, setActionModal] = useState<ActionModal | null>(null);
   const [actionNote, setActionNote] = useState('');
   const [actionReason, setActionReason] = useState('');
+  const [verifiedAmount, setVerifiedAmount] = useState('');
   const [actionLoading, setActionLoading] = useState(false);
 
   const fetchDeposits = useCallback(async () => {
@@ -347,8 +348,23 @@ export default function DepositsPage() {
           : `/finance/withdrawals/${actionModal.id}`;
 
       if (actionModal.type === 'approve') {
+        // For deposit approvals the admin confirms the amount actually
+        // received (proof-verified), which may differ from the figure
+        // the user typed. We credit THAT, not the user-claimed value
+        // (audit H1). Withdrawals carry no verified-amount concept.
+        let verified: number | undefined;
+        if (actionModal.target === 'deposit') {
+          const v = parseFloat(verifiedAmount);
+          if (!Number.isFinite(v) || v <= 0) {
+            toast.error('Enter the verified amount received (must be greater than 0)');
+            setActionLoading(false);
+            return;
+          }
+          verified = v;
+        }
         await adminApi.post(`${basePath}/approve`, {
           note: actionNote.trim() || undefined,
+          verified_amount: verified,
         });
         toast.success('Approved successfully');
       } else {
@@ -361,6 +377,7 @@ export default function DepositsPage() {
       setActionModal(null);
       setActionNote('');
       setActionReason('');
+      setVerifiedAmount('');
 
       if (activeTab === 'deposits') fetchDeposits();
       else fetchWithdrawals();
@@ -561,15 +578,16 @@ export default function DepositsPage() {
                                 <div className="flex items-center justify-end gap-1.5">
                                   <button
                                     type="button"
-                                    onClick={() =>
+                                    onClick={() => {
+                                      setVerifiedAmount(String(d.amount));
                                       setActionModal({
                                         type: 'approve',
                                         target: 'deposit',
                                         id: d.id,
                                         userName: d.user_name,
                                         amount: d.amount,
-                                      })
-                                    }
+                                      });
+                                    }}
                                     className="px-2 py-1 rounded-md text-xxs font-medium bg-success/15 text-success border border-success/30 hover:bg-success/25 transition-fast"
                                   >
                                     Approve
@@ -816,6 +834,7 @@ export default function DepositsPage() {
                   setActionModal(null);
                   setActionNote('');
                   setActionReason('');
+                  setVerifiedAmount('');
                 }}
                 className="p-1 rounded-md text-text-tertiary hover:text-text-primary hover:bg-bg-hover transition-fast"
               >
@@ -834,17 +853,38 @@ export default function DepositsPage() {
               </div>
 
               {actionModal.type === 'approve' ? (
-                <div>
-                  <label className="block text-xxs text-text-tertiary mb-1">
-                    Note (optional)
-                  </label>
-                  <textarea
-                    value={actionNote}
-                    onChange={(e) => setActionNote(e.target.value)}
-                    rows={3}
-                    placeholder="Add an optional note..."
-                    className="w-full px-3 py-2 text-xs bg-bg-input border border-border-primary rounded-md placeholder:text-text-tertiary transition-fast focus:border-buy resize-none"
-                  />
+                <div className="space-y-4">
+                  {actionModal.target === 'deposit' && (
+                    <div>
+                      <label className="block text-xxs text-text-tertiary mb-1">
+                        Verified amount received <span className="text-danger">*</span>
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={verifiedAmount}
+                        onChange={(e) => setVerifiedAmount(e.target.value)}
+                        placeholder="Amount confirmed from proof"
+                        className="w-full px-3 py-2 text-xs bg-bg-input border border-border-primary rounded-md placeholder:text-text-tertiary transition-fast focus:border-buy font-mono tabular-nums"
+                      />
+                      <p className="text-xxs text-text-tertiary mt-1">
+                        This amount is credited — not the user-claimed figure. Confirm against the deposit proof.
+                      </p>
+                    </div>
+                  )}
+                  <div>
+                    <label className="block text-xxs text-text-tertiary mb-1">
+                      Note (optional)
+                    </label>
+                    <textarea
+                      value={actionNote}
+                      onChange={(e) => setActionNote(e.target.value)}
+                      rows={3}
+                      placeholder="Add an optional note..."
+                      className="w-full px-3 py-2 text-xs bg-bg-input border border-border-primary rounded-md placeholder:text-text-tertiary transition-fast focus:border-buy resize-none"
+                    />
+                  </div>
                 </div>
               ) : (
                 <div>
@@ -869,6 +909,7 @@ export default function DepositsPage() {
                   setActionModal(null);
                   setActionNote('');
                   setActionReason('');
+                  setVerifiedAmount('');
                 }}
                 className="px-3 py-1.5 text-xs text-text-secondary border border-border-primary rounded-md hover:bg-bg-hover transition-fast"
               >

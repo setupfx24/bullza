@@ -56,16 +56,30 @@ async def list_all_withdrawals(
     return await deposit_service.list_all_withdrawals(page=page, per_page=per_page, status=status, db=db)
 
 
+class ApproveDepositRequest(BaseModel):
+    # Optional — when set, credits this admin-verified amount instead of
+    # the user-claimed deposit.amount (audit H1). Leave null to approve
+    # the user-submitted amount as-is (e.g. auto-reconciled crypto).
+    verified_amount: float | None = None
+
+
 @router.post("/deposits/{deposit_id}/approve")
 async def approve_deposit(
     deposit_id: uuid.UUID,
     request: Request,
+    body: ApproveDepositRequest | None = None,
     admin: User = Depends(require_permission("deposits.approve")),
     db: AsyncSession = Depends(get_db),
 ):
+    vamt = (
+        Decimal(str(body.verified_amount))
+        if body is not None and body.verified_amount is not None
+        else None
+    )
     return await deposit_service.approve_deposit(
         deposit_id=deposit_id, admin_id=admin.id,
         ip_address=request.client.host if request.client else None, db=db,
+        verified_amount=vamt,
     )
 
 
