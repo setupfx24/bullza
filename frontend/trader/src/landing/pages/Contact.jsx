@@ -239,10 +239,6 @@ const Contact = () => {
                     </p>
                   </div>
                 </Card>
-
-                <div className="glass-card p-8 aspect-video bg-gradient-primary/10 flex items-center justify-center">
-                  <MapPin className="w-24 h-24 text-primary-accent" />
-                </div>
               </div>
             </ScrollReveal>
           </div>
