@@ -3,25 +3,24 @@
 /**
  * Cookie consent dialog.
  *
- * Lifecycle:
- *   1. On every page load / refresh, if no preference is saved in
- *      localStorage, the full 3-tab dialog opens automatically (centered
- *      modal with a dark backdrop). This is the GDPR-standard "explicit
- *      opt-in" pattern — the user has to interact with the dialog
- *      (Save / Accept All / Close) before they reach the site content.
+ * Lifecycle (per the client brief — dialog shows on EVERY visit):
+ *   1. The full 3-tab dialog opens automatically ~600 ms after each
+ *      page load / refresh. Centered modal, dark backdrop with blur.
+ *      Any previously saved preference is pre-loaded into the toggles
+ *      so the user sees their current choice and can re-confirm or
+ *      change it.
  *   2. The dialog has 3 tabs:
  *        - Change Settings (toggles for promotional / preference cookies;
  *          functional is always-on per the brief).
  *        - What are Cookies? (educational copy).
  *        - Why are Cookies Useful? (educational copy).
  *   3. Saving / accepting writes prefs + an ISO timestamp under
- *      `swisdex_cookie_consent` so the dialog never reappears for the
- *      same browser. Closing without saving (X / backdrop click) leaves
- *      localStorage empty — the dialog re-opens on the next visit, which
- *      matches the ePrivacy "no implicit consent" requirement.
- *   4. After a preference is saved, the footer's 'Cookie Settings' link
- *      re-opens the dialog via the exported `openCookieSettings()` helper
- *      so the user can revisit their choice.
+ *      `swisdex_cookie_consent`. The dialog still re-opens on the
+ *      NEXT visit per the client brief — the localStorage entry is
+ *      used to remember the user's current choice for the toggles,
+ *      not to suppress the dialog.
+ *   4. The footer's 'Cookie Settings' link calls openCookieSettings()
+ *      to surface the dialog manually at any time.
  *
  * Mounted once in src/app/layout.tsx so it shows on every route.
  */
@@ -88,22 +87,23 @@ export function CookieConsent() {
   const [tab, setTab] = useState<Tab>('settings');
   const [prefs, setPrefs] = useState<EditablePrefs>(DEFAULT_PREFS);
 
-  // Auto-open the full dialog on every visit until the user has saved a
-  // preference. We delay one tick so the splash screen + initial paint
-  // finish first — the dialog then slides in over the loaded page,
-  // matching the GDPR-standard "first-action consent" pattern.
+  // Auto-open the full dialog on EVERY page load / refresh, per the
+  // client's explicit request. Pre-populate toggles with the previously
+  // saved preference so the user can see and re-confirm their choice
+  // each time. We delay one tick so the splash overlay + first paint
+  // finish first — the dialog then slides in over the loaded page.
   useEffect(() => {
     setMounted(true);
     const existing = readPrefs();
-    if (!existing) {
-      const t = window.setTimeout(() => setShowModal(true), 600);
-      return () => window.clearTimeout(t);
+    if (existing) {
+      setPrefs({
+        functional: true,
+        promotional: existing.promotional,
+        preference: existing.preference,
+      });
     }
-    setPrefs({
-      functional: true,
-      promotional: existing.promotional,
-      preference: existing.preference,
-    });
+    const t = window.setTimeout(() => setShowModal(true), 600);
+    return () => window.clearTimeout(t);
   }, []);
 
   // Listen for footer/nav-triggered open events.
