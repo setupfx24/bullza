@@ -1,28 +1,34 @@
 'use client';
 
 /**
- * Cookie consent banner + settings modal.
+ * Cookie consent dialog.
  *
  * Lifecycle:
- *   1. On first visit (no preference in localStorage), a bottom-fixed
- *      banner appears with a brief explainer + "Manage" / "Accept All".
- *   2. "Manage" opens the full settings modal with 3 tabs:
+ *   1. On every page load / refresh, if no preference is saved in
+ *      localStorage, the full 3-tab dialog opens automatically (centered
+ *      modal with a dark backdrop). This is the GDPR-standard "explicit
+ *      opt-in" pattern — the user has to interact with the dialog
+ *      (Save / Accept All / Close) before they reach the site content.
+ *   2. The dialog has 3 tabs:
  *        - Change Settings (toggles for promotional / preference cookies;
  *          functional is always-on per the brief).
  *        - What are Cookies? (educational copy).
  *        - Why are Cookies Useful? (educational copy).
  *   3. Saving / accepting writes prefs + an ISO timestamp under
- *      `swisdex_cookie_consent` so the banner never reappears for the
- *      same browser. Users can re-open the modal at any time by clicking
- *      "Cookie Settings" in the footer (still TODO — the modal exports
- *      its open state via the module-level `openCookieSettings()` helper).
+ *      `swisdex_cookie_consent` so the dialog never reappears for the
+ *      same browser. Closing without saving (X / backdrop click) leaves
+ *      localStorage empty — the dialog re-opens on the next visit, which
+ *      matches the ePrivacy "no implicit consent" requirement.
+ *   4. After a preference is saved, the footer's 'Cookie Settings' link
+ *      re-opens the dialog via the exported `openCookieSettings()` helper
+ *      so the user can revisit their choice.
  *
  * Mounted once in src/app/layout.tsx so it shows on every route.
  */
 
 import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Cookie, X, Settings, Check } from 'lucide-react';
+import { Cookie, X, Check } from 'lucide-react';
 
 const STORAGE_KEY = 'swisdex_cookie_consent';
 
@@ -78,17 +84,20 @@ type Tab = 'settings' | 'what' | 'why';
 
 export function CookieConsent() {
   const [mounted, setMounted] = useState(false);
-  const [showBanner, setShowBanner] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [tab, setTab] = useState<Tab>('settings');
   const [prefs, setPrefs] = useState<EditablePrefs>(DEFAULT_PREFS);
 
+  // Auto-open the full dialog on every visit until the user has saved a
+  // preference. We delay one tick so the splash screen + initial paint
+  // finish first — the dialog then slides in over the loaded page,
+  // matching the GDPR-standard "first-action consent" pattern.
   useEffect(() => {
     setMounted(true);
     const existing = readPrefs();
     if (!existing) {
-      setShowBanner(true);
-      return;
+      const t = window.setTimeout(() => setShowModal(true), 600);
+      return () => window.clearTimeout(t);
     }
     setPrefs({
       functional: true,
@@ -121,97 +130,24 @@ export function CookieConsent() {
     const all: EditablePrefs = { functional: true, promotional: true, preference: true };
     setPrefs(all);
     writePrefs(all);
-    setShowBanner(false);
     setShowModal(false);
   };
 
   const saveAndClose = () => {
     writePrefs(prefs);
-    setShowBanner(false);
     setShowModal(false);
   };
+
+  // Closing the dialog without explicitly saving leaves localStorage
+  // empty — the dialog will auto-open again on the next visit, which is
+  // the ePrivacy "no implicit consent" requirement.
+  const dismiss = () => setShowModal(false);
 
   if (!mounted) return null;
 
   return (
     <>
-      {/* Bottom banner — shown to first-time visitors only. */}
-      <AnimatePresence>
-        {showBanner && !showModal && (
-          <motion.div
-            initial={{ y: 120, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            exit={{ y: 120, opacity: 0 }}
-            transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
-            className="fixed bottom-4 left-4 right-4 sm:left-6 sm:right-6 z-[200]"
-            role="dialog"
-            aria-label="Cookie consent"
-          >
-            <div
-              className="max-w-4xl mx-auto rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center gap-4"
-              style={{
-                background: 'linear-gradient(135deg, #0d1014 0%, #050608 100%)',
-                border: '1px solid rgba(85,166,48,0.35)',
-                boxShadow: '0 20px 60px rgba(0,0,0,0.55)',
-              }}
-            >
-              <div
-                className="size-11 shrink-0 rounded-xl flex items-center justify-center"
-                style={{
-                  background: 'rgba(85,166,48,0.18)',
-                  border: '1px solid rgba(85,166,48,0.4)',
-                }}
-              >
-                <Cookie className="size-5" style={{ color: '#55a630' }} />
-              </div>
-              <div className="flex-1 min-w-0">
-                <h3
-                  className="font-display uppercase tracking-tight text-base sm:text-lg"
-                  style={{ color: '#ffffff' }}
-                >
-                  We use cookies
-                </h3>
-                <p className="mt-1 text-xs sm:text-sm leading-relaxed" style={{ color: 'rgba(255,255,255,0.7)' }}>
-                  Functional cookies keep your session secure and the platform working. Promotional
-                  and preference cookies are optional. See our{' '}
-                  <a
-                    href="/privacy"
-                    className="underline-offset-2 hover:underline"
-                    style={{ color: '#55a630' }}
-                  >
-                    Privacy Policy
-                  </a>{' '}
-                  for details.
-                </p>
-              </div>
-              <div className="flex items-center gap-2 shrink-0 w-full sm:w-auto">
-                <button
-                  type="button"
-                  onClick={() => setShowModal(true)}
-                  className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 rounded-full px-4 py-2 text-xs font-semibold uppercase tracking-wider hover:opacity-90 transition-opacity"
-                  style={{
-                    color: 'rgba(255,255,255,0.85)',
-                    background: 'transparent',
-                    border: '1px solid rgba(255,255,255,0.2)',
-                  }}
-                >
-                  <Settings className="size-3.5" /> Manage
-                </button>
-                <button
-                  type="button"
-                  onClick={acceptAll}
-                  className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 rounded-full px-4 py-2 text-xs font-semibold uppercase tracking-wider hover:opacity-90 transition-opacity"
-                  style={{ background: '#55a630', color: '#ffffff' }}
-                >
-                  Accept All <Check className="size-3.5" />
-                </button>
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Full settings modal. */}
+      {/* Full cookie-settings dialog. */}
       <AnimatePresence>
         {showModal && (
           <motion.div
@@ -221,7 +157,7 @@ export function CookieConsent() {
             transition={{ duration: 0.2 }}
             className="fixed inset-0 z-[250] flex items-center justify-center p-4"
             style={{ background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(6px)' }}
-            onClick={(e) => { if (e.target === e.currentTarget) setShowModal(false); }}
+            onClick={(e) => { if (e.target === e.currentTarget) dismiss(); }}
             role="dialog"
             aria-modal="true"
             aria-label="Your cookie settings"
