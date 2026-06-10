@@ -185,7 +185,7 @@ const SECTIONS: { h: string; clauses: { n: string; body: string }[] }[] = [
 
 export default function TermsPage() {
   return (
-    <main className="min-h-screen bg-background">
+    <main className="min-h-screen" style={{ background: '#08090b', color: '#f5f5f5' }}>
       <BannerPlaceholder
         title="Terms and Conditions"
         tagline="The rules that govern your use of SwisDex. Read carefully before you trade."

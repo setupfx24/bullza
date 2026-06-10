@@ -102,7 +102,7 @@ const SECTIONS = [
 
 export default function RiskPage() {
   return (
-    <main className="min-h-screen bg-background">
+    <main className="min-h-screen" style={{ background: '#08090b', color: '#f5f5f5' }}>
       <BannerPlaceholder
         title="Risk Disclaimer"
         tagline="Plain-English warnings about the risks of trading forex, CFDs, crypto, and structured-yield products."

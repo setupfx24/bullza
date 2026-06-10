@@ -27,7 +27,7 @@ export default function ContactPage() {
         <div className="max-w-7xl mx-auto px-6 lg:px-8">
           <div className="grid md:grid-cols-3 gap-8 mb-16">
             {[
-              { icon: Phone, title: 'Phone', value: '+1 (908) 228-0305', desc: 'Available 24/7' },
+              { icon: Phone, title: 'WhatsApp', value: '+44 7737 119978', desc: 'Available 24/7' },
               { icon: Mail, title: 'Email', value: 'info@swisdex.com', desc: 'Response within 1 hour' },
               { icon: MessageCircle, title: 'Live Chat', value: 'Chat with us', desc: 'Instant support' },
             ].map(({ icon: Icon, title, value, desc }) => (

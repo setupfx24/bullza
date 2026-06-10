@@ -170,7 +170,7 @@ const SECTIONS: Section[] = [
 
 export default function PrivacyPage() {
   return (
-    <main className="min-h-screen bg-background">
+    <main className="min-h-screen" style={{ background: '#08090b', color: '#f5f5f5' }}>
       <BannerPlaceholder
         title="Privacy Policy"
         tagline="What personal data we collect, why we collect it, and how we keep it safe."
