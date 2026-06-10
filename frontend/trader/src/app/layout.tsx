@@ -11,6 +11,7 @@ import ProfileCompleteGate from '@/components/profile/ProfileCompleteGate';
 import TopLoader from '@/components/TopLoader';
 import GoogleTranslate from '@/components/GoogleTranslate';
 import SplashScreen from '@/components/SplashScreen';
+import { CookieConsent } from '@/swisdex/components/CookieConsent';
 
 export const metadata: Metadata = {
   title: 'SwisDex',
@@ -44,6 +45,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             of every full page load / refresh. Client component; auto-unmounts
             after ~650 ms so it never blocks clicks. */}
         <SplashScreen />
+        {/* GDPR-style cookie banner + settings modal. Shows once on first
+            visit; preferences persist in localStorage. Re-open the modal
+            via openCookieSettings() exported from the same component. */}
+        <CookieConsent />
         {/* Google Translate — loaded client-side after hydration to avoid DOM mismatch */}
         <GoogleTranslate />
         <Suspense fallback={null}>
