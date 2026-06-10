@@ -167,7 +167,7 @@ export function CookieConsent() {
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.96, y: 16 }}
               transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
-              className="w-full max-w-3xl max-h-[92vh] rounded-3xl flex flex-col overflow-hidden"
+              className="w-full max-w-2xl max-h-[80vh] rounded-3xl flex flex-col overflow-hidden"
               style={{
                 background: 'linear-gradient(180deg, #0d1014 0%, #05070a 100%)',
                 border: '1px solid rgba(85,166,48,0.35)',
@@ -207,9 +207,11 @@ export function CookieConsent() {
                 </button>
               </div>
 
-              {/* Tabs */}
+              {/* Tabs — pill style, no border-bottom clipping. Wraps on
+                  narrow screens so 'Why are Cookies Useful?' never goes
+                  off-canvas. */}
               <div
-                className="flex gap-1 px-5 sm:px-6 pt-3 overflow-x-auto"
+                className="flex flex-wrap gap-1.5 px-5 sm:px-6 py-3"
                 style={{ borderBottom: '1px solid rgba(255,255,255,0.08)' }}
               >
                 {(
@@ -225,10 +227,13 @@ export function CookieConsent() {
                       key={key}
                       type="button"
                       onClick={() => setTab(key)}
-                      className="shrink-0 px-3 sm:px-4 py-2.5 text-xs sm:text-sm font-semibold transition-colors"
+                      className="px-3 sm:px-4 py-1.5 rounded-full text-xs sm:text-sm font-semibold transition-colors whitespace-nowrap"
                       style={{
-                        color: active ? '#55a630' : 'rgba(255,255,255,0.55)',
-                        borderBottom: active ? '2px solid #55a630' : '2px solid transparent',
+                        color: active ? '#ffffff' : 'rgba(255,255,255,0.6)',
+                        background: active ? 'rgba(85,166,48,0.22)' : 'transparent',
+                        border: active
+                          ? '1px solid rgba(85,166,48,0.6)'
+                          : '1px solid rgba(255,255,255,0.1)',
                       }}
                       aria-pressed={active}
                     >
@@ -509,6 +514,13 @@ function CookieRow({
   );
 }
 
+/**
+ * iOS-style pill toggle. Knob is positioned via `left` so it stays
+ * inside the track at both extremes — using transform-only positioning
+ * the way the previous version did caused the knob to render past the
+ * right edge on some browsers (the `<span>`'s natural left position
+ * defaulted to the right of the parent in flex/auto contexts).
+ */
 function Toggle({
   on,
   onClick,
@@ -525,20 +537,26 @@ function Toggle({
       aria-checked={on}
       disabled={disabled}
       onClick={onClick}
-      className="relative w-11 h-6 rounded-full transition-colors shrink-0"
+      className="relative rounded-full transition-colors shrink-0"
       style={{
-        background: on ? '#55a630' : 'rgba(255,255,255,0.18)',
-        opacity: disabled ? 0.85 : 1,
+        width: 44,
+        height: 24,
+        background: on ? '#55a630' : 'rgba(255,255,255,0.22)',
+        opacity: disabled ? 0.9 : 1,
         cursor: disabled ? 'not-allowed' : 'pointer',
+        border: '1px solid rgba(255,255,255,0.1)',
       }}
     >
       <span
         aria-hidden
-        className="absolute top-0.5 size-5 rounded-full transition-transform"
+        className="absolute rounded-full transition-all duration-200"
         style={{
+          width: 18,
+          height: 18,
+          top: 2,
+          left: on ? 22 : 2,
           background: '#ffffff',
-          transform: on ? 'translateX(22px)' : 'translateX(2px)',
-          boxShadow: '0 1px 3px rgba(0,0,0,0.35)',
+          boxShadow: '0 1px 3px rgba(0,0,0,0.4)',
         }}
       />
     </button>
