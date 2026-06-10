@@ -44,8 +44,15 @@ class StatsEngine:
         self._running = False
 
     async def _run(self):
+        from packages.common.src.redis_client import acquire_leader_lock
         while self._running:
             try:
+                # Leader lock — under --workers N only one worker runs
+                # stats recompute + management-fee collection, else
+                # duplicate writes / double fee charges (audit C1/C3).
+                if not await acquire_leader_lock("engine:stats:lock", 50):
+                    await asyncio.sleep(STATS_INTERVAL)
+                    continue
                 async with AsyncSessionLocal() as db:
                     await self._recalculate_all(db)
                     await db.commit()

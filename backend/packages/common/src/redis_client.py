@@ -30,6 +30,30 @@ async def get_redis():
     return redis_client
 
 
+async def acquire_leader_lock(key: str, ttl_seconds: int) -> bool:
+    """Best-effort cluster leader lock (Redis SET NX EX).
+
+    Returns True if THIS process acquired the lock for the next
+    `ttl_seconds`, False otherwise. Used by the background engines so
+    that under `uvicorn --workers N` only one worker runs each engine's
+    tick — without this every worker duplicates the work (double
+    overnight fees, double SL/TP closes, etc. — audit findings C1/C3).
+
+    The TTL auto-expires the lock so a crashed leader doesn't wedge the
+    engine: the next tick from any worker re-acquires it. Pick a TTL
+    comfortably larger than the engine's tick interval.
+
+    Never raises — on a Redis hiccup it returns True (fail-open) so the
+    engine keeps running on a single-worker deployment rather than
+    silently halting. Duplicate-execution risk only exists with N>1
+    workers, where Redis is up anyway.
+    """
+    try:
+        return bool(await redis_client.set(key, "1", ex=ttl_seconds, nx=True))
+    except Exception:
+        return True
+
+
 async def publish_price(symbol: str, bid: float, ask: float, timestamp: str):
     import json
     data = json.dumps({
@@ -39,7 +63,14 @@ async def publish_price(symbol: str, bid: float, ask: float, timestamp: str):
         "timestamp": timestamp,
         "spread": round(ask - bid, 8),
     })
-    await redis_client.set(PriceChannel.tick_key(symbol), data)
+    # TTL on tick keys (audit C4/C6 + C1-infra): a dead feed must NOT
+    # leave a stale price in Redis forever — consumers (risk engine,
+    # SL/TP, margin) would act on a frozen price. With a 120s TTL the
+    # key disappears if the feed stops, and the staleness-aware
+    # consumers treat "no tick" as "don't liquidate". The market-data
+    # stale-quote refresher republishes every 30s while a symbol is
+    # live, so a healthy feed keeps the key alive comfortably.
+    await redis_client.set(PriceChannel.tick_key(symbol), data, ex=120)
     await redis_client.publish(PriceChannel.price_channel(symbol), data)
     await redis_client.publish(PriceChannel.PRICE_CHANNEL, data)
 

@@ -15,6 +15,7 @@ import { wsManager } from '@/lib/ws/wsManager';
 import OrderPanelSymbolPicker from '@/components/trading/OrderPanelSymbolPicker';
 import InsuranceTierPicker from '@/components/trading/InsuranceTierPicker';
 import { insuranceApi, type InsuranceTier } from '@/lib/api/insurance';
+import { fmtAccountMoney, isCentAccount } from '@/lib/wallet/centDisplay';
 
 type OrderSide = 'buy' | 'sell';
 type OrderType = 'market' | 'pending';
@@ -78,10 +79,19 @@ export default function OrderPanel() {
   const execPrice = tick ? (side === 'buy' ? tick.ask : tick.bid) : 0;
   const lotsNum = parseFloat(lots) || 0;
 
+  // Cent-account lot scaling (Mig 0069). The backend persists the
+  // position at (typed lots × multiplier), so the margin preview +
+  // the "Insufficient margin" gate must use the SAME effective lots,
+  // or a cent account shows a 100×-too-high margin and falsely blocks
+  // the trade. Standard accounts have multiplier=1 so this is a no-op.
+  const lotMultiplier =
+    (activeAccount?.account_group?.lot_size_multiplier as number | undefined) ?? 1;
+  const effectiveLots = lotsNum * lotMultiplier;
+
   const marginRequired = useMemo(() => {
     if (!execPrice || !activeAccount) return 0;
-    return (lotsNum * contractSize * execPrice) / activeAccount.leverage;
-  }, [execPrice, lotsNum, activeAccount, contractSize]);
+    return (effectiveLots * contractSize * execPrice) / activeAccount.leverage;
+  }, [execPrice, effectiveLots, activeAccount, contractSize]);
 
   const freeMargin = activeAccount?.free_margin || 0;
   const hasEnoughMargin = freeMargin >= marginRequired;
@@ -247,7 +257,7 @@ export default function OrderPanel() {
       if (insuranceChoice && resp?.position_id) {
         try {
           await insuranceApi.activate(resp.position_id, insuranceChoice.tier);
-          toast.success(`Insured ($${insuranceChoice.fee.toFixed(2)} fee)`);
+          toast.success(`Insured (${fmtAccountMoney(insuranceChoice.fee, isCentAccount(activeAccount))} fee)`);
         } catch (e: any) {
           const detail = e?.response?.data?.detail || e?.message || 'insurance_failed';
           toast.error(`Insurance not activated: ${detail}`);
@@ -608,18 +618,27 @@ export default function OrderPanel() {
             </div>
           )}
 
-          {/* Trade Insurance — only on market orders */}
-          {orderTab === 'market' && activeAccount && (
+          {/* Trade Insurance — only on market orders, and only when the
+              account's TYPE has insurance enabled (admin per-type gate,
+              Mig 0070). Default true when the flag is absent so legacy
+              payloads keep showing the picker. */}
+          {orderTab === 'market' && activeAccount &&
+            (activeAccount.account_group?.insurance_enabled ?? true) && (
             <div className="pt-2">
               <InsuranceTierPicker
                 accountId={activeAccount.id}
                 symbol={selectedSymbol}
                 side={side}
-                lots={lotsNum}
+                // Quote on EFFECTIVE (cent-scaled) lots so the fee + the
+                // coverage cap line up with the actual position the
+                // backend opens. Display-side ¢ conversion is handled by
+                // the picker's isCent prop.
+                lots={effectiveLots}
                 leverage={(activeAccount as any).leverage || 100}
                 stopLoss={slEnabled && stopLoss ? parseFloat(stopLoss) : undefined}
                 takeProfit={tpEnabled && takeProfit ? parseFloat(takeProfit) : undefined}
                 onSelect={setInsuranceSelection}
+                isCent={isCentAccount(activeAccount)}
               />
             </div>
           )}
@@ -638,8 +657,11 @@ export default function OrderPanel() {
                       : (execPrice > 0 ? execPrice.toFixed(digits) : '—'),
                     color: 'var(--text-primary)',
                   },
-                  { label: 'Margin Required', value: `$${marginRequired.toFixed(2)}`, color: !hasEnoughMargin ? '#ef5350' : 'var(--text-secondary)' },
-                  { label: 'Free Margin', value: `$${freeMargin.toFixed(2)}`, color: !hasEnoughMargin ? '#ef5350' : '#55a630' },
+                  // Cent-account display rebrand — Mig 0068. Same helper
+                  // the dashboard + terminal status bar use so a cent
+                  // account sees ¢ here too.
+                  { label: 'Margin Required', value: fmtAccountMoney(marginRequired, isCentAccount(activeAccount)), color: !hasEnoughMargin ? '#ef5350' : 'var(--text-secondary)' },
+                  { label: 'Free Margin', value: fmtAccountMoney(freeMargin, isCentAccount(activeAccount)), color: !hasEnoughMargin ? '#ef5350' : '#55a630' },
                   { label: 'Feed', value: isConnected ? '● Connected' : '○ Disconnected', color: isConnected ? '#55a630' : '#f57c00' },
                 ].map((row) => (
                   <div key={row.label} className="flex items-center justify-between">
@@ -692,9 +714,9 @@ export default function OrderPanel() {
               </span>
             </div>
             <div className="flex items-center justify-between gap-1 px-1 text-[9px] text-text-tertiary">
-              <span className="truncate">Mrgn ${marginRequired.toFixed(2)}</span>
+              <span className="truncate">Mrgn {fmtAccountMoney(marginRequired, isCentAccount(activeAccount))}</span>
               <span className={clsx('shrink-0 font-mono', hasEnoughMargin ? 'text-[#55a630]' : 'text-[#ef5350]')}>
-                Free ${freeMargin.toFixed(2)}
+                Free {fmtAccountMoney(freeMargin, isCentAccount(activeAccount))}
               </span>
               <span
                 className={clsx('shrink-0 font-mono', isConnected ? 'text-[#55a630]' : 'text-[#f57c00]')}

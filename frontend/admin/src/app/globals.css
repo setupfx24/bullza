@@ -28,9 +28,9 @@
   --c-border-secondary: 45 45 45;
   --c-border-accent: 60 60 60;
   --c-border-glass: 255 255 255;
-  --c-text-primary: 250 250 250;     /* was 240 — push to near-pure white for max contrast */
-  --c-text-secondary: 200 205 215;   /* was 160 — table header / label readable on bg-secondary */
-  --c-text-tertiary: 150 155 165;    /* was 100 — helper text + placeholders no longer disappear */
+  --c-text-primary: 252 252 252;     /* near-pure white for max contrast */
+  --c-text-secondary: 214 219 228;   /* table header / label readable on bg-secondary */
+  --c-text-tertiary: 176 182 194;    /* helper text + placeholders — pushed brighter again 2026-06-09 */
   --c-text-inverse: 10 10 10;
   --shadow-modal: 0 8px 40px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.05);
   --shadow-dropdown: 0 4px 20px rgba(0, 0, 0, 0.5);
@@ -51,9 +51,9 @@ html.light, [data-theme='light'] {
   --c-border-secondary: 210 210 210;
   --c-border-accent: 180 180 180;
   --c-border-glass: 0 0 0;
-  --c-text-primary: 15 15 15;        /* was 20 — slightly darker for crisp on white */
-  --c-text-secondary: 60 65 75;      /* was 80 — table labels readable on bg-secondary */
-  --c-text-tertiary: 105 110 120;    /* was 130 — helper text visible against light bg */
+  --c-text-primary: 10 10 10;        /* crisp near-black on white */
+  --c-text-secondary: 50 55 65;      /* table labels readable on bg-secondary */
+  --c-text-tertiary: 88 94 104;      /* helper text clearly visible against light bg */
   --c-text-inverse: 255 255 255;
   --shadow-modal: 0 8px 40px rgba(0, 0, 0, 0.12);
   --shadow-dropdown: 0 4px 20px rgba(0, 0, 0, 0.08);
@@ -118,11 +118,19 @@ table td {
   color: rgb(var(--c-text-primary) / 1);
   font-weight: 500;
 }
-/* Helper / footnote prose under tables / forms — was --text-tertiary
-   at 100/100/115 which faded to a smudge on dark bg. The bumped
-   tertiary value already helps; this rule pins the floor so a page
-   that wraps notes in <p class="text-text-tertiary"> still reads. */
+/* Helper / footnote prose under tables / forms. The brighter tertiary
+   value already helps; this rule pins the floor so a page that wraps
+   notes in <p class="text-text-tertiary"> still reads. */
 p, label, span { font-weight: inherit; }
+
+/* Readability floor for the smallest admin text. text-xxs / text-xs
+   are used for dense table labels, helper notes, and pill badges; at
+   their tiny size a 400 weight + tertiary colour reads as a smudge.
+   Nudge their default weight up so the data is legible without
+   touching per-element classes. Elements that set their own
+   font-weight (font-bold, font-semibold) still win via specificity /
+   later declaration. */
+.text-xxs, .text-xs { font-weight: 500; }
 
 ::selection { background-color: rgba(85,166,48, 0.2); }
 

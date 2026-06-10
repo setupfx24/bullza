@@ -51,8 +51,15 @@ class OvernightFeeEngine:
         self._running = False
 
     async def _run(self):
+        from packages.common.src.redis_client import acquire_leader_lock
         while self._running:
             try:
+                # Leader lock — under --workers N only one worker charges,
+                # else the same position gets double overnight fees
+                # (audit C1/C3). TTL covers the charge loop duration.
+                if not await acquire_leader_lock("engine:overnight_fee:lock", 60):
+                    await asyncio.sleep(TICK_INTERVAL)
+                    continue
                 async with AsyncSessionLocal() as db:
                     n = await charge_due_positions(db)
                     if n:

@@ -84,6 +84,9 @@ class AccountTypeIn(BaseModel):
     swap_free: bool = False
     is_demo: bool = False
     is_active: bool = True
+    # Per-account-type Trade Insurance gate (Mig 0070). True = type may
+    # use insurance; False = insurance hidden + blocked for this type.
+    insurance_enabled: bool = True
 
 
 class AccountTypeOut(BaseModel):
@@ -98,6 +101,7 @@ class AccountTypeOut(BaseModel):
     swap_free: bool
     is_demo: bool
     is_active: bool
+    insurance_enabled: bool = True
     created_at: Optional[datetime] = None
 
     class Config:

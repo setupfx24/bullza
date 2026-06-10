@@ -1,4 +1,5 @@
 """Wallet API — Deposits, Withdrawals, Transactions."""
+from datetime import datetime
 from decimal import Decimal
 from typing import Optional
 from uuid import UUID
@@ -267,6 +268,147 @@ async def get_bank_info(
     db: AsyncSession = Depends(get_db),
 ):
     return await wallet_service.get_bank_info(amount=amount, db=db)
+
+
+class RmRequestBody(BaseModel):
+    amount: Decimal
+    phone: str
+    side: str = "deposit"  # 'deposit' or 'withdraw'
+    payout_details: Optional[str] = None  # bank/UPI for withdraw
+    note: Optional[str] = None
+
+
+@router.post("/deposit/rm-request", status_code=201)
+async def create_rm_request(
+    body: RmRequestBody,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    # Client spec 2026-06-09: replaces the P2P-marketplace concept. User
+    # submits name/amount/phone and the gateway emails the relationship
+    # manager — no marketplace, no escrow, no order flow. RM coordinates
+    # the actual payment offline. The body's `side` field lets the same
+    # endpoint power deposit + withdraw flows; payout_details is only
+    # honoured on withdraw.
+    from fastapi import HTTPException
+    from packages.common.src.settings_store import get_bool_setting, get_system_setting
+    from packages.common.src.models import User, Transaction
+    from sqlalchemy import select
+
+    if not await get_bool_setting("wallet.p2p_enabled", False):
+        # The same admin toggle that used to gate the P2P marketplace
+        # now gates this RM-request flow — admin can disable it without
+        # a code deploy if RMs are unavailable.
+        raise HTTPException(
+            status_code=403,
+            detail="Manual RM requests are currently disabled.",
+        )
+
+    amount = Decimal(str(body.amount))
+    if amount <= 0:
+        raise HTTPException(status_code=400, detail="Amount must be positive")
+    phone = (body.phone or "").strip()
+    if len(phone) < 7 or len(phone) > 20:
+        raise HTTPException(status_code=400, detail="Enter a valid phone number")
+    side = (body.side or "deposit").lower()
+    if side not in ("deposit", "withdraw"):
+        raise HTTPException(status_code=400, detail="side must be 'deposit' or 'withdraw'")
+
+    user_row = (await db.execute(
+        select(User).where(User.id == current_user["user_id"])
+    )).scalar_one_or_none()
+    if user_row is None:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    full_name = " ".join(filter(None, [user_row.first_name, user_row.last_name])).strip()
+    if not full_name:
+        full_name = user_row.email or "(unnamed)"
+
+    rm_email = (await get_system_setting("wallet.rm_email", "") or "").strip()
+    if not rm_email:
+        raise HTTPException(
+            status_code=503,
+            detail="RM email is not configured. Please contact support.",
+        )
+
+    # Build a simple, scannable email body the RM can act on without
+    # logging into the platform. No HTML styling for plaintext mode +
+    # a quick HTML version too.
+    subject = (
+        f"[SwisDex] {side.title()} request — {full_name} — "
+        f"${float(amount):,.2f}"
+    )
+    payout_block = (
+        f"\nPayout details: {body.payout_details}\n"
+        if side == "withdraw" and body.payout_details
+        else ""
+    )
+    note_block = f"\nNote: {body.note}\n" if body.note else ""
+
+    text_body = (
+        f"A trader has filed a manual {side} request.\n\n"
+        f"Name: {full_name}\n"
+        f"User ID: {user_row.id}\n"
+        f"Email: {user_row.email or '-'}\n"
+        f"Phone (provided): {phone}\n"
+        f"Amount: ${float(amount):,.2f}\n"
+        f"Type: {side}\n"
+        f"Filed at: {datetime.utcnow().isoformat()}Z"
+        f"{payout_block}{note_block}"
+        f"\nPlease reach out to coordinate payment."
+    )
+    html_body = (
+        f"<p>A trader has filed a manual <b>{side}</b> request.</p>"
+        f"<table cellpadding='6' style='border-collapse:collapse;font-family:Arial,sans-serif;font-size:14px;'>"
+        f"<tr><td><b>Name</b></td><td>{full_name}</td></tr>"
+        f"<tr><td><b>User ID</b></td><td><code>{user_row.id}</code></td></tr>"
+        f"<tr><td><b>Email</b></td><td>{user_row.email or '-'}</td></tr>"
+        f"<tr><td><b>Phone</b></td><td>{phone}</td></tr>"
+        f"<tr><td><b>Amount</b></td><td>${float(amount):,.2f}</td></tr>"
+        f"<tr><td><b>Type</b></td><td>{side}</td></tr>"
+        f"<tr><td><b>Filed at</b></td><td>{datetime.utcnow().isoformat()}Z</td></tr>"
+        + (
+            f"<tr><td><b>Payout</b></td><td>{body.payout_details}</td></tr>"
+            if side == "withdraw" and body.payout_details else ""
+        )
+        + (f"<tr><td><b>Note</b></td><td>{body.note}</td></tr>" if body.note else "")
+        + f"</table><p>Please reach out to coordinate payment.</p>"
+    )
+
+    # Fire the mail. Swallow individual mail failure so the request is
+    # still recorded on the user's ledger — finance can fall back to the
+    # Transaction row if SMTP is briefly down.
+    from packages.common.src.smtp_mail import send_email
+    try:
+        await send_email(
+            rm_email, subject, html_body, text=text_body, category="account",
+        )
+    except Exception as exc:
+        # Don't 500 the user — log audit row + tell them anyway
+        from packages.common.src.instrumentation import logger as _log
+        _log.warning("RM email failed for user=%s: %s", user_row.id, exc)
+
+    # Audit ledger row — finance / support can see every RM request that
+    # ever fired, with the same description the email carried.
+    db.add(Transaction(
+        user_id=user_row.id,
+        type="rm_request",
+        amount=Decimal("0") if side == "withdraw" else -amount,
+        balance_after=Decimal(str(user_row.main_wallet_balance or 0)),
+        description=(
+            f"Manual {side} request — ${float(amount):,.2f} via RM "
+            f"(phone {phone})"
+        ),
+    ))
+    await db.commit()
+
+    return {
+        "status": "submitted",
+        "message": (
+            "Your relationship manager has been notified and will contact "
+            "you within 24 hours to coordinate payment."
+        ),
+    }
 
 
 @router.get("/payment-methods")

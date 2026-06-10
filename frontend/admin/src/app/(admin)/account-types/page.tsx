@@ -19,6 +19,8 @@ interface AccountType {
   swap_free: boolean;
   is_demo: boolean;
   is_active: boolean;
+  // Per-account-type Trade Insurance gate (Mig 0070).
+  insurance_enabled: boolean;
 }
 
 const EMPTY = {
@@ -33,6 +35,7 @@ const EMPTY = {
   swap_free: false,
   is_demo: false,
   is_active: true,
+  insurance_enabled: true,
 };
 
 export default function AccountTypesPage() {
@@ -79,6 +82,7 @@ export default function AccountTypesPage() {
       swap_free: r.swap_free,
       is_demo: r.is_demo,
       is_active: r.is_active,
+      insurance_enabled: r.insurance_enabled ?? true,
     });
     setModal(true);
   };
@@ -104,6 +108,7 @@ export default function AccountTypesPage() {
         swap_free: form.swap_free,
         is_demo: form.is_demo,
         is_active: form.is_active,
+        insurance_enabled: form.insurance_enabled,
       };
       if (editId) {
         await adminApi.put(`/account-types/${editId}`, body);
@@ -210,6 +215,9 @@ export default function AccountTypesPage() {
                   <td className="p-2 text-xxs text-text-secondary">
                     {r.is_demo ? 'demo ' : ''}
                     {r.swap_free ? 'swap-free ' : ''}
+                    {r.insurance_enabled === false && (
+                      <span className="text-warning">no-insurance </span>
+                    )}
                   </td>
                   <td className="p-2">
                     <div className="flex gap-1 justify-end">
@@ -327,6 +335,11 @@ export default function AccountTypesPage() {
               <label className="flex items-center gap-2 text-xs text-text-secondary">
                 <input type="checkbox" checked={form.swap_free} onChange={(e) => u('swap_free', e.target.checked)} />
                 Swap-free
+              </label>
+              <label className="flex items-center gap-2 text-xs text-text-secondary">
+                <input type="checkbox" checked={form.insurance_enabled} onChange={(e) => u('insurance_enabled', e.target.checked)} />
+                Trade Insurance available
+                <span className="text-text-tertiary">— traders on this type can insure trades</span>
               </label>
               <label className="flex items-center gap-2 text-xs text-text-secondary">
                 <input type="checkbox" checked={form.is_demo} onChange={(e) => u('is_demo', e.target.checked)} />

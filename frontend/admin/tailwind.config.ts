@@ -55,13 +55,17 @@ const config: Config = {
         mono: ['var(--font-jetbrains)', 'JetBrains Mono', 'ui-monospace', 'monospace'],
       },
       fontSize: {
-        'xxs': ['10px', { lineHeight: '14px' }],
-        'xs': ['11px', { lineHeight: '16px' }],
-        'sm': ['12px', { lineHeight: '16px' }],
-        'base': ['13px', { lineHeight: '20px' }],
-        'md': ['14px', { lineHeight: '20px' }],
-        'lg': ['16px', { lineHeight: '24px' }],
-        'xl': ['20px', { lineHeight: '28px' }],
+        // Client report 2026-06-09: admin text was unreadable — the
+        // whole scale ran 10–14px. Bumped every tier up ~2px so dense
+        // config tables (Fixed Return, IB Tiers, Charges, Spreads)
+        // read comfortably. Line-heights scaled to match.
+        'xxs': ['12px', { lineHeight: '16px' }],
+        'xs': ['13px', { lineHeight: '18px' }],
+        'sm': ['13px', { lineHeight: '18px' }],
+        'base': ['14px', { lineHeight: '21px' }],
+        'md': ['15px', { lineHeight: '22px' }],
+        'lg': ['17px', { lineHeight: '25px' }],
+        'xl': ['21px', { lineHeight: '29px' }],
         '2xl': ['28px', { lineHeight: '36px' }],
       },
       borderRadius: {

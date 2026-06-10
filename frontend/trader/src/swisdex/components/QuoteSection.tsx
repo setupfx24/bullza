@@ -71,7 +71,12 @@ export function QuoteSection({
               <img
                 src="/images/swisdex_png5.png"
                 alt="SwisDex"
-                className="h-7 w-auto opacity-90"
+                className="h-7 w-auto opacity-90 hidden dark:block"
+              />
+              <img
+                src="/images/swisdex_logo_white.png"
+                alt="SwisDex"
+                className="h-7 w-auto opacity-90 dark:hidden"
               />
               <span className="text-[11px] uppercase tracking-[0.22em] text-foreground/55 font-semibold ml-2">
                 {eyebrow}

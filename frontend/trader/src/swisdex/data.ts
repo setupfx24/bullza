@@ -47,6 +47,15 @@ export const NAV_ITEMS: NavItem[] = [
   },
   { label: 'About',        href: '/company/about' },
   { label: 'Contact',      href: '/company/contact' },
+  {
+    label: 'Legal',
+    href: '/terms',
+    children: [
+      { label: 'Terms & Conditions', href: '/terms' },
+      { label: 'Privacy Policy',     href: '/privacy' },
+      { label: 'Risk Disclaimer',    href: '/risk' },
+    ],
+  },
 ];
 
 export const HERO = {
@@ -213,10 +222,11 @@ export const FOOTER_SERVICES = [
   { label: 'ICO Investments',       href: '/services/ico-coming-soon' },
 ];
 
-export const FOOTER_LINKS = [
-  { label: 'Privacy Policy',   href: '/privacy' },
-  { label: 'Terms of Service', href: '/terms' },
-  { label: 'Risk Disclaimer',  href: '/risk' },
+/* Legal links are now surfaced via the Legal dropdown in NAV_ITEMS.
+   FOOTER_LINKS kept empty so we don't double-list the same routes
+   on the home-page footer bottom bar. */
+export const FOOTER_LINKS: { label: string; href: string }[] = [
+  // intentionally empty — legal nav now lives in the Legal dropdown
 ];
 
 export const COPYRIGHT = `© ${new Date().getFullYear()} SwisDex. All Rights Reserved. · Founded in 2010`;

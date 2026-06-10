@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { ShieldCheck, Loader2 } from 'lucide-react';
 import { insuranceApi, type InsuranceTier, type QuoteRequest, type TierQuote } from '@/lib/api/insurance';
+import { fmtAccountMoney } from '@/lib/wallet/centDisplay';
 
 interface Props {
   accountId: string | undefined;
@@ -13,6 +14,9 @@ interface Props {
   stopLoss?: number;
   takeProfit?: number;
   onSelect: (selection: { tier: InsuranceTier; fee: number } | null) => void;
+  /** Cent-account display flag — when true, fees and caps render as
+   *  ¢ instead of $ (× 100), matching the rest of the trader UI. */
+  isCent?: boolean;
 }
 
 /** Render a tier label sent by the backend. Legacy mode sends
@@ -28,10 +32,15 @@ function formatTierLabel(raw: string): string {
 }
 
 export default function InsuranceTierPicker(props: Props) {
-  const { accountId, symbol, side, lots, leverage, stopLoss, takeProfit, onSelect } = props;
+  const { accountId, symbol, side, lots, leverage, stopLoss, takeProfit, onSelect, isCent } = props;
   const [enabled, setEnabled] = useState(false);
   const [tier, setTier] = useState<InsuranceTier | null>(null);
   const [quotes, setQuotes] = useState<TierQuote[] | null>(null);
+  // Once quotes arrive AND the picker is enabled, default-pick the
+  // CHEAPEST tier so a user who flips the toggle on actually gets
+  // insurance without having to click a card. Client report 2026-06-09:
+  // traders kept turning the toggle on then placing the order and
+  // wondering why no countdown appeared on the position.
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -71,14 +80,27 @@ export default function InsuranceTierPicker(props: Props) {
     };
   }, [enabled, accountId, symbol, side, lots, leverage, stopLoss, takeProfit]);
 
-  /* Bubble selection up. Reset on disable. */
+  /* Single effect: auto-pick the cheapest tier AND bubble the selection
+   * up in the SAME render. Splitting these into two effects left a
+   * window where `tier` was set but onSelect hadn't fired yet — if the
+   * user clicked BUY in that window the order went out with no
+   * insurance selection and the trade opened "Not insured". Doing both
+   * here closes that race. */
   useEffect(() => {
-    if (!enabled || !tier || !quotes) {
+    if (!enabled || !quotes || quotes.length === 0) {
       onSelect(null);
       return;
     }
-    const q = quotes.find((x) => x.tier === tier);
-    if (q) onSelect({ tier, fee: q.fee });
+    // Honour an explicit pick; otherwise default to the cheapest tier.
+    const picked = tier
+      ? quotes.find((x) => x.tier === tier)
+      : [...quotes].sort((a, b) => a.fee - b.fee)[0];
+    if (!picked) {
+      onSelect(null);
+      return;
+    }
+    if (!tier) setTier(picked.tier);
+    onSelect({ tier: picked.tier, fee: picked.fee });
   }, [enabled, tier, quotes, onSelect]);
 
   return (
@@ -112,11 +134,20 @@ export default function InsuranceTierPicker(props: Props) {
             </div>
           )}
           {error && !loading && (
-            <p className="text-xs text-red-400">
+            <p className="text-xs text-amber-400">
               {error === 'insurance_disabled' && 'Insurance is currently disabled.'}
+              {error === 'insurance_disabled_for_account_type' && 'Insurance is not available for this account type.'}
               {error === 'news_blackout' && 'Insurance is paused during the active news window.'}
               {error === 'vol_too_low' && 'Volatility too low — insurance unavailable for this instrument.'}
-              {!['insurance_disabled', 'news_blackout', 'vol_too_low'].includes(error) && 'Could not get a quote — try again.'}
+              {error === 'vol_too_high' && 'Volatility too high — insurance unavailable right now.'}
+              {error === 'hour_blackout' && 'Insurance is paused during this hour window.'}
+              {error.startsWith('max_lots_exceeded')
+                && `This trade is too large to insure. Max insurable size is ${error.split(':')[1] || 'lower'} lots — reduce volume to insure it.`}
+              {![
+                'insurance_disabled', 'insurance_disabled_for_account_type',
+                'news_blackout', 'vol_too_low', 'vol_too_high', 'hour_blackout',
+              ].includes(error) && !error.startsWith('max_lots_exceeded')
+                && 'Could not get a quote — try again.'}
             </p>
           )}
           {quotes && !loading && (
@@ -146,17 +177,17 @@ export default function InsuranceTierPicker(props: Props) {
                   >
                     <p className="text-[10px] uppercase tracking-wider text-text-tertiary">{formatTierLabel(q.tier)}</p>
                     <p className="mt-1 text-sm font-bold tabular-nums" style={{ color: 'var(--text-primary)' }}>
-                      ${q.fee.toFixed(2)}
+                      {fmtAccountMoney(q.fee, !!isCent)}
                     </p>
                     <p className="text-[10px] text-[#55a630] mt-0.5 font-semibold">
                       {q.coverage_pct.toFixed(0)}% covered
                     </p>
                     <p className="text-[10px] text-text-tertiary mt-0.5">
-                      Max ${q.max_cap.toFixed(0)}
+                      Max {fmtAccountMoney(q.max_cap, !!isCent, { decimals: 0 })}
                     </p>
                     {q.estimated_refund > 0 && (
                       <p className="text-[10px] text-text-secondary mt-0.5">
-                        ~${q.estimated_refund.toFixed(2)} if SL hits
+                        ~{fmtAccountMoney(q.estimated_refund, !!isCent)} if SL hits
                       </p>
                     )}
                   </button>

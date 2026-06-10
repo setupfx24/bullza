@@ -26,8 +26,14 @@ class PlayZoneEngine:
         self._running = False
 
     async def _run(self):
+        from packages.common.src.redis_client import acquire_leader_lock
         while self._running:
             try:
+                # Leader lock — only one worker settles rounds, else
+                # double payout under --workers N (audit C1/C3).
+                if not await acquire_leader_lock("engine:play_zone:lock", 50):
+                    await asyncio.sleep(TICK_INTERVAL)
+                    continue
                 async with AsyncSessionLocal() as db:
                     n_lot = await play_zone_service.close_due_lottery_rounds(db)
                     n_bid = await play_zone_service.close_due_bidding_rounds(db)

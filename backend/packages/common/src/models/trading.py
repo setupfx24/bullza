@@ -44,6 +44,23 @@ class AccountGroup(Base):
     is_cent_account = Column(
         Boolean, nullable=False, default=False, server_default="false",
     )
+    # Lot scaling factor applied at order open (Mig 0069). Standard /
+    # ECN / VIP groups = 1.0 (no scaling). Cent group = 0.01, so a
+    # trader-submitted 0.01 lots becomes 0.0001 effective lots on the
+    # Position row — every downstream engine (margin, P&L, swap, SLTP,
+    # copy, risk) does normal math on the smaller number and the
+    # trader's risk genuinely scales 100× down.
+    lot_size_multiplier = Column(
+        Numeric(10, 6), nullable=False, default=1, server_default="1",
+    )
+    # Per-account-type Trade Insurance gate (Mig 0070). Default TRUE so
+    # every type keeps offering insurance. Admin flips off per type to
+    # block insurance for e.g. VIP accounts. Checked by the insurance
+    # /quote + /activate endpoints on top of the global + per-master
+    # gates.
+    insurance_enabled = Column(
+        Boolean, nullable=False, default=True, server_default="true",
+    )
     created_at = Column(DateTime(timezone=True), default=datetime.utcnow)
 
 

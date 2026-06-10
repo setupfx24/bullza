@@ -26,6 +26,7 @@ import {
 } from 'lucide-react';
 import { ActiveAccountBadge } from '@/components/trading/ActiveAccountBadge';
 import ShareTradeModal from '@/components/trading/ShareTradeModal';
+import { fmtAccountMoney, isCentAccount } from '@/lib/wallet/centDisplay';
 
 interface ClosedTrade {
   id: string;
@@ -99,7 +100,11 @@ function estimatePositionMargin(
 ): number | null {
   const inst = instruments.find((i) => i.symbol === pos.symbol);
   if (!inst || !leverage) return null;
-  const notional = pos.lots * inst.contract_size * pos.open_price;
+  // Use engine lots (effective_lots) so the margin / notional estimate
+  // matches the backend for cent accounts. Display lots would overstate
+  // it 100×. Falls back to display lots when absent (standard accounts).
+  const engineLots = pos.effective_lots ?? pos.lots;
+  const notional = engineLots * inst.contract_size * pos.open_price;
   return notional / leverage;
 }
 
@@ -161,6 +166,7 @@ function formatLotsInput(n: number): string {
 function TerminalPositionStaticCard({
   pos,
   digits,
+  isCent,
   marginExposureLine,
   swapsFeeLine,
   onCloseFull,
@@ -168,6 +174,7 @@ function TerminalPositionStaticCard({
 }: {
   pos: Position;
   digits: number;
+  isCent: boolean;
   marginExposureLine: string;
   swapsFeeLine: string;
   onCloseFull: () => void;
@@ -203,7 +210,7 @@ function TerminalPositionStaticCard({
                 : 'bg-red-500/10 border-red-500/20 text-[#ff5252]',
             )}
           >
-            {pnl >= 0 ? '+' : ''}${pnl.toFixed(2)}
+            {pnl >= 0 ? '+' : ''}{fmtAccountMoney(pnl, isCent)}
           </div>
           <div className="flex justify-end gap-0.5 mt-1">
             <span className="text-[8px] font-semibold uppercase px-1 py-0.5 rounded bg-bg-secondary text-text-tertiary">
@@ -773,14 +780,24 @@ export default function PositionsPanel({ variant = 'default' }: PositionsPanelPr
                 />
               </div>
               <div className="flex items-end gap-3 sm:gap-4 md:gap-5 shrink-0 min-w-0 overflow-x-auto scrollbar-none no-scrollbar">
-                {activeAccount ? (
+                {activeAccount ? (() => {
+                  // Cent-account display flag (Mig 0068). When true, every
+                  // money figure in the terminal status bar is multiplied
+                  // by 100 and rendered with ¢ instead of $. The engine
+                  // math + Redis cache stay USD — this is a display-only
+                  // rebrand. Earlier the dashboard + accounts page used
+                  // this helper too (batch #6); now the trading terminal
+                  // follows the same convention so a $5 deposit reads
+                  // as ¢500 here as well.
+                  const isCent = isCentAccount(activeAccount);
+                  return (
                   <>
                     <div className="flex flex-col items-end gap-0.5 shrink-0">
                       <span className="text-[9px] font-semibold uppercase tracking-wide text-text-tertiary leading-none">
                         Balance
                       </span>
                       <span className="text-xs font-mono font-semibold text-text-primary tabular-nums leading-tight">
-                        ${activeAccount.balance.toFixed(2)}
+                        {fmtAccountMoney(activeAccount.balance, isCent)}
                       </span>
                     </div>
                     <div className="flex flex-col items-end gap-0.5 shrink-0">
@@ -793,7 +810,7 @@ export default function PositionsPanel({ variant = 'default' }: PositionsPanelPr
                           totalPnl >= 0 ? 'text-[#55a630]' : 'text-[#ef5350]',
                         )}
                       >
-                        {totalPnl >= 0 ? '+' : ''}${totalPnl.toFixed(2)}
+                        {totalPnl >= 0 ? '+' : ''}{fmtAccountMoney(totalPnl, isCent)}
                       </span>
                     </div>
                     <div className="flex flex-col items-end gap-0.5 shrink-0">
@@ -801,7 +818,7 @@ export default function PositionsPanel({ variant = 'default' }: PositionsPanelPr
                         Equity
                       </span>
                       <span className="text-xs font-mono font-semibold text-text-primary tabular-nums leading-tight">
-                        ${equity.toFixed(2)}
+                        {fmtAccountMoney(equity, isCent)}
                       </span>
                     </div>
                     <div className="flex flex-col items-end gap-0.5 shrink-0">
@@ -809,7 +826,7 @@ export default function PositionsPanel({ variant = 'default' }: PositionsPanelPr
                         Margin Used
                       </span>
                       <span className="text-xs font-mono font-semibold text-text-primary tabular-nums leading-tight">
-                        ${activeAccount.margin_used.toFixed(2)}
+                        {fmtAccountMoney(activeAccount.margin_used, isCent)}
                       </span>
                     </div>
                     <div className="flex flex-col items-end gap-0.5 shrink-0">
@@ -817,7 +834,7 @@ export default function PositionsPanel({ variant = 'default' }: PositionsPanelPr
                         Free Margin
                       </span>
                       <span className="text-xs font-mono font-semibold text-text-primary tabular-nums leading-tight">
-                        ${freeMarginCalc.toFixed(2)}
+                        {fmtAccountMoney(freeMarginCalc, isCent)}
                       </span>
                     </div>
                     <div className="flex flex-col items-end gap-0.5 shrink-0">
@@ -830,7 +847,8 @@ export default function PositionsPanel({ variant = 'default' }: PositionsPanelPr
                       </span>
                     </div>
                   </>
-                ) : null}
+                  );
+                })() : null}
                 {isTerminal && activeTab === 'open' && (
                   <div className="flex items-center gap-1 shrink-0 pb-0.5 border-l border-border-primary ml-1 pl-2">
                     {positions.length > 0 && (
@@ -991,24 +1009,34 @@ export default function PositionsPanel({ variant = 'default' }: PositionsPanelPr
                           const lev = activeAccount?.leverage ?? 100;
                           const m = estimatePositionMargin(pos, instruments, lev);
                           const inst = instruments.find((i) => i.symbol === pos.symbol);
+                          // Engine lots for notional so cent positions
+                          // don't show a 100×-inflated contract value.
+                          const _engineLots = pos.effective_lots ?? pos.lots;
                           const notional =
-                            inst != null ? pos.lots * inst.contract_size * pos.open_price : null;
+                            inst != null ? _engineLots * inst.contract_size * pos.open_price : null;
+                          // Cent-aware money strings for the card view.
+                          // Notional stays in raw $ (it's the symbol's
+                          // contract value, not the user's wallet), but
+                          // margin, swap, and commission are wallet money
+                          // and follow the account's currency.
+                          const _isCent = isCentAccount(activeAccount);
                           const marginExposureLine =
                             m != null && notional != null
-                              ? `$${m.toFixed(2)} / $${notional.toLocaleString('en-US', { maximumFractionDigits: 0 })}`
+                              ? `${fmtAccountMoney(m, _isCent)} / $${notional.toLocaleString('en-US', { maximumFractionDigits: 0 })}`
                               : notional != null
                                 ? `— / $${notional.toLocaleString('en-US', { maximumFractionDigits: 0 })}`
                                 : '— / —';
                           const swapsFeeLine =
                             pos.swap === 0
-                              ? `— / $${pos.commission.toFixed(2)}`
-                              : `$${pos.swap.toFixed(2)} / $${pos.commission.toFixed(2)}`;
+                              ? `— / ${fmtAccountMoney(pos.commission, _isCent)}`
+                              : `${fmtAccountMoney(pos.swap, _isCent)} / ${fmtAccountMoney(pos.commission, _isCent)}`;
 
                           return (
                             <TerminalPositionStaticCard
                               key={pos.id}
                               pos={pos}
                               digits={d}
+                              isCent={isCentAccount(activeAccount)}
                               marginExposureLine={marginExposureLine}
                               swapsFeeLine={swapsFeeLine}
                               onCloseFull={() =>
@@ -1202,10 +1230,10 @@ export default function PositionsPanel({ variant = 'default' }: PositionsPanelPr
                               {pos.current_price != null ? pos.current_price.toFixed(d) : '—'}
                             </td>
                             <td className={clsx(td, 'font-mono font-bold tabular-nums')} style={{ color: pnl >= 0 ? '#2962FF' : '#FF2440' }}>
-                              {pnl >= 0 ? '+' : ''}${pnl.toFixed(2)}
+                              {pnl >= 0 ? '+' : ''}{fmtAccountMoney(pnl, isCentAccount(activeAccount))}
                             </td>
                             <td className={clsx(td, 'font-mono tabular-nums', charges < 0 ? 'text-sell' : 'text-text-secondary')}>
-                              {charges === 0 ? '$0.00' : (charges > 0 ? '+' : '-') + '$' + Math.abs(charges).toFixed(2)}
+                              {charges === 0 ? fmtAccountMoney(0, isCentAccount(activeAccount)) : (charges > 0 ? '+' : '-') + fmtAccountMoney(Math.abs(charges), isCentAccount(activeAccount)).replace('-', '')}
                             </td>
                             <td className={clsx(td, 'text-[10px]')}>
                               {sltpEdit && sltpEdit.positionId === pos.id ? (
@@ -2036,7 +2064,21 @@ function InsuranceCountdown({ pos }: { pos: Position }) {
     return () => clearInterval(id);
   }, [hasInsurance]);
 
-  if (!hasInsurance) return null;
+  // Client report 2026-06-09: when no insurance tier was picked at
+  // order time, the cell was empty and traders didn't know why. Show a
+  // muted "Not insured" chip so the state is visible — and so users
+  // realise insurance is opt-in (pick a tier in the order panel BEFORE
+  // pressing BUY/SELL to get the countdown).
+  if (!hasInsurance) {
+    return (
+      <div
+        className="mt-1 inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-semibold bg-text-tertiary/10 text-text-tertiary border border-text-tertiary/20"
+        title="Pick an insurance tier in the order panel before placing the trade to activate coverage."
+      >
+        Not insured
+      </div>
+    );
+  }
 
   const fmtRemaining = (ms: number): string => {
     if (ms < 0) ms = 0;

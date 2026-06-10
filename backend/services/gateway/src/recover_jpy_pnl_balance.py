@@ -20,11 +20,12 @@ This script:
      balance reflects what the user would have had if the close path
      had been correct from day one.
 
-Safe to re-run: rows already corrected (profit matches recomputed
-value within $0.01) are skipped. We do NOT mutate `trade_history.profit`
-itself — that's audit-immutable. Instead we issue a single Transaction
-of type='adjustment' per affected account so the ledger explains the
-change.
+Safe to re-run: accounts that already carry a JPY_PNL_FX_RECOVERY
+adjustment Transaction are skipped, so a second run can never
+double-refund. We do NOT mutate `trade_history.profit` itself — that's
+audit-immutable. Instead we issue a single Transaction of
+type='adjustment' (tagged JPY_PNL_FX_RECOVERY) per affected account so
+the ledger explains the change AND the next run can detect it.
 
 Run inside gateway container:
     python -m services.gateway.src.recover_jpy_pnl_balance
@@ -45,9 +46,25 @@ from packages.common.src.trading_service import quote_to_account_pnl_async
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)-5s %(message)s")
 logger = logging.getLogger("recover-jpy-pnl")
 
+# Sentinel stamped on the adjustment Transaction. Accounts that already
+# carry an adjustment with this tag are skipped, so re-running the
+# script can NEVER double-refund (audit finding M3 — the old
+# `corrected vs stored` test compared against trade_history.profit,
+# which this script never mutates, so a second run re-applied the same
+# delta). This mirrors the guard in recover_overnight_fees.py.
+RECOVERY_TAG = "JPY_PNL_FX_RECOVERY"
+
 
 async def recover():
     async with AsyncSessionLocal() as db:
+        # Accounts already corrected in a prior run — skip them entirely.
+        already = (await db.execute(
+            select(Transaction.account_id).where(
+                Transaction.type == "adjustment",
+                Transaction.description.contains(RECOVERY_TAG),
+            )
+        )).scalars().all()
+        already_set = {a for a in already if a is not None}
         rows = (await db.execute(
             select(TradeHistory)
             .options(selectinload(TradeHistory.instrument))
@@ -106,6 +123,11 @@ async def recover():
             if abs(diff) < Decimal("0.01"):
                 continue
 
+            # Idempotency: never touch an account that was already
+            # corrected in a previous run.
+            if th.account_id in already_set:
+                continue
+
             deltas[th.account_id] = deltas.get(th.account_id, Decimal("0")) + diff
             affected[th.account_id] = affected.get(th.account_id, 0) + 1
 
@@ -130,7 +152,7 @@ async def recover():
                 amount=delta,
                 balance_after=new_balance,
                 description=(
-                    f"JPY/cross-pair P&L recovery — "
+                    f"{RECOVERY_TAG} — JPY/cross-pair P&L recovery — "
                     f"{affected[account_id]} closed trade(s) recomputed "
                     f"(net {'refund' if delta > 0 else 'debit'} {delta:+.2f} USD)"
                 ),

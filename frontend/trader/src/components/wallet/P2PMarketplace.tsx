@@ -1,337 +1,231 @@
 'use client';
 
 /**
- * Peer-to-peer trade marketplace — XM-style.
+ * Manual deposit/withdraw request — relays user details to the
+ * relationship manager (RM) over email.
  *
- * Renders as a sub-section inside the wallet page's Deposit and Withdraw
- * tabs. `mode="buy"` opens the marketplace in fiat→crypto direction
- * (deposit path); `mode="sell"` flips it for the withdraw path.
+ * Replaces the earlier P2P-marketplace concept per client decision
+ * 2026-06-09. No escrow, no ads, no order matching — just a form that
+ * captures name + amount + phone (+ payout details on withdraw), then
+ * fires an email to the RM the admin configured in system settings
+ * (`wallet.rm_email`).
  *
- * Backend wiring is intentionally generic — the component hits
- * `/api/v1/p2p/ads` with the current filters. While the backend is
- * still being built, an empty list + a "marketplace launching soon"
- * banner is rendered so the UI works end-to-end without crashing.
+ * The component file name stays "P2PMarketplace" so the wallet page's
+ * existing import + the admin's `wallet.p2p_enabled` toggle keep
+ * working without any cross-file rename churn.
  */
-import { useEffect, useMemo, useState } from 'react';
-import { clsx } from 'clsx';
-import {
-  ArrowRightLeft, ShieldCheck, Star, Clock,
-  CheckCircle2, Info, Search, Repeat, Wallet,
-} from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Mail, Phone, CheckCircle2, Loader2, Info } from 'lucide-react';
+import toast from 'react-hot-toast';
 import api from '@/lib/api/client';
+import { useAuthStore } from '@/stores/authStore';
 
 type Side = 'buy' | 'sell';
 
-interface P2PAd {
-  id: string;
-  side: Side;                   // ad poster's side — 'sell' = they sell crypto for fiat
-  asset: string;                 // USDT / BTC / ETH / USDC
-  fiat: string;                  // INR / USD / EUR / PHP / VND / IDR / MYR / NGN / TRY
-  price: number;                 // fiat per 1 unit of asset
-  available: number;             // asset units still available
-  min_fiat: number;
-  max_fiat: number;
-  payment_methods: string[];     // e.g. ['UPI', 'IMPS', 'Bank Transfer']
-  trader_name: string;
-  trader_completed: number;      // total completed trades
-  trader_completion_pct: number; // 0–100
-  release_minutes: number;       // SLA — how long seller takes to release crypto
+interface UserProfile {
+  first_name?: string | null;
+  last_name?: string | null;
+  email?: string | null;
+  phone?: string | null;
 }
 
-const ASSETS = ['USDT', 'BTC', 'ETH', 'USDC'] as const;
-const FIATS = ['INR', 'USD', 'EUR', 'PHP', 'IDR', 'MYR', 'VND', 'NGN', 'TRY'] as const;
-const PAYMENT_METHODS = [
-  'All',
-  'UPI',
-  'IMPS / NEFT',
-  'Bank Transfer',
-  'PayPal',
-  'Wise',
-  'GCash',
-  'Cash',
-] as const;
-
-const ASSET_DECIMALS: Record<string, number> = {
-  USDT: 2, USDC: 2, BTC: 6, ETH: 5,
-};
-
-const fmtAsset = (n: number, asset: string) =>
-  n.toLocaleString('en-US', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: ASSET_DECIMALS[asset] ?? 2,
-  });
-
-const fmtFiat = (n: number, fiat: string) =>
-  n.toLocaleString('en-US', { style: 'currency', currency: fiat, maximumFractionDigits: 2 });
-
 export default function P2PMarketplace({ mode }: { mode: Side }) {
-  // When the user is on the Deposit tab (mode='buy'), they want to BUY
-  // crypto with fiat — i.e. find SELL ads from other users. Vice-versa
-  // on Withdraw. The visible toggle still says Buy/Sell so users see
-  // the universal XM-style language.
-  const [side, setSide] = useState<Side>(mode);
-  const [asset, setAsset] = useState<typeof ASSETS[number]>('USDT');
-  const [fiat, setFiat] = useState<typeof FIATS[number]>('INR');
-  const [paymentMethod, setPaymentMethod] = useState<string>('All');
+  // mode='buy'  → deposit flow (user gives money, RM credits SwisDex balance)
+  // mode='sell' → withdraw flow (user pulls money out via RM)
+  const side: 'deposit' | 'withdraw' = mode === 'buy' ? 'deposit' : 'withdraw';
+  const authUser = useAuthStore((s) => s.user) as UserProfile | null;
+
   const [amount, setAmount] = useState<string>('');
-  const [ads, setAds] = useState<P2PAd[] | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [phone, setPhone] = useState<string>(authUser?.phone || '');
+  const [payoutDetails, setPayoutDetails] = useState<string>('');
+  const [note, setNote] = useState<string>('');
+  const [submitting, setSubmitting] = useState(false);
+  const [done, setDone] = useState(false);
 
-  // Sync the side when the parent flips deposit↔withdraw.
-  useEffect(() => { setSide(mode); }, [mode]);
+  // Re-prime phone when the auth store hydrates after first paint.
+  useEffect(() => {
+    if (!phone && authUser?.phone) setPhone(authUser.phone);
+  }, [authUser?.phone, phone]);
 
-  const fetchAds = useMemo(
-    () => async (signal: AbortSignal) => {
-      setLoading(true);
-      setError(null);
-      try {
-        const q = new URLSearchParams({
-          side,
-          asset,
-          fiat,
-          ...(paymentMethod !== 'All' && { payment_method: paymentMethod }),
-          ...(amount && Number(amount) > 0 && { amount }),
-        });
-        const list = await api.get<P2PAd[]>(`/p2p/ads?${q.toString()}`, undefined, { signal });
-        setAds(Array.isArray(list) ? list : []);
-      } catch (e: any) {
-        if (e?.name === 'AbortError') return;
-        // Backend may not be live yet — surface as empty list + banner
-        // instead of toasting an error every time the user opens the tab.
-        setAds([]);
-        setError(e?.message ?? 'unable to load ads');
-      } finally {
-        setLoading(false);
-      }
-    },
-    [side, asset, fiat, paymentMethod, amount],
+  const fullName = (
+    [authUser?.first_name, authUser?.last_name].filter(Boolean).join(' ').trim()
+    || authUser?.email
+    || '—'
   );
 
-  useEffect(() => {
-    const c = new AbortController();
-    void fetchAds(c.signal);
-    return () => c.abort();
-  }, [fetchAds]);
+  const submit = async () => {
+    const amt = Number(amount);
+    if (!Number.isFinite(amt) || amt <= 0) {
+      toast.error('Enter a valid amount');
+      return;
+    }
+    if (!phone || phone.trim().length < 7) {
+      toast.error('Enter a valid phone number');
+      return;
+    }
+    if (side === 'withdraw' && !payoutDetails.trim()) {
+      toast.error('Add your payout details (UPI ID / bank A/C)');
+      return;
+    }
+    setSubmitting(true);
+    try {
+      await api.post<{ status: string; message: string }>(
+        '/wallet/deposit/rm-request',
+        {
+          amount: amt,
+          phone: phone.trim(),
+          side,
+          payout_details: side === 'withdraw' ? payoutDetails.trim() : undefined,
+          note: note.trim() || undefined,
+        },
+      );
+      setDone(true);
+      toast.success(side === 'deposit'
+        ? 'Request sent — your RM will contact you shortly'
+        : 'Withdrawal request sent — your RM will coordinate payout');
+    } catch (e: any) {
+      toast.error(e?.message || 'Failed to submit request');
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
-  const sideLabel = side === 'buy' ? 'Buy' : 'Sell';
-  const otherSideLabel = side === 'buy' ? 'Sell' : 'Buy';
+  if (done) {
+    return (
+      <div className="rounded-xl border border-accent/20 bg-accent/5 p-6 text-center space-y-3">
+        <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-accent/15">
+          <CheckCircle2 className="w-6 h-6 text-accent" />
+        </div>
+        <div className="text-base font-bold text-text-primary">
+          {side === 'deposit' ? 'Deposit request submitted' : 'Withdrawal request submitted'}
+        </div>
+        <p className="text-xs text-text-tertiary max-w-md mx-auto leading-relaxed">
+          Your relationship manager has been notified by email and will contact
+          you on <span className="text-text-primary font-semibold">{phone}</span>{' '}
+          within <span className="text-text-primary font-semibold">24 hours</span>{' '}
+          to coordinate the payment.
+        </p>
+        <button
+          type="button"
+          onClick={() => { setDone(false); setAmount(''); setNote(''); }}
+          className="mt-2 text-xs text-accent hover:underline"
+        >
+          Submit another request
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">
-      {/* Intro / explainer */}
+      {/* Intro */}
       <div className="rounded-xl border border-accent/20 bg-accent/5 px-4 py-3 flex items-start gap-2.5">
-        <ArrowRightLeft className="w-4 h-4 text-accent shrink-0 mt-0.5" />
+        <Mail className="w-4 h-4 text-accent shrink-0 mt-0.5" />
         <div className="text-xs text-text-secondary leading-relaxed">
-          <span className="text-text-primary font-bold">Peer-to-peer marketplace.</span>{' '}
-          {side === 'buy'
-            ? 'Pick a seller, pay them directly in your local currency, and they release the crypto to your SwisDex wallet from escrow.'
-            : 'Post an offer or accept a buyer\'s. Buyer pays you off-platform; SwisDex holds your crypto in escrow until you confirm and release.'}
-          {' '}Inspired by the XM P2P flow — verified traders only, 24/7 dispute support.
+          <span className="text-text-primary font-bold">
+            Request Manually (Mail to RM).
+          </span>{' '}
+          {side === 'deposit'
+            ? 'Fill the form — your name, amount, and phone number go to your relationship manager by email. They\'ll contact you to coordinate the payment.'
+            : 'Fill the form — your name, amount, phone, and payout details go to your relationship manager by email. They\'ll process your withdrawal manually.'}
         </div>
       </div>
 
-      {/* Buy / Sell toggle */}
-      <div className="flex gap-1 p-1 rounded-xl bg-bg-secondary border border-border-secondary">
-        {(['buy', 'sell'] as Side[]).map((s) => (
-          <button
-            key={s}
-            type="button"
-            onClick={() => setSide(s)}
-            className={clsx(
-              'flex-1 py-2.5 text-xs font-bold uppercase tracking-wider rounded-lg transition-all',
-              side === s
-                ? s === 'buy'
-                  ? 'bg-[#22c55e] text-white'
-                  : 'bg-[#ef4444] text-white'
-                : 'text-text-tertiary hover:text-text-primary',
-            )}
-          >
-            {s === 'buy' ? 'Buy Crypto' : 'Sell Crypto'}
-          </button>
-        ))}
-      </div>
-
-      {/* Filters: asset + fiat + payment method + amount */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-        <Filter title="Asset">
-          <select
-            value={asset}
-            onChange={(e) => setAsset(e.target.value as any)}
-            className="w-full px-3 py-2 rounded-lg bg-bg-secondary border border-border-primary text-sm font-bold text-text-primary outline-none focus:border-accent/50"
-          >
-            {ASSETS.map((a) => <option key={a} value={a}>{a}</option>)}
-          </select>
-        </Filter>
-        <Filter title="Fiat">
-          <select
-            value={fiat}
-            onChange={(e) => setFiat(e.target.value as any)}
-            className="w-full px-3 py-2 rounded-lg bg-bg-secondary border border-border-primary text-sm font-bold text-text-primary outline-none focus:border-accent/50"
-          >
-            {FIATS.map((f) => <option key={f} value={f}>{f}</option>)}
-          </select>
-        </Filter>
-        <Filter title="Payment">
-          <select
-            value={paymentMethod}
-            onChange={(e) => setPaymentMethod(e.target.value)}
-            className="w-full px-3 py-2 rounded-lg bg-bg-secondary border border-border-primary text-sm font-bold text-text-primary outline-none focus:border-accent/50"
-          >
-            {PAYMENT_METHODS.map((p) => <option key={p} value={p}>{p}</option>)}
-          </select>
-        </Filter>
-        <Filter title={`Amount (${fiat})`}>
+      {/* Form */}
+      <div className="space-y-3">
+        <Field label="Name">
           <input
-            type="number"
-            min="0"
-            step="1"
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-            placeholder="Any"
-            className="w-full px-3 py-2 rounded-lg bg-bg-secondary border border-border-primary text-sm font-mono font-bold text-text-primary placeholder:text-text-tertiary outline-none focus:border-accent/50"
+            type="text"
+            value={fullName}
+            disabled
+            className="w-full px-3 py-2.5 rounded-xl border border-border-primary bg-bg-secondary text-text-secondary text-sm cursor-not-allowed opacity-80"
           />
-        </Filter>
-      </div>
+        </Field>
 
-      {/* Ads list */}
-      <div className="rounded-xl border border-border-primary bg-bg-secondary overflow-hidden">
-        <div className="px-4 py-2.5 border-b border-border-primary flex items-center justify-between">
-          <div className="text-[11px] uppercase tracking-wider text-text-tertiary font-bold">
-            {side === 'buy' ? `Sellers offering ${asset} for ${fiat}` : `Buyers wanting ${asset} for ${fiat}`}
+        <Field label={`Amount (USD)${side === 'withdraw' ? ' to withdraw' : ' to deposit'}`}>
+          <div className="relative">
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-text-tertiary font-bold">$</span>
+            <input
+              type="number"
+              min={1}
+              step="0.01"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              placeholder="0.00"
+              className="w-full pl-7 pr-4 py-2.5 rounded-xl border border-border-primary bg-bg-secondary text-text-primary placeholder:text-text-tertiary outline-none focus:border-accent/50 font-mono font-bold text-base"
+            />
           </div>
-          <div className="flex items-center gap-1.5 text-[10px] text-text-tertiary">
-            <ShieldCheck className="w-3 h-3" /> Escrow-protected
+        </Field>
+
+        <Field label="Phone number">
+          <div className="relative">
+            <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-text-tertiary" />
+            <input
+              type="tel"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              placeholder="+91 98765 43210"
+              className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-border-primary bg-bg-secondary text-text-primary placeholder:text-text-tertiary outline-none focus:border-accent/50 text-sm"
+            />
           </div>
+        </Field>
+
+        {side === 'withdraw' && (
+          <Field label="Payout details (UPI ID / bank A/C / IFSC)">
+            <textarea
+              value={payoutDetails}
+              onChange={(e) => setPayoutDetails(e.target.value)}
+              placeholder="e.g. UPI: name@upi  |  Bank: HDFC, A/C 123456789, IFSC HDFC0001234"
+              rows={3}
+              className="w-full px-3 py-2.5 rounded-xl border border-border-primary bg-bg-secondary text-text-primary placeholder:text-text-tertiary outline-none focus:border-accent/50 text-sm resize-none"
+            />
+          </Field>
+        )}
+
+        <Field label={`Note ${'(optional)'}`}>
+          <input
+            type="text"
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            placeholder="Anything the RM should know"
+            maxLength={240}
+            className="w-full px-3 py-2.5 rounded-xl border border-border-primary bg-bg-secondary text-text-primary placeholder:text-text-tertiary outline-none focus:border-accent/50 text-sm"
+          />
+        </Field>
+
+        <button
+          type="button"
+          onClick={() => void submit()}
+          disabled={submitting || !amount || !phone}
+          className="w-full mt-2 py-3 rounded-xl font-bold text-sm uppercase tracking-wider bg-accent text-white disabled:bg-bg-hover disabled:text-text-tertiary disabled:cursor-not-allowed flex items-center justify-center gap-2"
+        >
+          {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
+          {submitting
+            ? 'Sending…'
+            : side === 'deposit'
+            ? 'Submit deposit request'
+            : 'Submit withdrawal request'}
+        </button>
+
+        <div className="flex items-start gap-1.5 text-[11px] text-text-tertiary leading-relaxed mt-1">
+          <Info className="w-3 h-3 shrink-0 mt-0.5" />
+          <span>
+            Your request goes to your relationship manager by email. They reach
+            out within 24 hours. No funds move until you confirm with them.
+          </span>
         </div>
-
-        {loading && (
-          <div className="px-4 py-12 text-center text-text-tertiary text-xs flex items-center justify-center gap-2">
-            <Search className="w-3.5 h-3.5 animate-pulse" /> Loading ads…
-          </div>
-        )}
-
-        {!loading && (ads?.length ?? 0) === 0 && (
-          <div className="px-4 py-10 text-center">
-            <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-accent/10 mb-3">
-              <Repeat className="w-5 h-5 text-accent" />
-            </div>
-            <div className="text-sm font-bold text-text-primary mb-1">
-              P2P Marketplace launching soon
-            </div>
-            <div className="text-xs text-text-tertiary max-w-sm mx-auto leading-relaxed">
-              We&apos;re onboarding verified traders for the SwisDex P2P launch.
-              Until the first ads go live, deposits and withdrawals remain
-              available via the <span className="text-text-primary font-semibold">Crypto</span> and{' '}
-              <span className="text-text-primary font-semibold">{mode === 'buy' ? 'Manual' : 'Bank'}</span> tabs.
-            </div>
-            {error && (
-              <div className="mt-3 text-[10px] text-text-tertiary flex items-center justify-center gap-1.5">
-                <Info className="w-3 h-3" />
-                {error}
-              </div>
-            )}
-          </div>
-        )}
-
-        {!loading && (ads?.length ?? 0) > 0 && (
-          <ul className="divide-y divide-border-primary">
-            {(ads ?? []).map((ad) => (
-              <AdRow key={ad.id} ad={ad} sideLabel={otherSideLabel} />
-            ))}
-          </ul>
-        )}
       </div>
-
-      {/* Post your own ad */}
-      <button
-        type="button"
-        className="w-full py-3 rounded-xl border border-dashed border-border-primary text-xs text-text-tertiary hover:text-text-primary hover:border-accent/50 flex items-center justify-center gap-2"
-        onClick={() => {
-          // Backend endpoint TBD — placeholder navigation to a future create-ad flow.
-          window.location.href = '/wallet/p2p/post';
-        }}
-      >
-        <Wallet className="w-3.5 h-3.5" />
-        Want to {sideLabel.toLowerCase()} your own? Post an ad
-      </button>
     </div>
   );
 }
 
-function Filter({ title, children }: { title: string; children: React.ReactNode }) {
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <label className="block min-w-0">
-      <span className="block text-[10px] uppercase tracking-wider text-text-tertiary mb-1 truncate">
-        {title}
+    <label className="block">
+      <span className="block text-[10px] uppercase tracking-wider text-text-tertiary mb-1">
+        {label}
       </span>
       {children}
     </label>
-  );
-}
-
-function AdRow({ ad, sideLabel }: { ad: P2PAd; sideLabel: string }) {
-  return (
-    <li className="px-4 py-3 grid grid-cols-1 sm:grid-cols-[1.4fr_1fr_1.4fr_auto] gap-3 sm:items-center hover:bg-bg-hover/40">
-      {/* Trader */}
-      <div className="flex items-center gap-2.5">
-        <div className="w-9 h-9 rounded-full bg-accent/20 text-accent grid place-items-center text-xs font-bold shrink-0">
-          {ad.trader_name.slice(0, 2).toUpperCase()}
-        </div>
-        <div className="min-w-0">
-          <div className="text-sm font-bold text-text-primary truncate flex items-center gap-1.5">
-            {ad.trader_name}
-            <CheckCircle2 className="w-3 h-3 text-accent shrink-0" />
-          </div>
-          <div className="text-[10px] text-text-tertiary flex items-center gap-2.5">
-            <span className="flex items-center gap-0.5"><Star className="w-2.5 h-2.5" /> {ad.trader_completion_pct.toFixed(1)}%</span>
-            <span>{ad.trader_completed.toLocaleString('en-US')} trades</span>
-            <span className="flex items-center gap-0.5"><Clock className="w-2.5 h-2.5" /> {ad.release_minutes}m</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Price */}
-      <div className="text-sm">
-        <div className="text-text-primary font-bold tabular-nums">
-          {fmtFiat(ad.price, ad.fiat)}
-        </div>
-        <div className="text-[10px] text-text-tertiary">per 1 {ad.asset}</div>
-      </div>
-
-      {/* Available + limits + methods */}
-      <div className="text-[11px] text-text-secondary leading-snug min-w-0">
-        <div className="tabular-nums">
-          Available <span className="text-text-primary font-semibold">{fmtAsset(ad.available, ad.asset)} {ad.asset}</span>
-        </div>
-        <div className="tabular-nums">
-          Limit{' '}
-          <span className="text-text-primary font-semibold">
-            {fmtFiat(ad.min_fiat, ad.fiat)} – {fmtFiat(ad.max_fiat, ad.fiat)}
-          </span>
-        </div>
-        <div className="flex flex-wrap gap-1 mt-1">
-          {ad.payment_methods.slice(0, 4).map((p) => (
-            <span key={p} className="text-[9px] px-1.5 py-0.5 rounded bg-bg-hover text-text-secondary border border-border-primary">
-              {p}
-            </span>
-          ))}
-        </div>
-      </div>
-
-      {/* CTA */}
-      <button
-        type="button"
-        className={clsx(
-          'px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider sm:justify-self-end',
-          sideLabel === 'Sell' ? 'bg-[#ef4444] text-white' : 'bg-[#22c55e] text-white',
-        )}
-        onClick={() => {
-          window.location.href = `/wallet/p2p/trade/${ad.id}`;
-        }}
-      >
-        {sideLabel} {ad.asset}
-      </button>
-    </li>
   );
 }

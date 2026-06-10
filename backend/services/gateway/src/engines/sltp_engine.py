@@ -52,8 +52,15 @@ class SLTPEngine:
         logger.info("SL/TP engine stopped")
 
     async def _run(self):
+        from packages.common.src.redis_client import acquire_leader_lock
         while self._running:
             try:
+                # Cluster leader lock — under uvicorn --workers N only one
+                # worker runs the SL/TP sweep, else each worker would
+                # close the same position (audit C1/C3). Lock TTL > tick.
+                if not await acquire_leader_lock("engine:sltp:lock", 5):
+                    await asyncio.sleep(CHECK_INTERVAL)
+                    continue
                 await self._load_prices()
                 await self._check_positions()
                 await asyncio.sleep(CHECK_INTERVAL)
@@ -136,6 +143,18 @@ class SLTPEngine:
     async def _close_position(
         self, db: AsyncSession, pos: Position, close_price: Decimal, reason: str
     ):
+        # Idempotent close guard — the b-book matching engine ALSO closes
+        # on SL/TP (audit C2). Atomically flip status open→closed and
+        # only proceed if THIS call won the flip; otherwise another
+        # closer already booked it, so bail before double-crediting.
+        from sqlalchemy import update as _sa_update
+        won = await db.execute(
+            _sa_update(Position)
+            .where(Position.id == pos.id, Position.status == "open")
+            .values(status="closed")
+        )
+        if (won.rowcount or 0) == 0:
+            return  # already closed by another closer — no double booking
         side = _side_val(pos.side)
         contract_size = pos.instrument.contract_size if pos.instrument else Decimal("100000")
 
@@ -143,8 +162,14 @@ class SLTPEngine:
             profit = (close_price - pos.open_price) * pos.lots * contract_size
         else:
             profit = (pos.open_price - close_price) * pos.lots * contract_size
-        from ..services.trading_service import quote_to_account_pnl
-        profit = quote_to_account_pnl(
+        # Cross-pair fix — same family as commits c66e1e2, 3284c59,
+        # a058754, 4b5771a. Sync `quote_to_account_pnl` short-circuits
+        # cross pairs (NZDJPY, EURGBP) to raw quote currency, so SL/TP
+        # triggers on those instruments credited JPY-as-USD profit and
+        # nuked balances silently. Use the async converter that pulls
+        # the live USD/quote rate from Redis.
+        from packages.common.src.trading_service import quote_to_account_pnl_async
+        profit = await quote_to_account_pnl_async(
             profit,
             getattr(pos.instrument, "base_currency", None),
             getattr(pos.instrument, "quote_currency", None),
@@ -163,7 +188,16 @@ class SLTPEngine:
         )
         account = acct_result.scalar_one_or_none()
         if account:
-            margin_release = (pos.lots * contract_size * pos.open_price) / Decimal(str(account.leverage))
+            # Cross-pair margin release fix — same as the trader-side
+            # close path. Raw `lots × cs × price / leverage` is in the
+            # quote currency; on cross pairs that's JPY etc. Convert to
+            # USD before releasing or margin_used leaks every SL/TP fire.
+            from packages.common.src.trading_service import convert_to_account_currency
+            margin_release_raw = (pos.lots * contract_size * pos.open_price) / Decimal(str(account.leverage))
+            margin_release = await convert_to_account_currency(
+                margin_release_raw,
+                getattr(pos.instrument, "quote_currency", None),
+            )
             account.balance += profit
             account.margin_used = max(Decimal("0"), (account.margin_used or Decimal("0")) - margin_release)
             account.equity = account.balance + (account.credit or Decimal("0"))

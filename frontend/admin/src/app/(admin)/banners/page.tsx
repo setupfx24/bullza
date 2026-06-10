@@ -239,7 +239,11 @@ export default function BannersPage() {
                 key={b.id}
                 className="bg-bg-secondary border border-border-primary rounded-md overflow-hidden transition-fast hover:border-border-secondary"
               >
-                <div className="aspect-[16/7] bg-bg-tertiary relative overflow-hidden">
+                {/* Preview uses the same 5:1 aspect ratio the dashboard
+                    renders banners at, so what the admin sees here
+                    matches what the trader sees on /dashboard. Upload
+                    recommendation: 1500×300 px. */}
+                <div className="aspect-[5/1] bg-bg-tertiary relative overflow-hidden">
                   {b.image_url ? (
                     <img
                       src={adminBannerImgSrc(b.image_url)}
@@ -338,7 +342,19 @@ export default function BannersPage() {
                 />
               </div>
               <div>
-                <label className="block text-xxs text-text-tertiary mb-1">Banner image</label>
+                <label className="block text-xxs text-text-tertiary mb-1">
+                  Banner image
+                  {' '}
+                  <span className="text-warning font-semibold">
+                    — recommended size: 1500 × 300 px (5:1 ratio)
+                  </span>
+                </label>
+                <p className="text-xxs text-text-tertiary mt-0.5 mb-2 leading-relaxed">
+                  Banners are displayed at a fixed <b>5:1</b> aspect ratio on
+                  the trader dashboard and in the preview list. Anything
+                  uploaded with a different aspect gets cropped centred —
+                  keep key visuals + text in the safe-zone center.
+                </p>
                 <input ref={fileInputRef} type="file" accept="image/png,image/jpeg,image/webp,image/gif" className="hidden" onChange={onPickFile} />
                 <div className="flex flex-wrap items-center gap-2">
                   <button
@@ -366,8 +382,11 @@ export default function BannersPage() {
                   placeholder="/api/v1/banners/media/… or https://…"
                 />
                 {form.image_url ? (
-                  <div className="mt-2 rounded-md border border-border-primary overflow-hidden bg-bg-tertiary max-h-32">
-                    <img src={adminBannerImgSrc(form.image_url)} alt="Preview" className="w-full h-full object-contain max-h-32" />
+                  // Form preview uses the SAME 5:1 aspect as the real
+                  // dashboard render so admin sees exactly how it'll look
+                  // before saving.
+                  <div className="mt-2 rounded-md border border-border-primary overflow-hidden bg-bg-tertiary aspect-[5/1]">
+                    <img src={adminBannerImgSrc(form.image_url)} alt="Preview" className="w-full h-full object-cover" />
                   </div>
                 ) : null}
               </div>

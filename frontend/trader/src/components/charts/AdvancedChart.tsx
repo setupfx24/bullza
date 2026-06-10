@@ -314,11 +314,30 @@ export default function AdvancedChart() {
       ref={wrapRef}
       className="relative w-full h-full min-h-[200px] min-w-0 bg-bg-base"
     >
-      {/* SwisDex branding lives on the page-level sidebar/header above
-          this chart already — adding another logo here just duplicated.
-          The chart now ships with only the fullscreen toggle, sized to
-          stay clear of TradingView's instrument-name watermark
-          (top-left) and the right-edge controls. */}
+      {/* SwisDex watermark — Vantage-broker-style faint logo centred on
+          the chart canvas. Sits ABOVE the TradingView iframe so it shows
+          through the iframe's coloured background, with pointer-events
+          disabled on the whole subtree so every drag / hover / drawing
+          tool click still reaches the chart underneath.
+          Theme-aware swap mirrors the pattern in 979362e: dark raster
+          on dark mode, white-bg variant on light mode. Lower opacity
+          on dark to keep it subtle on the dark candles; higher on
+          light because the light variant is intentionally faint. */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center select-none"
+      >
+        <img
+          src="/images/swisdex_png5.png"
+          alt=""
+          className="pointer-events-none w-[40%] max-w-[480px] min-w-[200px] object-contain opacity-[0.07] hidden dark:block"
+        />
+        <img
+          src="/images/swisdex_logo_white.png"
+          alt=""
+          className="pointer-events-none w-[40%] max-w-[480px] min-w-[200px] object-contain opacity-[0.10] dark:hidden"
+        />
+      </div>
 
       {/* Timezone picker — click to open dropdown of common timezones.
           Selection persists in localStorage and forces the widget to
