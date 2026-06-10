@@ -37,7 +37,7 @@ const RULES: { keys: string[]; reply: string; cta?: { label: string; href: strin
   {
     keys: ['minimum deposit', 'min deposit', 'minimum', 'start with', 'how much to start', 'deposit kitna'],
     reply:
-      'Minimum deposit depends on the account type: Standard $50 · ECN $200 · IB $500. A free Demo account with $100,000 virtual funds is also available — no commitment.',
+      'Minimum deposit depends on the account type: Standard $50 · ECN $200 · IB $50. A free Demo account with $100,000 virtual funds is also available — no commitment.',
     cta: [
       { label: 'Compare accounts', href: '/account-types' },
       { label: 'Open account',     href: '/auth/register' },
@@ -46,7 +46,7 @@ const RULES: { keys: string[]; reply: string; cta?: { label: string; href: strin
   {
     keys: ['account type', 'accounts', 'standard account', 'ecn', 'demo account', 'pro account', 'swap account', 'islamic account'],
     reply:
-      'We offer 4 account types: Standard ($50 min, beginner-friendly), ECN ($200 min, raw spreads from 0.0 pips), IB ($500 min, partner program), and Swap ($200 min, Sharia-compliant, zero overnight swap). A free Demo with $100K virtual funds is also available.',
+      'We offer 4 account types: Standard ($50 min, beginner-friendly), ECN ($200 min, raw spreads from 0.0 pips), IB ($50 min, partner program), and Swap ($200 min, Sharia-compliant, zero overnight swap). A free Demo with $100K virtual funds is also available.',
     cta: [{ label: 'View all accounts', href: '/account-types' }],
   },
   {

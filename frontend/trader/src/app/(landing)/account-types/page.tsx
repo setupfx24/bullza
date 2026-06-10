@@ -41,7 +41,7 @@ const TIERS: Tier[] = [
     name: 'IB',
     href: '/products/ib-referral',
     badge: 'Partner',
-    deposit: '$500',
+    deposit: '$50',
     spread: 'Lifetime commissions',
     commission: 'Multi-tier earnings',
     desc: 'For partners and introducing brokers. Lifetime per-lot commissions, multi-tier earnings, and a dedicated partner manager.',
@@ -145,7 +145,7 @@ const COLUMN_HEADERS = [
 const INSTRUMENTS = ['Forex', 'Metal', 'Crypto', 'Energies', 'Stocks', 'Indices'];
 
 const FEATURE_ROWS: Array<{ label: string; values: React.ReactNode[] }> = [
-  { label: 'Minimum Deposit',  values: ['$50', '$200', '$500', '$200'] },
+  { label: 'Minimum Deposit',  values: ['$50', '$200', '$50', '$200'] },
   { label: 'Spread',           values: ['From 0.6 pips', 'From 0.4 pips', 'From 0.8 pips', 'From 0.8 pips'] },
   { label: 'Commission',       values: ['No Commission', 'Ultra-low per lot', 'Lifetime per-lot earnings', 'No swap charges'] },
   { label: 'Maximum Leverage', values: ['1:1000', '1:1000', '1:1000', '1:1000'] },
