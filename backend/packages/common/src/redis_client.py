@@ -63,7 +63,14 @@ async def publish_price(symbol: str, bid: float, ask: float, timestamp: str):
         "timestamp": timestamp,
         "spread": round(ask - bid, 8),
     })
-    await redis_client.set(PriceChannel.tick_key(symbol), data)
+    # TTL on tick keys (audit C4/C6 + C1-infra): a dead feed must NOT
+    # leave a stale price in Redis forever — consumers (risk engine,
+    # SL/TP, margin) would act on a frozen price. With a 120s TTL the
+    # key disappears if the feed stops, and the staleness-aware
+    # consumers treat "no tick" as "don't liquidate". The market-data
+    # stale-quote refresher republishes every 30s while a symbol is
+    # live, so a healthy feed keeps the key alive comfortably.
+    await redis_client.set(PriceChannel.tick_key(symbol), data, ex=120)
     await redis_client.publish(PriceChannel.price_channel(symbol), data)
     await redis_client.publish(PriceChannel.PRICE_CHANNEL, data)
 

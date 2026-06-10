@@ -81,11 +81,33 @@ class RiskEngine:
                             continue
 
                         unrealized_pnl = Decimal("0")
+                        # Stale-price guard (audit infra-C1): if ANY open
+                        # position has a missing or stale tick we must NOT
+                        # act on a partial / frozen equity picture — a dead
+                        # feed could otherwise trigger phantom mass stop-outs
+                        # or hide a real one. Flag it and skip the stop-out /
+                        # margin-call decision for this account this tick.
+                        import time as _time
+                        STALE_PRICE_SECONDS = 60.0
+                        now_epoch = _time.time()
+                        stale_price = False
                         for pos in positions:
                             tick_data = await redis_client.get(PriceChannel.tick_key(pos.instrument.symbol))
                             if not tick_data:
+                                stale_price = True
                                 continue
                             tick = json.loads(tick_data)
+                            # Tick timestamp is ISO; treat anything older than
+                            # STALE_PRICE_SECONDS as stale.
+                            _ts = tick.get("timestamp")
+                            if _ts:
+                                try:
+                                    from datetime import datetime as _dt
+                                    _tt = _dt.fromisoformat(str(_ts).replace("Z", "+00:00"))
+                                    if (now_epoch - _tt.timestamp()) > STALE_PRICE_SECONDS:
+                                        stale_price = True
+                                except (ValueError, TypeError):
+                                    pass
                             current_price = Decimal(str(tick["bid"])) if pos.side == OrderSide.BUY else Decimal(str(tick["ask"]))
 
                             if pos.side == OrderSide.BUY:
@@ -112,6 +134,17 @@ class RiskEngine:
                         account.equity = equity
                         account.free_margin = equity - account.margin_used
                         account.margin_level = margin_level
+
+                        # Never liquidate / warn on a stale-price equity
+                        # figure — wait for a fresh feed. Equity fields above
+                        # are still updated (best-effort display), but no
+                        # irreversible action fires.
+                        if stale_price:
+                            logger.warning(
+                                "Skipping stop-out/margin-call for account %s — stale/missing price feed",
+                                account.account_number,
+                            )
+                            continue
 
                         from packages.common.src.settings_store import get_float_setting
                         stop_out = await get_float_setting("stop_out_level", settings.STOP_OUT_LEVEL)
