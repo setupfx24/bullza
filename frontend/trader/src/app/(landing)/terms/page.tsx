@@ -10,70 +10,11 @@
  * surfaced as a download grid above the inline sections.
  */
 import Link from 'next/link';
-import {
-  FileText, ArrowUpRight, ScrollText, ShieldAlert, Mail,
-  Download, ExternalLink, Shield, Wallet, Scale, FileBadge,
-} from 'lucide-react';
+import { FileText, ArrowUpRight, ScrollText, ShieldAlert, Mail } from 'lucide-react';
 import { BannerPlaceholder } from '@/swisdex/components/BannerPlaceholder';
 
-/**
- * Official legal-document PDFs hosted under /public/pdfs/terms.
- * Filenames include spaces and one typo ("privcy", "complient") — those
- * stay as-is in the URL because the files on disk are named that way,
- * but the visible labels are spelled correctly.
- */
-const PDF_DOCS: {
-  title: string;
-  description: string;
-  file: string;
-  sizeKB: number;
-  icon: typeof FileText;
-}[] = [
-  {
-    title: 'Terms & Conditions',
-    description: 'The core agreement between you and SwisDex — eligibility, account rules, and conduct.',
-    file: 'terms and condition.pdf',
-    sizeKB: 24,
-    icon: ScrollText,
-  },
-  {
-    title: 'Privacy Policy',
-    description: 'What personal data we collect, how it is processed, your rights under GDPR / UK-DPA.',
-    file: 'privcy policy.pdf',
-    sizeKB: 29,
-    icon: Shield,
-  },
-  {
-    title: 'Promotional & Service Terms',
-    description: 'Specific rules for welcome bonuses, fixed-return plans, trade insurance, and IB rewards.',
-    file: 'SwisDex Promotional & Service Terms and Conditions.pdf',
-    sizeKB: 24,
-    icon: FileBadge,
-  },
-  {
-    title: 'Deposit & Withdrawal Policy',
-    description: 'Accepted rails, processing windows, fees, and the verification steps for fund movement.',
-    file: 'deposit and withdrawal.pdf',
-    sizeKB: 26,
-    icon: Wallet,
-  },
-  {
-    title: 'Client Fund Security',
-    description: 'Segregated banking, cold storage of crypto, insurance cover, and our negative-balance protection.',
-    file: 'Client Fund Security.pdf',
-    sizeKB: 24,
-    icon: ShieldAlert,
-  },
-  {
-    title: 'Compliance & Dispute Resolution',
-    description: 'Our AML / KYC framework, complaint-handling timelines, and the dispute escalation path.',
-    file: 'complient and dispute.pdf',
-    sizeKB: 22,
-    icon: Scale,
-  },
-];
-
-const pdfHref = (file: string) => `/pdfs/terms/${encodeURI(file)}`;
+/* Official PDF links live in the footer "Legal documents" row now —
+   the on-page PDF grid was removed per client request. */
 
 /**
  * 14 numbered sections preserving the client-PDF wording verbatim.
@@ -201,84 +142,9 @@ export default function TermsPage() {
         </div>
       </section>
 
-      {/* Downloadable official PDFs */}
-      <section
-        id="documents"
-        className="mx-auto max-w-[1100px] px-[var(--gutter)] pt-2 pb-8 sm:pb-12"
-      >
-        <div className="text-center mb-8">
-          <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full liquid-glass text-[11px] uppercase tracking-[0.18em] text-foreground/70">
-            <FileText className="size-3.5 text-primary" /> Official Documents
-          </span>
-          <h2 className="mt-4 font-display uppercase text-2xl sm:text-3xl md:text-4xl tracking-tight">
-            Download the Full Legal Pack
-          </h2>
-          <p className="mt-3 text-foreground/65 max-w-2xl mx-auto text-sm sm:text-base">
-            The signed PDF version of every SwisDex policy — open in your browser to read
-            or download a copy for your records.
-          </p>
-        </div>
-
-        <div className="grid sm:grid-cols-2 gap-4 sm:gap-5">
-          {PDF_DOCS.map(({ title, description, file, sizeKB, icon: Icon }) => (
-            <article
-              key={file}
-              className="liquid-glass rounded-2xl p-5 sm:p-6 flex flex-col gap-4 hover:bg-foreground/[0.03] transition-colors"
-            >
-              <div className="flex items-start gap-4">
-                <div
-                  className="size-12 shrink-0 rounded-xl flex items-center justify-center"
-                  style={{
-                    background: 'hsl(99 55% 42% / 0.18)',
-                    border: '1px solid hsl(99 55% 42% / 0.45)',
-                  }}
-                >
-                  <Icon className="size-5 text-primary" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <h3 className="font-display text-base sm:text-lg uppercase tracking-tight text-foreground">
-                    {title}
-                  </h3>
-                  <p className="mt-1 text-xs sm:text-sm text-foreground/65 leading-relaxed">
-                    {description}
-                  </p>
-                </div>
-              </div>
-
-              <div className="mt-auto flex items-center justify-between gap-3 pt-2 border-t border-foreground/10">
-                <span className="inline-flex items-center gap-1.5 text-[11px] uppercase tracking-[0.14em] text-foreground/55">
-                  <FileText className="size-3.5" />
-                  PDF · {sizeKB} KB
-                </span>
-                <div className="flex items-center gap-2">
-                  <a
-                    href={pdfHref(file)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1.5 rounded-full liquid-glass px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-foreground hover:bg-foreground/5"
-                    aria-label={`View ${title} in a new tab`}
-                  >
-                    View <ExternalLink className="size-3" />
-                  </a>
-                  <a
-                    href={pdfHref(file)}
-                    download={file}
-                    className="inline-flex items-center gap-1.5 rounded-full bg-primary text-white px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wider hover:opacity-90"
-                    aria-label={`Download ${title}`}
-                  >
-                    Download <Download className="size-3" />
-                  </a>
-                </div>
-              </div>
-            </article>
-          ))}
-        </div>
-
-        <p className="mt-6 text-center text-[11px] text-foreground/45 max-w-2xl mx-auto leading-relaxed">
-          Documents are provided in PDF format. If a download fails, right-click the
-          View button and choose &quot;Save link as&quot; to save the file locally.
-        </p>
-      </section>
+      {/* PDF download grid removed per client request — the official
+          signed documents are now linked from the bottom of every page
+          footer as plain text links that open the PDF in a new tab. */}
 
       {/* 14 verbatim PDF sections */}
       <article className="mx-auto max-w-[840px] px-[var(--gutter)] py-8 sm:py-10 space-y-7">

@@ -45,17 +45,16 @@ export const NAV_ITEMS: NavItem[] = [
       { label: 'Insurance',    href: '/products/insurance' },
     ],
   },
-  { label: 'About',        href: '/company/about' },
-  { label: 'Contact',      href: '/company/contact' },
   {
     label: 'Legal',
     href: '/terms',
     children: [
       { label: 'Terms & Conditions', href: '/terms' },
       { label: 'Privacy Policy',     href: '/privacy' },
-      { label: 'Risk Disclaimer',    href: '/risk' },
     ],
   },
+  { label: 'About',        href: '/company/about' },
+  { label: 'Contact',      href: '/company/contact' },
 ];
 
 export const HERO = {
@@ -163,7 +162,7 @@ export const TESTIMONIALS = [
 export const FAQ = [
   {
     q: 'What is the minimum deposit required to start trading?',
-    a: 'Only $50. A first deposit of $50 unlocks the Standard live account; ECN ($200) and IB partner ($500) accounts have their own minimums. A free Demo account with $100,000 in virtual funds is also available — no commitment. Every first deposit also receives a 100% Welcome Bonus (up to $200).',
+    a: 'Only $50. A $50 first deposit unlocks the Standard live account or the IB partner account; ECN starts at $200. A free Demo account with $100,000 in virtual funds is also available — no commitment. Every first deposit also receives a 100% Welcome Bonus (up to $200).',
   },
   {
     q: 'How do I get the 100% Welcome Bonus?',

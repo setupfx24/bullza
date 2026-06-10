@@ -190,7 +190,7 @@ export default function BonusPage() {
           {/* Bonus illustration — branded artwork dropped by the client. */}
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src="/images/bonus_details1.png"
+            src="/images/bonus_details2.png"
             alt="Welcome bonus illustration"
             className="rounded-2xl w-full min-h-[260px] max-h-[340px] object-cover"
             style={{ border: '1px solid hsl(99 55% 42% / 0.35)' }}

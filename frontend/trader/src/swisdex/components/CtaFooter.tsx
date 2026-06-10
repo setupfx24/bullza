@@ -157,22 +157,40 @@ export function CtaFooter() {
             </div>
           </div>
 
-          <div className="border-t border-border pt-8 flex flex-col gap-4">
+          {/* Legal / Policy quick-links — each opens the official signed
+              PDF in a new tab. Drop replacement files at /public/pdfs/terms/
+              with the exact filenames used below. */}
+          <nav
+            aria-label="Legal documents"
+            className="border-t border-border pt-8 flex flex-wrap gap-x-7 gap-y-3"
+          >
+            {[
+              { name: 'Privacy Policy',              href: '/pdfs/terms/privcy%20policy.pdf' },
+              { name: 'Terms & Conditions',          href: '/pdfs/terms/terms%20and%20condition.pdf' },
+              { name: 'AML Policy',                  href: '/pdfs/terms/aml-policy.pdf' },
+              { name: 'Deposit & withdrawal Policy', href: '/pdfs/terms/deposit%20and%20withdrawal.pdf' },
+              { name: 'Restricted Countries',        href: '/pdfs/terms/restricted-countries.pdf' },
+              { name: 'Risk Warning',                href: '/pdfs/terms/risk-warning.pdf' },
+              { name: 'Legal Documents',             href: '/pdfs/terms/SwisDex%20Promotional%20%26%20Service%20Terms%20and%20Conditions.pdf' },
+              { name: 'Risk Disclosure',             href: '/pdfs/terms/Client%20Fund%20Security.pdf' },
+            ].map((doc) => (
+              <a
+                key={doc.name}
+                href={doc.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-body text-sm font-semibold text-foreground/90 hover:text-foreground hover:underline transition-colors"
+              >
+                {doc.name}
+              </a>
+            ))}
+          </nav>
+
+          <div className="border-t border-border pt-8 mt-6 flex flex-col gap-4">
             <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
               <span className="font-body text-xs text-foreground/55 max-w-2xl">
                 {COPYRIGHT}
               </span>
-              <nav className="flex items-center gap-5 flex-wrap">
-                {FOOTER_LINKS.map((l) => (
-                  <Link
-                    key={l.label}
-                    href={l.href}
-                    className="font-body text-xs text-foreground/55 hover:text-foreground/85 transition-colors"
-                  >
-                    {l.label}
-                  </Link>
-                ))}
-              </nav>
             </div>
             <p className="font-body text-[11px] text-foreground/40 leading-relaxed max-w-4xl">
               {RISK_DISCLAIMER}

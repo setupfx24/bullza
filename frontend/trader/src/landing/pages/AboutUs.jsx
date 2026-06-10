@@ -24,7 +24,7 @@ const ACCOUNT_TYPES = [
   {
     icon: Handshake,
     name: 'IB',
-    min: '$500',
+    min: '$50',
     tagline: 'For partners and introducing brokers',
     points: ['Lifetime per-lot commissions', 'Multi-tier earnings', 'Marketing kit and dashboard', 'Dedicated partner manager'],
   },

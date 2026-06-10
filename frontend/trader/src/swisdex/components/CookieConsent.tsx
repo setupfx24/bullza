@@ -3,24 +3,22 @@
 /**
  * Cookie consent dialog.
  *
- * Lifecycle (per the client brief — dialog shows on EVERY visit):
- *   1. The full 3-tab dialog opens automatically ~600 ms after each
- *      page load / refresh. Centered modal, dark backdrop with blur.
- *      Any previously saved preference is pre-loaded into the toggles
- *      so the user sees their current choice and can re-confirm or
- *      change it.
+ * Lifecycle (standard GDPR — dialog shows once, then is suppressed):
+ *   1. On the user's FIRST visit (no localStorage entry yet), the full
+ *      3-tab dialog opens automatically ~600 ms after first paint.
+ *      Centered modal, dark backdrop with blur.
  *   2. The dialog has 3 tabs:
  *        - Change Settings (toggles for promotional / preference cookies;
  *          functional is always-on per the brief).
  *        - What are Cookies? (educational copy).
  *        - Why are Cookies Useful? (educational copy).
  *   3. Saving / accepting writes prefs + an ISO timestamp under
- *      `swisdex_cookie_consent`. The dialog still re-opens on the
- *      NEXT visit per the client brief — the localStorage entry is
- *      used to remember the user's current choice for the toggles,
- *      not to suppress the dialog.
- *   4. The footer's 'Cookie Settings' link calls openCookieSettings()
- *      to surface the dialog manually at any time.
+ *      `swisdex_cookie_consent`. The dialog will NOT auto-open again
+ *      on subsequent visits — the user is no longer interrupted.
+ *   4. Users can revisit the dialog at any time via the footer
+ *      'Cookie Settings' link, which calls openCookieSettings(). The
+ *      dialog re-opens with the previously saved toggles pre-loaded
+ *      so the user can change their mind.
  *
  * Mounted once in src/app/layout.tsx so it shows on every route.
  */
@@ -87,11 +85,11 @@ export function CookieConsent() {
   const [tab, setTab] = useState<Tab>('settings');
   const [prefs, setPrefs] = useState<EditablePrefs>(DEFAULT_PREFS);
 
-  // Auto-open the full dialog on EVERY page load / refresh, per the
-  // client's explicit request. Pre-populate toggles with the previously
-  // saved preference so the user can see and re-confirm their choice
-  // each time. We delay one tick so the splash overlay + first paint
-  // finish first — the dialog then slides in over the loaded page.
+  // Auto-open the full dialog ONLY when no preference is saved yet.
+  // Once the user clicks Save Settings / Enable All, the localStorage
+  // entry suppresses every subsequent auto-open — the user can still
+  // re-surface the dialog via the footer 'Cookie Settings' link, but
+  // the page no longer interrupts them on every load.
   useEffect(() => {
     setMounted(true);
     const existing = readPrefs();
@@ -101,7 +99,10 @@ export function CookieConsent() {
         promotional: existing.promotional,
         preference: existing.preference,
       });
+      return;
     }
+    // No saved preference → schedule the dialog 600 ms after first
+    // paint so the splash overlay finishes first.
     const t = window.setTimeout(() => setShowModal(true), 600);
     return () => window.clearTimeout(t);
   }, []);
