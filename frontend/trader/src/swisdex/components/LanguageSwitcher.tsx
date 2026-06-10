@@ -165,6 +165,12 @@ export function LanguageSwitcher() {
         aria-label={`Change language. Current: ${activeLabel}`}
         className="inline-flex items-center gap-1.5 rounded-full liquid-glass px-3 py-1.5 text-xs font-semibold text-foreground/85 hover:text-foreground transition-colors notranslate"
         translate="no"
+        // Browser extensions (form fillers, password managers, etc.) inject
+        // `fdprocessedid` onto interactive elements after the server HTML
+        // ships but before React hydrates — React then complains about the
+        // attribute mismatch. Suppressing the warning here is the canonical
+        // fix; the attribute is harmless and React still hydrates correctly.
+        suppressHydrationWarning
       >
         <Globe className="size-4" />
         <Flag country={activeCountry} className="hidden sm:inline-block" />
