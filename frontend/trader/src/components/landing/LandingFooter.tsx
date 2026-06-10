@@ -40,7 +40,7 @@ export default function LandingFooter() {
         <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-10 mb-10">
           <div className="lg:col-span-2">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/images/swisdex_png5.png" alt="SwisDex" className="h-10 w-auto mb-4" />
+            <img src="/images/swisdex_png.png" alt="SwisDex" className="h-10 w-auto mb-4" />
             <p className="text-sm leading-relaxed mb-3 max-w-sm" style={{ color: 'rgba(255,255,255,0.6)' }}>
               Professional multi-asset trading platform. Licensed under Investment Dealer Licence
               No. MAK21098161, St. Lucia.

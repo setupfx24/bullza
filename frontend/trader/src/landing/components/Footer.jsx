@@ -68,7 +68,7 @@ export default function Footer() {
             <ScrollReveal variant="fadeLeft">
               <Link href="/" className="inline-block mb-5" aria-label="SwisDex home">
                 <img src="/images/swisdex_png5.png" alt="SwisDex" className="h-10 w-auto hidden dark:block" />
-                <img src="/images/swisdex_logo_white.png" alt="SwisDex" className="h-10 w-auto dark:hidden" />
+                <img src="/images/swisdex_png.png" alt="SwisDex" className="h-10 w-auto dark:hidden" />
               </Link>
               <p className="text-sm leading-relaxed max-w-sm mb-6" style={{ color: 'var(--fx-text-2)' }}>
                 SwisDex is an institutional-grade forex, CFD broker, and decentralized exchange

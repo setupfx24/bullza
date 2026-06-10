@@ -80,7 +80,7 @@ export default function Navbar() {
               className="h-10 md:h-11 w-auto object-contain transition-transform duration-300 group-hover:scale-[1.03] hidden dark:block"
             />
             <img
-              src="/images/swisdex_logo_white.png"
+              src="/images/swisdex_png.png"
               alt="SwisDex"
               className="h-10 md:h-11 w-auto object-contain transition-transform duration-300 group-hover:scale-[1.03] dark:hidden"
             />

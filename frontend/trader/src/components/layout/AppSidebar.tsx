@@ -116,7 +116,7 @@ export default function AppSidebar() {
               className="h-9 w-auto object-contain shrink-0 hidden dark:block"
             />
             <img
-              src="/images/swisdex_logo_white.png"
+              src="/images/swisdex_png.png"
               alt="SwisDex"
               className="h-9 w-auto object-contain shrink-0 dark:hidden"
             />

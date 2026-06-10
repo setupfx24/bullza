@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from packages.common.src.database import get_db
-from dependencies import get_current_admin
+from dependencies import get_current_admin, require_permission
 from packages.common.src.models import User
 from packages.common.src.admin_schemas import SystemSettingUpdate
 from services import settings_service
@@ -22,7 +22,11 @@ async def list_settings(
 async def update_settings(
     body: SystemSettingUpdate,
     request: Request,
-    admin: User = Depends(get_current_admin),
+    # System settings include money-flow flags (allow_withdrawals,
+    # maintenance_mode, welcome-bonus brackets, wallet.*). Was reachable
+    # by any employee — now requires settings.manage (held by no employee
+    # role → super_admin only) (audit M1).
+    admin: User = Depends(require_permission("settings.manage")),
     db: AsyncSession = Depends(get_db),
 ):
     return await settings_service.update_settings(

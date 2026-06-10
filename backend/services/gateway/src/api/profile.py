@@ -163,7 +163,19 @@ async def get_kyc_file(
     file_path = await profile_service.get_kyc_file(
         user_id=current_user["user_id"], document_id=doc_id, db=db,
     )
-    return FileResponse(str(file_path))
+    # Force download, never inline render (security review F2): serving a
+    # user-uploaded file inline same-origin is a stored-XSS vector if a
+    # renderable type ever slips past the upload check. octet-stream +
+    # attachment + nosniff makes the browser save it instead of executing.
+    import os as _os
+    return FileResponse(
+        str(file_path),
+        media_type="application/octet-stream",
+        headers={
+            "Content-Disposition": f'attachment; filename="{_os.path.basename(str(file_path))}"',
+            "X-Content-Type-Options": "nosniff",
+        },
+    )
 
 
 # ── Wallet linking (SIWE) ───────────────────────────────────────────────────

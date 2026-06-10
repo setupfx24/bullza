@@ -59,6 +59,16 @@ def hash_token(token: str) -> str:
     return hashlib.sha256(token.encode()).hexdigest()
 
 
+def password_epoch(password_hash: str | None) -> str:
+    """Short, stable fingerprint of a user's bcrypt hash, embedded in
+    admin JWTs as the `pe` claim (audit H2). It lets us revoke every
+    outstanding token — access AND refresh — the instant the password
+    changes, with no token-version table / migration: a new hash yields
+    a new fingerprint, so any token minted against the old password no
+    longer validates. The bcrypt hash itself never leaves the server."""
+    return hashlib.sha256((password_hash or "").encode()).hexdigest()[:16]
+
+
 # ─── Email-verify token (separate JWT type, can't be used as a session) ──
 
 def create_email_verify_token(user_id: str, *, expires_hours: int = 24) -> tuple[str, datetime]:

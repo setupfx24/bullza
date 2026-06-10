@@ -30,6 +30,23 @@ async def get_redis():
     return redis_client
 
 
+async def throttle(bucket: str, identity: str, max_hits: int, window_sec: int) -> bool:
+    """Fixed-window rate limiter. Returns True if the call is ALLOWED,
+    False if `identity` has exceeded `max_hits` in the last
+    `window_sec` for `bucket`. Used to throttle admin login brute-force
+    (audit C4). Fail-OPEN on Redis error (don't lock admins out if
+    Redis hiccups) — the window is short so the exposure is bounded.
+    """
+    try:
+        key = f"throttle:{bucket}:{identity}"
+        n = await redis_client.incr(key)
+        if n == 1:
+            await redis_client.expire(key, window_sec)
+        return int(n) <= max_hits
+    except Exception:
+        return True
+
+
 async def acquire_leader_lock(key: str, ttl_seconds: int) -> bool:
     """Best-effort cluster leader lock (Redis SET NX EX).
 

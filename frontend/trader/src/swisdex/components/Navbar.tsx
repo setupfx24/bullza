@@ -269,7 +269,7 @@ export function Navbar() {
                 className="h-8 w-auto object-contain hidden dark:block"
               />
               <img
-                src="/images/swisdex_logo_white.png"
+                src="/images/swisdex_png.png"
                 alt={BRAND.name}
                 className="h-8 w-auto object-contain dark:hidden"
               />

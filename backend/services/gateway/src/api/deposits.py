@@ -17,9 +17,17 @@ from packages.common.src.schemas import (
     WithdrawalRequest,
 )
 from packages.common.src.auth import get_current_user
+from packages.common.src.rate_limit import check_rate_limit
 from ..services import wallet_service
 
 router = APIRouter()
+
+# Per-user throttle on money-out endpoints (security review). A
+# legitimate trader withdraws a handful of times a day; an
+# account-takeover or scripted-abuse attempt hammers it. 10 attempts /
+# 10 min per user, on top of nginx's coarse per-IP cap.
+WITHDRAW_MAX_PER_WINDOW = 10
+WITHDRAW_WINDOW_SEC = 600
 
 
 @router.post("/deposit", status_code=201)
@@ -133,6 +141,10 @@ async def create_withdrawal(
     current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    await check_rate_limit(
+        "withdraw", str(current_user["user_id"]),
+        max_requests=WITHDRAW_MAX_PER_WINDOW, window_sec=WITHDRAW_WINDOW_SEC,
+    )
     return await wallet_service.create_withdrawal(
         req=req, user_id=current_user["user_id"], db=db,
     )
@@ -150,6 +162,10 @@ async def create_manual_withdrawal(
     """Manual payout: user provides UPI ID and/or a QR image for finance to pay out (main wallet)."""
     from fastapi import HTTPException
     from packages.common.src.settings_store import get_bool_setting
+    await check_rate_limit(
+        "withdraw", str(current_user["user_id"]),
+        max_requests=WITHDRAW_MAX_PER_WINDOW, window_sec=WITHDRAW_WINDOW_SEC,
+    )
     if not await get_bool_setting("wallet.manual_enabled", True):
         raise HTTPException(
             status_code=403,

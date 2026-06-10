@@ -103,8 +103,24 @@ async def create_payment(
 
 
 def verify_webhook_signature(raw_body: bytes, received_hmac: str) -> bool:
-    """Verify HMAC-SHA512 signature on an OxaPay webhook request."""
+    """Verify HMAC-SHA512 signature on an OxaPay webhook request.
+
+    Fail-CLOSED (audit security review). The merchant key defaults to ""
+    when OxaPay isn't configured; signing with an empty key is trivially
+    forgeable (an attacker computes HMAC-SHA512(key=b"", body) and posts a
+    fake `status:"paid"` webhook). So we refuse outright if the key — or
+    the received signature — is missing. We also use the SAME merchant key
+    that create_payment signs invoices with: 'sandbox' in sandbox mode,
+    otherwise the real key (previously sandbox webhooks could never
+    verify).
+    """
     settings = get_settings()
-    key = settings.OXAPAY_MERCHANT_KEY.encode()
-    computed = hmac.new(key, raw_body, hashlib.sha512).hexdigest()
+    key = (settings.OXAPAY_MERCHANT_KEY or "").strip()
+    if not key:
+        logger.error("OxaPay merchant key not configured — refusing webhook (fail-closed)")
+        return False
+    if not received_hmac:
+        return False
+    signing_key = ("sandbox" if settings.OXAPAY_SANDBOX else key).encode()
+    computed = hmac.new(signing_key, raw_body, hashlib.sha512).hexdigest()
     return hmac.compare_digest(computed, received_hmac)

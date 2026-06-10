@@ -32,7 +32,7 @@ export function SwisDexWordmark({
       >
         {/* Rail logo: raster image in both modes, swap variant per theme. */}
         <img src="/images/swisdex_png5.png" alt="SwisDex" className="w-7 h-7 object-contain hidden dark:block" />
-        <img src="/images/swisdex_logo_white.png" alt="SwisDex" className="w-7 h-7 object-contain dark:hidden" />
+        <img src="/images/swisdex_png.png" alt="SwisDex" className="w-7 h-7 object-contain dark:hidden" />
       </Link>
     );
   }
@@ -49,7 +49,7 @@ export function SwisDexWordmark({
         className="h-9 sm:h-10 w-auto object-contain shrink-0 hidden dark:block"
       />
       <img
-        src="/images/swisdex_logo_white.png"
+        src="/images/swisdex_png.png"
         alt="SwisDex"
         className="h-9 sm:h-10 w-auto object-contain shrink-0 dark:hidden"
       />

@@ -115,20 +115,33 @@ async def update_bank_account(
     return {"message": "Bank account updated"}
 
 
+_QR_ALLOWED_EXT = {".png", ".jpg", ".jpeg", ".webp", ".gif"}
+
+
 async def upload_qr_code(file: UploadFile) -> dict:
     if not file.content_type or not file.content_type.startswith("image/"):
         raise HTTPException(status_code=400, detail="Only image files are allowed")
 
     max_size = 5 * 1024 * 1024
     contents = await file.read()
+    if not contents:
+        raise HTTPException(status_code=400, detail="Empty file")
     if len(contents) > max_size:
         raise HTTPException(status_code=400, detail="File too large (max 5MB)")
 
-    ext = file.filename.rsplit(".", 1)[-1].lower() if file.filename and "." in file.filename else "png"
-    if ext not in ("png", "jpg", "jpeg", "webp", "gif"):
-        ext = "png"
+    declared = ("." + file.filename.rsplit(".", 1)[-1].lower()) if file.filename and "." in file.filename else ".png"
+    if declared not in _QR_ALLOWED_EXT:
+        declared = ".png"
+    # Magic-byte validation (security review F1) — Content-Type and the
+    # extension are both spoofable; the previous code even silently
+    # rewrote an unknown extension to ".png" and stored the blob as-is.
+    # Verify the real bytes and adopt the detected canonical extension.
+    from packages.common.src.upload_safety import detect_kind
+    kind = detect_kind(contents)
+    if kind is None or kind.suffix not in _QR_ALLOWED_EXT:
+        raise HTTPException(status_code=400, detail="File is not a valid image (PNG, JPG, WEBP, or GIF)")
 
-    filename = f"{uuid.uuid4().hex}.{ext}"
+    filename = f"{uuid.uuid4().hex}{kind.suffix}"
     filepath = UPLOAD_DIR / filename
     filepath.write_bytes(contents)
 

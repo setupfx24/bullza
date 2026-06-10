@@ -20,7 +20,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from dependencies import get_current_admin
+from dependencies import get_current_admin, require_permission
 from packages.common.src.database import get_db
 from packages.common.src.models import User
 
@@ -48,7 +48,9 @@ async def list_pending(
 @router.post("/{lock_id}/approve")
 async def approve_early(
     lock_id: UUID,
-    _admin: dict = Depends(get_current_admin),
+    # Credits a payout — gate behind fixed_return.manage (no employee
+    # role holds it → super_admin only) (audit M2).
+    _admin: dict = Depends(require_permission("fixed_return.manage")),
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
     return await fixed_return_service.approve(lock_id, db)
@@ -58,7 +60,7 @@ async def approve_early(
 async def reject_early(
     lock_id: UUID,
     req: RejectRequest,
-    _admin: dict = Depends(get_current_admin),
+    _admin: dict = Depends(require_permission("fixed_return.manage")),
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
     return await fixed_return_service.reject(lock_id, db, reason=req.reason)
@@ -111,7 +113,9 @@ class GrantLockRequest(BaseModel):
 async def grant_lock(
     user_id: UUID,
     body: GrantLockRequest,
-    _admin: dict = Depends(get_current_admin),
+    # Debits a user wallet / creates a paying financial product — gate
+    # behind fixed_return.manage → super_admin only (audit M2).
+    _admin: dict = Depends(require_permission("fixed_return.manage")),
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
     """Admin creates a Fixed Return lock for one user with custom terms.
@@ -144,7 +148,9 @@ async def grant_lock(
 async def set_rate_override(
     user_id: UUID,
     body: RateOverrideRequest,
-    _admin: dict = Depends(get_current_admin),
+    # Changes the payout rate ladder for a user — gate behind
+    # fixed_return.manage → super_admin only (audit M2).
+    _admin: dict = Depends(require_permission("fixed_return.manage")),
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
     user = (await db.execute(

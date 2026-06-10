@@ -54,7 +54,7 @@ function ResetPasswordForm() {
       <div className="w-full max-w-[400px]">
         <div className="mb-8 flex justify-center">
           <img src="/images/swisdex_png5.png" alt="SwisDex" className="w-20 h-20 object-contain hidden dark:block" />
-          <img src="/images/swisdex_logo_white.png" alt="SwisDex" className="w-20 h-20 object-contain dark:hidden" />
+          <img src="/images/swisdex_png.png" alt="SwisDex" className="w-20 h-20 object-contain dark:hidden" />
         </div>
         <div className="glass-panel rounded-3xl p-8 noise-texture overflow-hidden">
           <h1 className="text-xl font-bold text-text-primary mb-2">Reset password</h1>

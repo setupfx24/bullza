@@ -21,6 +21,16 @@ settings = get_settings()
 
 ADMIN_COOKIE_NAME = "swisdex_admin"
 
+# High-trust permissions deliberately held by NO employee role below.
+# Because super_admin bypasses the permission check entirely, gating an
+# endpoint on one of these makes it effectively super_admin-only while
+# still being grantable to a specific employee later via
+# Employee.extra_permissions if the business ever needs it:
+#   users.impersonate   — login-as a trader (account takeover)
+#   users.delete        — permanently delete a user + their ledger
+#   settings.manage     — edit platform/system settings (withdrawal flags…)
+#   fixed_return.manage — grant/approve fixed-return locks (payouts)
+#   insurance.manage    — edit insurance fee/payout economics
 EMPLOYEE_ROLE_PERMISSIONS = {
     "super_admin": {"*"},
     "trade_manager": {
@@ -94,6 +104,16 @@ async def get_current_admin(
     if admin is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Admin user not found or inactive")
 
+    # Revoke-on-password-change (audit H2): the token carries a `pe`
+    # fingerprint of the password hash it was minted against. A mismatch
+    # means the password has since changed, so this token is stale.
+    # Tokens minted before this claim existed have no `pe` — accept those
+    # so the rollout doesn't log every admin out; they age out naturally.
+    from packages.common.src.auth import password_epoch
+    tok_pe = payload.get("pe")
+    if tok_pe is not None and tok_pe != password_epoch(admin.password_hash):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Session revoked, please log in again")
+
     return admin
 
 
@@ -103,8 +123,18 @@ def require_permission(permission: str):
         admin: User = Depends(get_current_admin),
         db: AsyncSession = Depends(get_db),
     ) -> User:
-        # Full admins (role 'admin' or 'super_admin') bypass per-permission checks.
-        if admin.role in ("admin", "super_admin"):
+        # Only super_admin bypasses the granular permission check.
+        #
+        # SECURITY (privilege-escalation fix): employees are created with
+        # User.role="admin" (employee_service.create) and carry their real
+        # privileges in Employee.role. The previous bypass `admin.role in
+        # ("admin","super_admin")` therefore let EVERY employee skip the
+        # permission check entirely — the whole EMPLOYEE_ROLE_PERMISSIONS
+        # map was dead code, so e.g. a 'marketing' or 'support' employee
+        # could approve withdrawals, add funds or delete users. Only the
+        # true super_admin (seeded role='super_admin', no Employee row)
+        # may bypass; role='admin' falls through to its Employee grants.
+        if admin.role == "super_admin":
             return admin
 
         result = await db.execute(

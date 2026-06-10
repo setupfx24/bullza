@@ -26,7 +26,18 @@ async def get_kyc_file(document_id: uuid.UUID, db: AsyncSession) -> FileResponse
     if not file_path.exists():
         raise HTTPException(status_code=404, detail="File not found on server")
 
-    return FileResponse(str(file_path), filename=file_path.name)
+    # Force download, never inline render (security review F2). This is the
+    # higher-value target: a malicious trader-uploaded file would otherwise
+    # render in the ADMIN's authenticated origin. octet-stream + attachment
+    # + nosniff makes the browser save rather than execute it.
+    return FileResponse(
+        str(file_path),
+        media_type="application/octet-stream",
+        headers={
+            "Content-Disposition": f'attachment; filename="{file_path.name}"',
+            "X-Content-Type-Options": "nosniff",
+        },
+    )
 
 
 async def list_kyc_pending(page: int, per_page: int, db: AsyncSession) -> dict:

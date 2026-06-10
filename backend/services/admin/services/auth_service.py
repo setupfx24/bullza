@@ -18,13 +18,17 @@ logger = logging.getLogger("uvicorn.error")
 settings = get_settings()
 
 
-def create_admin_token(admin_id: str, role: str) -> str:
+def create_admin_token(admin_id: str, role: str, password_hash: str | None = None) -> str:
+    from packages.common.src.auth import password_epoch
     now = datetime.now(timezone.utc)
     expire = now + timedelta(hours=settings.ADMIN_JWT_EXPIRY_HOURS)
     payload = {
         "admin_id": admin_id,
         "role": str(role),
         "type": "admin",
+        # Password-epoch claim — invalidates this token the moment the
+        # admin's password changes (audit H2). See auth.password_epoch.
+        "pe": password_epoch(password_hash),
         "exp": expire,
         "iat": now,
     }
@@ -69,7 +73,7 @@ async def admin_login(body: AdminLoginRequest, db: AsyncSession) -> AdminLoginRe
     if admin.status != "active":
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Account is not active")
 
-    token = create_admin_token(str(admin.id), admin.role)
+    token = create_admin_token(str(admin.id), admin.role, admin.password_hash)
 
     return AdminLoginResponse(
         access_token=token,
@@ -78,6 +82,12 @@ async def admin_login(body: AdminLoginRequest, db: AsyncSession) -> AdminLoginRe
         first_name=admin.first_name,
         last_name=admin.last_name,
     )
+
+
+# How long after a token was ISSUED it may still be refreshed. Past this
+# an admin must log in again — bounds the indefinite-refresh hole where a
+# token leaked months ago could be swapped for a fresh one forever (H2).
+ADMIN_REFRESH_MAX_AGE_HOURS = 7 * 24
 
 
 async def admin_refresh(body: AdminRefreshRequest, db: AsyncSession) -> AdminLoginResponse:
@@ -92,6 +102,13 @@ async def admin_refresh(body: AdminRefreshRequest, db: AsyncSession) -> AdminLog
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token type")
 
         admin_id = payload.get("admin_id")
+
+        # Bound the refresh window off the token's issue time.
+        iat = payload.get("iat")
+        if iat is not None:
+            age = datetime.now(timezone.utc) - datetime.fromtimestamp(int(iat), tz=timezone.utc)
+            if age > timedelta(hours=ADMIN_REFRESH_MAX_AGE_HOURS):
+                raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Session expired, please log in again")
     except jwt.PyJWTError:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
 
@@ -106,7 +123,12 @@ async def admin_refresh(body: AdminRefreshRequest, db: AsyncSession) -> AdminLog
     if admin is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Admin not found")
 
-    token = create_admin_token(str(admin.id), admin.role)
+    # Reject refresh if the password changed after this token was minted.
+    from packages.common.src.auth import password_epoch
+    if payload.get("pe") != password_epoch(admin.password_hash):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Session revoked, please log in again")
+
+    token = create_admin_token(str(admin.id), admin.role, admin.password_hash)
     return AdminLoginResponse(
         access_token=token,
         admin_id=str(admin.id),
@@ -124,7 +146,12 @@ async def change_admin_password(admin: User, current_password: str, new_password
     from packages.common.src.auth import hash_password
     admin.password_hash = hash_password(new_password)
     await db.commit()
-    return {"message": "Password changed successfully"}
+    await db.refresh(admin)
+    # The new hash changes the password-epoch, which revokes every OTHER
+    # outstanding token (audit H2). Re-mint one bound to the new hash so
+    # the admin who just changed it stays logged in on THIS session.
+    fresh = create_admin_token(str(admin.id), admin.role, admin.password_hash)
+    return {"message": "Password changed successfully", "access_token": fresh}
 
 
 async def get_admin_me(admin: User, db: AsyncSession) -> dict:
