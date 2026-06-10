@@ -515,11 +515,13 @@ function CookieRow({
 }
 
 /**
- * iOS-style pill toggle. Knob is positioned via `left` so it stays
- * inside the track at both extremes — using transform-only positioning
- * the way the previous version did caused the knob to render past the
- * right edge on some browsers (the `<span>`'s natural left position
- * defaulted to the right of the parent in flex/auto contexts).
+ * iOS-style pill toggle — classic Tailwind / Headless-UI pattern.
+ *
+ * Track is `inline-flex items-center` so the knob (an inline-block span)
+ * sits vertically centred without needing absolute positioning. Sliding
+ * is done with `translate-x` rather than left/top so it never drifts past
+ * the track edge on any browser. The required (Functional) row disables
+ * the button + dims it; the other two rows toggle through onClick.
  */
 function Toggle({
   on,
@@ -536,28 +538,20 @@ function Toggle({
       role="switch"
       aria-checked={on}
       disabled={disabled}
-      onClick={onClick}
-      className="relative rounded-full transition-colors shrink-0"
+      onClick={disabled ? undefined : onClick}
+      className={`relative inline-flex h-7 w-12 shrink-0 items-center rounded-full transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-transparent ${
+        disabled ? 'cursor-not-allowed opacity-90' : 'cursor-pointer'
+      }`}
       style={{
-        width: 44,
-        height: 24,
         background: on ? '#55a630' : 'rgba(255,255,255,0.22)',
-        opacity: disabled ? 0.9 : 1,
-        cursor: disabled ? 'not-allowed' : 'pointer',
-        border: '1px solid rgba(255,255,255,0.1)',
+        border: '1px solid rgba(255,255,255,0.12)',
       }}
     >
       <span
         aria-hidden
-        className="absolute rounded-full transition-all duration-200"
-        style={{
-          width: 18,
-          height: 18,
-          top: 2,
-          left: on ? 22 : 2,
-          background: '#ffffff',
-          boxShadow: '0 1px 3px rgba(0,0,0,0.4)',
-        }}
+        className={`inline-block h-5 w-5 transform rounded-full bg-white shadow-md transition-transform duration-200 ${
+          on ? 'translate-x-6' : 'translate-x-0.5'
+        }`}
       />
     </button>
   );
