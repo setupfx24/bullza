@@ -14,6 +14,7 @@ from datetime import datetime, timezone
 from collections import defaultdict
 
 from sqlalchemy import select, func
+from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from packages.common.src.database import AsyncSessionLocal
@@ -69,14 +70,28 @@ class RiskEngine:
                     )
                     accounts = result.scalars().all()
 
-                    for account in accounts:
-                        positions_result = await db.execute(
-                            select(Position).where(
-                                Position.account_id == account.id,
+                    # Load every open position for these accounts in ONE
+                    # query with the instrument eager-loaded, then group by
+                    # account in Python (audit perf #10). Previously this
+                    # ran one positions query per account AND lazy-loaded
+                    # pos.instrument per position — an N+1 that scaled with
+                    # both account and position count every single tick.
+                    positions_by_account: dict = defaultdict(list)
+                    if accounts:
+                        acct_ids = [a.id for a in accounts]
+                        all_pos_result = await db.execute(
+                            select(Position)
+                            .options(selectinload(Position.instrument))
+                            .where(
+                                Position.account_id.in_(acct_ids),
                                 Position.status == PositionStatus.OPEN,
                             )
                         )
-                        positions = positions_result.scalars().all()
+                        for p in all_pos_result.scalars().all():
+                            positions_by_account[p.account_id].append(p)
+
+                    for account in accounts:
+                        positions = positions_by_account.get(account.id, [])
                         if not positions:
                             continue
 
@@ -375,7 +390,9 @@ class RiskEngine:
             try:
                 async with AsyncSessionLocal() as db:
                     result = await db.execute(
-                        select(Position).where(Position.status == PositionStatus.OPEN)
+                        select(Position)
+                        .options(selectinload(Position.instrument))  # avoid per-position lazy load (N+1)
+                        .where(Position.status == PositionStatus.OPEN)
                     )
                     positions = result.scalars().all()
 
@@ -427,7 +444,9 @@ class RiskEngine:
                 try:
                     async with AsyncSessionLocal() as db:
                         result = await db.execute(
-                            select(Position).where(Position.status == PositionStatus.OPEN)
+                            select(Position)
+                            .options(selectinload(Position.instrument))  # avoid per-position lazy load (N+1)
+                            .where(Position.status == PositionStatus.OPEN)
                         )
                         positions = result.scalars().all()
 

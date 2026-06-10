@@ -11,6 +11,7 @@ from datetime import datetime
 from decimal import Decimal
 
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from packages.common.src.database import AsyncSessionLocal
@@ -61,7 +62,6 @@ class SLTPEngine:
                 if not await acquire_leader_lock("engine:sltp:lock", 5):
                     await asyncio.sleep(CHECK_INTERVAL)
                     continue
-                await self._load_prices()
                 await self._check_positions()
                 await asyncio.sleep(CHECK_INTERVAL)
             except asyncio.CancelledError:
@@ -70,39 +70,53 @@ class SLTPEngine:
                 logger.error("SL/TP engine error: %s", e)
                 await asyncio.sleep(3)
 
-    async def _load_prices(self):
-        """Load latest prices directly from Redis keys instead of pubsub."""
+    async def _load_prices_for(self, symbols: set[str]):
+        """Fetch the latest tick for exactly the symbols we care about via
+        a single MGET. We deliberately avoid `KEYS tick:*` — KEYS is an
+        O(keyspace) blocking command that stalls all of Redis and grows
+        with every instrument ever quoted (audit perf #11). Driving the
+        fetch off the open SL/TP positions means we read only the handful
+        of keys that can actually trigger a close."""
+        self._prices = {}
+        if not symbols:
+            return
         try:
-            keys = await redis_client.keys("tick:*")
-            if not keys:
-                return
+            sym_list = list(symbols)
+            keys = [PriceChannel.tick_key(s) for s in sym_list]
             values = await redis_client.mget(keys)
-            for val in values:
+            for sym, val in zip(sym_list, values):
                 if val:
                     try:
-                        data = json.loads(val)
-                        self._prices[data["symbol"]] = data
-                    except (json.JSONDecodeError, KeyError):
+                        self._prices[sym] = json.loads(val)
+                    except json.JSONDecodeError:
                         pass
         except Exception as e:
             logger.warning("Failed to load prices: %s", e)
 
     async def _check_positions(self):
-        if not self._prices:
-            return
-
         async with AsyncSessionLocal() as db:
             result = await db.execute(
                 select(Position)
+                .options(selectinload(Position.instrument))  # avoid per-position lazy load (N+1)
                 .where(Position.status == "open")
                 .where(
                     (Position.stop_loss.isnot(None)) | (Position.take_profit.isnot(None))
                 )
             )
             positions = result.scalars().all()
+            if not positions:
+                return
 
-            if positions:
-                logger.info("Checking %d positions with SL/TP", len(positions))
+            logger.info("Checking %d positions with SL/TP", len(positions))
+
+            # One MGET for just the symbols these positions reference.
+            symbols = {
+                pos.instrument.symbol for pos in positions
+                if pos.instrument and pos.instrument.symbol
+            }
+            await self._load_prices_for(symbols)
+            if not self._prices:
+                return
 
             for pos in positions:
                 symbol = pos.instrument.symbol if pos.instrument else None
