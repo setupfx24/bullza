@@ -187,9 +187,40 @@ export default function Footer() {
           </div>
         </div>
 
+        {/* Legal / Policy quick-links — each opens the official signed
+            PDF in a new tab. Drop replacement files at /public/pdfs/terms/
+            with the exact filenames used below. */}
+        <nav
+          aria-label="Legal documents"
+          className="mt-10 pt-6 flex flex-wrap gap-x-7 gap-y-3"
+          style={{ borderTop: '1px solid var(--fx-line)' }}
+        >
+          {[
+            { name: 'Privacy Policy',           href: '/pdfs/terms/privcy%20policy.pdf' },
+            { name: 'Terms & Conditions',       href: '/pdfs/terms/terms%20and%20condition.pdf' },
+            { name: 'AML Policy',               href: '/pdfs/terms/aml-policy.pdf' },
+            { name: 'Deposit & withdrawal Policy', href: '/pdfs/terms/deposit%20and%20withdrawal.pdf' },
+            { name: 'Restricted Countries',     href: '/pdfs/terms/restricted-countries.pdf' },
+            { name: 'Risk Warning',             href: '/pdfs/terms/risk-warning.pdf' },
+            { name: 'Legal Documents',          href: '/pdfs/terms/SwisDex%20Promotional%20%26%20Service%20Terms%20and%20Conditions.pdf' },
+            { name: 'Risk Disclosure',          href: '/pdfs/terms/Client%20Fund%20Security.pdf' },
+          ].map((doc) => (
+            <a
+              key={doc.name}
+              href={doc.href}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-sm font-semibold hover:underline transition-colors"
+              style={{ color: 'var(--fx-text)' }}
+            >
+              {doc.name}
+            </a>
+          ))}
+        </nav>
+
         {/* Bottom bar */}
         <div
-          className="mt-10 pt-6 flex flex-col md:flex-row gap-3 md:gap-6 items-start md:items-center justify-between"
+          className="mt-6 pt-6 flex flex-col md:flex-row gap-3 md:gap-6 items-start md:items-center justify-between"
           style={{ borderTop: '1px solid var(--fx-line)' }}
         >
           <p className="text-xs" style={{ color: 'var(--fx-text-3)' }}>

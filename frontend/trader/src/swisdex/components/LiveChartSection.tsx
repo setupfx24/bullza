@@ -245,6 +245,11 @@ function InstrumentDirectory({
                 aria-expanded={isOpen}
                 aria-haspopup="true"
                 aria-label={`Show ${col.heading} instruments`}
+                /* Chrome/Edge form-helper extensions inject `fdprocessedid`
+                   onto these buttons after first paint, which triggers a
+                   React hydration-mismatch warning. The button is
+                   functionally unaffected — suppress the warning. */
+                suppressHydrationWarning
                 className={`w-full liquid-glass rounded-2xl px-4 py-4 flex items-center justify-between gap-2 transition-colors ${
                   isOpen ? 'bg-primary/10 ring-1 ring-primary/40' : 'hover:bg-foreground/[0.05]'
                 }`}
