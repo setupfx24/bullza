@@ -79,3 +79,18 @@ def in_deposit_withdrawal_window(cfg: dict, now: Optional[datetime] = None) -> b
     start = int(cfg.get("dep_window_start_day") or 1)
     end = int(cfg.get("dep_window_end_day") or 31)
     return start <= n.day <= end
+
+
+def in_trade_window(cfg: dict, now: Optional[datetime] = None) -> bool:
+    """True if today's date (UTC) falls within the PAMM/MAM trading day
+    window. Masters may only open positions on their pool account during
+    this window (the deposit/withdrawal window is the complementary
+    part of the month). Inclusive on both ends; fail-open if the window
+    is unset/degenerate (start>end) so a misconfig never freezes trading.
+    """
+    n = now or datetime.now(timezone.utc)
+    start = int(cfg.get("trade_window_start_day") or 1)
+    end = int(cfg.get("trade_window_end_day") or 31)
+    if start > end:
+        return True  # degenerate window — don't block
+    return start <= n.day <= end
