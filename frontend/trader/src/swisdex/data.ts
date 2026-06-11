@@ -32,7 +32,7 @@ export const NAV_ITEMS: NavItem[] = [
     label: 'Risk Management',
     href: '/risk-management/calculator',
     children: [
-      { label: 'Lot Size & Profit Calculator', href: '/risk-management/calculator' },
+      { label: 'Trading Calculators', href: '/risk-management/calculator' },
     ],
   },
   {
