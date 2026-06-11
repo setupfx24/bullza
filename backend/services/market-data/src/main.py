@@ -119,6 +119,11 @@ class MarketDataService:
             tasks.append(asyncio.create_task(self._alltick_fallback_watchdog()))
         if self._infoway_watchdog_armed:
             tasks.append(asyncio.create_task(self._infoway_fallback_watchdog()))
+        # InfoWay/AllTick don't reliably stream crypto (placeholder symbol
+        # mapping) — pull crypto from Binance directly so BTC/ETH prices and
+        # P&L actually move. FeedSimulator already runs its own Binance feed.
+        if isinstance(self.feed, (InfoWayFeed, AllTickFeed)):
+            tasks.append(asyncio.create_task(self._binance_crypto_feed()))
 
         await asyncio.gather(*tasks)
 
@@ -264,6 +269,59 @@ class MarketDataService:
                 # if Redis briefly hiccups. The gateway will catch up on
                 # the next tick anyway.
                 logger.debug("publish_bar_update %s %s failed: %s", symbol, tf_name, exc)
+
+    async def _binance_crypto_feed(self) -> None:
+        """Live crypto ticks from Binance, run ALONGSIDE the primary feed.
+
+        InfoWay/AllTick's crypto symbol mapping is a placeholder and does
+        not actually stream BTC/ETH/etc., so crypto prices froze and P&L
+        never moved (client report: "BTC not working"). Binance's public
+        trade stream is free + reliable. This mirrors _process_ticks —
+        applies the admin spread via spread_cache.widen and publishes
+        through the same path — but deliberately does NOT touch
+        self._tick_count, so the primary-feed watchdogs still detect a
+        dead forex feed correctly.
+        """
+        import json as _json
+        import websockets as _ws
+        from .feed_handler import BINANCE_MAP, BINANCE_WS
+
+        streams = [f"{pair}@trade" for pair in BINANCE_MAP]
+        url = f"{BINANCE_WS}/{'/'.join(streams)}"
+        # Stop if a watchdog swaps the primary feed to FeedSimulator, which
+        # runs its OWN Binance feed — else we'd double-publish crypto.
+        while self.running and isinstance(self.feed, (InfoWayFeed, AllTickFeed)):
+            try:
+                logger.info("Binance crypto feed connecting (alongside primary feed)")
+                async with _ws.connect(url, ping_interval=20, ping_timeout=10) as ws:
+                    logger.info("Binance crypto feed connected — live crypto prices active")
+                    async for raw in ws:
+                        if not self.running or not isinstance(self.feed, (InfoWayFeed, AllTickFeed)):
+                            break
+                        try:
+                            data = _json.loads(raw)
+                            pair = (data.get("s") or "").lower()
+                            symbol = BINANCE_MAP.get(pair)
+                            if not symbol:
+                                continue
+                            price = float(data["p"])
+                        except (KeyError, ValueError, TypeError):
+                            continue
+                        ts = datetime.now(timezone.utc)
+                        timestamp = ts.strftime("%Y-%m-%dT%H:%M:%S.") + f"{ts.microsecond // 1000:03d}Z"
+                        mid = price
+                        self._last_mid[symbol] = mid
+                        self._last_live_mono[symbol] = time.monotonic()
+                        bid, ask = self.spread_cache.widen(symbol, mid)
+                        await publish_price(symbol, bid, ask, timestamp)
+                        await self.store.insert_tick(symbol, bid, ask, timestamp)
+                        self.aggregator.update(symbol, bid, ask, timestamp)
+                        await self._publish_current_bars(symbol)
+            except asyncio.CancelledError:
+                raise
+            except Exception as e:
+                logger.warning("Binance crypto feed error: %s — reconnecting in 5s", e)
+                await asyncio.sleep(5)
 
     async def _alltick_fallback_watchdog(self) -> None:
         """If AllTick never delivers ticks (bad token, expired plan, network,
