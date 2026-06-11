@@ -179,14 +179,21 @@ export function transactionTitle(tx: Transaction): string {
       return 'Realized loss';
     case 'credit':
       return 'Credit';
-    case 'adjustment':
-      // The backend sets a meaningful description for every ledger entry
-      // that maps here — "Welcome bonus", "Trade insurance payout",
-      // "Insurance fee", "Admin fund addition", "Swap …", "IB commission",
-      // P&L-recovery notes, etc. Show THAT instead of a bare "Adjustment".
+    case 'adjustment': {
+      // Every ledger row that collapses to "adjustment" still carries a
+      // clean category in tx.method ("Insurance Fee", "Account Open
+      // Transfer", "Swap", "IB Commission", …) and a detailed
+      // description. Show the clean category as the title instead of a
+      // bare "Adjustment"; fall back to the description, then the literal.
+      const m = (tx.method || '').trim();
+      if (m && m.toLowerCase() !== 'adjustment') return m;
       return tx.description || 'Adjustment';
-    case 'bonus':
+    }
+    case 'bonus': {
+      const m = (tx.method || '').trim();
+      if (m && m.toLowerCase() !== 'bonus') return m;
       return tx.description || 'Bonus';
+    }
     case 'correction':
       return tx.description || 'Correction';
     case 'fixed_return':
@@ -196,7 +203,7 @@ export function transactionTitle(tx: Transaction): string {
       // Falls back to a generic when the method is empty.
       return fixedReturnLabel(tx.method);
     default:
-      return tx.description || 'Transaction';
+      return tx.method || tx.description || 'Transaction';
   }
 }
 
