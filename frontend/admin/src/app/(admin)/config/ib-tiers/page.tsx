@@ -38,6 +38,9 @@ const FALLBACK_TIERS: Tier[] = [
 
 export default function IBTiersAdminPage() {
   const [tiers, setTiers] = useState<Tier[]>(FALLBACK_TIERS);
+  // Activation rule (what makes a referred user count as an "activation").
+  const [minTrades, setMinTrades] = useState(3);
+  const [requiresKyc, setRequiresKyc] = useState(true);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -60,6 +63,10 @@ export default function IBTiersAdminPage() {
       if (Array.isArray(raw) && raw.length > 0 && raw.some((t: any) => t.min_activations != null || t.min_amount != null)) {
         setTiers(raw.map(normalize));
       }
+      const mt = list.find((s) => s.key === 'ib_commission_min_trades')?.value;
+      if (mt != null && Number.isFinite(Number(mt))) setMinTrades(Number(mt));
+      const rk = list.find((s) => s.key === 'ib_commission_requires_kyc')?.value;
+      if (rk != null) setRequiresKyc(rk === true || rk === 'true' || rk === 1 || rk === '1');
     } catch (e: any) {
       toast.error(e?.message || 'Failed to load IB tiers');
     } finally {
@@ -106,7 +113,13 @@ export default function IBTiersAdminPage() {
     const sorted = [...tiers].sort((a, b) => a.per_lot - b.per_lot);
     setSaving(true);
     try {
-      await adminApi.put('/settings', { settings: { ib_commission_tiers: sorted } });
+      await adminApi.put('/settings', {
+        settings: {
+          ib_commission_tiers: sorted,
+          ib_commission_min_trades: Math.max(0, Math.floor(minTrades) || 0),
+          ib_commission_requires_kyc: requiresKyc,
+        },
+      });
       toast.success('IB commission tiers saved');
       setTiers(sorted);
     } catch (e: any) {
@@ -145,6 +158,35 @@ export default function IBTiersAdminPage() {
         >
           {saving ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />} Save
         </button>
+      </div>
+
+      {/* Activation rule — what makes a referred user count toward the
+          activation thresholds above. Fully admin-editable. */}
+      <div className="bg-bg-secondary border border-border-primary rounded-md p-4 space-y-3">
+        <h2 className="text-sm font-semibold text-text-primary">Activation rule</h2>
+        <p className="text-xxs text-text-tertiary -mt-1">
+          A referred user counts as one <strong>activation</strong> once they meet these conditions.
+        </p>
+        <div className="flex flex-wrap items-center gap-6">
+          <label className="flex items-center gap-2 text-xs text-text-secondary">
+            Minimum completed trades
+            <input
+              type="number" min={0}
+              value={minTrades}
+              onChange={(e) => setMinTrades(parseInt(e.target.value) || 0)}
+              className="w-20 px-2 py-1 text-xs bg-bg-input border border-border-primary rounded font-mono tabular-nums text-text-primary"
+            />
+          </label>
+          <label className="flex items-center gap-2 text-xs text-text-secondary cursor-pointer">
+            <input
+              type="checkbox"
+              checked={requiresKyc}
+              onChange={(e) => setRequiresKyc(e.target.checked)}
+              className="w-4 h-4 accent-buy"
+            />
+            Require KYC approved
+          </label>
+        </div>
       </div>
 
       <div className="bg-bg-secondary border border-border-primary rounded-md overflow-x-auto">

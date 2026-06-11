@@ -122,7 +122,7 @@ async def compute_ib_qualification(db: AsyncSession, ib_profile_id: UUID) -> tup
     from packages.common.src.models import (
         User, TradeHistory, TradingAccount, Deposit,
     )
-    from packages.common.src.settings_store import get_int_setting
+    from packages.common.src.settings_store import get_int_setting, get_bool_setting
 
     referred_ids = [
         r[0] for r in (await db.execute(
@@ -141,23 +141,29 @@ async def compute_ib_qualification(db: AsyncSession, ib_profile_id: UUID) -> tup
     )).scalar() or 0
     amount = Decimal(str(amount_raw))
 
-    # Activations: KYC-approved referrals with >= min_trades closed trades.
+    # Activations: referrals with >= min_trades closed trades, and (when
+    # the admin toggle is on) KYC-approved. Both the trade count and the
+    # KYC requirement are admin-editable from /config/ib-tiers.
     min_trades = await get_int_setting("ib_commission_min_trades", 3)
-    kyc_ok_ids = [
-        r[0] for r in (await db.execute(
-            select(User.id).where(
-                User.id.in_(referred_ids),
-                func.lower(User.kyc_status).in_(["approved", "verified"]),
-            )
-        )).all()
-    ]
+    requires_kyc = await get_bool_setting("ib_commission_requires_kyc", True)
+    if requires_kyc:
+        eligible_ids = [
+            r[0] for r in (await db.execute(
+                select(User.id).where(
+                    User.id.in_(referred_ids),
+                    func.lower(User.kyc_status).in_(["approved", "verified"]),
+                )
+            )).all()
+        ]
+    else:
+        eligible_ids = referred_ids
     activations = 0
-    if kyc_ok_ids:
+    if eligible_ids:
         rows = (await db.execute(
             select(TradingAccount.user_id, func.count(TradeHistory.id))
             .select_from(TradeHistory)
             .join(TradingAccount, TradingAccount.id == TradeHistory.account_id)
-            .where(TradingAccount.user_id.in_(kyc_ok_ids))
+            .where(TradingAccount.user_id.in_(eligible_ids))
             .group_by(TradingAccount.user_id)
         )).all()
         for _uid, cnt in rows:
