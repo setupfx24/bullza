@@ -2,19 +2,79 @@
 
 /**
  * Fixed Return Funds — rate matrix.
- * Columns: deposit tier. Rows: lock-up tenure. Cells: % return for that tenure.
+ * Columns: deposit tier. Rows: lock-up tenure. Cells: % return.
+ *
+ * Pulls the SAME live rate matrix the dashboard + calculator use
+ * (/fixed-return/public-config) so all three stay in sync with admin.
+ * Cells are PER-MONTH rates (the tenure sets the payout cadence), matching
+ * the user-dashboard Fixed Return product. Falls back to the seed ladder
+ * if the endpoint is unreachable.
  */
-const TIERS = ['$1K', '$10K', '$25K', '$50K', '$100K'] as const;
+import { useEffect, useState } from 'react';
 
-const ROWS: { tenure: string; values: [string, string, string, string, string] }[] = [
-  { tenure: 'Month',     values: ['1%',  '2%',  '2.5%', '3%',   '4%'  ] },
-  { tenure: 'Quarter',   values: ['2%',  '3%',  '3%',   '3.5%', '4.5%'] },
-  { tenure: 'Half-Year', values: ['3%',  '4%',  '4.5%', '5%',   '5%'  ] },
-  { tenure: 'Year',      values: ['4%',  '5%',  '5.5%', '6%',   '5.5%'] },
-  { tenure: '2 Year',    values: ['5%',  '6%',  '6.5%', '7%',   '7%'  ] },
+interface Tier { label: string; min_amount: number }
+interface Tenure { label: string; days: number }
+interface RateConfig {
+  tiers: Tier[];
+  tenures: Tenure[];
+  rate_matrix_pct: number[][];
+}
+
+const FALLBACK: RateConfig = {
+  tiers: [
+    { label: '$1K+', min_amount: 1_000 },
+    { label: '$10K+', min_amount: 10_000 },
+    { label: '$25K+', min_amount: 25_000 },
+    { label: '$50K+', min_amount: 50_000 },
+    { label: '$100K+', min_amount: 100_000 },
+  ],
+  tenures: [
+    { label: 'Month', days: 30 },
+    { label: 'Quarter', days: 90 },
+    { label: 'Half-Year', days: 180 },
+    { label: 'Year', days: 365 },
+    { label: '2 Year', days: 730 },
+  ],
+  rate_matrix_pct: [
+    [1, 2, 2.5, 3, 4],
+    [2, 3, 3, 3.5, 4.5],
+    [3, 4, 4.5, 5, 5],
+    [4, 5, 5.5, 6, 5.5],
+    [5, 6, 6.5, 7, 7],
+  ],
+};
+
+const tierShort = (min: number) => `$${min >= 1000 ? `${min / 1000}K` : min}`;
+
+const HEADER_BG = [
+  'linear-gradient(180deg, #1f2937 0%, #0a0a0a 100%)',
+  'linear-gradient(180deg, #2c3e50 0%, #0e1418 100%)',
+  'linear-gradient(180deg, #55a630 0%, #1a3210 100%)',
+  'linear-gradient(180deg, #2f7d18 0%, #0a1f08 100%)',
+  'linear-gradient(180deg, #d00000 0%, #3d0000 100%)',
 ];
 
 export function FixedReturnRateTable({ heading = true }: { heading?: boolean }) {
+  const [cfg, setCfg] = useState<RateConfig>(FALLBACK);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch('/api/v1/fixed-return/public-config', { cache: 'no-store' });
+        if (!res.ok) return;
+        const c = (await res.json()) as RateConfig;
+        if (!cancelled && c?.tiers?.length && c?.tenures?.length && c?.rate_matrix_pct?.length) {
+          setCfg(c);
+        }
+      } catch {
+        /* keep FALLBACK */
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  const tiers = cfg.tiers;
   return (
     <section className="mx-auto max-w-[1200px] px-[var(--gutter)] py-12 sm:py-16">
       {heading && (
@@ -43,50 +103,40 @@ export function FixedReturnRateTable({ heading = true }: { heading?: boolean }) 
                 >
                   Tenure
                 </th>
-                {TIERS.map((tier, i) => (
+                {tiers.map((tier, i) => (
                   <th
-                    key={tier}
+                    key={tier.min_amount}
                     scope="col"
                     className={`px-5 py-4 text-center font-display uppercase tracking-[0.16em] text-sm text-white ${
-                      i < TIERS.length - 1 ? 'border-r border-white/10' : ''
+                      i < tiers.length - 1 ? 'border-r border-white/10' : ''
                     }`}
-                    style={{
-                      background:
-                        i === 0
-                          ? 'linear-gradient(180deg, #1f2937 0%, #0a0a0a 100%)'
-                          : i === 1
-                          ? 'linear-gradient(180deg, #2c3e50 0%, #0e1418 100%)'
-                          : i === 2
-                          ? 'linear-gradient(180deg, #55a630 0%, #1a3210 100%)'
-                          : i === 3
-                          ? 'linear-gradient(180deg, #2f7d18 0%, #0a1f08 100%)'
-                          : 'linear-gradient(180deg, #d00000 0%, #3d0000 100%)',
-                    }}
+                    style={{ background: HEADER_BG[i % HEADER_BG.length] }}
                   >
-                    {tier}
+                    {tierShort(tier.min_amount)}
                   </th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {ROWS.map((row, ri) => (
-                <tr key={row.tenure} className="border-t border-foreground/10">
+              {cfg.tenures.map((tn, ri) => (
+                <tr key={tn.label} className="border-t border-foreground/10">
                   <th
                     scope="row"
                     className="px-5 py-4 text-left text-sm font-semibold text-foreground/85 bg-foreground/[0.04] border-r border-foreground/15"
                   >
-                    {row.tenure}
+                    {tn.label}
                   </th>
-                  {row.values.map((v, ci) => {
-                    const highlight = ri === ROWS.length - 1 || ci === TIERS.length - 1;
+                  {tiers.map((_, ci) => {
+                    const highlight = ri === cfg.tenures.length - 1 || ci === tiers.length - 1;
+                    const v = cfg.rate_matrix_pct[ri]?.[ci];
                     return (
                       <td
                         key={ci}
                         className={`px-5 py-4 text-center text-sm tabular-nums ${
                           highlight ? 'text-primary font-semibold bg-primary/[0.08]' : 'text-foreground/90 bg-foreground/[0.02]'
-                        } ${ci < TIERS.length - 1 ? 'border-r border-foreground/10' : ''}`}
+                        } ${ci < tiers.length - 1 ? 'border-r border-foreground/10' : ''}`}
                       >
-                        {v}
+                        {v != null ? `${v}%` : '—'}
                       </td>
                     );
                   })}
@@ -98,7 +148,7 @@ export function FixedReturnRateTable({ heading = true }: { heading?: boolean }) 
       </div>
 
       <p className="mt-5 text-center text-xs text-foreground/45 max-w-2xl mx-auto leading-relaxed">
-        Rates shown are the fixed return paid for the full tenure, not annualised yields.
+        Rates are per month; the tenure sets how often the return is paid out.
         Early withdrawal forfeits the return earned to date and may incur a fee.
       </p>
     </section>
