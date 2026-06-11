@@ -358,12 +358,17 @@ export const useTradingStore = create<TradingState>()((set, get) => ({
     if (data.order_type === 'market' && tick) {
       const execPrice = data.side === 'buy' ? tick.ask : tick.bid;
       const prev = s.positions;
+      // Cent-account multiplier so the optimistic row's live P&L matches
+      // the engine immediately (no 100× flash before the first refresh).
+      const _mult = Number(s.activeAccount?.account_group?.lot_size_multiplier) || 1;
+      const _dispLots = Number(data.lots) || 0;
       const optimisticPos = {
         id: optimisticId,
         account_id: data.account_id,
         symbol: data.symbol,
         side: data.side,
-        lots: Number(data.lots) || 0,
+        lots: _dispLots,
+        effective_lots: _dispLots * _mult,
         open_price: execPrice,
         current_price: execPrice,
         stop_loss: data.stop_loss,

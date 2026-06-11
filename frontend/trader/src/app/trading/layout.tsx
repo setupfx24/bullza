@@ -217,6 +217,12 @@ function TradingSession({ children }: { children: React.ReactNode }) {
             symbol: String(p.symbol || (p.instrument as { symbol?: string })?.symbol || ''),
             side: p.side as 'buy' | 'sell',
             lots: Number(p.lots) || 0,
+            // Engine lots (0.0001 on a cent account). MUST be carried so the
+            // WS-tick P&L recompute uses it; otherwise it falls back to the
+            // display lots and a cent position's P&L spikes 100× on every
+            // tick (¢-4 → ¢-477) until the next REST poll resets it — the
+            // "fluctuation" the client reported. Same fix as refreshPositions.
+            effective_lots: p.effective_lots != null ? Number(p.effective_lots) : undefined,
             open_price: Number(p.open_price) || 0,
             current_price: p.current_price != null ? Number(p.current_price) : undefined,
             stop_loss: p.stop_loss != null ? Number(p.stop_loss) : undefined,
@@ -226,6 +232,11 @@ function TradingSession({ children }: { children: React.ReactNode }) {
             profit: Number(p.profit) || 0,
             trade_type: p.trade_type as string | undefined,
             created_at: String(p.created_at ?? ''),
+            // Insurance markers — same as refreshPositions, else the badge
+            // reads "Not insured" + no countdown on the terminal.
+            insurance_activated_at: (p.insurance_activated_at as string | null) ?? null,
+            insurance_eligible_at: (p.insurance_eligible_at as string | null) ?? null,
+            insurance_expires_at: (p.insurance_expires_at as string | null) ?? null,
             };
           }),
         );

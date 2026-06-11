@@ -26,6 +26,9 @@ interface MiniPosition {
   symbol: string;
   side: 'buy' | 'sell';
   lots: number;
+  /** Engine lots (0.0001 on a cent account). Used for live P&L so a cent
+   *  position doesn't show 100× the real P&L. Falls back to lots. */
+  effective_lots?: number;
   open_price: number;
   profit: number;
 }
@@ -147,6 +150,7 @@ export default function AccountTradePanel({ account, onClose }: AccountTradePane
           symbol: String(p.symbol || ''),
           side: p.side as 'buy' | 'sell',
           lots: Number(p.lots) || 0,
+          effective_lots: p.effective_lots != null ? Number(p.effective_lots) : undefined,
           open_price: Number(p.open_price) || 0,
           profit: Number(p.profit) || 0,
         })),
@@ -213,6 +217,7 @@ export default function AccountTradePanel({ account, onClose }: AccountTradePane
         symbol: selectedSymbol,
         side,
         lots,
+        effective_lots: lots * (Number((account as { account_group?: { lot_size_multiplier?: number } }).account_group?.lot_size_multiplier) || 1),
         open_price: execPrice,
         profit: 0,
       };
@@ -529,10 +534,13 @@ export default function AccountTradePanel({ account, onClose }: AccountTradePane
                 const cp = liveTick ? (pos.side === 'buy' ? liveTick.bid : liveTick.ask) : 0;
                 const inst = instruments.find((i) => i.symbol === pos.symbol);
                 const cs = inst?.contract_size || 100000;
+                // Engine lots, not display lots — else a cent position's
+                // live P&L shows 100× too large.
+                const pnlLots = pos.effective_lots ?? pos.lots;
                 const livePnl = cp > 0
                   ? pos.side === 'buy'
-                    ? (cp - pos.open_price) * pos.lots * cs
-                    : (pos.open_price - cp) * pos.lots * cs
+                    ? (cp - pos.open_price) * pnlLots * cs
+                    : (pos.open_price - cp) * pnlLots * cs
                   : pos.profit;
                 const pnlColor = livePnl >= 0 ? '#55a630' : '#ef5350';
                 const d = getDigits(pos.symbol);
