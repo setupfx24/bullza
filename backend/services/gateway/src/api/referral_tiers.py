@@ -58,24 +58,28 @@ async def list_referral_tiers():
         label = str(row.get("label") or "").strip()
         if not label:
             continue
-        min_r = _coerce_int(row.get("min_referrals"))
-        # max_referrals: null = no upper bound (the top tier).
-        max_r = _coerce_int(row.get("max_referrals"))
-        bounty = _coerce_float(row.get("per_referral_bounty"))
+        # New model (2026-06-11): per-lot commission, reached by activations
+        # OR cumulative referral deposit amount. Legacy min_referrals fields
+        # are still emitted (0 when absent) for backward compat.
+        per_lot = _coerce_float(row.get("per_lot"))
+        min_act = _coerce_int(row.get("min_activations"))
+        min_amt = _coerce_float(row.get("min_amount"))
         instant = row.get("instant_payout")
         tiers.append({
             "label": label,
-            "min_referrals": min_r if min_r is not None else 0,
-            "max_referrals": max_r,  # None → "X+" on the trader page
-            "per_referral_bounty": bounty,
-            # Default to True when admin omits it — every existing tier the
-            # marketing copy refers to pays instantly.
+            "per_lot": per_lot,
+            "min_activations": min_act if min_act is not None else 0,
+            "min_amount": min_amt,
+            # Legacy fields kept so older clients don't break.
+            "min_referrals": _coerce_int(row.get("min_referrals")) or 0,
+            "max_referrals": _coerce_int(row.get("max_referrals")),
+            "per_referral_bounty": _coerce_float(row.get("per_referral_bounty")),
             "instant_payout": True if instant is None else bool(instant),
         })
 
-    # Stable order so the trader page renders left → right by referral
-    # threshold, even if admin saved them out of order.
-    tiers.sort(key=lambda t: t["min_referrals"])
+    # Order low → high by per-lot so the trader page renders the ladder
+    # from entry tier to top tier.
+    tiers.sort(key=lambda t: t["per_lot"])
 
     # Activation conditions the trader page renders under
     # "How a Referral Qualifies". Defaults match the documented promise

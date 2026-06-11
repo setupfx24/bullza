@@ -452,16 +452,6 @@ function IBTab() {
 
                 {dashboard.tier.label}
 
-                {dashboard.tier.per_referral_bounty != null && dashboard.tier.per_referral_bounty > 0 ? (
-
-                  <span className="text-text-tertiary text-sm font-normal ml-2">
-
-                    · ${dashboard.tier.per_referral_bounty}/referral bounty
-
-                  </span>
-
-                ) : null}
-
               </p>
 
               {/* Per-lot breakdown across account types — what the IB earns
@@ -509,15 +499,13 @@ function IBTab() {
 
               <p className="text-xxs text-text-tertiary mt-1">
 
-                Perks: {dashboard.tier.instant_payout ? '✓ Instant payouts' : '— Manual payouts'}
-
-                {dashboard.tier.dedicated_manager ? ' · ✓ Dedicated manager' : ''}
+                {dashboard.activations ?? 0} activations · ${Number(dashboard.referral_deposit_total ?? 0).toLocaleString('en-US')} referred deposits
 
               </p>
 
             </div>
 
-            {dashboard?.next_tier && dashboard?.needed_for_next_tier ? (
+            {dashboard?.next_tier ? (
 
               <div className="text-right">
 
@@ -525,13 +513,20 @@ function IBTab() {
 
                 <p className="text-sm font-bold text-text-primary mt-0.5">
 
-                  {dashboard.next_tier.label} (${dashboard.next_tier.per_lot}/lot{dashboard.next_tier.per_referral_bounty != null && dashboard.next_tier.per_referral_bounty > 0 ? ` · $${dashboard.next_tier.per_referral_bounty}/ref` : ''})
+                  {dashboard.next_tier.label} (${dashboard.next_tier.per_lot}/lot)
 
                 </p>
 
                 <p className="text-xxs text-text-tertiary mt-1">
 
-                  {dashboard.needed_for_next_tier} more referrals to unlock
+                  {[
+                    dashboard.needed_activations_for_next != null && dashboard.needed_activations_for_next > 0
+                      ? `${dashboard.needed_activations_for_next} more activations`
+                      : null,
+                    dashboard.needed_amount_for_next != null && dashboard.needed_amount_for_next > 0
+                      ? `$${Number(dashboard.needed_amount_for_next).toLocaleString('en-US')} more deposits`
+                      : null,
+                  ].filter(Boolean).join(' or ') || 'Almost there'} to unlock
 
                 </p>
 

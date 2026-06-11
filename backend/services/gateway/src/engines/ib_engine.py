@@ -24,16 +24,20 @@ logger = logging.getLogger("ib-engine")
 DEFAULT_MLM_DISTRIBUTION = [40, 25, 15, 10, 10]
 
 # Fallback used if the system_settings row is absent. Matches the
-# client's 2026-05-26 spec: three levels with admin-tunable commission,
-# resolved by the IB's active-referral count — 1-20 → Starter,
-# 21-100 → Pro, 100+ → Elite. Admin retunes from /admin/config/ib-tiers.
+# client's 2026-06-11 spec: four named tiers with admin-tunable per-lot
+# commission, resolved by EITHER the IB's activation count OR the
+# cumulative deposit amount their referrals have brought — whichever
+# qualifies for the higher tier. A separate per-IB custom override
+# (IBProfile.custom_commission_per_lot, e.g. $15) outranks the ladder.
+#   - "activation" = a referred user who is KYC-approved AND has placed
+#     at least `ib_commission_min_trades` (default 3) closed trades.
+#   - "amount"     = sum of all approved deposits across the IB's referrals.
+# Admin retunes thresholds + per-lot from /admin/config/ib-tiers.
 DEFAULT_IB_TIERS = [
-    {"label": "Starter", "min_referrals": 1,   "max_referrals": 20,   "per_lot": 6,
-     "instant_payout": True, "dedicated_manager": False},
-    {"label": "Pro",     "min_referrals": 21,  "max_referrals": 100,  "per_lot": 8,
-     "instant_payout": True, "dedicated_manager": True},
-    {"label": "Elite",   "min_referrals": 101, "max_referrals": None, "per_lot": 13,
-     "instant_payout": True, "dedicated_manager": True},
+    {"label": "Bronze",   "per_lot": 5,  "min_activations": 5,   "min_amount": 500},
+    {"label": "Silver",   "per_lot": 7,  "min_activations": 20,  "min_amount": 5000},
+    {"label": "Gold",     "per_lot": 10, "min_activations": 50,  "min_amount": 20000},
+    {"label": "Platinum", "per_lot": 12, "min_activations": 100, "min_amount": 50000},
 ]
 
 
@@ -72,18 +76,94 @@ async def get_ib_tiers(db: AsyncSession) -> list[dict]:
     return DEFAULT_IB_TIERS
 
 
-def resolve_tier_for_count(count: int, tiers: list[dict]) -> dict | None:
-    """Pick the tier whose [min_referrals, max_referrals] window contains
-    ``count``. None means the IB hasn't hit the first threshold yet —
-    they're below the program's lowest tier and earn nothing from the
-    tier ladder (the plan fallback may still apply)."""
+def resolve_tier(activations: int, amount, tiers: list[dict]) -> dict | None:
+    """Highest tier the IB qualifies for. A tier is reached when EITHER
+    the activation count OR the cumulative referral-deposit amount meets
+    that tier's threshold (whichever is satisfied). Among all qualifying
+    tiers we return the richest (highest per_lot). None means the IB is
+    below the lowest tier and earns nothing from the ladder (a per-IB
+    custom override or plan default may still apply)."""
+    try:
+        amt = float(amount or 0)
+    except (TypeError, ValueError):
+        amt = 0.0
+    chosen = None
+    chosen_lot = -1.0
     for t in tiers:
-        lo = int(t.get("min_referrals") or 0)
-        hi = t.get("max_referrals")
-        hi_v = int(hi) if hi is not None else None
-        if count >= lo and (hi_v is None or count <= hi_v):
-            return t
-    return None
+        min_act = int(t.get("min_activations") or 0)
+        min_amt = float(t.get("min_amount") or 0)
+        qualifies = (
+            (min_act > 0 and activations >= min_act)
+            or (min_amt > 0 and amt >= min_amt)
+        )
+        if qualifies:
+            lot = float(t.get("per_lot") or 0)
+            if lot >= chosen_lot:
+                chosen = t
+                chosen_lot = lot
+    return chosen
+
+
+# Backward-compat shim: a couple of older call sites still import
+# resolve_tier_for_count. The new ladder has no referral-count windows,
+# so treat the count as the activation count with amount=0.
+def resolve_tier_for_count(count: int, tiers: list[dict]) -> dict | None:
+    return resolve_tier(int(count or 0), 0, tiers)
+
+
+async def compute_ib_qualification(db: AsyncSession, ib_profile_id: UUID) -> tuple[int, Decimal]:
+    """Return ``(activation_count, cumulative_deposit_amount)`` for an IB.
+
+    activation = a referred user who is KYC-approved AND has at least
+    ``ib_commission_min_trades`` (default 3) closed trades.
+    amount      = sum of approved / auto-approved deposits across all of
+    the IB's referred users.
+    """
+    from packages.common.src.models import (
+        User, TradeHistory, TradingAccount, Deposit,
+    )
+    from packages.common.src.settings_store import get_int_setting
+
+    referred_ids = [
+        r[0] for r in (await db.execute(
+            select(Referral.referred_id).where(Referral.ib_profile_id == ib_profile_id)
+        )).all() if r[0] is not None
+    ]
+    if not referred_ids:
+        return 0, Decimal("0")
+
+    # Cumulative deposit amount brought by all referrals.
+    amount_raw = (await db.execute(
+        select(func.coalesce(func.sum(Deposit.amount), 0)).where(
+            Deposit.user_id.in_(referred_ids),
+            Deposit.status.in_(["approved", "auto_approved"]),
+        )
+    )).scalar() or 0
+    amount = Decimal(str(amount_raw))
+
+    # Activations: KYC-approved referrals with >= min_trades closed trades.
+    min_trades = await get_int_setting("ib_commission_min_trades", 3)
+    kyc_ok_ids = [
+        r[0] for r in (await db.execute(
+            select(User.id).where(
+                User.id.in_(referred_ids),
+                func.lower(User.kyc_status).in_(["approved", "verified"]),
+            )
+        )).all()
+    ]
+    activations = 0
+    if kyc_ok_ids:
+        rows = (await db.execute(
+            select(TradingAccount.user_id, func.count(TradeHistory.id))
+            .select_from(TradeHistory)
+            .join(TradingAccount, TradingAccount.id == TradeHistory.account_id)
+            .where(TradingAccount.user_id.in_(kyc_ok_ids))
+            .group_by(TradingAccount.user_id)
+        )).all()
+        for _uid, cnt in rows:
+            if int(cnt or 0) >= int(min_trades or 0):
+                activations += 1
+    return activations, amount
 
 
 async def _referred_account_type_key(db: AsyncSession, order_id: UUID) -> str | None:
@@ -208,8 +288,8 @@ async def distribute_ib_commission(
 
     if per_lot is None:
         tiers = await get_ib_tiers(db)
-        active_n = await count_active_referrals(db, direct_ib.id)
-        tier = resolve_tier_for_count(active_n, tiers)
+        activations, amount = await compute_ib_qualification(db, direct_ib.id)
+        tier = resolve_tier(activations, amount, tiers)
         if tier:
             # Look up the referred user's account-type bucket. The
             # commission row that pays is the one tied to the same
