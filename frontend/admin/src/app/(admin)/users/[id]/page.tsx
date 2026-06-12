@@ -59,6 +59,8 @@ interface UserDetail {
   total_withdrawal: number;
   total_trades: number;
   open_positions: number;
+  assigned_rm_id?: string | null;
+  assigned_rm_name?: string | null;
 }
 
 function fmt(n: number) {
@@ -71,6 +73,59 @@ function statusColor(s: string) {
     case 'banned': case 'suspended': return 'bg-danger/15 text-danger';
     default: return 'bg-warning/15 text-warning';
   }
+}
+
+/** Assign a user to a Relationship Manager. Renders only for admins who hold
+ *  rm.assign (the /rm/list call 403s otherwise → we hide the card). */
+function RMAssignCard({ userId, currentRmId, currentRmName, onSaved }: {
+  userId: string; currentRmId: string | null | undefined; currentRmName: string | null | undefined; onSaved: () => void;
+}) {
+  const [rms, setRms] = useState<Array<{ id: string; name: string; email: string | null }>>([]);
+  const [allowed, setAllowed] = useState(false);
+  const [sel, setSel] = useState(currentRmId || '');
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    adminApi.get<{ rms: typeof rms }>('/rm/list')
+      .then((d) => { setRms(d.rms || []); setAllowed(true); })
+      .catch(() => setAllowed(false));
+  }, []);
+  useEffect(() => { setSel(currentRmId || ''); }, [currentRmId]);
+
+  if (!allowed) return null;
+
+  const save = async () => {
+    setSaving(true);
+    try {
+      await adminApi.post(`/rm/assign/${userId}`, { rm_id: sel || null });
+      toast.success('RM assignment updated');
+      onSaved();
+    } catch (e: any) {
+      toast.error(e?.message || 'Failed to update');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="bg-bg-secondary border border-border-primary rounded-lg p-5">
+      <h2 className="text-base font-bold text-text-primary mb-1">Relationship Manager</h2>
+      <p className="text-xxs text-text-tertiary mb-3">
+        {currentRmName ? <>Currently managed by <span className="text-text-secondary">{currentRmName}</span>.</> : 'No RM assigned.'}
+      </p>
+      <div className="flex items-center gap-2 flex-wrap">
+        <select value={sel} onChange={(e) => setSel(e.target.value)}
+          className="text-sm py-1.5 px-2 bg-bg-input border border-border-primary rounded-md text-text-primary min-w-[220px]">
+          <option value="">— Unassigned —</option>
+          {rms.map((r) => <option key={r.id} value={r.id}>{r.name} {r.email ? `(${r.email})` : ''}</option>)}
+        </select>
+        <button onClick={save} disabled={saving || sel === (currentRmId || '')}
+          className="text-sm font-medium bg-accent text-white rounded-md px-3 py-1.5 disabled:opacity-50">
+          {saving ? 'Saving…' : 'Save'}
+        </button>
+      </div>
+    </div>
+  );
 }
 
 function kycColor(k: string) {
@@ -179,6 +234,14 @@ export default function UserDetailPage() {
             </div>
           ))}
         </div>
+
+        {/* RM assignment (only visible to admins with rm.assign) */}
+        <RMAssignCard
+          userId={userId}
+          currentRmId={data.assigned_rm_id}
+          currentRmName={data.assigned_rm_name}
+          onSaved={fetchUser}
+        />
 
         {/* Deposit history — how each deposit was made + which admin approved */}
         <div className="bg-bg-secondary border border-border-primary rounded-lg p-5">

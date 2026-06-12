@@ -224,6 +224,12 @@ async def get_user_detail(user_id: uuid.UUID, db: AsyncSession):
         )
         open_positions = pos_q.scalar() or 0
 
+    assigned_rm_name = None
+    if user.assigned_rm_id:
+        rm = (await db.execute(select(User).where(User.id == user.assigned_rm_id))).scalar_one_or_none()
+        if rm:
+            assigned_rm_name = f"{rm.first_name or ''} {rm.last_name or ''}".strip() or rm.email
+
     return UserDetailOut(
         user=UserOut(**_user_to_out(user)),
         accounts=[TradingAccountOut(**_account_to_out(a)) for a in accounts],
@@ -231,6 +237,8 @@ async def get_user_detail(user_id: uuid.UUID, db: AsyncSession):
         total_withdrawal=total_withdrawal,
         total_trades=total_trades,
         open_positions=open_positions,
+        assigned_rm_id=str(user.assigned_rm_id) if user.assigned_rm_id else None,
+        assigned_rm_name=assigned_rm_name,
     )
 
 

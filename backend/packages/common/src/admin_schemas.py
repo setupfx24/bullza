@@ -136,6 +136,9 @@ class UserDetailOut(BaseModel):
     total_withdrawal: float = 0
     total_trades: int = 0
     open_positions: int = 0
+    # RM subsystem — who manages this user (if anyone).
+    assigned_rm_id: Optional[str] = None
+    assigned_rm_name: Optional[str] = None
 
 
 class PaginatedResponse(BaseModel):
