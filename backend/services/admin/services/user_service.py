@@ -234,6 +234,42 @@ async def get_user_detail(user_id: uuid.UUID, db: AsyncSession):
     )
 
 
+async def get_user_deposits(user_id: uuid.UUID, db: AsyncSession) -> list[dict]:
+    """Per-deposit history for a user — how each deposit was made (method),
+    its status, and WHICH admin approved it (client 2026-06-12)."""
+    from sqlalchemy.orm import aliased
+    Approver = aliased(User)
+    rows = (await db.execute(
+        select(
+            Deposit.id, Deposit.amount, Deposit.method, Deposit.status,
+            Deposit.created_at, Deposit.approved_at,
+            Deposit.transaction_id,
+            Approver.first_name, Approver.last_name, Approver.email,
+        )
+        .select_from(Deposit)
+        .outerjoin(Approver, Approver.id == Deposit.approved_by)
+        .where(Deposit.user_id == user_id)
+        .order_by(Deposit.created_at.desc())
+        .limit(200)
+    )).all()
+    out = []
+    for r in rows:
+        approver = None
+        if r.first_name or r.last_name or r.email:
+            approver = (" ".join(filter(None, [r.first_name, r.last_name])).strip() or r.email)
+        out.append({
+            "id": str(r.id),
+            "amount": float(r.amount or 0),
+            "method": r.method or "—",
+            "status": r.status,
+            "created_at": r.created_at.isoformat() if r.created_at else None,
+            "approved_at": r.approved_at.isoformat() if r.approved_at else None,
+            "approved_by": approver,
+            "reference": r.transaction_id,
+        })
+    return out
+
+
 async def add_fund(
     user_id: uuid.UUID, body: FundRequest,
     admin_id: uuid.UUID, ip_address: str | None, db: AsyncSession,

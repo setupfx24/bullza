@@ -42,6 +42,16 @@ async def get_user_detail(
     return await user_service.get_user_detail(user_id=user_id, db=db)
 
 
+@router.get("/{user_id}/deposits")
+async def get_user_deposits(
+    user_id: uuid.UUID,
+    admin: User = Depends(require_permission("users.view")),
+    db: AsyncSession = Depends(get_db),
+):
+    """Per-deposit history (method + which admin approved it)."""
+    return {"deposits": await user_service.get_user_deposits(user_id=user_id, db=db)}
+
+
 @router.post("/{user_id}/add-fund")
 async def add_fund(
     user_id: uuid.UUID,

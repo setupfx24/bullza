@@ -88,6 +88,7 @@ export default function UserDetailPage() {
   const userId = params.id as string;
 
   const [data, setData] = useState<UserDetail | null>(null);
+  const [deposits, setDeposits] = useState<Array<{ id: string; amount: number; method: string; status: string; created_at: string | null; approved_at: string | null; approved_by: string | null; reference: string | null }>>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -97,6 +98,10 @@ export default function UserDetailPage() {
     try {
       const res = await adminApi.get<UserDetail>(`/users/${userId}`);
       setData(res);
+      adminApi
+        .get<{ deposits: typeof deposits }>(`/users/${userId}/deposits`)
+        .then((d) => setDeposits(d.deposits || []))
+        .catch(() => {});
     } catch (e: any) {
       setError(e.message || 'Failed to load user');
     } finally {
@@ -173,6 +178,43 @@ export default function UserDetailPage() {
               <p className="text-lg font-bold text-text-primary font-mono tabular-nums">{c.value}</p>
             </div>
           ))}
+        </div>
+
+        {/* Deposit history — how each deposit was made + which admin approved */}
+        <div className="bg-bg-secondary border border-border-primary rounded-lg p-5">
+          <h2 className="text-base font-bold text-text-primary mb-4">Deposit history</h2>
+          {deposits.length === 0 ? (
+            <p className="text-xs text-text-tertiary">No deposits.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="text-text-tertiary text-left uppercase tracking-wide">
+                    <th className="py-2 pr-3">Date</th>
+                    <th className="py-2 pr-3">Amount</th>
+                    <th className="py-2 pr-3">Method</th>
+                    <th className="py-2 pr-3">Status</th>
+                    <th className="py-2 pr-3">Approved by</th>
+                    <th className="py-2 pr-3">Reference</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {deposits.map((d) => (
+                    <tr key={d.id} className="border-t border-border-primary/50">
+                      <td className="py-2 pr-3 text-text-secondary whitespace-nowrap">{d.created_at ? new Date(d.created_at).toLocaleString() : '—'}</td>
+                      <td className="py-2 pr-3 font-mono text-text-primary">${fmt(d.amount)}</td>
+                      <td className="py-2 pr-3 text-text-primary capitalize">{(d.method || '—').replace(/_/g, ' ')}</td>
+                      <td className="py-2 pr-3">
+                        <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold ${['approved', 'auto_approved'].includes(d.status) ? 'bg-success/15 text-success' : d.status === 'pending' ? 'bg-warning/15 text-warning' : 'bg-bg-tertiary text-text-tertiary'}`}>{d.status}</span>
+                      </td>
+                      <td className="py-2 pr-3 text-text-secondary">{d.approved_by || (['approved', 'auto_approved'].includes(d.status) ? 'auto' : '—')}</td>
+                      <td className="py-2 pr-3 text-text-tertiary font-mono truncate max-w-[160px]">{d.reference || '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
 
         {/* User Details */}
