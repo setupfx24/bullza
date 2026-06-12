@@ -489,7 +489,7 @@ export default function KycPage() {
                 >
                   <input
                     type="file"
-                    accept=".jpg,.jpeg,.png,.pdf,.webp"
+                    accept="image/*,application/pdf"
                     className="hidden"
                     onChange={(e) => setFile(e.target.files?.[0] ?? null)}
                   />
@@ -537,7 +537,7 @@ export default function KycPage() {
                 >
                   <input
                     type="file"
-                    accept=".jpg,.jpeg,.png,.pdf,.webp"
+                    accept="image/*,application/pdf"
                     className="hidden"
                     onChange={(e) => setFile2(e.target.files?.[0] ?? null)}
                   />
@@ -563,7 +563,8 @@ export default function KycPage() {
                 >
                   <input
                     type="file"
-                    accept=".jpg,.jpeg,.png,.webp"
+                    accept="image/*"
+                    capture="user"
                     className="hidden"
                     onChange={(e) => setFile3(e.target.files?.[0] ?? null)}
                   />
