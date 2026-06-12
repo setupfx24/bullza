@@ -224,7 +224,9 @@ class Settings(BaseSettings):
     # ─── Admin financial-action thresholds (USD) ──────────────────────────
     # Withdrawals at or above this amount require a second admin to approve
     # (4-eyes rule). Add-fund / deduct-fund go through the same gate.
-    ADMIN_DUAL_APPROVAL_THRESHOLD: float = 1000.0
+    # 0 ⇒ EVERY admin fund add/deduct/withdrawal-approval needs a second
+    # admin's sign-off (client 2026-06-12 — no direct admin funding at all).
+    ADMIN_DUAL_APPROVAL_THRESHOLD: float = 0.0
     # Hard cap for any single admin balance mutation (defense-in-depth, even
     # for a super_admin). Set to 0 to disable.
     ADMIN_BALANCE_MUTATION_CAP: float = 100_000.0

@@ -31,6 +31,7 @@ ADMIN_COOKIE_NAME = "swisdex_admin"
 #   settings.manage     — edit platform/system settings (withdrawal flags…)
 #   fixed_return.manage — grant/approve fixed-return locks (payouts)
 #   insurance.manage    — edit insurance fee/payout economics
+#   funds.approve       — approve/reject a 2nd-admin financial sign-off
 EMPLOYEE_ROLE_PERMISSIONS = {
     "super_admin": {"*"},
     "trade_manager": {
