@@ -1,4 +1,5 @@
 import uuid
+from datetime import datetime, time, timezone
 
 from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -12,16 +13,33 @@ from services import trade_service
 router = APIRouter(prefix="/trades", tags=["Trades"])
 
 
+def _date_bound(value: str | None, *, end_of_day: bool):
+    """Parse YYYY-MM-DD → UTC datetime (start or end of day). None passes through."""
+    if not value:
+        return None
+    try:
+        d = datetime.strptime(value, "%Y-%m-%d").date()
+    except ValueError:
+        return None
+    return datetime.combine(d, time.max if end_of_day else time.min, tzinfo=timezone.utc)
+
+
 @router.get("/positions")
 async def list_positions(
     page: int = Query(1, ge=1),
     per_page: int = Query(50, ge=1, le=200),
     status_filter: str = Query("open", alias="status"),
+    start_date: str | None = Query(None),
+    end_date: str | None = Query(None),
+    sort: str = Query("recent", description="recent | gainers | losers"),
     admin: User = Depends(require_permission("trades.view")),
     db: AsyncSession = Depends(get_db),
 ):
     return await trade_service.list_positions(
         page=page, per_page=per_page, status_filter=status_filter, db=db,
+        start_date=_date_bound(start_date, end_of_day=False),
+        end_date=_date_bound(end_date, end_of_day=True),
+        sort=sort,
     )
 
 
@@ -42,10 +60,18 @@ async def list_orders(
 async def list_trade_history(
     page: int = Query(1, ge=1),
     per_page: int = Query(50, ge=1, le=200),
+    start_date: str | None = Query(None),
+    end_date: str | None = Query(None),
+    sort: str = Query("recent", description="recent | gainers | losers"),
     admin: User = Depends(require_permission("trades.view")),
     db: AsyncSession = Depends(get_db),
 ):
-    return await trade_service.list_trade_history(page=page, per_page=per_page, db=db)
+    return await trade_service.list_trade_history(
+        page=page, per_page=per_page, db=db,
+        start_date=_date_bound(start_date, end_of_day=False),
+        end_date=_date_bound(end_date, end_of_day=True),
+        sort=sort,
+    )
 
 
 @router.put("/position/{position_id}/modify")
