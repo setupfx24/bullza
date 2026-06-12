@@ -38,11 +38,18 @@ async def list_transactions(
     type_filter: str | None,
     search: str | None,
     db: AsyncSession,
+    start_date=None,
+    end_date=None,
 ) -> PaginatedResponse:
     query = select(Transaction)
 
     if type_filter and type_filter != "all":
         query = query.where(Transaction.type == type_filter)
+
+    if start_date is not None:
+        query = query.where(Transaction.created_at >= start_date)
+    if end_date is not None:
+        query = query.where(Transaction.created_at <= end_date)
 
     if search:
         user_ids_q = select(User.id).where(

@@ -1,4 +1,5 @@
 import uuid
+from datetime import datetime, time, timezone
 from decimal import Decimal
 
 from fastapi import APIRouter, Depends, Query, Request
@@ -12,6 +13,17 @@ from packages.common.src.admin_schemas import RejectRequest
 from services import deposit_service
 
 router = APIRouter(prefix="/finance", tags=["Finance"])
+
+
+def _date_bound(value: str | None, *, end_of_day: bool):
+    """Parse YYYY-MM-DD → UTC datetime (start or end of day). None passes through."""
+    if not value:
+        return None
+    try:
+        d = datetime.strptime(value, "%Y-%m-%d").date()
+    except ValueError:
+        return None
+    return datetime.combine(d, time.max if end_of_day else time.min, tzinfo=timezone.utc)
 
 
 @router.get("/deposits/pending")
@@ -39,10 +51,16 @@ async def list_all_deposits(
     page: int = Query(1, ge=1),
     per_page: int = Query(20, ge=1, le=100),
     status: str = Query(None),
+    start_date: str | None = Query(None),
+    end_date: str | None = Query(None),
     admin: User = Depends(require_permission("deposits.view")),
     db: AsyncSession = Depends(get_db),
 ):
-    return await deposit_service.list_all_deposits(page=page, per_page=per_page, status=status, db=db)
+    return await deposit_service.list_all_deposits(
+        page=page, per_page=per_page, status=status, db=db,
+        start_date=_date_bound(start_date, end_of_day=False),
+        end_date=_date_bound(end_date, end_of_day=True),
+    )
 
 
 @router.get("/withdrawals")
@@ -50,10 +68,16 @@ async def list_all_withdrawals(
     page: int = Query(1, ge=1),
     per_page: int = Query(20, ge=1, le=100),
     status: str = Query(None),
+    start_date: str | None = Query(None),
+    end_date: str | None = Query(None),
     admin: User = Depends(require_permission("withdrawals.view")),
     db: AsyncSession = Depends(get_db),
 ):
-    return await deposit_service.list_all_withdrawals(page=page, per_page=per_page, status=status, db=db)
+    return await deposit_service.list_all_withdrawals(
+        page=page, per_page=per_page, status=status, db=db,
+        start_date=_date_bound(start_date, end_of_day=False),
+        end_date=_date_bound(end_date, end_of_day=True),
+    )
 
 
 class ApproveDepositRequest(BaseModel):
