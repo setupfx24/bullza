@@ -75,7 +75,6 @@ export const paymentMethods = [
   { name: 'Skrill', icon: <Wallet size={24} />, color: 'text-primary-purple', bg: 'bg-primary-purple/10' },
   { name: 'Neteller', icon: <CircleDollarSign size={24} />, color: 'text-primary-accent', bg: 'bg-primary-accent/10' },
   { name: 'Crypto Payments', icon: <Bitcoin size={24} />, color: 'text-blue-400', bg: 'bg-blue-400/10' },
-  { name: 'UPI / Local Transfer', icon: <QrCode size={24} />, color: 'text-primary-purple', bg: 'bg-primary-purple/10' },
 ]
 
 export const stats = [

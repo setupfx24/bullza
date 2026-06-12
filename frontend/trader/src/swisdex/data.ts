@@ -170,7 +170,7 @@ export const FAQ = [
   },
   {
     q: 'Which deposit and withdrawal methods are available, and how long do they take?',
-    a: 'We support bank wire transfers, Visa/Mastercard, Skrill, Neteller, and cryptocurrency. UPI is supported as a deposit payment option for traders in India. Card and e-wallet deposits are typically instant; bank wires and crypto withdrawals usually settle within 1–3 business days.',
+    a: 'We support bank wire transfers, Visa/Mastercard, Skrill, Neteller, and cryptocurrency. Card and e-wallet deposits are typically instant; bank wires and crypto withdrawals usually settle within 1–3 business days.',
   },
   {
     q: 'Which trading platforms and devices are supported?',

@@ -88,7 +88,7 @@ const RULES: { keys: string[]; reply: string; cta?: { label: string; href: strin
   {
     keys: ['withdraw', 'withdrawal', 'cash out', 'payout', 'paise nikalna'],
     reply:
-      'Withdrawals are processed by your preferred method — crypto (instant), bank wire (1–3 business days), card, Skrill, Neteller, or UPI. All deposits are 100% fee-free; withdrawal speed depends on the rail.',
+      'Withdrawals are processed by your preferred method — crypto (instant), bank wire (1–3 business days), card, Skrill, or Neteller. All deposits are 100% fee-free; withdrawal speed depends on the rail.',
   },
   {
     keys: ['leverage', 'margin'],
