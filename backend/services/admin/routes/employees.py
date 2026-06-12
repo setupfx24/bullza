@@ -27,6 +27,7 @@ PERMISSION_CATALOG = {
     "Support":     ["tickets.view", "tickets.reply", "tickets.assign"],
     "Analytics":   ["analytics.view", "exposure.view"],
     "Audit":       ["audit_logs.view"],
+    "RM":          ["rm.view", "rm.request", "rm.manage", "rm.assign"],
 }
 
 

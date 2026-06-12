@@ -18,7 +18,7 @@ from routes import (
     support, employees, settings, transactions, kyc, account_types, user_audit_logs,
     insurance as insurance_admin, play_zone as play_zone_admin,
     lifestyle as lifestyle_admin, approvals, notifications, broadcast,
-    fixed_return as fixed_return_admin,
+    fixed_return as fixed_return_admin, rm as rm_admin,
 )
 
 app_settings = get_settings()
@@ -55,6 +55,36 @@ async def _apply_startup_ddl():
                     updated_at TIMESTAMPTZ DEFAULT now()
                 )
             """))
+            # RM subsystem (migration 0071). Self-heal so the /rm endpoints work
+            # even on hosts where the migrate step wasn't run.
+            await conn.execute(text(
+                "ALTER TABLE users ADD COLUMN IF NOT EXISTS assigned_rm_id UUID REFERENCES users(id)"
+            ))
+            await conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS rm_funding_requests (
+                    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                    rm_id UUID NOT NULL REFERENCES users(id),
+                    user_id UUID NOT NULL REFERENCES users(id),
+                    amount NUMERIC(18,2) NOT NULL,
+                    currency VARCHAR(10) NOT NULL DEFAULT 'USD',
+                    method VARCHAR(40),
+                    note TEXT,
+                    proof_path TEXT,
+                    status VARCHAR(20) NOT NULL DEFAULT 'pending',
+                    approved_by UUID REFERENCES users(id),
+                    approved_at TIMESTAMPTZ,
+                    credited_by UUID REFERENCES users(id),
+                    credited_at TIMESTAMPTZ,
+                    rejected_by UUID REFERENCES users(id),
+                    rejected_at TIMESTAMPTZ,
+                    rejection_reason TEXT,
+                    deposit_id UUID REFERENCES deposits(id),
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+                )
+            """))
+            await conn.execute(text(
+                "CREATE INDEX IF NOT EXISTS ix_rm_funding_requests_status ON rm_funding_requests(status)"
+            ))
     except Exception as e:
         logger.warning("startup DDL skipped: %s", e)
 
@@ -126,6 +156,7 @@ app.include_router(lifestyle_admin.router, prefix=prefix)
 app.include_router(approvals.router, prefix=f"{prefix}/approvals", tags=["Approvals"])
 app.include_router(notifications.router, prefix=prefix)
 app.include_router(broadcast.router, prefix=prefix)
+app.include_router(rm_admin.router, prefix=prefix)
 
 
 @app.get("/health")

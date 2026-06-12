@@ -52,6 +52,9 @@ EMPLOYEE_ROLE_PERMISSIONS = {
         "banks.view", "banks.create", "banks.update",
         "ib.view",
         "kyc.view", "kyc.manage",
+        # Finance admins clear RM funding requests (the two-admin approve →
+        # credit flow) and assign users to RMs.
+        "rm.manage", "rm.assign",
     },
     "risk_manager": {
         "trades.view", "positions.view", "users.view",
@@ -63,6 +66,14 @@ EMPLOYEE_ROLE_PERMISSIONS = {
         "banners.view", "banners.create", "banners.update", "banners.delete",
         "bonus.view", "bonus.create", "bonus.update",
         "ib.view", "ib.manage",
+    },
+    # Relationship Manager — a limited role that only sees its own assigned
+    # users and can raise funding requests (with proof) for them. It cannot
+    # approve/credit (that's rm.manage, held by finance/super_admin).
+    "rm": {
+        # Deliberately NOT users.view — an RM must only ever see the users
+        # assigned to them, which the /rm endpoints scope by assigned_rm_id.
+        "rm.view", "rm.request",
     },
 }
 
