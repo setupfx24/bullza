@@ -38,6 +38,16 @@ async def analytics_dashboard(
     )
 
 
+@router.get("/finance-overview")
+async def finance_overview(
+    # Company-wide financial overview = sensitive; super_admin-only via a
+    # permission no employee role holds (analytics.finance).
+    admin: User = Depends(require_permission("analytics.finance")),
+    db: AsyncSession = Depends(get_db),
+):
+    return await analytics_service.finance_overview(db=db)
+
+
 @router.get("/exposure")
 async def get_exposure(
     admin: User = Depends(require_permission("analytics.view")),

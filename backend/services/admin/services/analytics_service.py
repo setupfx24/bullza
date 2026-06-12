@@ -228,6 +228,165 @@ async def analytics_dashboard(
     }
 
 
+async def finance_overview(db: AsyncSession) -> dict:
+    """Super-admin financial overview with clickable-breakdown data.
+
+    Every headline number ships with its segregation so the dashboard can
+    drill down without extra round-trips (per-USER lists are fetched
+    on-click via separate endpoints). Net P&L follows the broker B-book
+    convention agreed 2026-06-12:
+        + user trading LOSS, + commission, + swap, + PAMM/MAM admin cut,
+        + insurance fees
+        − user trading PROFIT, − insurance payouts, − IB commission,
+        − referral commission
+    Fixed Return is reported separately (NOT part of Net P&L).
+    """
+    from packages.common.src.models import FixedReturnLock
+
+    # ── Net P&L sources ───────────────────────────────────────────────
+    user_pnl = float((await db.execute(
+        select(func.coalesce(func.sum(TradeHistory.profit), 0))
+    )).scalar() or 0)
+    broker_trading = -user_pnl  # user loss = broker gain
+
+    commission = abs(float((await db.execute(
+        select(func.coalesce(func.sum(Position.commission), 0)).where(Position.commission != 0)
+    )).scalar() or 0))
+    swap = abs(float((await db.execute(
+        select(func.coalesce(func.sum(Position.swap), 0)).where(Position.swap != 0)
+    )).scalar() or 0))
+
+    admin_commission = float((await db.execute(
+        select(func.coalesce(func.sum(Transaction.amount), 0)).where(
+            Transaction.type == "admin_commission",
+        )
+    )).scalar() or 0)
+
+    insurance_fees = abs(float((await db.execute(
+        select(func.coalesce(func.sum(Transaction.amount), 0)).where(
+            Transaction.type == "insurance_fee",
+        )
+    )).scalar() or 0))
+    insurance_payouts = abs(float((await db.execute(
+        select(func.coalesce(func.sum(Transaction.amount), 0)).where(
+            Transaction.type == "insurance_payout",
+        )
+    )).scalar() or 0))
+
+    ib_commission = float((await db.execute(
+        select(func.coalesce(func.sum(IBCommission.amount), 0))
+    )).scalar() or 0)
+    referral_commission = abs(float((await db.execute(
+        select(func.coalesce(func.sum(Transaction.amount), 0)).where(
+            Transaction.type.in_(["referral_commission", "ib_referral_bounty"]),
+        )
+    )).scalar() or 0))
+
+    pnl_sources = [
+        {"key": "trading",        "label": "Trading P&L (user loss − profit)", "amount": round(broker_trading, 2)},
+        {"key": "commission",     "label": "Commission",                       "amount": round(commission, 2)},
+        {"key": "swap",           "label": "Swap / overnight",                 "amount": round(swap, 2)},
+        {"key": "pamm_mam",       "label": "PAMM / MAM admin cut",             "amount": round(admin_commission, 2)},
+        {"key": "insurance_fees", "label": "Insurance fees",                   "amount": round(insurance_fees, 2)},
+        {"key": "insurance_payouts", "label": "Insurance payouts",             "amount": round(-insurance_payouts, 2)},
+        {"key": "ib_commission",  "label": "IB commission paid",               "amount": round(-ib_commission, 2)},
+        {"key": "referral",       "label": "Referral commission paid",         "amount": round(-referral_commission, 2)},
+    ]
+    net_pnl_total = round(sum(s["amount"] for s in pnl_sources), 2)
+
+    # ── Deposits / Withdrawals by method ──────────────────────────────
+    async def _by_method(model, statuses):
+        rows = (await db.execute(
+            select(model.method, func.coalesce(func.sum(model.amount), 0), func.count(model.id))
+            .where(model.status.in_(statuses))
+            .group_by(model.method)
+        )).all()
+        out = [{"method": (m or "other"), "amount": round(float(a or 0), 2), "count": int(c or 0)} for m, a, c in rows]
+        out.sort(key=lambda x: x["amount"], reverse=True)
+        return out, round(sum(x["amount"] for x in out), 2)
+
+    dep_methods, dep_total = await _by_method(Deposit, ["approved", "auto_approved"])
+    wd_methods, wd_total = await _by_method(Withdrawal, ["approved", "completed"])
+    pdep_methods, pdep_total = await _by_method(Deposit, ["pending"])
+    pwd_methods, pwd_total = await _by_method(Withdrawal, ["pending"])
+
+    # ── Net credit (non-withdrawable tradable funds) ──────────────────
+    bonus_wallet = float((await db.execute(
+        select(func.coalesce(func.sum(User.main_wallet_bonus), 0))
+    )).scalar() or 0)
+    account_credit = float((await db.execute(
+        select(func.coalesce(func.sum(TradingAccount.credit), 0))
+    )).scalar() or 0)
+    # Best-effort split of the account-credit pool into insurance vs other
+    # using lifetime credited transactions (the live balance itself doesn't
+    # store its source).
+    insurance_credited = abs(float((await db.execute(
+        select(func.coalesce(func.sum(Transaction.amount), 0)).where(
+            Transaction.type == "insurance_payout",
+        )
+    )).scalar() or 0))
+
+    # ── Fixed Return (separate from P&L) ──────────────────────────────
+    active_locks = (await db.execute(
+        select(FixedReturnLock).where(FixedReturnLock.state.in_(["active", "early_pending"]))
+    )).scalars().all()
+    fr_collected = 0.0
+    fr_interest_paid = 0.0
+    fr_payable = 0.0
+    by_tenure: dict[str, dict] = {}
+    maturing: dict[str, dict] = {}
+    for lk in active_locks:
+        p = float(lk.principal or 0)
+        fr_collected += p
+        paid = float(lk.total_interest_paid or 0)
+        fr_interest_paid += paid
+        # Projected total interest the broker will owe over the full lock
+        # (rate_pct is per tenure-cycle; months/cycle = tenure_days/30).
+        months = int(lk.lock_months_at_creation or 24)
+        cyc_months = max(1, int(round((lk.tenure_days or 30) / 30)))
+        cycles = max(1, months // cyc_months)
+        projected = p * float(lk.rate_pct or 0) / 100.0 * cycles
+        fr_payable += max(0.0, projected - paid)
+        t = lk.tenure_label or "—"
+        by_tenure.setdefault(t, {"tenure": t, "principal": 0.0, "count": 0})
+        by_tenure[t]["principal"] += p
+        by_tenure[t]["count"] += 1
+        if lk.matures_at:
+            mk = lk.matures_at.strftime("%Y-%m")
+            maturing.setdefault(mk, {"month": mk, "principal": 0.0, "count": 0})
+            maturing[mk]["principal"] += p
+            maturing[mk]["count"] += 1
+    fr_by_tenure = sorted(
+        [{**v, "principal": round(v["principal"], 2)} for v in by_tenure.values()],
+        key=lambda x: x["principal"], reverse=True,
+    )
+    fr_maturing = sorted(
+        [{**v, "principal": round(v["principal"], 2)} for v in maturing.values()],
+        key=lambda x: x["month"],
+    )
+
+    return {
+        "net_pnl": {"total": net_pnl_total, "sources": pnl_sources},
+        "deposits": {"total": dep_total, "by_method": dep_methods},
+        "withdrawals": {"total": wd_total, "by_method": wd_methods},
+        "net_credit": {
+            "total": round(bonus_wallet + account_credit, 2),
+            "bonus": round(bonus_wallet, 2),
+            "account_credit": round(account_credit, 2),
+            "insurance_credited_lifetime": round(insurance_credited, 2),
+        },
+        "fixed_return": {
+            "collected": round(fr_collected, 2),
+            "interest_paid_to_date": round(fr_interest_paid, 2),
+            "projected_payable": round(fr_payable, 2),
+            "by_tenure": fr_by_tenure,
+            "maturing": fr_maturing,
+        },
+        "pending_deposits": {"total": pdep_total, "by_method": pdep_methods},
+        "pending_withdrawals": {"total": pwd_total, "by_method": pwd_methods},
+    }
+
+
 async def get_exposure(db: AsyncSession) -> dict:
     result = await db.execute(
         select(
