@@ -13,12 +13,49 @@ from __future__ import annotations
 import asyncio
 import logging
 import smtplib
+import urllib.request
 from email.message import EmailMessage
 from typing import Optional
 
 from .config import get_settings
 
 logger = logging.getLogger(__name__)
+
+# Cache of fetched logo bytes keyed by URL → (bytes, image_subtype). Filled
+# lazily on the first send so we hit the network once, then embed the logo
+# inline (cid:) in every mail. Inline images aren't blocked by Gmail/Outlook
+# the way remote <img src="https://…"> are, which is why some clients showed
+# a broken logo before. Failures are NOT cached so a transient fetch error
+# just falls back to the remote URL and retries next send.
+_LOGO_CACHE: dict[str, tuple[bytes, str]] = {}
+_LOGO_CID = "swisdexlogo"
+
+
+def _get_logo_bytes(url: str) -> Optional[tuple[bytes, str]]:
+    """Fetch (and cache) the brand logo so it can be embedded inline.
+    Returns (bytes, subtype) or None if the fetch fails."""
+    if url in _LOGO_CACHE:
+        return _LOGO_CACHE[url]
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent": "SwisDex-Mailer/1.0"})
+        with urllib.request.urlopen(req, timeout=10) as resp:  # noqa: S310 (trusted config URL)
+            data = resp.read()
+            ctype = (resp.headers.get("Content-Type") or "").lower()
+        if not data:
+            return None
+        if "png" in ctype or url.lower().endswith(".png"):
+            subtype = "png"
+        elif "jpeg" in ctype or "jpg" in ctype or url.lower().endswith((".jpg", ".jpeg")):
+            subtype = "jpeg"
+        elif "gif" in ctype or url.lower().endswith(".gif"):
+            subtype = "gif"
+        else:
+            subtype = "png"
+        _LOGO_CACHE[url] = (data, subtype)
+        return _LOGO_CACHE[url]
+    except Exception:
+        logger.warning("Could not fetch email logo %s — falling back to remote URL", url)
+        return None
 
 
 def smtp_configured() -> bool:
@@ -120,12 +157,37 @@ def _send_sync(to_email: str, subject: str, html: str, text: Optional[str], cate
     except Exception:
         pass
     msg["To"] = to_email
+
+    # Embed the brand logo inline (cid:) when the html references the
+    # configured EMAIL_LOGO_URL and we can fetch its bytes. This sidesteps
+    # the remote-image blocking that made the logo look broken in some
+    # clients. If the fetch fails we leave the remote <img src> untouched.
+    logo_bytes: Optional[tuple[bytes, str]] = None
+    logo_url = (getattr(s, "EMAIL_LOGO_URL", "") or "").strip()
+    if logo_url and logo_url in html:
+        logo_bytes = _get_logo_bytes(logo_url)
+        if logo_bytes:
+            html = html.replace(logo_url, f"cid:{_LOGO_CID}")
+
     # Always include a plain-text fallback. If the caller didn't give us one,
     # produce a crude strip-tags version of the html so picky clients still
     # render something.
     plain = text if text else _strip_tags(html)
     msg.set_content(plain)
     msg.add_alternative(html, subtype="html")
+
+    if logo_bytes:
+        # Attach the image to the html part so it becomes multipart/related
+        # (alternative[text, related[html, image]]). Content-ID matches the
+        # cid: reference we rewrote into the html above.
+        html_part = msg.get_payload()[-1]
+        try:
+            html_part.add_related(
+                logo_bytes[0], maintype="image", subtype=logo_bytes[1],
+                cid=f"<{_LOGO_CID}>",
+            )
+        except Exception:
+            logger.exception("Failed to embed inline logo — mail will use remote URL fallback")
 
     host = str(s.SMTP_HOST).strip()
     port = int(s.SMTP_PORT)
