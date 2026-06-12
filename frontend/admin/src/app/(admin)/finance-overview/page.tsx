@@ -7,7 +7,8 @@
  * and opens a drill-down modal with its segregation (P&L by source,
  * deposits/withdrawals by method, credit split, fixed-return by tenure +
  * maturity schedule, pending by mode). Data: GET /analytics/finance-overview
- * (super_admin only). Per-USER drill-down is a follow-up phase.
+ * (super_admin only). Clicking a method/tenure row inside a drill opens a
+ * second-level per-USER breakdown via /analytics/finance-overview/drill.
  */
 import { useCallback, useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
@@ -30,11 +31,71 @@ const fmt = (n: number | undefined) =>
 const titleCase = (s: string) => s.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 
 type Drill = { title: string; render: () => React.ReactNode } | null;
+type UserDrill = { title: string; section: string; method?: string; tenure?: string } | null;
+
+interface UserRow { user_id: string | null; name: string; email: string | null; amount: number; count: number }
+
+/** Second-level drill: who (per user) is behind a method/tenure/credit row. */
+function UserBreakdown({ section, method, tenure }: { section: string; method?: string; tenure?: string }) {
+  const [rows, setRows] = useState<UserRow[]>([]);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      setLoading(true);
+      try {
+        const params: Record<string, string> = { section };
+        if (method) params.method = method;
+        if (tenure) params.tenure = tenure;
+        const d = await adminApi.get<{ users: UserRow[]; total: number }>('/analytics/finance-overview/drill', params);
+        if (alive) { setRows(d.users || []); setTotal(d.total || 0); }
+      } catch (e: any) {
+        toast.error(e?.message || 'Failed to load per-user breakdown');
+      } finally {
+        if (alive) setLoading(false);
+      }
+    })();
+    return () => { alive = false; };
+  }, [section, method, tenure]);
+
+  if (loading) return <div className="flex justify-center py-8"><Loader2 className="animate-spin text-text-tertiary" size={18} /></div>;
+  return (
+    <table className="w-full text-sm">
+      <thead><tr className="text-text-tertiary text-xxs uppercase tracking-wide">
+        <th className="text-left py-2">User</th><th className="text-right py-2">Amount</th><th className="text-right py-2">Count</th>
+      </tr></thead>
+      <tbody>
+        {rows.length === 0 && <tr><td colSpan={3} className="py-4 text-center text-text-tertiary text-xs">No data</td></tr>}
+        {rows.map((u, i) => (
+          <tr key={u.user_id || i} className="border-t border-border-primary/50">
+            <td className="py-2">
+              {u.user_id
+                ? <a href={`/users/${u.user_id}`} className="text-accent hover:underline">{u.name}</a>
+                : <span className="text-text-primary">{u.name}</span>}
+              {u.email && <span className="block text-xxs text-text-tertiary">{u.email}</span>}
+            </td>
+            <td className="py-2 text-right font-mono text-text-primary">{fmt(u.amount)}</td>
+            <td className="py-2 text-right text-text-tertiary">{u.count}</td>
+          </tr>
+        ))}
+        {rows.length > 0 && (
+          <tr className="border-t-2 border-border-primary font-bold">
+            <td className="py-2 text-text-primary">Total ({rows.length} users)</td>
+            <td className="py-2 text-right font-mono text-text-primary">{fmt(total)}</td>
+            <td />
+          </tr>
+        )}
+      </tbody>
+    </table>
+  );
+}
 
 export default function FinanceOverviewPage() {
   const [data, setData] = useState<Overview | null>(null);
   const [loading, setLoading] = useState(true);
   const [drill, setDrill] = useState<Drill>(null);
+  const [userDrill, setUserDrill] = useState<UserDrill>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -55,20 +116,43 @@ export default function FinanceOverviewPage() {
   if (!data) return null;
 
   // ── reusable breakdown table ──
-  const methodTable = (rows: Row[], valKey: 'amount' | 'principal' = 'amount') => (
+  // When `section` is passed, each row is clickable and opens the per-user
+  // drill-down for that method/tenure (GET /analytics/finance-overview/drill).
+  const methodTable = (rows: Row[], valKey: 'amount' | 'principal' = 'amount', section?: string) => (
     <table className="w-full text-sm">
       <thead><tr className="text-text-tertiary text-xxs uppercase tracking-wide">
         <th className="text-left py-2">Method</th><th className="text-right py-2">Amount</th><th className="text-right py-2">Count</th>
       </tr></thead>
       <tbody>
         {rows.length === 0 && <tr><td colSpan={3} className="py-4 text-center text-text-tertiary text-xs">No data</td></tr>}
-        {rows.map((r, i) => (
-          <tr key={i} className="border-t border-border-primary/50">
-            <td className="py-2 text-text-primary capitalize">{(r.method || r.tenure || r.month || '—').replace(/_/g, ' ')}</td>
-            <td className="py-2 text-right font-mono text-text-primary">{fmt(r[valKey])}</td>
-            <td className="py-2 text-right text-text-tertiary">{r.count ?? '—'}</td>
-          </tr>
-        ))}
+        {rows.map((r, i) => {
+          const label = (r.method || r.tenure || r.month || '—').replace(/_/g, ' ');
+          // 'maturing' rows are keyed by month (no per-user drill); only
+          // method/tenure rows are drillable.
+          const drillable = !!section && r.month === undefined;
+          return (
+            <tr key={i} className="border-t border-border-primary/50">
+              <td className="py-2 text-text-primary capitalize">
+                {drillable ? (
+                  <button
+                    type="button"
+                    onClick={() => setUserDrill({
+                      title: `${label} — by user`,
+                      section: section!,
+                      method: r.method,
+                      tenure: r.tenure,
+                    })}
+                    className="text-accent hover:underline capitalize"
+                  >
+                    {label}
+                  </button>
+                ) : label}
+              </td>
+              <td className="py-2 text-right font-mono text-text-primary">{fmt(r[valKey])}</td>
+              <td className="py-2 text-right text-text-tertiary">{r.count ?? '—'}</td>
+            </tr>
+          );
+        })}
       </tbody>
     </table>
   );
@@ -100,11 +184,11 @@ export default function FinanceOverviewPage() {
     },
     {
       title: 'Net Deposits', value: data.deposits.total, icon: ArrowDownCircle,
-      drill: { title: 'Deposits — by method', render: () => methodTable(data.deposits.by_method) },
+      drill: { title: 'Deposits — by method (click a method for per-user)', render: () => methodTable(data.deposits.by_method, 'amount', 'deposits') },
     },
     {
       title: 'Net Withdrawals', value: data.withdrawals.total, icon: ArrowUpCircle,
-      drill: { title: 'Withdrawals — by method', render: () => methodTable(data.withdrawals.by_method) },
+      drill: { title: 'Withdrawals — by method (click a method for per-user)', render: () => methodTable(data.withdrawals.by_method, 'amount', 'withdrawals') },
     },
     {
       title: 'Net Credit (tradable)', value: data.net_credit.total, icon: Gift,
@@ -115,6 +199,15 @@ export default function FinanceOverviewPage() {
             <tr className="border-t border-border-primary/50"><td className="py-2 text-text-primary">Deposit bonus (wallet)</td><td className="py-2 text-right font-mono text-text-primary">{fmt(data.net_credit.bonus)}</td></tr>
             <tr className="border-t border-border-primary/50"><td className="py-2 text-text-primary">Account credit (bonus / insurance grants)</td><td className="py-2 text-right font-mono text-text-primary">{fmt(data.net_credit.account_credit)}</td></tr>
             <tr className="border-t border-border-primary/50"><td className="py-2 text-text-tertiary text-xs">Insurance credited (lifetime, ref)</td><td className="py-2 text-right font-mono text-text-tertiary text-xs">{fmt(data.net_credit.insurance_credited_lifetime)}</td></tr>
+            <tr><td colSpan={2} className="pt-3">
+              <button
+                type="button"
+                onClick={() => setUserDrill({ title: 'Net Credit — by user', section: 'net_credit' })}
+                className="text-xs text-accent hover:underline inline-flex items-center gap-0.5"
+              >
+                View by user <ChevronRight size={11} />
+              </button>
+            </td></tr>
           </tbody></table>
         ),
       },
@@ -131,8 +224,8 @@ export default function FinanceOverviewPage() {
               <div><p className="text-xxs text-text-tertiary uppercase">Projected payable</p><p className="font-mono text-amber-400">{fmt(data.fixed_return.projected_payable)}</p></div>
             </div>
             <div>
-              <p className="text-xs font-semibold text-text-secondary mb-1">By tenure</p>
-              {methodTable(data.fixed_return.by_tenure, 'principal')}
+              <p className="text-xs font-semibold text-text-secondary mb-1">By tenure (click for per-user)</p>
+              {methodTable(data.fixed_return.by_tenure, 'principal', 'fixed_return')}
             </div>
             <div>
               <p className="text-xs font-semibold text-text-secondary mb-1">Maturing (by month)</p>
@@ -144,11 +237,11 @@ export default function FinanceOverviewPage() {
     },
     {
       title: 'Pending Deposits', value: data.pending_deposits.total, icon: Clock,
-      drill: { title: 'Pending deposits — by method', render: () => methodTable(data.pending_deposits.by_method) },
+      drill: { title: 'Pending deposits — by method (click for per-user)', render: () => methodTable(data.pending_deposits.by_method, 'amount', 'pending_deposits') },
     },
     {
       title: 'Pending Withdrawals', value: data.pending_withdrawals.total, icon: Clock,
-      drill: { title: 'Pending withdrawals — by method', render: () => methodTable(data.pending_withdrawals.by_method) },
+      drill: { title: 'Pending withdrawals — by method (click for per-user)', render: () => methodTable(data.pending_withdrawals.by_method, 'amount', 'pending_withdrawals') },
     },
   ];
 
@@ -196,6 +289,22 @@ export default function FinanceOverviewPage() {
               <button onClick={() => setDrill(null)} className="p-1.5 rounded-md text-text-tertiary hover:bg-bg-hover hover:text-text-primary"><X size={16} /></button>
             </div>
             <div className="p-5">{drill.render()}</div>
+          </div>
+        </div>
+      )}
+
+      {/* Per-user drill-down modal (layered above the method modal) */}
+      {userDrill && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/60" onClick={() => setUserDrill(null)} />
+          <div className="relative w-full max-w-lg max-h-[85vh] overflow-y-auto bg-bg-secondary border border-border-primary rounded-xl shadow-modal">
+            <div className="flex items-center justify-between px-5 py-3 border-b border-border-primary sticky top-0 bg-bg-secondary">
+              <h2 className="text-sm font-bold text-text-primary capitalize">{userDrill.title}</h2>
+              <button onClick={() => setUserDrill(null)} className="p-1.5 rounded-md text-text-tertiary hover:bg-bg-hover hover:text-text-primary"><X size={16} /></button>
+            </div>
+            <div className="p-5">
+              <UserBreakdown section={userDrill.section} method={userDrill.method} tenure={userDrill.tenure} />
+            </div>
           </div>
         </div>
       )}

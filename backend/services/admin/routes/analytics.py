@@ -48,6 +48,20 @@ async def finance_overview(
     return await analytics_service.finance_overview(db=db)
 
 
+@router.get("/finance-overview/drill")
+async def finance_overview_drill(
+    section: str = Query(..., description="deposits | withdrawals | pending_deposits | pending_withdrawals | net_credit | fixed_return"),
+    method: str | None = Query(None, description="filter deposit/withdrawal rows by method"),
+    tenure: str | None = Query(None, description="filter fixed_return locks by tenure label"),
+    admin: User = Depends(require_permission("analytics.finance")),
+    db: AsyncSession = Depends(get_db),
+):
+    """Per-user drill-down behind a Finance Overview card (super_admin only)."""
+    return await analytics_service.finance_overview_drill(
+        db=db, section=section, method=method, tenure=tenure,
+    )
+
+
 @router.get("/exposure")
 async def get_exposure(
     admin: User = Depends(require_permission("analytics.view")),

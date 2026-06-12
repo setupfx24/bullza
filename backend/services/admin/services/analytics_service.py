@@ -387,6 +387,124 @@ async def finance_overview(db: AsyncSession) -> dict:
     }
 
 
+async def _user_label_map(db: AsyncSession, user_ids: list) -> dict:
+    """Batch-resolve {user_id: {name, email}} for a set of ids."""
+    if not user_ids:
+        return {}
+    rows = (await db.execute(
+        select(User.id, User.first_name, User.last_name, User.email)
+        .where(User.id.in_(user_ids))
+    )).all()
+    out = {}
+    for uid, fn, ln, email in rows:
+        name = f"{fn or ''} {ln or ''}".strip() or (email or str(uid))
+        out[uid] = {"name": name, "email": email}
+    return out
+
+
+async def finance_overview_drill(
+    db: AsyncSession, section: str, method: str | None = None, tenure: str | None = None,
+) -> dict:
+    """Per-user drill-down for a Finance Overview card.
+
+    section ∈ {deposits, withdrawals, pending_deposits, pending_withdrawals,
+               net_credit, fixed_return}. `method` filters deposit/withdrawal
+               rows; `tenure` filters fixed_return locks.
+    Returns {section, method, users:[{user_id,name,email,amount,count}], total}.
+    """
+    from packages.common.src.models import FixedReturnLock
+
+    section = (section or "").strip()
+    users: list[dict] = []
+
+    if section in ("deposits", "pending_deposits", "withdrawals", "pending_withdrawals"):
+        if section.endswith("deposits"):
+            model = Deposit
+            statuses = ["pending"] if section.startswith("pending") else ["approved", "auto_approved"]
+        else:
+            model = Withdrawal
+            statuses = ["pending"] if section.startswith("pending") else ["approved", "completed"]
+        q = (
+            select(model.user_id, func.coalesce(func.sum(model.amount), 0), func.count(model.id))
+            .where(model.status.in_(statuses))
+        )
+        if method and method != "all":
+            q = q.where(func.coalesce(model.method, "other") == method)
+        q = q.group_by(model.user_id)
+        rows = (await db.execute(q)).all()
+        umap = await _user_label_map(db, [r[0] for r in rows if r[0]])
+        for uid, amt, cnt in rows:
+            info = umap.get(uid, {})
+            users.append({
+                "user_id": str(uid) if uid else None,
+                "name": info.get("name", "—"),
+                "email": info.get("email"),
+                "amount": round(float(amt or 0), 2),
+                "count": int(cnt or 0),
+            })
+
+    elif section == "net_credit":
+        # Per-user bonus wallet + account credit (the two tradable-but-not-
+        # withdrawable pools shown in the Net Credit card).
+        bonus_rows = (await db.execute(
+            select(User.id, func.coalesce(User.main_wallet_bonus, 0))
+            .where(func.coalesce(User.main_wallet_bonus, 0) != 0)
+        )).all()
+        credit_rows = (await db.execute(
+            select(TradingAccount.user_id, func.coalesce(func.sum(TradingAccount.credit), 0))
+            .where(TradingAccount.credit != 0)
+            .group_by(TradingAccount.user_id)
+        )).all()
+        acc: dict = {}
+        for uid, b in bonus_rows:
+            acc.setdefault(uid, 0.0)
+            acc[uid] += float(b or 0)
+        for uid, c in credit_rows:
+            acc.setdefault(uid, 0.0)
+            acc[uid] += float(c or 0)
+        umap = await _user_label_map(db, list(acc.keys()))
+        for uid, amt in acc.items():
+            info = umap.get(uid, {})
+            users.append({
+                "user_id": str(uid) if uid else None,
+                "name": info.get("name", "—"),
+                "email": info.get("email"),
+                "amount": round(amt, 2),
+                "count": 1,
+            })
+
+    elif section == "fixed_return":
+        q = select(FixedReturnLock).where(FixedReturnLock.state.in_(["active", "early_pending"]))
+        if tenure:
+            q = q.where(FixedReturnLock.tenure_label == tenure)
+        locks = (await db.execute(q)).scalars().all()
+        acc: dict = {}
+        for lk in locks:
+            uid = lk.user_id
+            entry = acc.setdefault(uid, {"amount": 0.0, "count": 0})
+            entry["amount"] += float(lk.principal or 0)
+            entry["count"] += 1
+        umap = await _user_label_map(db, list(acc.keys()))
+        for uid, e in acc.items():
+            info = umap.get(uid, {})
+            users.append({
+                "user_id": str(uid) if uid else None,
+                "name": info.get("name", "—"),
+                "email": info.get("email"),
+                "amount": round(e["amount"], 2),
+                "count": e["count"],
+            })
+
+    users.sort(key=lambda x: x["amount"], reverse=True)
+    return {
+        "section": section,
+        "method": method,
+        "tenure": tenure,
+        "users": users,
+        "total": round(sum(u["amount"] for u in users), 2),
+    }
+
+
 async def get_exposure(db: AsyncSession) -> dict:
     result = await db.execute(
         select(
