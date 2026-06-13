@@ -404,12 +404,17 @@ async def _user_label_map(db: AsyncSession, user_ids: list) -> dict:
 
 async def finance_overview_drill(
     db: AsyncSession, section: str, method: str | None = None, tenure: str | None = None,
+    sort: str = "amount",
 ) -> dict:
     """Per-user drill-down for a Finance Overview card.
 
     section ∈ {deposits, withdrawals, pending_deposits, pending_withdrawals,
-               net_credit, fixed_return}. `method` filters deposit/withdrawal
-               rows; `tenure` filters fixed_return locks.
+               net_credit, fixed_return,
+               trading, commission, swap, pamm_mam, insurance_fees,
+               insurance_payouts, ib_commission, referral}.
+    `method` filters deposit/withdrawal rows; `tenure` filters fixed_return
+    locks; `sort` ∈ {amount, gainers, losers} (gainers/losers only meaningful
+    for the trading P&L section).
     Returns {section, method, users:[{user_id,name,email,amount,count}], total}.
     """
     from packages.common.src.models import FixedReturnLock
@@ -495,11 +500,97 @@ async def finance_overview_drill(
                 "count": e["count"],
             })
 
-    users.sort(key=lambda x: x["amount"], reverse=True)
+    elif section == "trading":
+        # Per-user realised P&L (from closed trades). The shown amount is the
+        # USER's net P&L: negative = the user lost (broker gained). This lets
+        # the dashboard sort top gainers / top losers.
+        rows = (await db.execute(
+            select(TradeHistory.user_id, func.coalesce(func.sum(TradeHistory.profit), 0), func.count(TradeHistory.id))
+            .group_by(TradeHistory.user_id)
+        )).all()
+        umap = await _user_label_map(db, [r[0] for r in rows if r[0]])
+        for uid, profit, cnt in rows:
+            info = umap.get(uid, {})
+            users.append({
+                "user_id": str(uid) if uid else None,
+                "name": info.get("name", "—"),
+                "email": info.get("email"),
+                "amount": round(float(profit or 0), 2),  # user P&L (− = broker profit)
+                "count": int(cnt or 0),
+            })
+
+    elif section in ("commission", "swap"):
+        col = Position.commission if section == "commission" else Position.swap
+        rows = (await db.execute(
+            select(Position.user_id, func.coalesce(func.sum(col), 0), func.count(Position.id))
+            .where(col != 0)
+            .group_by(Position.user_id)
+        )).all()
+        umap = await _user_label_map(db, [r[0] for r in rows if r[0]])
+        for uid, amt, cnt in rows:
+            info = umap.get(uid, {})
+            users.append({
+                "user_id": str(uid) if uid else None,
+                "name": info.get("name", "—"),
+                "email": info.get("email"),
+                "amount": round(abs(float(amt or 0)), 2),
+                "count": int(cnt or 0),
+            })
+
+    elif section in ("pamm_mam", "insurance_fees", "insurance_payouts", "referral"):
+        type_map = {
+            "pamm_mam": ["admin_commission"],
+            "insurance_fees": ["insurance_fee"],
+            "insurance_payouts": ["insurance_payout"],
+            "referral": ["referral_commission", "ib_referral_bounty"],
+        }
+        rows = (await db.execute(
+            select(Transaction.user_id, func.coalesce(func.sum(Transaction.amount), 0), func.count(Transaction.id))
+            .where(Transaction.type.in_(type_map[section]))
+            .group_by(Transaction.user_id)
+        )).all()
+        umap = await _user_label_map(db, [r[0] for r in rows if r[0]])
+        for uid, amt, cnt in rows:
+            info = umap.get(uid, {})
+            users.append({
+                "user_id": str(uid) if uid else None,
+                "name": info.get("name", "—"),
+                "email": info.get("email"),
+                "amount": round(abs(float(amt or 0)), 2),
+                "count": int(cnt or 0),
+            })
+
+    elif section == "ib_commission":
+        # IBCommission.ib_id → ib_profiles.id → user. Group by the IB's user.
+        rows = (await db.execute(
+            select(IBProfile.user_id, func.coalesce(func.sum(IBCommission.amount), 0), func.count(IBCommission.id))
+            .join(IBProfile, IBProfile.id == IBCommission.ib_id)
+            .group_by(IBProfile.user_id)
+        )).all()
+        umap = await _user_label_map(db, [r[0] for r in rows if r[0]])
+        for uid, amt, cnt in rows:
+            info = umap.get(uid, {})
+            users.append({
+                "user_id": str(uid) if uid else None,
+                "name": info.get("name", "—"),
+                "email": info.get("email"),
+                "amount": round(abs(float(amt or 0)), 2),
+                "count": int(cnt or 0),
+            })
+
+    # Sorting: trading supports gainers (most profit first) / losers (most
+    # loss first); everything else sorts by amount descending.
+    if section == "trading" and sort == "losers":
+        users.sort(key=lambda x: x["amount"])           # most negative first
+    elif section == "trading" and sort == "gainers":
+        users.sort(key=lambda x: x["amount"], reverse=True)
+    else:
+        users.sort(key=lambda x: x["amount"], reverse=True)
     return {
         "section": section,
         "method": method,
         "tenure": tenure,
+        "sort": sort,
         "users": users,
         "total": round(sum(u["amount"] for u in users), 2),
     }

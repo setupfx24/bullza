@@ -31,15 +31,21 @@ const fmt = (n: number | undefined) =>
 const titleCase = (s: string) => s.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 
 type Drill = { title: string; render: () => React.ReactNode } | null;
-type UserDrill = { title: string; section: string; method?: string; tenure?: string } | null;
+type UserDrill = { title: string; section: string; method?: string; tenure?: string; sort?: string } | null;
 
 interface UserRow { user_id: string | null; name: string; email: string | null; amount: number; count: number }
 
-/** Second-level drill: who (per user) is behind a method/tenure/credit row. */
-function UserBreakdown({ section, method, tenure }: { section: string; method?: string; tenure?: string }) {
+/** Second-level drill: who (per user) is behind a card/source row. Supports a
+ *  client-side name/email search and, for the trading section, a top
+ *  gainers / top losers sort. */
+function UserBreakdown({ section, method, tenure, initialSort }: { section: string; method?: string; tenure?: string; initialSort?: string }) {
   const [rows, setRows] = useState<UserRow[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
+  const [sort, setSort] = useState(initialSort || 'amount');
+  const isTrading = section === 'trading';
+
   useEffect(() => {
     let alive = true;
     (async () => {
@@ -48,6 +54,7 @@ function UserBreakdown({ section, method, tenure }: { section: string; method?: 
         const params: Record<string, string> = { section };
         if (method) params.method = method;
         if (tenure) params.tenure = tenure;
+        if (isTrading) params.sort = sort;
         const d = await adminApi.get<{ users: UserRow[]; total: number }>('/analytics/finance-overview/drill', params);
         if (alive) { setRows(d.users || []); setTotal(d.total || 0); }
       } catch (e: any) {
@@ -57,37 +64,67 @@ function UserBreakdown({ section, method, tenure }: { section: string; method?: 
       }
     })();
     return () => { alive = false; };
-  }, [section, method, tenure]);
+  }, [section, method, tenure, sort, isTrading]);
 
-  if (loading) return <div className="flex justify-center py-8"><Loader2 className="animate-spin text-text-tertiary" size={18} /></div>;
+  const q = search.trim().toLowerCase();
+  const shown = q
+    ? rows.filter((u) => (u.name || '').toLowerCase().includes(q) || (u.email || '').toLowerCase().includes(q))
+    : rows;
+  const shownTotal = q ? shown.reduce((s, u) => s + (u.amount || 0), 0) : total;
+
   return (
-    <table className="w-full text-sm">
-      <thead><tr className="text-text-tertiary text-xxs uppercase tracking-wide">
-        <th className="text-left py-2">User</th><th className="text-right py-2">Amount</th><th className="text-right py-2">Count</th>
-      </tr></thead>
-      <tbody>
-        {rows.length === 0 && <tr><td colSpan={3} className="py-4 text-center text-text-tertiary text-xs">No data</td></tr>}
-        {rows.map((u, i) => (
-          <tr key={u.user_id || i} className="border-t border-border-primary/50">
-            <td className="py-2">
-              {u.user_id
-                ? <a href={`/users/${u.user_id}`} className="text-accent hover:underline">{u.name}</a>
-                : <span className="text-text-primary">{u.name}</span>}
-              {u.email && <span className="block text-xxs text-text-tertiary">{u.email}</span>}
-            </td>
-            <td className="py-2 text-right font-mono text-text-primary">{fmt(u.amount)}</td>
-            <td className="py-2 text-right text-text-tertiary">{u.count}</td>
-          </tr>
-        ))}
-        {rows.length > 0 && (
-          <tr className="border-t-2 border-border-primary font-bold">
-            <td className="py-2 text-text-primary">Total ({rows.length} users)</td>
-            <td className="py-2 text-right font-mono text-text-primary">{fmt(total)}</td>
-            <td />
-          </tr>
+    <div className="space-y-3">
+      <div className="flex items-center gap-2 flex-wrap">
+        <input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search user name / email…"
+          className="flex-1 min-w-[180px] text-xs py-1.5 px-2 bg-bg-input border border-border-primary rounded-md text-text-primary placeholder:text-text-tertiary"
+        />
+        {isTrading && (
+          <div className="flex items-center gap-1">
+            {(['gainers', 'losers'] as const).map((s) => (
+              <button key={s} type="button" onClick={() => setSort(s)}
+                className={`text-xs px-2 py-1 rounded-md capitalize border ${sort === s ? 'bg-bg-hover text-text-primary border-border-primary' : 'text-text-secondary border-transparent hover:bg-bg-hover/60'}`}>
+                Top {s}
+              </button>
+            ))}
+          </div>
         )}
-      </tbody>
-    </table>
+      </div>
+
+      {loading ? (
+        <div className="flex justify-center py-8"><Loader2 className="animate-spin text-text-tertiary" size={18} /></div>
+      ) : (
+        <table className="w-full text-sm">
+          <thead><tr className="text-text-tertiary text-xxs uppercase tracking-wide">
+            <th className="text-left py-2">User</th><th className="text-right py-2">{isTrading ? 'User P&L' : 'Amount'}</th><th className="text-right py-2">Count</th>
+          </tr></thead>
+          <tbody>
+            {shown.length === 0 && <tr><td colSpan={3} className="py-4 text-center text-text-tertiary text-xs">No data</td></tr>}
+            {shown.map((u, i) => (
+              <tr key={u.user_id || i} className="border-t border-border-primary/50">
+                <td className="py-2">
+                  {u.user_id
+                    ? <a href={`/users/${u.user_id}`} className="text-accent hover:underline">{u.name}</a>
+                    : <span className="text-text-primary">{u.name}</span>}
+                  {u.email && <span className="block text-xxs text-text-tertiary">{u.email}</span>}
+                </td>
+                <td className={`py-2 text-right font-mono ${isTrading ? (u.amount >= 0 ? 'text-buy' : 'text-sell') : 'text-text-primary'}`}>{fmt(u.amount)}</td>
+                <td className="py-2 text-right text-text-tertiary">{u.count}</td>
+              </tr>
+            ))}
+            {shown.length > 0 && (
+              <tr className="border-t-2 border-border-primary font-bold">
+                <td className="py-2 text-text-primary">Total ({shown.length} users)</td>
+                <td className="py-2 text-right font-mono text-text-primary">{fmt(shownTotal)}</td>
+                <td />
+              </tr>
+            )}
+          </tbody>
+        </table>
+      )}
+    </div>
   );
 }
 
@@ -161,13 +198,27 @@ export default function FinanceOverviewPage() {
     {
       title: 'Net P&L (company)', value: data.net_pnl.total, icon: TrendingUp, accent: true,
       sub: 'Real profit to broker', drill: {
-        title: 'Net P&L — by source',
+        title: 'Net P&L — by source (click a source for per-user)',
         render: () => (
           <table className="w-full text-sm">
             <tbody>
               {data.net_pnl.sources.map((s, i) => (
                 <tr key={i} className="border-t border-border-primary/50">
-                  <td className="py-2 text-text-primary">{s.label}</td>
+                  <td className="py-2 text-text-primary">
+                    {s.key ? (
+                      <button
+                        type="button"
+                        onClick={() => setUserDrill({
+                          title: `${s.label} — by user`,
+                          section: s.key!,
+                          sort: s.key === 'trading' ? 'gainers' : undefined,
+                        })}
+                        className="text-accent hover:underline text-left"
+                      >
+                        {s.label}
+                      </button>
+                    ) : s.label}
+                  </td>
                   <td className={`py-2 text-right font-mono ${(s.amount ?? 0) >= 0 ? 'text-buy' : 'text-sell'}`}>
                     {(s.amount ?? 0) >= 0 ? '+' : '−'}{fmt(Math.abs(s.amount ?? 0))}
                   </td>
@@ -303,7 +354,7 @@ export default function FinanceOverviewPage() {
               <button onClick={() => setUserDrill(null)} className="p-1.5 rounded-md text-text-tertiary hover:bg-bg-hover hover:text-text-primary"><X size={16} /></button>
             </div>
             <div className="p-5">
-              <UserBreakdown section={userDrill.section} method={userDrill.method} tenure={userDrill.tenure} />
+              <UserBreakdown section={userDrill.section} method={userDrill.method} tenure={userDrill.tenure} initialSort={userDrill.sort} />
             </div>
           </div>
         </div>

@@ -50,15 +50,16 @@ async def finance_overview(
 
 @router.get("/finance-overview/drill")
 async def finance_overview_drill(
-    section: str = Query(..., description="deposits | withdrawals | pending_deposits | pending_withdrawals | net_credit | fixed_return"),
+    section: str = Query(..., description="deposits|withdrawals|pending_deposits|pending_withdrawals|net_credit|fixed_return|trading|commission|swap|pamm_mam|insurance_fees|insurance_payouts|ib_commission|referral"),
     method: str | None = Query(None, description="filter deposit/withdrawal rows by method"),
     tenure: str | None = Query(None, description="filter fixed_return locks by tenure label"),
+    sort: str = Query("amount", description="amount | gainers | losers (trading only)"),
     admin: User = Depends(require_permission("analytics.finance")),
     db: AsyncSession = Depends(get_db),
 ):
     """Per-user drill-down behind a Finance Overview card (super_admin only)."""
     return await analytics_service.finance_overview_drill(
-        db=db, section=section, method=method, tenure=tenure,
+        db=db, section=section, method=method, tenure=tenure, sort=sort,
     )
 
 
