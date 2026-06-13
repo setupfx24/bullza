@@ -85,6 +85,13 @@ async def _apply_startup_ddl():
             await conn.execute(text(
                 "CREATE INDEX IF NOT EXISTS ix_rm_funding_requests_status ON rm_funding_requests(status)"
             ))
+            # Bonus promo-code flow (migration 0072).
+            await conn.execute(text(
+                "ALTER TABLE bonus_offers ADD COLUMN IF NOT EXISTS promo_code VARCHAR(40)"
+            ))
+            await conn.execute(text(
+                "ALTER TABLE bonus_offers ADD COLUMN IF NOT EXISTS code_visible BOOLEAN NOT NULL DEFAULT true"
+            ))
     except Exception as e:
         logger.warning("startup DDL skipped: %s", e)
 

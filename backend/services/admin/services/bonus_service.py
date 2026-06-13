@@ -31,6 +31,8 @@ def _offer_to_out(o: BonusOffer) -> BonusOfferOut:
         sort_order=int(o.sort_order or 0),
         cta_label=o.cta_label,
         tagline=o.tagline,
+        promo_code=getattr(o, "promo_code", None),
+        code_visible=bool(getattr(o, "code_visible", True)),
         created_at=o.created_at,
     )
 
@@ -71,6 +73,8 @@ def _apply_offer_fields(offer: BonusOffer, body: BonusOfferIn) -> None:
     offer.sort_order = int(body.sort_order or 0)
     offer.cta_label = body.cta_label or None
     offer.tagline = body.tagline or None
+    offer.promo_code = (body.promo_code or "").strip().upper() or None
+    offer.code_visible = bool(body.code_visible)
 
 
 async def create_bonus_offer(

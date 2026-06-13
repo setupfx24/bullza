@@ -45,6 +45,12 @@ class BonusOffer(Base):
     sort_order = Column(Integer, default=0, nullable=False)
     cta_label = Column(String(80), nullable=True)
     tagline = Column(String(200), nullable=True)
+    # Promo-code flow (migration 0072). `promo_code` is an optional code the
+    # user enters at deposit time to claim this offer. `code_visible` lets the
+    # admin decide whether the code is shown publicly on the /bonus page or
+    # kept hidden (shared privately for a targeted campaign).
+    promo_code = Column(String(40), nullable=True)
+    code_visible = Column(Boolean, default=True, nullable=False, server_default="true")
     created_at = Column(DateTime(timezone=True), default=datetime.utcnow)
 
 

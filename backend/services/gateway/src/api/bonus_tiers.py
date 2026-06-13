@@ -63,5 +63,10 @@ async def list_bonus_tiers(db: AsyncSession = Depends(get_db)):
             "is_popular": bool(o.is_popular),
             "cta_label": o.cta_label,
             "tagline": o.tagline,
+            # Only surface the promo code publicly when the admin ticked
+            # "show code to users"; otherwise it's a private/targeted code.
+            "promo_code": (
+                getattr(o, "promo_code", None) if bool(getattr(o, "code_visible", True)) else None
+            ),
         })
     return {"tiers": tiers}
