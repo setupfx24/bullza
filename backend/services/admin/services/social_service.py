@@ -129,16 +129,21 @@ async def distribute_pamm_profit(
     if master_total_pnl <= 0:
         raise HTTPException(status_code=400, detail="No profit to distribute")
 
-    alloc_result = await db.execute(
-        select(InvestorAllocation, TradingAccount)
-        .join(TradingAccount, InvestorAllocation.investor_account_id == TradingAccount.id)
+    # PAMM is a POOLED product: the investor's capital lives in their main
+    # wallet (no per-investor sub-account), so InvestorAllocation.
+    # investor_account_id is NULL for PAMM. The old INNER JOIN to
+    # trading_accounts therefore dropped every PAMM investor and the
+    # distribution failed with "No active investors". Load allocations
+    # without the join and credit each investor where their money actually
+    # sits — their sub-account if one exists, otherwise the main wallet.
+    allocations = (await db.execute(
+        select(InvestorAllocation)
         .where(InvestorAllocation.master_id == master_id, InvestorAllocation.status == "active")
-    )
-    allocations = alloc_result.all()
+    )).scalars().all()
     if not allocations:
         raise HTTPException(status_code=400, detail="No active investors in this pool")
 
-    total_pool = sum(float(alloc.allocation_amount or 0) for alloc, _ in allocations)
+    total_pool = sum(float(alloc.allocation_amount or 0) for alloc in allocations)
     if total_pool <= 0:
         raise HTTPException(status_code=400, detail="No capital in pool")
 
@@ -149,7 +154,7 @@ async def distribute_pamm_profit(
     total_perf_fee = 0.0
     total_admin_fee = 0.0
 
-    for alloc, investor_account in allocations:
+    for alloc in allocations:
         share_pct = float(alloc.allocation_amount or 0) / total_pool
         gross_due = master_total_pnl * share_pct
         already_paid = float(alloc.total_profit or 0)
@@ -161,16 +166,27 @@ async def distribute_pamm_profit(
         perf_fee = new_gross * perf_fee_pct / 100
         admin_fee = perf_fee * admin_commission_pct / 100
         net_profit = new_gross - perf_fee
+        net_dec = Decimal(str(round(net_profit, 8)))
 
-        investor_account.balance = (investor_account.balance or Decimal("0")) + Decimal(str(round(net_profit, 8)))
-        investor_account.equity = investor_account.balance + (investor_account.credit or Decimal("0"))
-        alloc.total_profit = (alloc.total_profit or Decimal("0")) + Decimal(str(round(net_profit, 8)))
+        investor_account = (
+            await db.get(TradingAccount, alloc.investor_account_id)
+            if alloc.investor_account_id else None
+        )
+        if investor_account is not None:
+            investor_account.balance = (investor_account.balance or Decimal("0")) + net_dec
+            investor_account.equity = investor_account.balance + (investor_account.credit or Decimal("0"))
+        else:
+            # PAMM pooled → credit the investor's main wallet directly.
+            inv_user = await db.get(User, alloc.investor_user_id)
+            if inv_user is not None:
+                inv_user.main_wallet_balance = (inv_user.main_wallet_balance or Decimal("0")) + net_dec
+        alloc.total_profit = (alloc.total_profit or Decimal("0")) + net_dec
 
         db.add(Transaction(
             user_id=alloc.investor_user_id,
             account_id=alloc.investor_account_id,
             type="performance_fee",
-            amount=Decimal(str(round(net_profit, 8))),
+            amount=net_dec,
             description=f"PAMM profit distribution — {share_pct * 100:.2f}% share",
             created_by=admin_id,
         ))
