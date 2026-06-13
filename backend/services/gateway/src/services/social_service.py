@@ -1773,13 +1773,19 @@ async def my_allocations(user_id: UUID, db: AsyncSession) -> dict:
         # admin_share = perf × admin_pct / 100; master keeps the rest.
         admin_share_pct = perf_pct * admin_pct / 100.0 if perf_pct > 0 else 0.0
         master_share_pct = max(0.0, perf_pct - admin_share_pct)
-        # Approx fees paid on realised gains so far (gross to net diff).
-        # Best-effort — pre-fee gross isn't stored, so we estimate from
-        # the configured pct: if net = gross × (1 − perf_pct/100), then
-        # fees_paid ≈ net × perf_pct / (100 − perf_pct) on positive net.
+        # Estimated performance fee on realised gains so far.
+        #   • PAMM: realized_pnl above is the GROSS paper profit (pool-share
+        #     value − invested), so the fee is simply perf_pct% OF it.
+        #     (The old net→gross inverse formula treated this gross figure as
+        #     net and, at a 50% fee, billed the ENTIRE profit — bug.)
+        #   • Signal copy: alloc.total_profit is already NET (credited after
+        #     the fee), so we back-out the gross fee with the inverse formula.
         fees_paid = 0.0
-        if realized_pnl > 0 and perf_pct > 0 and perf_pct < 100:
-            fees_paid = realized_pnl * perf_pct / (100.0 - perf_pct)
+        if realized_pnl > 0 and perf_pct > 0:
+            if alloc.copy_type == "pamm":
+                fees_paid = realized_pnl * perf_pct / 100.0
+            elif perf_pct < 100:
+                fees_paid = realized_pnl * perf_pct / (100.0 - perf_pct)
 
         items.append({
             "id": str(alloc.id),
