@@ -79,6 +79,16 @@ EMPLOYEE_ROLE_PERMISSIONS = {
         # assigned to them, which the /rm endpoints scope by assigned_rm_id.
         "rm.view", "rm.request",
     },
+    # Split finance duties — an employee can be given ONLY deposits or ONLY
+    # withdrawals (the combined "finance" role still exists for both).
+    "deposit_manager": {
+        "deposits.view", "deposits.approve", "deposits.reject",
+        "users.view", "kyc.view",
+    },
+    "withdrawal_manager": {
+        "withdrawals.view", "withdrawals.approve", "withdrawals.reject",
+        "users.view",
+    },
 }
 
 
