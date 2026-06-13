@@ -333,6 +333,8 @@ async def finance_overview(db: AsyncSession) -> dict:
     fr_collected = 0.0
     fr_interest_paid = 0.0
     fr_payable = 0.0
+    fr_accrued = 0.0   # interest that has BUILT UP day-by-day up to today
+    _now = datetime.now(timezone.utc)
     by_tenure: dict[str, dict] = {}
     maturing: dict[str, dict] = {}
     for lk in active_locks:
@@ -347,6 +349,16 @@ async def finance_overview(db: AsyncSession) -> dict:
         cycles = max(1, months // cyc_months)
         projected = p * float(lk.rate_pct or 0) / 100.0 * cycles
         fr_payable += max(0.0, projected - paid)
+        # Accrued-to-date: how much interest has built up on a per-day basis
+        # from lock start until today (capped at maturity / projected total).
+        td = int(lk.tenure_days or 30) or 30
+        daily_interest = p * float(lk.rate_pct or 0) / 100.0 / td
+        try:
+            days_elapsed = max(0, (_now - lk.locked_at).days) if lk.locked_at else 0
+        except Exception:
+            days_elapsed = 0
+        total_days = max(1, cycles * td)
+        fr_accrued += min(projected, daily_interest * min(days_elapsed, total_days))
         t = lk.tenure_label or "—"
         by_tenure.setdefault(t, {"tenure": t, "principal": 0.0, "count": 0})
         by_tenure[t]["principal"] += p
@@ -379,6 +391,10 @@ async def finance_overview(db: AsyncSession) -> dict:
             "collected": round(fr_collected, 2),
             "interest_paid_to_date": round(fr_interest_paid, 2),
             "projected_payable": round(fr_payable, 2),
+            # Interest accrued day-by-day up to today, and the slice of it not
+            # yet paid out (what the broker effectively owes as of now).
+            "accrued_to_date": round(fr_accrued, 2),
+            "accrued_unpaid": round(max(0.0, fr_accrued - fr_interest_paid), 2),
             "by_tenure": fr_by_tenure,
             "maturing": fr_maturing,
         },

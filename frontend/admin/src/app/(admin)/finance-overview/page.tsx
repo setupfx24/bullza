@@ -21,7 +21,7 @@ interface Overview {
   deposits: { total: number; by_method: Row[] };
   withdrawals: { total: number; by_method: Row[] };
   net_credit: { total: number; bonus: number; account_credit: number; insurance_credited_lifetime: number };
-  fixed_return: { collected: number; interest_paid_to_date: number; projected_payable: number; by_tenure: Row[]; maturing: Row[] };
+  fixed_return: { collected: number; interest_paid_to_date: number; projected_payable: number; accrued_to_date?: number; accrued_unpaid?: number; by_tenure: Row[]; maturing: Row[] };
   pending_deposits: { total: number; by_method: Row[] };
   pending_withdrawals: { total: number; by_method: Row[] };
 }
@@ -269,10 +269,12 @@ export default function FinanceOverviewPage() {
         title: 'Fixed Return — by tenure & maturity',
         render: () => (
           <div className="space-y-5">
-            <div className="grid grid-cols-3 gap-3 text-center">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-center">
               <div><p className="text-xxs text-text-tertiary uppercase">Collected</p><p className="font-mono text-text-primary">{fmt(data.fixed_return.collected)}</p></div>
               <div><p className="text-xxs text-text-tertiary uppercase">Interest paid</p><p className="font-mono text-text-primary">{fmt(data.fixed_return.interest_paid_to_date)}</p></div>
               <div><p className="text-xxs text-text-tertiary uppercase">Projected payable</p><p className="font-mono text-amber-400">{fmt(data.fixed_return.projected_payable)}</p></div>
+              <div><p className="text-xxs text-text-tertiary uppercase">Accrued to date</p><p className="font-mono text-text-primary">{fmt(data.fixed_return.accrued_to_date ?? 0)}</p></div>
+              <div><p className="text-xxs text-text-tertiary uppercase">Accrued unpaid</p><p className="font-mono text-amber-400">{fmt(data.fixed_return.accrued_unpaid ?? 0)}</p></div>
             </div>
             <div>
               <p className="text-xs font-semibold text-text-secondary mb-1">By tenure (click for per-user)</p>

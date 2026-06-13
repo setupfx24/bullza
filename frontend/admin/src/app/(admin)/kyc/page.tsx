@@ -39,6 +39,8 @@ function fmt(d: string) {
 
 export default function KYCPage() {
   const [tab, setTab] = useState<Tab>('pending');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
   const [pending, setPending] = useState<KYCUser[]>([]);
   const [approved, setApproved] = useState<KYCUser[]>([]);
   const [rejected, setRejected] = useState<KYCUser[]>([]);
@@ -82,10 +84,13 @@ export default function KYCPage() {
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
+      const p: Record<string, string> = {};
+      if (dateFrom) p.start_date = dateFrom;
+      if (dateTo) p.end_date = dateTo;
       const [pendingRes, approvedRes, rejectedRes] = await Promise.all([
-        adminApi.get<{ items: KYCUser[] }>('/kyc/pending'),
-        adminApi.get<{ items: KYCUser[] }>('/kyc/approved'),
-        adminApi.get<{ items: KYCUser[] }>('/kyc/rejected'),
+        adminApi.get<{ items: KYCUser[] }>('/kyc/pending', p),
+        adminApi.get<{ items: KYCUser[] }>('/kyc/approved', p),
+        adminApi.get<{ items: KYCUser[] }>('/kyc/rejected', p),
       ]);
       setPending(pendingRes.items || []);
       setApproved(approvedRes.items || []);
@@ -95,7 +100,7 @@ export default function KYCPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [dateFrom, dateTo]);
 
   useEffect(() => {
     fetchData();
@@ -161,7 +166,8 @@ export default function KYCPage() {
 
         {/* Tabs */}
         <div className="bg-bg-secondary border border-border-primary rounded-md">
-          <div className="flex gap-1 p-1 border-b border-border-primary">
+          <div className="flex items-center justify-between gap-2 flex-wrap p-1 border-b border-border-primary">
+            <div className="flex gap-1">
             {[
               { id: 'pending' as Tab, label: 'Pending Review', badge: pending.length },
               { id: 'approved' as Tab, label: 'Approved', badge: approved.length },
@@ -185,6 +191,22 @@ export default function KYCPage() {
                 )}
               </button>
             ))}
+            </div>
+            {/* Custom date range (filters by user signup date) */}
+            <div className="flex items-center gap-1.5 pr-1">
+              <span className="text-xxs text-text-tertiary">From</span>
+              <input type="date" value={dateFrom} max={dateTo || undefined}
+                onChange={(e) => setDateFrom(e.target.value)}
+                className="text-xs py-1 px-2 bg-bg-input border border-border-primary rounded-md text-text-primary" />
+              <span className="text-xxs text-text-tertiary">To</span>
+              <input type="date" value={dateTo} min={dateFrom || undefined}
+                onChange={(e) => setDateTo(e.target.value)}
+                className="text-xs py-1 px-2 bg-bg-input border border-border-primary rounded-md text-text-primary" />
+              {(dateFrom || dateTo) && (
+                <button type="button" onClick={() => { setDateFrom(''); setDateTo(''); }}
+                  className="text-xxs text-text-tertiary hover:text-text-primary underline">Clear</button>
+              )}
+            </div>
           </div>
 
           {loading ? (

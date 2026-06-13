@@ -40,8 +40,13 @@ async def get_kyc_file(document_id: uuid.UUID, db: AsyncSession) -> FileResponse
     )
 
 
-async def list_kyc_pending(page: int, per_page: int, db: AsyncSession) -> dict:
+async def list_kyc_pending(page: int, per_page: int, db: AsyncSession,
+                           start_date=None, end_date=None) -> dict:
     query = select(User).where(User.kyc_status == "submitted")
+    if start_date is not None:
+        query = query.where(User.created_at >= start_date)
+    if end_date is not None:
+        query = query.where(User.created_at <= end_date)
     count_q = select(func.count()).select_from(query.subquery())
     total = (await db.execute(count_q)).scalar() or 0
 
@@ -81,8 +86,13 @@ async def list_kyc_pending(page: int, per_page: int, db: AsyncSession) -> dict:
     return {"items": items, "total": total, "page": page, "per_page": per_page}
 
 
-async def list_kyc_approved(page: int, per_page: int, db: AsyncSession) -> dict:
+async def list_kyc_approved(page: int, per_page: int, db: AsyncSession,
+                            start_date=None, end_date=None) -> dict:
     query = select(User).where(User.kyc_status == "approved")
+    if start_date is not None:
+        query = query.where(User.created_at >= start_date)
+    if end_date is not None:
+        query = query.where(User.created_at <= end_date)
     count_q = select(func.count()).select_from(query.subquery())
     total = (await db.execute(count_q)).scalar() or 0
 
@@ -124,8 +134,13 @@ async def list_kyc_approved(page: int, per_page: int, db: AsyncSession) -> dict:
     return {"items": items, "total": total, "page": page, "per_page": per_page}
 
 
-async def list_kyc_rejected(page: int, per_page: int, db: AsyncSession) -> dict:
+async def list_kyc_rejected(page: int, per_page: int, db: AsyncSession,
+                            start_date=None, end_date=None) -> dict:
     query = select(User).where(User.kyc_status == "rejected")
+    if start_date is not None:
+        query = query.where(User.created_at >= start_date)
+    if end_date is not None:
+        query = query.where(User.created_at <= end_date)
     count_q = select(func.count()).select_from(query.subquery())
     total = (await db.execute(count_q)).scalar() or 0
 
