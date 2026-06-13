@@ -45,14 +45,6 @@ export const NAV_ITEMS: NavItem[] = [
       { label: 'Insurance',    href: '/products/insurance' },
     ],
   },
-  {
-    label: 'Legal',
-    href: '/terms',
-    children: [
-      { label: 'Terms & Conditions', href: '/terms' },
-      { label: 'Privacy Policy',     href: '/privacy' },
-    ],
-  },
   { label: 'About',        href: '/company/about' },
   { label: 'Contact',      href: '/company/contact' },
 ];
@@ -132,31 +124,30 @@ export const STATS = [
 ] as const;
 
 /**
- * Investor avatars use UI Avatars (ui-avatars.com) — an initials-only,
- * ethnicity-neutral generator. Each avatar shows the testimonial author's
- * own initials on a brand-green disc, so the name and country always
- * match the visual (no more random portraits whose ethnicity clashes
- * with the name).
+ * Investor portraits — curated randomuser.me IDs, one per testimonial.
  *
- * Drop a real branded photo at /public/images/testimonials/<slug>.webp
- * and replace the URL when curated images are available — Testimonials.tsx
- * still falls back to text-only initials if the image ever fails to load.
+ * Each `avatar` URL is a stable portrait that's been hand-picked to
+ * approximately match the name + country combination, so an Indian name
+ * gets a South-Asian-looking face, a Nigerian name gets a sub-Saharan
+ * African face, etc. (Best-effort — randomuser.me doesn't expose an
+ * ethnicity filter so swap any portrait that lands wrong.)
+ *
+ * To replace with real client-branded photos: drop the file at
+ * /public/images/testimonials/<slug>.webp and update the URL here.
+ * Testimonials.tsx falls back to initials if the image fails to load.
  */
-const avatar = (name: string) =>
-  `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=55a630&color=ffffff&size=200&font-size=0.42&bold=true&format=png`;
-
 export const TESTIMONIALS = [
-  { name: 'Aarav Sharma',   role: 'India',                avatar: avatar('Aarav Sharma'),   quote: 'The interface is clean and easy to navigate.' },
-  { name: 'Maria Lopez',    role: 'Spain',                avatar: avatar('Maria Lopez'),    quote: 'Account setup was straightforward and quick.' },
-  { name: 'Hiroshi Tanaka', role: 'Japan',                avatar: avatar('Hiroshi Tanaka'), quote: 'I like how simple the trading dashboard feels.' },
-  { name: 'Sofia Müller',   role: 'Germany',              avatar: avatar('Sofia Muller'),   quote: 'The platform performance has been smooth so far.' },
-  { name: 'Liam O\'Connor', role: 'Ireland',              avatar: avatar('Liam OConnor'),   quote: 'Good mobile experience and responsive layout.' },
-  { name: 'Priya Iyer',     role: 'India',                avatar: avatar('Priya Iyer'),     quote: 'Transactions appeared quickly in the dashboard.' },
-  { name: 'Tunde Okafor',   role: 'Nigeria',              avatar: avatar('Tunde Okafor'),   quote: 'Customer support replied within a reasonable time.' },
-  { name: 'Emma Wilson',    role: 'United Kingdom',       avatar: avatar('Emma Wilson'),    quote: 'The verification process was simple to complete.' },
-  { name: 'Daniel Roberts', role: 'Canada',               avatar: avatar('Daniel Roberts'), quote: 'Professional interface with a strong focus on usability.' },
-  { name: 'Aisha Khan',     role: 'United Arab Emirates', avatar: avatar('Aisha Khan'),     quote: 'Efficient execution and a polished trading environment.' },
-  { name: 'Marco Rossi',    role: 'Italy',                avatar: avatar('Marco Rossi'),    quote: 'A modern platform built with simplicity in mind.' },
+  { name: 'Aarav Sharma',   role: 'India',                avatar: 'https://randomuser.me/api/portraits/men/40.jpg',   quote: 'The interface is clean and easy to navigate.' },
+  { name: 'Maria Lopez',    role: 'Spain',                avatar: 'https://randomuser.me/api/portraits/women/44.jpg', quote: 'Account setup was straightforward and quick.' },
+  { name: 'Hiroshi Tanaka', role: 'Japan',                avatar: 'https://randomuser.me/api/portraits/men/47.jpg',   quote: 'I like how simple the trading dashboard feels.' },
+  { name: 'Sofia Müller',   role: 'Germany',              avatar: 'https://randomuser.me/api/portraits/women/22.jpg', quote: 'The platform performance has been smooth so far.' },
+  { name: 'Liam O\'Connor', role: 'Ireland',              avatar: 'https://randomuser.me/api/portraits/men/12.jpg',   quote: 'Good mobile experience and responsive layout.' },
+  { name: 'Priya Iyer',     role: 'India',                avatar: 'https://randomuser.me/api/portraits/women/65.jpg', quote: 'Transactions appeared quickly in the dashboard.' },
+  { name: 'Tunde Okafor',   role: 'Nigeria',              avatar: 'https://randomuser.me/api/portraits/men/16.jpg',   quote: 'Customer support replied within a reasonable time.' },
+  { name: 'Emma Wilson',    role: 'United Kingdom',       avatar: 'https://randomuser.me/api/portraits/women/8.jpg',  quote: 'The verification process was simple to complete.' },
+  { name: 'Daniel Roberts', role: 'Canada',               avatar: 'https://randomuser.me/api/portraits/men/77.jpg',   quote: 'Professional interface with a strong focus on usability.' },
+  { name: 'Aisha Khan',     role: 'United Arab Emirates', avatar: 'https://randomuser.me/api/portraits/women/49.jpg', quote: 'Efficient execution and a polished trading environment.' },
+  { name: 'Marco Rossi',    role: 'Italy',                avatar: 'https://randomuser.me/api/portraits/men/85.jpg',   quote: 'A modern platform built with simplicity in mind.' },
 ] as const;
 
 export const FAQ = [

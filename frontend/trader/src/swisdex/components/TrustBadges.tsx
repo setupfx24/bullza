@@ -2,8 +2,8 @@
 
 /**
  * "Trusted By" badge row — sits just above the footer on every public
- * landing page. Logo-only, single-line layout (10 badges fit on a row
- * on desktop; mobile falls back to horizontal scroll via overflow-x-auto).
+ * landing page. Logo-only, single-line layout (11 badges; mobile falls
+ * back to horizontal scroll via overflow-x-auto).
  */
 type Badge = { label?: string; sub?: string; logo: string };
 
@@ -18,6 +18,7 @@ const BADGES: Badge[] = [
   { logo: '/images/b8.png' },
   { logo: '/images/b9.png' },
   { logo: '/images/b10.png' },
+  { logo: '/images/b11.png' },
 ];
 
 export function TrustBadges() {
