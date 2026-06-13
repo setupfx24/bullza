@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from packages.common.src.config import get_settings
 from sqlalchemy import delete as sql_delete
+from sqlalchemy import update as sa_update
 from packages.common.src.models import (
     User, TradingAccount, Position, Order, Transaction, Deposit, Withdrawal,
     PositionStatus, OrderStatus, TradeHistory,
@@ -649,6 +650,64 @@ async def unban_user(
     )
     await db.commit()
     return {"message": "User unbanned successfully"}
+
+
+async def _set_user_status(
+    user_id: uuid.UUID, new_status: str, action: str, message: str,
+    admin_id: uuid.UUID, ip_address: str | None, db: AsyncSession,
+    revoke_sessions: bool = True,
+) -> dict:
+    """Shared status transition for suspend / terminate / soft-delete /
+    reactivate. The user's data is fully retained — only the `status` column
+    changes, which the login paths honour (see login_block_message). When the
+    new status blocks login we also revoke any live sessions so an already
+    signed-in user is kicked out immediately."""
+    user = (await db.execute(select(User).where(User.id == user_id))).scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    old_status = user.status
+    user.status = new_status
+
+    if revoke_sessions and new_status != "active":
+        await db.execute(
+            sa_update(UserSession)
+            .where(UserSession.user_id == user_id, UserSession.is_active.is_(True))
+            .values(is_active=False)
+        )
+
+    await write_audit_log(
+        db, admin_id, action, "user", user_id,
+        old_values={"status": old_status},
+        new_values={"status": new_status},
+        ip_address=ip_address,
+    )
+    await db.commit()
+    return {"message": message, "status": new_status}
+
+
+async def suspend_user(user_id, admin_id, ip_address, db):
+    """Temporary hold — user can't log in until reactivated. Data kept."""
+    return await _set_user_status(user_id, "suspended", "suspend_user",
+                                  "User suspended", admin_id, ip_address, db)
+
+
+async def terminate_user(user_id, admin_id, ip_address, db):
+    """Account closed (end of relationship) but full history retained."""
+    return await _set_user_status(user_id, "terminated", "terminate_user",
+                                  "User terminated", admin_id, ip_address, db)
+
+
+async def soft_delete_user(user_id, admin_id, ip_address, db):
+    """Soft delete — user can never log in again, but every record (ledger,
+    deposits, trades) stays with the broker for audit/compliance."""
+    return await _set_user_status(user_id, "deleted", "soft_delete_user",
+                                  "User soft-deleted (records retained)", admin_id, ip_address, db)
+
+
+async def reactivate_user(user_id, admin_id, ip_address, db):
+    """Bring a suspended / terminated / soft-deleted user back to active."""
+    return await _set_user_status(user_id, "active", "reactivate_user",
+                                  "User reactivated", admin_id, ip_address, db, revoke_sessions=False)
 
 
 async def block_trading(
