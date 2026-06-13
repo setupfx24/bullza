@@ -11,11 +11,12 @@ from decimal import Decimal
 from uuid import UUID
 
 from fastapi import HTTPException
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from packages.common.src.models import FixedReturnLock, User, Transaction
 from packages.common.src.settings_store import get_float_setting, get_int_setting
+from packages.common.src.notify import create_notification
 
 
 DEFAULT_FEE_PCT = 5.0
@@ -393,3 +394,61 @@ async def reject(lock_id: UUID, db: AsyncSession, *, reason: str | None = None) 
     await db.commit()
     await db.refresh(lock)
     return _serialize(lock)
+
+
+async def grant_bonus(
+    user_id: UUID, mode: str, value: float, admin_id: UUID, db: AsyncSession,
+) -> dict:
+    """Special bonus for a Fixed-Return holder. `mode`:
+      - "percent" → bonus = value% of the user's TOTAL active locked principal
+      - "fixed"   → bonus = a flat USD `value`
+    Credited to the user's main wallet as a 'bonus' transaction."""
+    user = (await db.execute(select(User).where(User.id == user_id))).scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    mode = (mode or "fixed").lower()
+    v = Decimal(str(value or 0))
+    if v <= 0:
+        raise HTTPException(status_code=400, detail="Bonus value must be greater than 0")
+
+    if mode == "percent":
+        principal = (await db.execute(
+            select(func.coalesce(func.sum(FixedReturnLock.principal), 0)).where(
+                FixedReturnLock.user_id == user_id,
+                FixedReturnLock.state.in_(["active", "early_pending"]),
+            )
+        )).scalar() or 0
+        principal = Decimal(str(principal))
+        if principal <= 0:
+            raise HTTPException(status_code=400, detail="User has no active Fixed-Return principal to base a % bonus on")
+        amount = (principal * v / Decimal("100")).quantize(Decimal("0.01"))
+        desc = f"Fixed-Return special bonus ({v}% of ${float(principal):,.2f} principal)"
+    else:
+        amount = v.quantize(Decimal("0.01"))
+        desc = f"Fixed-Return special bonus (${float(amount):,.2f})"
+
+    user.main_wallet_balance = Decimal(str(user.main_wallet_balance or 0)) + amount
+    db.add(Transaction(
+        user_id=user.id,
+        account_id=None,
+        type="bonus",
+        amount=amount,
+        balance_after=user.main_wallet_balance,
+        description=desc,
+        created_by=admin_id,
+    ))
+    await create_notification(
+        db, user.id,
+        title="Bonus credited",
+        message=f"${float(amount):,.2f} Fixed-Return bonus has been added to your main wallet.",
+        notif_type="bonus",
+        action_url="/wallet",
+        commit=False,
+    )
+    await db.commit()
+    return {
+        "message": "Bonus granted",
+        "amount": float(amount),
+        "new_main_wallet_balance": float(user.main_wallet_balance),
+    }
