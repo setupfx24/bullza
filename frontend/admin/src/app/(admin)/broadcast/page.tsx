@@ -30,6 +30,8 @@ const SERVICE_OPTIONS = [
 export default function BroadcastPage() {
   const [windowLabel, setWindowLabel] = useState('');
   const [duration, setDuration] = useState('~2 hours');
+  const [mSubject, setMSubject] = useState('');
+  const [mTitle, setMTitle] = useState('');
   const [services, setServices] = useState<string[]>(['Trading']);
   const [reason, setReason] = useState('');
   const [customHtml, setCustomHtml] = useState('');
@@ -86,6 +88,8 @@ export default function BroadcastPage() {
   const buildPayload = (dry: boolean) => ({
     window_label: windowLabel.trim(),
     expected_duration: duration.trim(),
+    subject: mSubject.trim() || null,
+    title: mTitle.trim() || null,
     impacted_services: services,
     reason: reason.trim() || null,
     custom_message_html: customHtml.trim() || null,
@@ -160,6 +164,29 @@ export default function BroadcastPage() {
       </div>
 
       <div className="bg-bg-secondary border border-border-primary rounded-md p-5 space-y-4">
+        {/* Editable email subject + heading — blank falls back to the
+            default "Scheduled maintenance …". */}
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="block text-xxs text-text-tertiary uppercase mb-1">Email subject (optional)</label>
+            <input
+              value={mSubject}
+              onChange={(e) => { setMSubject(e.target.value); setRecipientPreview(null); }}
+              placeholder="Scheduled maintenance — 13 Jun 2026"
+              className="w-full px-3 py-2 text-xs bg-bg-tertiary border border-border-primary rounded-md focus:outline-none focus:border-accent"
+            />
+          </div>
+          <div>
+            <label className="block text-xxs text-text-tertiary uppercase mb-1">Heading in email (optional)</label>
+            <input
+              value={mTitle}
+              onChange={(e) => setMTitle(e.target.value)}
+              placeholder="Scheduled maintenance"
+              className="w-full px-3 py-2 text-xs bg-bg-tertiary border border-border-primary rounded-md focus:outline-none focus:border-accent"
+            />
+          </div>
+        </div>
+
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="block text-xxs text-text-tertiary uppercase mb-1">Window label</label>

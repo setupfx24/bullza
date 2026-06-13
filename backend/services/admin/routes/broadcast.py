@@ -135,6 +135,10 @@ async def send_announcement(
 class MaintenanceBroadcastIn(BaseModel):
     window_label: str = Field(..., min_length=4, max_length=120)
     expected_duration: str = Field(..., min_length=2, max_length=60)
+    # Optional admin overrides for the email subject + the heading shown
+    # inside the email. Blank → the default "Scheduled maintenance …".
+    subject: str | None = Field(None, max_length=160)
+    title: str | None = Field(None, max_length=160)
     impacted_services: list[str] = Field(default_factory=list)
     reason: str | None = Field(None, max_length=400)
     custom_message_html: str | None = Field(None, max_length=4000)
@@ -207,7 +211,7 @@ async def send_maintenance_broadcast(
         return {
             "dry_run": True,
             "would_send_to": len(recipients),
-            "sample_subject": f"Scheduled maintenance — {body.window_label}",
+            "sample_subject": (body.subject or "").strip() or f"Scheduled maintenance — {body.window_label}",
         }
 
     app_url = (get_settings().TRADER_APP_URL or "https://trade.swisdex.com")
@@ -222,6 +226,8 @@ async def send_maintenance_broadcast(
                 reason=body.reason,
                 custom_message_html=body.custom_message_html,
                 trader_app_url=app_url,
+                subject_override=body.subject,
+                title_override=body.title,
             )
         except Exception:
             continue
