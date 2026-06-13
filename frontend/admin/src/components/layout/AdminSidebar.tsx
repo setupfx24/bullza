@@ -11,6 +11,7 @@ import {
   UserCog, ChevronDown, ChevronRight, Network, Share2,
   DollarSign, Percent, ArrowLeftRight, PanelLeftClose, PanelLeft,
   Receipt, Layers, ShieldCheck, ScrollText, BookOpen, Sparkles, Package, Megaphone,
+  UserCheck, HandCoins,
 } from 'lucide-react';
 
 interface NavItem {
@@ -24,6 +25,7 @@ interface NavItem {
 
 const NAV_ITEMS: NavItem[] = [
   { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+  { label: 'Finance Overview', href: '/finance-overview', icon: BarChart3, perm: 'analytics.finance' },
   { label: 'Users', href: '/users', icon: Users, perm: 'users.view' },
   {
     label: 'Identity verification',
@@ -63,6 +65,8 @@ const NAV_ITEMS: NavItem[] = [
       { label: 'MLM Config', href: '/business/mlm' },
     ],
   },
+  { label: 'My Clients (RM)', href: '/rm-portal', icon: HandCoins, perm: 'rm.view' },
+  { label: 'RM Requests', href: '/rm-requests', icon: UserCheck, perm: 'rm.manage' },
   { label: 'Analytics', href: '/analytics', icon: BarChart3, perm: 'analytics.view' },
   { label: 'Audit logs', href: '/audit-logs', icon: ScrollText, perm: 'audit_logs.view' },
   { label: 'Bonus', href: '/bonus', icon: Gift, perm: 'bonus.view' },

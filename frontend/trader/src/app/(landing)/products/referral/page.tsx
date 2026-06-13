@@ -14,17 +14,16 @@ const SIGNUP_HREF = '/auth/register';
  *  /config/ib-tiers (system_settings.ib_commission_tiers). */
 type ApiTier = {
   label: string;
-  min_referrals: number;
-  max_referrals: number | null;   // null = top tier (rendered as "X+")
-  per_referral_bounty: number;
+  per_lot: number;
+  min_activations: number;
+  min_amount: number;
   instant_payout: boolean;
 };
 
 type DisplayTier = {
-  label: string;
-  range: string;     // "5 – 20" / "100+"
-  bounty: string;    // "$5"
-  payout: string;    // "Instant" / "Weekly"
+  label: string;        // "Bronze"
+  perLot: string;       // "$5 / lot"
+  requirement: string;  // "5+ activations or $500+"
 };
 
 /** Admin-driven qualification conditions surfaced under the table.
@@ -47,26 +46,22 @@ const DEFAULT_QUALIFICATION: Qualification = {
  *  design the client signed off on, so a fresh install still renders the
  *  ladder rather than going blank. */
 const FALLBACK_TIERS: DisplayTier[] = [
-  { label: 'Starter', range: '5 – 20',  bounty: '$5',  payout: 'Instant' },
-  { label: 'Pro',     range: '21 – 100', bounty: '$7',  payout: 'Instant' },
-  { label: 'Elite',   range: '100+',     bounty: '$10', payout: 'Instant' },
+  { label: 'Bronze',   perLot: '$5 / lot',  requirement: '5+ activations or $500+' },
+  { label: 'Silver',   perLot: '$7 / lot',  requirement: '20+ activations or $5,000+' },
+  { label: 'Gold',     perLot: '$10 / lot', requirement: '50+ activations or $20,000+' },
+  { label: 'Platinum', perLot: '$12 / lot', requirement: '100+ activations or $50,000+' },
 ];
 
-const fmtUsd = (n: number) =>
-  n >= 1
-    ? `$${Number.isInteger(n) ? n : n.toFixed(2).replace(/\.00$/, '')}`
-    : `$${n.toFixed(2)}`;
+const fmtUsd = (n: number) => `$${(n || 0).toLocaleString('en-US', { maximumFractionDigits: 2 })}`;
 
 function adaptApi(t: ApiTier): DisplayTier {
-  const lo = t.min_referrals;
-  const range = t.max_referrals == null
-    ? `${lo}+`
-    : `${lo} – ${t.max_referrals}`;
+  const act = t.min_activations > 0 ? `${t.min_activations}+ activations` : '';
+  const amt = t.min_amount > 0 ? `${fmtUsd(t.min_amount)}+` : '';
+  const requirement = [act, amt].filter(Boolean).join(' or ') || '—';
   return {
     label: t.label,
-    range,
-    bounty: fmtUsd(t.per_referral_bounty || 0),
-    payout: t.instant_payout ? 'Instant' : 'Weekly',
+    perLot: `${fmtUsd(t.per_lot || 0)} / lot`,
+    requirement,
   };
 }
 
@@ -198,7 +193,7 @@ export default function ReferralPage() {
               <thead>
                 <tr>
                   <th className="bg-foreground/[0.04] border-r border-foreground/15 px-5 py-4 text-left text-xs uppercase tracking-[0.16em] text-foreground/55">
-                    Active Referrals
+                    Tier
                   </th>
                   {tiers.map((t, i) => (
                     <th
@@ -208,46 +203,46 @@ export default function ReferralPage() {
                       }`}
                       style={{ background: TIER_HEADER_GRADIENTS[i % TIER_HEADER_GRADIENTS.length] }}
                     >
-                      {t.range}
+                      {t.label}
                     </th>
                   ))}
                 </tr>
               </thead>
               <tbody>
-                {/* Per-referral bounty row */}
+                {/* Commission per lot row */}
                 <tr className="border-t border-foreground/10">
                   <td className="px-5 py-4 text-sm text-foreground/75 bg-foreground/[0.04] border-r border-foreground/15">
-                    Per-referral bounty
+                    Commission / lot
                   </td>
                   {tiers.map((t, i) => {
                     const isMid = tiers.length >= 3 && i === Math.floor(tiers.length / 2);
                     return (
                       <td
-                        key={`bounty-${i}`}
-                        className={`px-5 py-4 text-center text-sm ${
+                        key={`perlot-${i}`}
+                        className={`px-5 py-4 text-center text-sm font-semibold ${
                           isMid ? 'text-foreground bg-primary/[0.08]' : 'text-foreground/90 bg-foreground/[0.02]'
                         }${i < tiers.length - 1 ? ' border-r border-foreground/10' : ''}`}
                       >
-                        {t.bounty}
+                        {t.perLot}
                       </td>
                     );
                   })}
                 </tr>
-                {/* Payout row */}
+                {/* Qualification row (activations OR amount) */}
                 <tr className="border-t border-foreground/10">
                   <td className="px-5 py-4 text-sm text-foreground/75 bg-foreground/[0.04] border-r border-foreground/15">
-                    Payout
+                    Qualify (either)
                   </td>
                   {tiers.map((t, i) => {
                     const isMid = tiers.length >= 3 && i === Math.floor(tiers.length / 2);
                     return (
                       <td
-                        key={`payout-${i}`}
-                        className={`px-5 py-4 text-center text-sm ${
-                          isMid ? 'text-foreground bg-primary/[0.08]' : 'text-foreground/90 bg-foreground/[0.02]'
+                        key={`req-${i}`}
+                        className={`px-5 py-4 text-center text-xs ${
+                          isMid ? 'text-foreground bg-primary/[0.08]' : 'text-foreground/80 bg-foreground/[0.02]'
                         }${i < tiers.length - 1 ? ' border-r border-foreground/10' : ''}`}
                       >
-                        {t.payout}
+                        {t.requirement}
                       </td>
                     );
                   })}
@@ -258,8 +253,9 @@ export default function ReferralPage() {
         </div>
 
         <p className="mt-5 text-center text-xs text-foreground/45 max-w-2xl mx-auto leading-relaxed">
-          The "Active Referrals" tier counts friends who have completed activation and the minimum-trade requirement
-          (see Terms below). The higher tier auto-applies as soon as you cross the threshold.
+          You earn the per-lot commission of the highest tier you reach. A tier unlocks when EITHER your
+          activations OR your referrals&apos; total deposits cross its threshold. An activation = a referred
+          client who completes KYC and at least 3 trades. Top partners can be set a custom rate.
         </p>
       </section>
 

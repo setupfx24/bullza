@@ -102,10 +102,7 @@ export default function KycPage() {
   const [file, setFile] = useState<File | null>(null);
   const [docType2, setDocType2] = useState('proof_of_address');
   const [file2, setFile2] = useState<File | null>(null);
-  const [address, setAddress] = useState('');
-  const [city, setCity] = useState('');
-  const [postal, setPostal] = useState('');
-  const [country, setCountry] = useState('');
+  const [file3, setFile3] = useState<File | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   const fetchProfile = useCallback(async () => {
@@ -113,8 +110,6 @@ export default function KycPage() {
       setLoading(true);
       const data = await api.get<Profile>('/profile');
       setProfile(data);
-      setCountry(data.country ?? '');
-      setAddress((data.address ?? '').trim());
     } catch {
       toast.error('Failed to load KYC status');
     } finally {
@@ -136,25 +131,30 @@ export default function KycPage() {
   const openForm = () => {
     setFile(null);
     setFile2(null);
+    setFile3(null);
     setShowFormModal(true);
   };
 
   const handleSubmit = async () => {
     if (!file) {
-      toast.error('Please select a primary document');
+      toast.error('Please upload your government ID');
+      return;
+    }
+    if (!file2) {
+      toast.error('Please upload your proof of address');
+      return;
+    }
+    if (!file3) {
+      toast.error('Please upload a selfie with your ID');
       return;
     }
     const fd = new FormData();
     fd.append('document_type', docType);
     fd.append('file', file);
-    if (file2) {
-      fd.append('document_type_2', docType2);
-      fd.append('file_2', file2);
-    }
-    if (address.trim()) fd.append('residential_address', address.trim());
-    if (city.trim()) fd.append('city', city.trim());
-    if (postal.trim()) fd.append('postal_code', postal.trim());
-    if (country.trim()) fd.append('country_of_residence', country.trim());
+    fd.append('document_type_2', docType2);
+    fd.append('file_2', file2);
+    fd.append('document_type_3', 'selfie');
+    fd.append('file_3', file3);
 
     setSubmitting(true);
     try {
@@ -489,7 +489,7 @@ export default function KycPage() {
                 >
                   <input
                     type="file"
-                    accept=".jpg,.jpeg,.png,.pdf,.webp"
+                    accept="image/*,application/pdf"
                     className="hidden"
                     onChange={(e) => setFile(e.target.files?.[0] ?? null)}
                   />
@@ -508,7 +508,7 @@ export default function KycPage() {
 
               <div className="space-y-2">
                 <label className="text-xs text-text-secondary uppercase tracking-wide font-semibold">
-                  Secondary document (optional)
+                  Proof of address *
                 </label>
                 <div className="relative">
                   <select
@@ -537,52 +537,48 @@ export default function KycPage() {
                 >
                   <input
                     type="file"
-                    accept=".jpg,.jpeg,.png,.pdf,.webp"
+                    accept="image/*,application/pdf"
                     className="hidden"
                     onChange={(e) => setFile2(e.target.files?.[0] ?? null)}
                   />
                   {file2 ? (
                     <span className="text-xs text-accent font-medium px-2 break-all text-center">{file2.name}</span>
                   ) : (
-                    <span className="text-xs text-text-secondary">Upload second file (e.g. proof of address)</span>
+                    <span className="text-xs text-text-secondary">Upload proof of address (utility bill / bank statement)</span>
                   )}
                 </label>
               </div>
 
-              <div className="space-y-3">
+              <div className="space-y-2">
                 <label className="text-xs text-text-secondary uppercase tracking-wide font-semibold">
-                  Address (optional)
+                  Selfie with ID *
                 </label>
-                <input
-                  type="text"
-                  value={address}
-                  onChange={(e) => setAddress(e.target.value)}
-                  placeholder="Residential address"
-                  className={inputCls}
-                />
-                <div className="grid grid-cols-2 gap-3">
+                <label
+                  className={clsx(
+                    'flex items-center justify-center gap-2 w-full min-h-[4rem] rounded-xl border-2 border-dashed cursor-pointer transition-colors px-3',
+                    file3
+                      ? 'border-accent/40 bg-accent/5'
+                      : 'border-border-primary hover:border-border-accent bg-card-nested',
+                  )}
+                >
                   <input
-                    type="text"
-                    value={city}
-                    onChange={(e) => setCity(e.target.value)}
-                    placeholder="City"
-                    className={inputCls}
+                    type="file"
+                    accept="image/*"
+                    capture="user"
+                    className="hidden"
+                    onChange={(e) => setFile3(e.target.files?.[0] ?? null)}
                   />
-                  <input
-                    type="text"
-                    value={postal}
-                    onChange={(e) => setPostal(e.target.value)}
-                    placeholder="Postal / ZIP"
-                    className={inputCls}
-                  />
-                </div>
-                <input
-                  type="text"
-                  value={country}
-                  onChange={(e) => setCountry(e.target.value)}
-                  placeholder="Country"
-                  className={inputCls}
-                />
+                  {file3 ? (
+                    <span className="text-xs text-accent font-medium px-2 break-all text-center">{file3.name}</span>
+                  ) : (
+                    <div className="flex flex-col items-center gap-1 text-center py-2">
+                      <Camera size={18} className="text-text-tertiary" />
+                      <span className="text-xs text-text-secondary">
+                        Take/upload a selfie holding your ID · JPG, PNG, WEBP
+                      </span>
+                    </div>
+                  )}
+                </label>
               </div>
 
               <button

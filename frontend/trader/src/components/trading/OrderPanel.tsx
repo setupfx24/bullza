@@ -223,6 +223,8 @@ export default function OrderPanel() {
         symbol: selectedSymbol,
         side,
         lots: lotsNum,
+        // Cent multiplier so live P&L matches the engine instantly.
+        effective_lots: lotsNum * (Number(activeAccount.account_group?.lot_size_multiplier) || 1),
         open_price: execPrice,
         current_price: execPrice,
         stop_loss: slEnabled && stopLoss ? parseFloat(stopLoss) : undefined,

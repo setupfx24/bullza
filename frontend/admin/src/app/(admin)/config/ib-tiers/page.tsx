@@ -6,126 +6,67 @@ import { Loader2, Save, Plus, Trash2 } from 'lucide-react';
 import { adminApi } from '@/lib/api';
 
 /**
- * IB Commission Tiers — dynamic per-account-type rates.
+ * IB Commission Tiers (2026-06-11 model).
  *
- * Columns are NOT hardcoded. We pull the live list of account types
- * from /account-types and render one rate column per active type.
- * Tier data is stored as `per_lot_by_account_type: { <lowercased_name>: rate }`
- * which matches the lookup key the IB engine uses
- * (`_referred_account_type_key` returns `AccountGroup.name.lower()`).
+ * Four named tiers (Bronze / Silver / Gold / Platinum) with a flat
+ * per-lot commission. An IB reaches a tier when EITHER their activation
+ * count OR the cumulative deposit amount their referrals brought meets
+ * the tier threshold — whichever qualifies for the higher tier.
+ *   - activation = referred user who is KYC-approved AND has >= 3 closed
+ *     trades (the ib_commission_min_trades setting).
+ *   - amount     = sum of all approved deposits across the IB's referrals.
+ * A per-IB custom override (set on the IB profile, e.g. $15) outranks
+ * this ladder for specific top partners.
  *
- * Renaming an account type doesn't migrate old tier rates automatically —
- * the old key stays in the JSON, the new column shows up empty until
- * admin fills it in. Deactivating a type just hides its column from
- * the editor without erasing existing data.
+ * Stored under system_settings.ib_commission_tiers and read by the IB
+ * engine (resolve_tier / compute_ib_qualification).
  */
-
-interface AccountTypeRow {
-  id: string;
-  name: string;
-  is_active: boolean;
-  is_demo: boolean;
-}
 
 interface Tier {
   label: string;
-  min_referrals: number;
-  // null = no upper bound (the top tier).
-  max_referrals: number | null;
-  // Flat per-lot fallback used when the user's account type isn't keyed in
-  // per_lot_by_account_type below. Stays on the JSON for backward compat.
   per_lot: number;
-  // Per-account-type per-lot rates. Keyed by lowercased account_group.name.
-  // The IB engine resolves the referred user's account → group name and
-  // looks up this map; flat per_lot is the fallback.
-  per_lot_by_account_type: Record<string, number>;
-  // Flat one-time payout per referred user's first approved deposit.
-  // Separate from the per-lot stream that pays as referrals trade.
-  per_referral_bounty: number;
-  instant_payout: boolean;
-  dedicated_manager: boolean;
+  min_activations: number;
+  min_amount: number;
 }
 
 const FALLBACK_TIERS: Tier[] = [
-  {
-    label: 'Starter',
-    min_referrals: 1,
-    max_referrals: 20,
-    per_lot: 6,
-    per_lot_by_account_type: {},
-    per_referral_bounty: 5,
-    instant_payout: true,
-    dedicated_manager: false,
-  },
-  {
-    label: 'Pro',
-    min_referrals: 21,
-    max_referrals: 100,
-    per_lot: 8,
-    per_lot_by_account_type: {},
-    per_referral_bounty: 7,
-    instant_payout: true,
-    dedicated_manager: true,
-  },
-  {
-    label: 'Elite',
-    min_referrals: 101,
-    max_referrals: null,
-    per_lot: 13,
-    per_lot_by_account_type: {},
-    per_referral_bounty: 10,
-    instant_payout: true,
-    dedicated_manager: true,
-  },
+  { label: 'Bronze',   per_lot: 5,  min_activations: 5,   min_amount: 500 },
+  { label: 'Silver',   per_lot: 7,  min_activations: 20,  min_amount: 5000 },
+  { label: 'Gold',     per_lot: 10, min_activations: 50,  min_amount: 20000 },
+  { label: 'Platinum', per_lot: 12, min_activations: 100, min_amount: 50000 },
 ];
-
-const groupKey = (name: string) => name.trim().toLowerCase();
 
 export default function IBTiersAdminPage() {
   const [tiers, setTiers] = useState<Tier[]>(FALLBACK_TIERS);
-  const [accountTypes, setAccountTypes] = useState<AccountTypeRow[]>([]);
+  // Activation rule (what makes a referred user count as an "activation").
+  const [minTrades, setMinTrades] = useState(3);
+  const [requiresKyc, setRequiresKyc] = useState(true);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
-  const normalize = (r: any): Tier => {
-    const fallbackPerLot = Number(r.per_lot) || 0;
-    const rawMap = (r.per_lot_by_account_type || {}) as Record<string, unknown>;
-    const per_lot_by_account_type: Record<string, number> = {};
-    for (const [k, v] of Object.entries(rawMap)) {
-      const n = Number(v);
-      if (Number.isFinite(n)) per_lot_by_account_type[String(k).toLowerCase()] = n;
-    }
-    return {
-      label: String(r.label || ''),
-      min_referrals: Number(r.min_referrals) || 0,
-      max_referrals: r.max_referrals == null ? null : Number(r.max_referrals) || 0,
-      per_lot: fallbackPerLot,
-      per_lot_by_account_type,
-      per_referral_bounty: Number(r.per_referral_bounty) || 0,
-      instant_payout: r.instant_payout !== false,
-      dedicated_manager: !!r.dedicated_manager,
-    };
-  };
+  const normalize = (r: any): Tier => ({
+    label: String(r.label || ''),
+    per_lot: Number(r.per_lot) || 0,
+    min_activations: Number(r.min_activations) || 0,
+    min_amount: Number(r.min_amount) || 0,
+  });
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      // Settings + account types in parallel — neither blocks the other.
-      const [all, groups] = await Promise.all([
-        adminApi.get<{ key: string; value: any }[]>('/settings').catch(() => []),
-        adminApi
-          .get<{ items?: AccountTypeRow[] } | AccountTypeRow[]>('/account-types')
-          .catch(() => []),
-      ]);
-
+      const all = await adminApi.get<{ key: string; value: any }[]>('/settings').catch(() => []);
       const list = Array.isArray(all) ? all : [];
       const raw = list.find((s) => s.key === 'ib_commission_tiers')?.value;
-      if (Array.isArray(raw) && raw.length > 0) {
+      // Only adopt stored tiers if they're in the new shape (have a
+      // min_activations / min_amount field). Legacy referral-count tiers
+      // fall back to the new default ladder.
+      if (Array.isArray(raw) && raw.length > 0 && raw.some((t: any) => t.min_activations != null || t.min_amount != null)) {
         setTiers(raw.map(normalize));
       }
-
-      const groupItems = Array.isArray(groups) ? groups : (groups?.items || []);
-      setAccountTypes(groupItems);
+      const mt = list.find((s) => s.key === 'ib_commission_min_trades')?.value;
+      if (mt != null && Number.isFinite(Number(mt))) setMinTrades(Number(mt));
+      const rk = list.find((s) => s.key === 'ib_commission_requires_kyc')?.value;
+      if (rk != null) setRequiresKyc(rk === true || rk === 'true' || rk === 1 || rk === '1');
     } catch (e: any) {
       toast.error(e?.message || 'Failed to load IB tiers');
     } finally {
@@ -134,41 +75,6 @@ export default function IBTiersAdminPage() {
   }, []);
 
   useEffect(() => { load(); }, [load]);
-
-  // Visible columns = live (non-demo) active account types, deduped by
-  // lowercased name. Demo types are excluded because demo trades can
-  // never earn IB commission — showing them was confusing admins and
-  // forced rate entry for columns that would never pay out.
-  // Inactive types are hidden from editing but their existing rate keys
-  // stay in the JSON so reactivation re-attaches them.
-  const visibleColumns = (() => {
-    const seen = new Set<string>();
-    const out: AccountTypeRow[] = [];
-    for (const g of accountTypes) {
-      if (!g.is_active) continue;
-      if (g.is_demo) continue;
-      const k = groupKey(g.name);
-      if (seen.has(k)) continue;
-      seen.add(k);
-      out.push(g);
-    }
-    return out;
-  })();
-
-  const updateRate = (tierIdx: number, group: AccountTypeRow, value: number) => {
-    setTiers((prev) => {
-      const next = prev.slice();
-      const cur = next[tierIdx];
-      next[tierIdx] = {
-        ...cur,
-        per_lot_by_account_type: {
-          ...cur.per_lot_by_account_type,
-          [groupKey(group.name)]: value,
-        },
-      };
-      return next;
-    });
-  };
 
   const updateTier = <K extends keyof Tier>(i: number, field: K, value: Tier[K]) => {
     setTiers((prev) => {
@@ -180,22 +86,13 @@ export default function IBTiersAdminPage() {
 
   const addTier = () => {
     const last = tiers[tiers.length - 1];
-    const lo = last ? (last.max_referrals ?? last.min_referrals) + 1 : 1;
-    // Initialize each visible account-type rate to 0 so the new row
-    // doesn't render blank inputs.
-    const seed: Record<string, number> = {};
-    for (const g of visibleColumns) seed[groupKey(g.name)] = 0;
     setTiers([
       ...tiers,
       {
         label: 'New tier',
-        min_referrals: lo,
-        max_referrals: lo + 9,
-        per_lot: 0,
-        per_lot_by_account_type: seed,
-        per_referral_bounty: 0,
-        instant_payout: true,
-        dedicated_manager: false,
+        per_lot: last ? last.per_lot + 1 : 5,
+        min_activations: last ? last.min_activations * 2 : 5,
+        min_amount: last ? last.min_amount * 2 : 500,
       },
     ]);
   };
@@ -206,26 +103,23 @@ export default function IBTiersAdminPage() {
   };
 
   const save = async () => {
-    if (tiers.some((t) => !t.label.trim() || t.per_lot < 0 || t.per_referral_bounty < 0 || t.min_referrals < 0)) {
-      toast.error('Every tier needs a label, non-negative threshold, per-lot and bounty.');
+    if (tiers.some((t) => !t.label.trim() || t.per_lot < 0 || t.min_activations < 0 || t.min_amount < 0)) {
+      toast.error('Every tier needs a label and non-negative per-lot / thresholds.');
       return;
     }
-    // Ensure tiers are sorted by min_referrals ascending and non-overlapping —
-    // simple sanity check; the resolver picks the first matching range,
-    // so an out-of-order list would silently mis-pay commissions.
-    const sorted = [...tiers].sort((a, b) => a.min_referrals - b.min_referrals);
-    for (let i = 1; i < sorted.length; i++) {
-      const prev = sorted[i - 1];
-      const cur = sorted[i];
-      const prevHi = prev.max_referrals ?? Number.POSITIVE_INFINITY;
-      if (cur.min_referrals <= prevHi) {
-        toast.error(`Tier "${cur.label}" starts at ${cur.min_referrals} but "${prev.label}" runs to ${prev.max_referrals ?? '∞'}`);
-        return;
-      }
-    }
+    // Sort by per-lot ascending so the ladder reads low→high. The engine
+    // resolves by "highest qualifying tier", so order is cosmetic, but a
+    // sorted list is clearer for the next admin.
+    const sorted = [...tiers].sort((a, b) => a.per_lot - b.per_lot);
     setSaving(true);
     try {
-      await adminApi.put('/settings', { settings: { ib_commission_tiers: sorted } });
+      await adminApi.put('/settings', {
+        settings: {
+          ib_commission_tiers: sorted,
+          ib_commission_min_trades: Math.max(0, Math.floor(minTrades) || 0),
+          ib_commission_requires_kyc: requiresKyc,
+        },
+      });
       toast.success('IB commission tiers saved');
       setTiers(sorted);
     } catch (e: any) {
@@ -243,21 +137,18 @@ export default function IBTiersAdminPage() {
     );
   }
 
-  // Minimum table width grows with the number of dynamic columns so
-  // wide platforms with 6+ account types still scroll cleanly.
-  const minWidth = 520 + visibleColumns.length * 130;
-
   return (
-    <div className="p-4 sm:p-6 space-y-4 max-w-6xl">
+    <div className="p-4 sm:p-6 space-y-4 max-w-4xl">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-lg font-semibold text-text-primary">IB Commission Tiers</h1>
           <p className="text-xxs text-text-tertiary mt-0.5 max-w-3xl">
-            Per-lot commission an IB earns scales with their active-referral count. The IB
-            engine picks the first tier whose <strong>Min</strong> ≤ count ≤ <strong>Max</strong>.
-            Leave the top tier&apos;s Max blank for &quot;no upper bound&quot;. Rate columns reflect the
-            account types you&apos;ve configured in{' '}
-            <a href="/account-types" className="text-buy underline">Account types</a>.
+            Per-lot commission an IB earns. An IB reaches a tier when{' '}
+            <strong>EITHER</strong> their <strong>activations</strong> reach the threshold{' '}
+            <strong>OR</strong> the <strong>cumulative deposit amount</strong> their referrals
+            brought reaches the threshold — whichever qualifies for the higher tier.
+            An <em>activation</em> = a referred user who is KYC-approved and has placed at
+            least 3 closed trades.
           </p>
         </div>
         <button
@@ -269,41 +160,43 @@ export default function IBTiersAdminPage() {
         </button>
       </div>
 
-      {visibleColumns.length === 0 && (
-        <div className="rounded-md border border-warning/40 bg-warning/10 p-3 text-xs text-warning">
-          No active account types found. Create some in{' '}
-          <a href="/account-types" className="underline font-semibold">Account types</a>{' '}
-          first — rate columns will appear here for every active type.
+      {/* Activation rule — what makes a referred user count toward the
+          activation thresholds above. Fully admin-editable. */}
+      <div className="bg-bg-secondary border border-border-primary rounded-md p-4 space-y-3">
+        <h2 className="text-sm font-semibold text-text-primary">Activation rule</h2>
+        <p className="text-xxs text-text-tertiary -mt-1">
+          A referred user counts as one <strong>activation</strong> once they meet these conditions.
+        </p>
+        <div className="flex flex-wrap items-center gap-6">
+          <label className="flex items-center gap-2 text-xs text-text-secondary">
+            Minimum completed trades
+            <input
+              type="number" min={0}
+              value={minTrades}
+              onChange={(e) => setMinTrades(parseInt(e.target.value) || 0)}
+              className="w-20 px-2 py-1 text-xs bg-bg-input border border-border-primary rounded font-mono tabular-nums text-text-primary"
+            />
+          </label>
+          <label className="flex items-center gap-2 text-xs text-text-secondary cursor-pointer">
+            <input
+              type="checkbox"
+              checked={requiresKyc}
+              onChange={(e) => setRequiresKyc(e.target.checked)}
+              className="w-4 h-4 accent-buy"
+            />
+            Require KYC approved
+          </label>
         </div>
-      )}
+      </div>
 
       <div className="bg-bg-secondary border border-border-primary rounded-md overflow-x-auto">
-        <table className="w-full" style={{ minWidth }}>
+        <table className="w-full" style={{ minWidth: 560 }}>
           <thead>
             <tr className="border-b border-border-primary bg-bg-tertiary/40">
-              <th className="text-left px-3 py-2 text-xxs font-medium text-text-tertiary uppercase tracking-wide">Label</th>
-              <th className="text-left px-3 py-2 text-xxs font-medium text-text-tertiary uppercase tracking-wide">Min referrals</th>
-              <th className="text-left px-3 py-2 text-xxs font-medium text-text-tertiary uppercase tracking-wide">Max referrals</th>
-              {visibleColumns.map((g) => (
-                <th
-                  key={g.id}
-                  className="text-left px-3 py-2 text-xxs font-medium text-text-tertiary uppercase tracking-wide"
-                  title={`Account type key: ${groupKey(g.name)}`}
-                >
-                  Per-lot {g.name} ($)
-                </th>
-              ))}
-              {/* Only show the catch-all column when no account types are
-                  configured yet — once admin has Standard/Pro/etc set up,
-                  the per-type columns are sufficient and the Fallback was
-                  redundant noise. The JSON field is still preserved on
-                  save for safety. */}
-              {visibleColumns.length === 0 && (
-                <th className="text-left px-3 py-2 text-xxs font-medium text-text-tertiary uppercase tracking-wide">Fallback per-lot ($)</th>
-              )}
-              <th className="text-left px-3 py-2 text-xxs font-medium text-text-tertiary uppercase tracking-wide">Per-referral bounty ($)</th>
-              <th className="text-center px-3 py-2 text-xxs font-medium text-text-tertiary uppercase tracking-wide">Instant payout</th>
-              <th className="text-center px-3 py-2 text-xxs font-medium text-text-tertiary uppercase tracking-wide">Dedicated manager</th>
+              <th className="text-left px-3 py-2 text-xxs font-medium text-text-tertiary uppercase tracking-wide">Tier</th>
+              <th className="text-left px-3 py-2 text-xxs font-medium text-text-tertiary uppercase tracking-wide">Per-lot ($)</th>
+              <th className="text-left px-3 py-2 text-xxs font-medium text-text-tertiary uppercase tracking-wide">Min activations</th>
+              <th className="text-left px-3 py-2 text-xxs font-medium text-text-tertiary uppercase tracking-wide">OR min amount ($)</th>
               <th className="px-2 py-2"></th>
             </tr>
           </thead>
@@ -314,74 +207,31 @@ export default function IBTiersAdminPage() {
                   <input
                     value={t.label}
                     onChange={(e) => updateTier(i, 'label', e.target.value)}
-                    className="w-28 px-2 py-1 text-xs bg-bg-input border border-border-primary rounded text-text-primary"
+                    className="w-32 px-2 py-1 text-xs bg-bg-input border border-border-primary rounded text-text-primary"
                   />
                 </td>
-                <td className="px-3 py-2">
-                  <input
-                    type="number" min={0}
-                    value={t.min_referrals}
-                    onChange={(e) => updateTier(i, 'min_referrals', parseInt(e.target.value) || 0)}
-                    className="w-20 px-2 py-1 text-xs bg-bg-input border border-border-primary rounded font-mono tabular-nums text-text-primary"
-                  />
-                </td>
-                <td className="px-3 py-2">
-                  <input
-                    type="number" min={0}
-                    value={t.max_referrals ?? ''}
-                    placeholder="∞"
-                    onChange={(e) => updateTier(i, 'max_referrals', e.target.value === '' ? null : (parseInt(e.target.value) || 0))}
-                    className="w-20 px-2 py-1 text-xs bg-bg-input border border-border-primary rounded font-mono tabular-nums text-text-primary"
-                  />
-                </td>
-                {visibleColumns.map((g) => {
-                  const k = groupKey(g.name);
-                  const current = t.per_lot_by_account_type[k] ?? '';
-                  return (
-                    <td key={g.id} className="px-3 py-2">
-                      <input
-                        type="number" min={0} step={0.5}
-                        value={current}
-                        placeholder="inherit"
-                        onChange={(e) => updateRate(i, g, parseFloat(e.target.value) || 0)}
-                        className="w-24 px-2 py-1 text-xs bg-bg-input border border-border-primary rounded font-mono tabular-nums text-text-primary"
-                      />
-                    </td>
-                  );
-                })}
-                {visibleColumns.length === 0 && (
-                  <td className="px-3 py-2">
-                    <input
-                      type="number" min={0} step={0.5}
-                      value={t.per_lot}
-                      onChange={(e) => updateTier(i, 'per_lot', parseFloat(e.target.value) || 0)}
-                      title="Used for any account type that doesn't have a specific rate above."
-                      className="w-24 px-2 py-1 text-xs bg-bg-input border border-border-primary rounded font-mono tabular-nums text-text-primary"
-                    />
-                  </td>
-                )}
                 <td className="px-3 py-2">
                   <input
                     type="number" min={0} step={0.5}
-                    value={t.per_referral_bounty}
-                    onChange={(e) => updateTier(i, 'per_referral_bounty', parseFloat(e.target.value) || 0)}
+                    value={t.per_lot}
+                    onChange={(e) => updateTier(i, 'per_lot', parseFloat(e.target.value) || 0)}
                     className="w-24 px-2 py-1 text-xs bg-bg-input border border-border-primary rounded font-mono tabular-nums text-text-primary"
                   />
                 </td>
-                <td className="px-3 py-2 text-center">
+                <td className="px-3 py-2">
                   <input
-                    type="checkbox"
-                    checked={t.instant_payout}
-                    onChange={(e) => updateTier(i, 'instant_payout', e.target.checked)}
-                    className="w-4 h-4 accent-buy"
+                    type="number" min={0}
+                    value={t.min_activations}
+                    onChange={(e) => updateTier(i, 'min_activations', parseInt(e.target.value) || 0)}
+                    className="w-24 px-2 py-1 text-xs bg-bg-input border border-border-primary rounded font-mono tabular-nums text-text-primary"
                   />
                 </td>
-                <td className="px-3 py-2 text-center">
+                <td className="px-3 py-2">
                   <input
-                    type="checkbox"
-                    checked={t.dedicated_manager}
-                    onChange={(e) => updateTier(i, 'dedicated_manager', e.target.checked)}
-                    className="w-4 h-4 accent-buy"
+                    type="number" min={0} step={100}
+                    value={t.min_amount}
+                    onChange={(e) => updateTier(i, 'min_amount', parseFloat(e.target.value) || 0)}
+                    className="w-28 px-2 py-1 text-xs bg-bg-input border border-border-primary rounded font-mono tabular-nums text-text-primary"
                   />
                 </td>
                 <td className="px-2 py-2 text-right">
@@ -397,13 +247,7 @@ export default function IBTiersAdminPage() {
               </tr>
             ))}
             <tr>
-              {/* colSpan tracks visible columns:
-                  3 fixed (Label/Min/Max) + N type cols + (1 fallback when N=0) +
-                  4 trailing (Bounty/Instant/Manager/trash) */}
-              <td
-                colSpan={3 + visibleColumns.length + (visibleColumns.length === 0 ? 1 : 0) + 4}
-                className="px-3 py-2"
-              >
+              <td colSpan={5} className="px-3 py-2">
                 <button
                   onClick={addTier}
                   className="inline-flex items-center gap-1 px-2 py-1 text-xxs text-text-secondary border border-border-primary rounded hover:bg-bg-hover"
@@ -418,21 +262,15 @@ export default function IBTiersAdminPage() {
 
       <div className="text-[11px] text-text-tertiary max-w-3xl space-y-1">
         <p>
-          <strong>Per-lot resolver priority:</strong> 1) per-agent custom override on the IB profile,
-          2) this tier&apos;s <em>per-account-type</em> rate (looked up by lowercased account type name),
-          3) this tier&apos;s <em>fallback per-lot</em>, 4) the IB commission plan&apos;s default.
-          First non-null wins.
+          <strong>Qualification is OR-based:</strong> an IB gets a tier if their activation
+          count <em>or</em> their referrals&apos; cumulative deposit total reaches that tier&apos;s
+          threshold. The engine pays the highest tier reached.
         </p>
         <p>
-          <strong>Per-referral bounty</strong> is paid once, when a referred user makes their
-          first approved deposit. The IB&apos;s current tier (by active-referral count) determines
-          the amount.
-        </p>
-        <p>
-          <strong>Renaming an account type</strong> in{' '}
-          <a href="/account-types" className="text-buy underline">Account types</a>{' '}
-          doesn&apos;t migrate this table&apos;s rates — the old key stays on the JSON and a new
-          empty column appears for the renamed type. Re-enter the rate and save to update.
+          <strong>Top custom deal:</strong> to give a specific partner a fixed rate (e.g. $15/lot)
+          that ignores this ladder, set the IB&apos;s <em>custom commission per lot</em> on their
+          profile in <a href="/business/ib" className="text-buy underline">Business → IB</a>.
+          A per-IB override always wins.
         </p>
       </div>
     </div>

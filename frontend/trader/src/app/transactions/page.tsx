@@ -490,7 +490,9 @@ export default function TransactionsPage() {
                           <div className="min-w-0">
                             <h3 className="text-text-primary font-semibold text-xs sm:text-sm truncate">
                               {transactionTitle(tx)}{' '}
-                              <span className="text-text-tertiary font-normal text-[10px] sm:text-xs hidden sm:inline">· {tx.method}</span>
+                              {tx.method && tx.method !== transactionTitle(tx) ? (
+                                <span className="text-text-tertiary font-normal text-[10px] sm:text-xs hidden sm:inline">· {tx.method}</span>
+                              ) : null}
                             </h3>
                             {tx.description ? (
                               <p className="text-[11px] text-text-tertiary mt-0.5 line-clamp-2">{tx.description}</p>

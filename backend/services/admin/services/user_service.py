@@ -224,6 +224,12 @@ async def get_user_detail(user_id: uuid.UUID, db: AsyncSession):
         )
         open_positions = pos_q.scalar() or 0
 
+    assigned_rm_name = None
+    if user.assigned_rm_id:
+        rm = (await db.execute(select(User).where(User.id == user.assigned_rm_id))).scalar_one_or_none()
+        if rm:
+            assigned_rm_name = f"{rm.first_name or ''} {rm.last_name or ''}".strip() or rm.email
+
     return UserDetailOut(
         user=UserOut(**_user_to_out(user)),
         accounts=[TradingAccountOut(**_account_to_out(a)) for a in accounts],
@@ -231,7 +237,45 @@ async def get_user_detail(user_id: uuid.UUID, db: AsyncSession):
         total_withdrawal=total_withdrawal,
         total_trades=total_trades,
         open_positions=open_positions,
+        assigned_rm_id=str(user.assigned_rm_id) if user.assigned_rm_id else None,
+        assigned_rm_name=assigned_rm_name,
     )
+
+
+async def get_user_deposits(user_id: uuid.UUID, db: AsyncSession) -> list[dict]:
+    """Per-deposit history for a user — how each deposit was made (method),
+    its status, and WHICH admin approved it (client 2026-06-12)."""
+    from sqlalchemy.orm import aliased
+    Approver = aliased(User)
+    rows = (await db.execute(
+        select(
+            Deposit.id, Deposit.amount, Deposit.method, Deposit.status,
+            Deposit.created_at, Deposit.approved_at,
+            Deposit.transaction_id,
+            Approver.first_name, Approver.last_name, Approver.email,
+        )
+        .select_from(Deposit)
+        .outerjoin(Approver, Approver.id == Deposit.approved_by)
+        .where(Deposit.user_id == user_id)
+        .order_by(Deposit.created_at.desc())
+        .limit(200)
+    )).all()
+    out = []
+    for r in rows:
+        approver = None
+        if r.first_name or r.last_name or r.email:
+            approver = (" ".join(filter(None, [r.first_name, r.last_name])).strip() or r.email)
+        out.append({
+            "id": str(r.id),
+            "amount": float(r.amount or 0),
+            "method": r.method or "—",
+            "status": r.status,
+            "created_at": r.created_at.isoformat() if r.created_at else None,
+            "approved_at": r.approved_at.isoformat() if r.approved_at else None,
+            "approved_by": approver,
+            "reference": r.transaction_id,
+        })
+    return out
 
 
 async def add_fund(

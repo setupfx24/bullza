@@ -1058,6 +1058,10 @@ function BecomeProviderTab() {
   }, []);
 
   const handleSubmit = async () => {
+    if (description.trim().length < 10) {
+      toast.error('A strategy description (at least 10 characters) is required.');
+      return;
+    }
     setSubmitting(true);
     try {
       const strategyInfo: Record<string, string> = {};
@@ -1156,8 +1160,8 @@ function BecomeProviderTab() {
           <input type="number" min="1" max="1000" value={maxInvestors} onChange={e => setMaxInvestors(e.target.value)} className="skeu-input w-full text-text-primary rounded-xl py-2.5 px-4 text-xs font-mono" />
         </div>
         <div>
-          <label className="text-xxs text-text-secondary block mb-1">Description / Strategy</label>
-          <textarea value={description} onChange={e => setDescription(e.target.value)} rows={3} placeholder="Describe your trading strategy..." className="skeu-input w-full text-text-primary rounded-xl py-2.5 px-4 text-xs resize-none" />
+          <label className="text-xxs text-text-secondary block mb-1">Description / Strategy <span className="text-danger">*</span></label>
+          <textarea value={description} onChange={e => setDescription(e.target.value)} rows={3} placeholder="Describe your trading strategy (required, min 10 characters)…" className="skeu-input w-full text-text-primary rounded-xl py-2.5 px-4 text-xs resize-none" />
         </div>
 
         {/* Strategy Info Section */}

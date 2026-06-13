@@ -39,6 +39,7 @@ async def _get_live_price(symbol: str) -> dict | None:
 
 async def list_positions(
     page: int, per_page: int, status_filter: str, db: AsyncSession,
+    start_date=None, end_date=None, sort: str = "recent",
 ):
     # Exclude demo-account activity from admin views (demo trades are practice-only).
     query = (
@@ -50,11 +51,23 @@ async def list_positions(
         query = query.where(Position.status == PositionStatus.OPEN.value)
     elif status_filter == "closed":
         query = query.where(Position.status == PositionStatus.CLOSED.value)
+    if start_date is not None:
+        query = query.where(Position.created_at >= start_date)
+    if end_date is not None:
+        query = query.where(Position.created_at <= end_date)
 
     count_q = select(func.count()).select_from(query.subquery())
     total = (await db.execute(count_q)).scalar() or 0
 
-    query = query.order_by(Position.created_at.desc()).offset((page - 1) * per_page).limit(per_page)
+    # 'gainers' / 'losers' sort on the stored profit (live P&L for open
+    # trades is recomputed below; this orders by last-known profit).
+    if sort == "gainers":
+        order_by = Position.profit.desc()
+    elif sort == "losers":
+        order_by = Position.profit.asc()
+    else:
+        order_by = Position.created_at.desc()
+    query = query.order_by(order_by).offset((page - 1) * per_page).limit(per_page)
     result = await db.execute(query)
     positions = result.scalars().all()
 
@@ -186,16 +199,31 @@ async def list_orders(
     return PaginatedResponse(items=items, total=total, page=page, per_page=per_page)
 
 
-async def list_trade_history(page: int, per_page: int, db: AsyncSession):
+async def list_trade_history(
+    page: int, per_page: int, db: AsyncSession,
+    start_date=None, end_date=None, sort: str = "recent",
+):
     query = (
         select(TradeHistory)
         .join(TradingAccount, TradeHistory.account_id == TradingAccount.id)
         .where(TradingAccount.is_demo == False)
     )
+    if start_date is not None:
+        query = query.where(TradeHistory.closed_at >= start_date)
+    if end_date is not None:
+        query = query.where(TradeHistory.closed_at <= end_date)
     count_q = select(func.count()).select_from(query.subquery())
     total = (await db.execute(count_q)).scalar() or 0
 
-    query = query.order_by(TradeHistory.closed_at.desc()).offset((page - 1) * per_page).limit(per_page)
+    # sort: 'gainers' = most profitable first, 'losers' = biggest loss first,
+    # default 'recent' = newest close first.
+    if sort == "gainers":
+        order_by = TradeHistory.profit.desc()
+    elif sort == "losers":
+        order_by = TradeHistory.profit.asc()
+    else:
+        order_by = TradeHistory.closed_at.desc()
+    query = query.order_by(order_by).offset((page - 1) * per_page).limit(per_page)
     result = await db.execute(query)
     trades = result.scalars().all()
 

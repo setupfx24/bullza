@@ -1130,6 +1130,34 @@ async def become_provider(
         master_type = "signal_provider"
     normalized_type = master_type if master_type in ("signal_provider", "pamm") else "signal_provider"
 
+    # Strategy description is mandatory — investors need to know what they
+    # are allocating into before they commit funds (client requirement).
+    if not description or not str(description).strip():
+        raise HTTPException(
+            status_code=400,
+            detail="A strategy description is required to become a master.",
+        )
+    if len(str(description).strip()) < 10:
+        raise HTTPException(
+            status_code=400,
+            detail="Please write a longer strategy description (at least 10 characters).",
+        )
+    description = str(description).strip()
+
+    # Enforce the manager performance-fee cap for EVERY master type. The
+    # PAMM apply path checks it explicitly, but MAM / signal_provider
+    # masters reached this function without any cap, so a manager could
+    # set a 50%+ cut. Clamp to the admin-configured ceiling here so the
+    # stored fee can never exceed it regardless of entry path.
+    try:
+        from .pamm_config_service import get_pamm_config
+        _cfg = await get_pamm_config()
+        _cap = Decimal(str(_cfg.get("max_manager_commission_pct") or 100))
+        if performance_fee_pct is not None and Decimal(str(performance_fee_pct)) > _cap:
+            performance_fee_pct = _cap
+    except Exception:
+        pass
+
     existing = await db.execute(
         select(MasterAccount).where(
             MasterAccount.user_id == user_id,
@@ -1977,13 +2005,13 @@ async def master_performance(user_id: UUID, db: AsyncSession) -> dict:
     )
     inv_row = investor_stats.one()
 
-    fee_result = await db.execute(
-        select(func.coalesce(func.sum(Transaction.amount), 0)).where(
-            Transaction.account_id == master.account_id,
-            Transaction.type == "performance_fee",
-        )
-    )
-    fee_earnings = float(fee_result.scalar() or 0)
+    # Master's earned commission. The credit is booked as type="ib_commission"
+    # on the master's USER wallet (not "performance_fee" on master.account_id),
+    # so the old query here matched zero rows → the dashboard always showed
+    # $0. master.total_fee_earned is the running total maintained by every fee
+    # path (copy-trade close, admin PAMM distribution, management fee), so read
+    # that directly.
+    fee_earnings = float(master.total_fee_earned or 0)
 
     monthly_result = await db.execute(
         select(

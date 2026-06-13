@@ -1409,6 +1409,17 @@ async def create_master(
     if dup:
         raise HTTPException(status_code=400, detail=f"User already has an active {normalized_type} master")
 
+    # Enforce the admin-configured manager performance-fee cap here too —
+    # otherwise admin-direct creation could set a fee above the same
+    # ceiling the master-apply flow rejects (audit: "cap not working").
+    try:
+        from packages.common.src.settings_store import get_float_setting
+        _cap = await get_float_setting("pamm_max_manager_commission_pct", 30.0)
+        if performance_fee_pct is not None and float(performance_fee_pct) > _cap:
+            performance_fee_pct = _cap
+    except Exception:
+        pass
+
     prefix = "PM" if normalized_type == "pamm" else ("MM" if normalized_type == "mamm" else "CT")
     pool_account = TradingAccount(
         user_id=target_uid,

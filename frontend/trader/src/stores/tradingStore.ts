@@ -222,6 +222,10 @@ export const useTradingStore = create<TradingState>()((set, get) => ({
           symbol: p.symbol || '',
           side: p.side,
           lots: Number(p.lots) || 0,
+          // Engine lots (0.0001 on a cent account). MUST be carried through
+          // or the live P&L recompute below falls back to display `lots`
+          // and a cent position's P&L jumps 100×. Was being dropped here.
+          effective_lots: p.effective_lots != null ? Number(p.effective_lots) : undefined,
           open_price: Number(p.open_price) || 0,
           current_price: p.current_price != null ? Number(p.current_price) : undefined,
           stop_loss: p.stop_loss != null ? Number(p.stop_loss) : undefined,
@@ -231,6 +235,12 @@ export const useTradingStore = create<TradingState>()((set, get) => ({
           profit: Number(p.profit) || 0,
           trade_type: p.trade_type,
           created_at: p.created_at,
+          // Insurance markers — without these the badge ALWAYS reads
+          // "Not insured" and the countdown never renders (the backend
+          // sends them; the mapper was silently discarding them).
+          insurance_activated_at: p.insurance_activated_at ?? null,
+          insurance_eligible_at: p.insurance_eligible_at ?? null,
+          insurance_expires_at: p.insurance_expires_at ?? null,
         })),
       });
     } catch {}
@@ -348,12 +358,17 @@ export const useTradingStore = create<TradingState>()((set, get) => ({
     if (data.order_type === 'market' && tick) {
       const execPrice = data.side === 'buy' ? tick.ask : tick.bid;
       const prev = s.positions;
+      // Cent-account multiplier so the optimistic row's live P&L matches
+      // the engine immediately (no 100× flash before the first refresh).
+      const _mult = Number(s.activeAccount?.account_group?.lot_size_multiplier) || 1;
+      const _dispLots = Number(data.lots) || 0;
       const optimisticPos = {
         id: optimisticId,
         account_id: data.account_id,
         symbol: data.symbol,
         side: data.side,
-        lots: Number(data.lots) || 0,
+        lots: _dispLots,
+        effective_lots: _dispLots * _mult,
         open_price: execPrice,
         current_price: execPrice,
         stop_loss: data.stop_loss,

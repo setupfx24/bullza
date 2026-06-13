@@ -228,6 +228,31 @@ async def place_order(
         select(MasterAccount).where(MasterAccount.account_id == account.id)
     )).scalar_one_or_none()
 
+    # Trade-day window enforcement (client: "trading day not working").
+    # A PAMM/MAM master may only OPEN positions on the pool account during
+    # the admin-configured trading-day window of the month; the rest of
+    # the month is the deposit/withdrawal window. Previously the window
+    # was configurable but never enforced. Only gates pool accounts; the
+    # check fails OPEN on any config error so a misconfig can't freeze
+    # trading for everyone.
+    if master_override and (master_override.master_type or "").lower() in ("pamm", "mamm"):
+        try:
+            from .pamm_config_service import get_pamm_config, in_trade_window
+            _pcfg = await get_pamm_config()
+            _in_window = in_trade_window(_pcfg)
+        except Exception as _twe:
+            logger.warning("PAMM trade-window check skipped (config error): %s", _twe)
+            _in_window = True
+        if not _in_window:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "PAMM/MAM trading is only allowed on days "
+                    f"{_pcfg.get('trade_window_start_day')}–{_pcfg.get('trade_window_end_day')} "
+                    "of the month. Today is outside the trading window."
+                ),
+            )
+
     if master_override and master_override.spread_markup_pips:
         # MAM/PAMM pool — master spread is the WHOLE spread, no
         # additive layering. Whatever account_group the pool account

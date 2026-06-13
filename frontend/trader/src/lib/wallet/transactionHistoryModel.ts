@@ -90,6 +90,8 @@ export function mapLedgerToTransaction(row: WalletLedgerItem): Transaction {
   else if (raw === 'profit') uiType = 'profit';
   else if (raw === 'loss') uiType = 'loss';
   else if (raw === 'credit') uiType = 'credit';
+  else if (raw === 'bonus') uiType = 'bonus';
+  else if (raw === 'correction') uiType = 'correction';
   else if (raw === 'adjustment') uiType = 'adjustment';
   // Every Fixed Return ledger entry the backend emits starts with the
   // `fixed_return` prefix — lock / interest / matured / early /
@@ -177,12 +179,23 @@ export function transactionTitle(tx: Transaction): string {
       return 'Realized loss';
     case 'credit':
       return 'Credit';
-    case 'adjustment':
-      return 'Adjustment';
-    case 'bonus':
-      return 'Bonus';
+    case 'adjustment': {
+      // Every ledger row that collapses to "adjustment" still carries a
+      // clean category in tx.method ("Insurance Fee", "Account Open
+      // Transfer", "Swap", "IB Commission", …) and a detailed
+      // description. Show the clean category as the title instead of a
+      // bare "Adjustment"; fall back to the description, then the literal.
+      const m = (tx.method || '').trim();
+      if (m && m.toLowerCase() !== 'adjustment') return m;
+      return tx.description || 'Adjustment';
+    }
+    case 'bonus': {
+      const m = (tx.method || '').trim();
+      if (m && m.toLowerCase() !== 'bonus') return m;
+      return tx.description || 'Bonus';
+    }
     case 'correction':
-      return 'Correction';
+      return tx.description || 'Correction';
     case 'fixed_return':
       // The backend method is e.g. "Fixed Return Lock Admin" / "Fixed
       // Return Interest" / "Fixed Return Matured" — read that to pick
@@ -190,7 +203,7 @@ export function transactionTitle(tx: Transaction): string {
       // Falls back to a generic when the method is empty.
       return fixedReturnLabel(tx.method);
     default:
-      return 'Transaction';
+      return tx.method || tx.description || 'Transaction';
   }
 }
 

@@ -496,6 +496,10 @@ export default function PammPage() {
   };
 
   const submitApply = async () => {
+    if (applyDesc.trim().length < 10) {
+      toast.error('A strategy description (at least 10 characters) is required.');
+      return;
+    }
     setApplying(true);
     try {
       // Server auto-creates a dedicated master trading account (PM/MM prefix)
@@ -1004,12 +1008,12 @@ export default function PammPage() {
                   </div>
 
                   <div>
-                    <label className="block text-xs text-text-secondary mb-1.5">Description (optional)</label>
+                    <label className="block text-xs text-text-secondary mb-1.5">Strategy description <span className="text-danger">*</span></label>
                     <textarea
                       rows={3}
                       value={applyDesc}
                       onChange={(e) => setApplyDesc(e.target.value)}
-                      placeholder="Describe your trading strategy..."
+                      placeholder="Describe your trading strategy (required, min 10 characters)…"
                       className="w-full bg-bg-secondary border border-border-primary rounded-lg px-3 py-2.5 text-sm text-text-primary placeholder:text-text-tertiary focus:outline-none focus:border-accent/50 resize-none"
                     />
                   </div>

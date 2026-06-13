@@ -35,6 +35,17 @@ async def get_config(
     )
 
 
+@router.get("/public-config")
+async def get_public_config(
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    """PUBLIC (no auth) rate matrix — powers the marketing-site Fixed
+    Return calculator so the website always shows the SAME live rates the
+    admin configures (no hard-coded table that drifts). Returns only the
+    GLOBAL ladder (no per-user override, no user data)."""
+    return await fixed_return_service.get_config(user_id=None, db=db)
+
+
 @router.get("/locks")
 async def list_locks(
     current_user: dict = Depends(get_current_user),

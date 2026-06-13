@@ -32,6 +32,11 @@ services:
       CORS_ORIGINS: https://swisdex.com,https://trade.swisdex.com,https://admin.swisdex.com
       COOKIE_DOMAIN: .swisdex.com
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      # Mobile app stores its own tokens (no cookies), so it needs the
+      # refresh token returned in the login JSON body. The web app keeps
+      # using the httpOnly cookie regardless. Without this the mobile app
+      # errors "gateway did not return a refresh token".
+      JWT_INCLUDE_REFRESH_IN_JSON: "true"
     command: ["uvicorn", "services.gateway.src.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "2"]
 
   market-data:

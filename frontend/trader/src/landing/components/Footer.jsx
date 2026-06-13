@@ -28,7 +28,7 @@ const columns = {
     { name: 'Blogs',  path: '/academy/blogs' },
   ],
   'Risk Management': [
-    { name: 'Lot Size & Profit Calculator', path: '/risk-management/calculator' },
+    { name: 'Trading Calculators', path: '/risk-management/calculator' },
   ],
   Products: [
     { name: 'IB Referral',              path: '/products/ib-referral' },

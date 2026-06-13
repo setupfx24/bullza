@@ -1,74 +1,148 @@
 'use client';
 
 /**
- * Fixed Return Funds — interactive calculator for the public landing page.
- * Uses the same rate matrix as FixedReturnRateTable so a marketing change
- * to either flows automatically to the other.
+ * Fixed Return Funds — public landing calculator.
  *
- * Picks the closest tier ceiling and the chosen tenure, then shows the
- * payout (principal × rate). Rates are total-tenure, not annualised — same
- * contract the rate table publishes.
+ * Mirrors the user-dashboard Fixed Return calculator (app/fixed-return):
+ * it pulls the SAME live rate matrix the dashboard uses (via the public
+ * /fixed-return/public-config endpoint) and runs the identical projection
+ * math, so the website always shows the exact numbers a logged-in user
+ * sees — no hard-coded table that drifts from what admin configures.
+ *
+ * rate_matrix_pct cells are PER-MONTH percentages; the tenure decides the
+ * payout cadence (monthsPerCycle) and the global lock_months drives the
+ * total — same contract as the dashboard.
  */
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { Calculator, ArrowUpRight, TrendingUp } from 'lucide-react';
 
-type TierKey = '1K' | '10K' | '25K' | '50K' | '100K';
-type TenureKey = 'Month' | 'Quarter' | 'Half-Year' | 'Year' | '2 Year';
-
-const TIER_CEILINGS: Record<TierKey, number> = {
-  '1K':   1_000,
-  '10K':  10_000,
-  '25K':  25_000,
-  '50K':  50_000,
-  '100K': 100_000,
-};
-
-// Same numbers as FixedReturnRateTable — keep them in sync if either moves.
-const RATES: Record<TenureKey, Record<TierKey, number>> = {
-  'Month':     { '1K': 0.01, '10K': 0.02, '25K': 0.025, '50K': 0.03,  '100K': 0.04  },
-  'Quarter':   { '1K': 0.02, '10K': 0.03, '25K': 0.03,  '50K': 0.035, '100K': 0.045 },
-  'Half-Year': { '1K': 0.03, '10K': 0.04, '25K': 0.045, '50K': 0.05,  '100K': 0.05  },
-  'Year':      { '1K': 0.04, '10K': 0.05, '25K': 0.055, '50K': 0.06,  '100K': 0.055 },
-  '2 Year':    { '1K': 0.05, '10K': 0.06, '25K': 0.065, '50K': 0.07,  '100K': 0.07  },
-};
-
-function resolveTier(amount: number): TierKey {
-  // Pick the highest tier whose ceiling the user reaches; falls back to 1K
-  // for sub-$1K deposits so the calc still shows a number instead of zero.
-  if (amount >= 100_000) return '100K';
-  if (amount >=  50_000) return '50K';
-  if (amount >=  25_000) return '25K';
-  if (amount >=  10_000) return '10K';
-  return '1K';
+interface Tier { label: string; min_amount: number }
+interface Tenure { label: string; days: number }
+interface RateConfig {
+  tiers: Tier[];
+  tenures: Tenure[];
+  rate_matrix_pct: number[][];
+  early_withdrawal_fee_pct: number;
+  lock_months: number;
 }
 
-const TENURES: { key: TenureKey; label: string; months: number }[] = [
-  { key: 'Month',     label: '1 Month',  months: 1  },
-  { key: 'Quarter',   label: '3 Months', months: 3  },
-  { key: 'Half-Year', label: '6 Months', months: 6  },
-  { key: 'Year',      label: '12 Months', months: 12 },
-  { key: '2 Year',    label: '24 Months', months: 24 },
-];
+// Fallback used only if the public-config endpoint is unreachable, so the
+// section still renders something sensible. Mirrors the seed ladder.
+const FALLBACK: RateConfig = {
+  tiers: [
+    { label: '$1K+', min_amount: 1_000 },
+    { label: '$10K+', min_amount: 10_000 },
+    { label: '$25K+', min_amount: 25_000 },
+    { label: '$50K+', min_amount: 50_000 },
+    { label: '$100K+', min_amount: 100_000 },
+  ],
+  tenures: [
+    { label: 'Month', days: 30 },
+    { label: 'Quarter', days: 90 },
+    { label: 'Half-Year', days: 180 },
+    { label: 'Year', days: 365 },
+    { label: '2 Year', days: 730 },
+  ],
+  rate_matrix_pct: [
+    [1, 2, 2.5, 3, 4],
+    [2, 3, 3, 3.5, 4.5],
+    [3, 4, 4.5, 5, 5],
+    [4, 5, 5.5, 6, 5.5],
+    [5, 6, 6.5, 7, 7],
+  ],
+  early_withdrawal_fee_pct: 10,
+  lock_months: 12,
+};
+
+const TENURE_DISPLAY: Record<string, string> = {
+  Month: '1 Month',
+  Quarter: '3 Months',
+  'Half-Year': '6 Months',
+  Year: '12 Months',
+  '2 Year': '24 Months',
+};
 
 const fmtUSD = (n: number) =>
   n.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 2 });
 
-export function FixedReturnCalculator() {
-  const [amountStr, setAmountStr] = useState('10000');
-  const [tenure, setTenure] = useState<TenureKey>('Year');
+// Same cadence mapping as the dashboard (app/fixed-return/page.tsx).
+function monthsPerCycleFor(days: number): number {
+  if (days >= 700) return 24;
+  if (days >= 350) return 12;
+  if (days >= 170) return 6;
+  if (days >= 80) return 3;
+  return 1;
+}
 
-  const amount = useMemo(() => {
+export function FixedReturnCalculator() {
+  const [cfg, setCfg] = useState<RateConfig>(FALLBACK);
+  const [amountStr, setAmountStr] = useState('10000');
+  const [tenureLabel, setTenureLabel] = useState<string>('Year');
+
+  // Pull the LIVE global rate matrix (public, no auth) so the marketing
+  // calculator matches the real product. Falls back silently to FALLBACK.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch('/api/v1/fixed-return/public-config', { cache: 'no-store' });
+        if (!res.ok) return;
+        const c = (await res.json()) as RateConfig;
+        if (cancelled || !c?.tiers?.length || !c?.tenures?.length) return;
+        setCfg(c);
+        if (!c.tenures.some((t) => t.label === tenureLabel)) {
+          // Prefer a 1-year tenure if present, else the first one.
+          const year = c.tenures.find((t) => t.days >= 350 && t.days < 700);
+          setTenureLabel((year ?? c.tenures[0]).label);
+        }
+      } catch {
+        /* keep FALLBACK */
+      }
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const principal = useMemo(() => {
     const n = parseFloat(amountStr || '0');
-    return isFinite(n) && n > 0 ? n : 0;
+    return Number.isFinite(n) && n > 0 ? n : 0;
   }, [amountStr]);
 
-  const tier = resolveTier(amount);
-  const rate = RATES[tenure][tier];
-  const returnAmount = amount * rate;
-  const total = amount + returnAmount;
-  const monthsForTenure = TENURES.find((t) => t.key === tenure)?.months ?? 12;
-  const monthlyEquiv = returnAmount / monthsForTenure;
+  const tierIdx = useMemo(() => {
+    let idx = -1;
+    cfg.tiers.forEach((t, i) => {
+      if (principal >= t.min_amount) idx = i;
+    });
+    // sub-minimum deposits still show the entry tier so the user sees a number
+    return idx < 0 ? 0 : idx;
+  }, [cfg, principal]);
+
+  const tenureIdx = useMemo(
+    () => cfg.tenures.findIndex((t) => t.label === tenureLabel),
+    [cfg, tenureLabel],
+  );
+
+  const ratePct = useMemo(() => {
+    if (tierIdx < 0 || tenureIdx < 0) return 0;
+    return cfg.rate_matrix_pct[tenureIdx]?.[tierIdx] ?? 0;
+  }, [cfg, tierIdx, tenureIdx]);
+
+  // Identical projection to the dashboard.
+  const projected = useMemo(() => {
+    if (tenureIdx < 0 || ratePct <= 0 || principal <= 0) {
+      return { perCycle: 0, cycles: 0, total: 0, payout: principal, monthly: 0 };
+    }
+    const t = cfg.tenures[tenureIdx];
+    const mpc = monthsPerCycleFor(t.days);
+    const cycles = Math.max(1, Math.floor(cfg.lock_months / mpc));
+    const perCycle = principal * (ratePct / 100) * mpc;
+    const total = principal * (ratePct / 100) * cfg.lock_months;
+    const monthly = principal * (ratePct / 100);
+    return { perCycle, cycles, total, payout: principal + total, monthly };
+  }, [cfg, tenureIdx, ratePct, principal]);
+
+  const activeTier = cfg.tiers[tierIdx];
 
   return (
     <section className="mx-auto max-w-[1200px] px-[var(--gutter)] py-12 sm:py-16">
@@ -80,8 +154,8 @@ export function FixedReturnCalculator() {
           Estimate Your Payout
         </h2>
         <p className="mt-3 text-foreground/65 max-w-xl mx-auto text-sm sm:text-base">
-          Pick a deposit and tenure — see your fixed return at maturity.
-          Rates match the table above.
+          Pick a deposit and tenure — see your fixed return at maturity. Live
+          rates, the same ones you get inside your account.
         </p>
       </div>
 
@@ -104,18 +178,18 @@ export function FixedReturnCalculator() {
               />
             </div>
             <div className="mt-3 flex flex-wrap gap-2">
-              {[1_000, 10_000, 25_000, 50_000, 100_000].map((v) => (
+              {cfg.tiers.map((t) => (
                 <button
-                  key={v}
+                  key={t.min_amount}
                   type="button"
-                  onClick={() => setAmountStr(String(v))}
+                  onClick={() => setAmountStr(String(t.min_amount))}
                   className={`px-3 py-1 text-xs rounded-full border transition-colors ${
-                    amount === v
+                    principal === t.min_amount
                       ? 'border-primary/70 bg-primary/15 text-primary'
                       : 'border-foreground/15 text-foreground/70 hover:border-foreground/30'
                   }`}
                 >
-                  ${v >= 1000 ? `${v / 1000}K` : v}
+                  ${t.min_amount >= 1000 ? `${t.min_amount / 1000}K` : t.min_amount}
                 </button>
               ))}
             </div>
@@ -124,19 +198,19 @@ export function FixedReturnCalculator() {
           <fieldset className="mt-6">
             <legend className="text-xs uppercase tracking-[0.16em] text-foreground/55">Tenure</legend>
             <div className="mt-2 grid grid-cols-5 gap-2">
-              {TENURES.map((t) => (
+              {cfg.tenures.map((t) => (
                 <button
-                  key={t.key}
+                  key={t.label}
                   type="button"
-                  onClick={() => setTenure(t.key)}
+                  onClick={() => setTenureLabel(t.label)}
                   className={`px-2 py-2 text-xs rounded-lg border transition-colors text-center ${
-                    tenure === t.key
+                    tenureLabel === t.label
                       ? 'border-primary/70 bg-primary/15 text-primary font-semibold'
                       : 'border-foreground/15 text-foreground/70 hover:border-foreground/30'
                   }`}
-                  aria-pressed={tenure === t.key}
+                  aria-pressed={tenureLabel === t.label}
                 >
-                  {t.label}
+                  {TENURE_DISPLAY[t.label] ?? t.label}
                 </button>
               ))}
             </div>
@@ -145,9 +219,9 @@ export function FixedReturnCalculator() {
           <div className="mt-6 text-xs text-foreground/50">
             Tier:{' '}
             <span className="text-foreground/80 font-semibold tabular-nums">
-              ${TIER_CEILINGS[tier].toLocaleString('en-US')}+
+              {activeTier ? `$${activeTier.min_amount.toLocaleString('en-US')}+` : '—'}
             </span>
-            {' · '}Rate: <span className="text-primary font-semibold">{(rate * 100).toFixed(2)}%</span>
+            {' · '}Rate: <span className="text-primary font-semibold">{ratePct.toFixed(2)}% / mo</span>
           </div>
         </div>
 
@@ -158,28 +232,31 @@ export function FixedReturnCalculator() {
           </div>
 
           <div className="mt-3">
-            <div className="text-xs uppercase tracking-wider text-foreground/55">You earn</div>
+            <div className="text-xs uppercase tracking-wider text-foreground/55">You earn (total)</div>
             <div className="mt-1 font-display text-4xl sm:text-5xl text-primary tabular-nums">
-              {fmtUSD(returnAmount)}
+              {fmtUSD(projected.total)}
             </div>
           </div>
 
           <dl className="mt-6 grid grid-cols-2 gap-4 text-sm">
             <div>
               <dt className="text-xs uppercase tracking-wider text-foreground/55">Total at maturity</dt>
-              <dd className="mt-1 text-base font-semibold tabular-nums">{fmtUSD(total)}</dd>
+              <dd className="mt-1 text-base font-semibold tabular-nums">{fmtUSD(projected.payout)}</dd>
             </div>
             <div>
-              <dt className="text-xs uppercase tracking-wider text-foreground/55">Monthly equivalent</dt>
-              <dd className="mt-1 text-base font-semibold tabular-nums">{fmtUSD(monthlyEquiv)}</dd>
+              <dt className="text-xs uppercase tracking-wider text-foreground/55">Per payout</dt>
+              <dd className="mt-1 text-base font-semibold tabular-nums">
+                {fmtUSD(projected.perCycle)}
+                <span className="text-foreground/45 text-xs"> × {projected.cycles}</span>
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs uppercase tracking-wider text-foreground/55">Monthly interest</dt>
+              <dd className="mt-1 text-base tabular-nums">{fmtUSD(projected.monthly)}</dd>
             </div>
             <div>
               <dt className="text-xs uppercase tracking-wider text-foreground/55">Principal</dt>
-              <dd className="mt-1 text-base tabular-nums">{fmtUSD(amount)}</dd>
-            </div>
-            <div>
-              <dt className="text-xs uppercase tracking-wider text-foreground/55">Tenure rate</dt>
-              <dd className="mt-1 text-base tabular-nums">{(rate * 100).toFixed(2)}%</dd>
+              <dd className="mt-1 text-base tabular-nums">{fmtUSD(principal)}</dd>
             </div>
           </dl>
 

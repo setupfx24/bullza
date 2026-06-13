@@ -189,7 +189,21 @@ class StatsEngine:
             )
             allocations = allocs_q.scalars().all()
 
+            from datetime import datetime, timezone
+            today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+
             for alloc in allocations:
+                # Idempotency (restart double-charge fix): the engine's daily
+                # timer resets to 0 on every gateway restart, so without this
+                # an allocation could be charged the management fee again on
+                # each restart. Charge at most once per UTC day by gating on
+                # last_distribution_at.
+                last_charged = getattr(alloc, "last_distribution_at", None)
+                if last_charged is not None:
+                    lc = last_charged if last_charged.tzinfo else last_charged.replace(tzinfo=timezone.utc)
+                    if lc >= today_start:
+                        continue
+
                 fee = Decimal(str(round(float(alloc.allocation_amount or 0) * daily_rate, 8)))
                 if fee <= 0:
                     continue
@@ -243,6 +257,10 @@ class StatsEngine:
 
                 # Track master's total fee earned
                 master.total_fee_earned = (master.total_fee_earned or Decimal("0")) + master_share
+
+                # Stamp the charge time so this allocation isn't charged
+                # again until the next UTC day (restart-safe idempotency).
+                alloc.last_distribution_at = datetime.now(timezone.utc)
 
                 logger.info(
                     "Mgmt fee collected: investor=%s amount=%s master_share=%s admin=%s",

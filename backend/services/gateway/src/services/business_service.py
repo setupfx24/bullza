@@ -225,18 +225,35 @@ async def ib_dashboard(user_id: UUID, db: AsyncSession) -> dict:
     # Tier ladder — surface where the IB sits today + how many more
     # referrals unlock the next tier so the trader-side page can render
     # a progress hint without a second roundtrip.
-    from ..engines.ib_engine import get_ib_tiers, resolve_tier_for_count
+    from ..engines.ib_engine import (
+        get_ib_tiers, resolve_tier, compute_ib_qualification,
+    )
 
     tiers = await get_ib_tiers(db)
-    current_tier = resolve_tier_for_count(int(total_referrals or 0), tiers)
+    # Tier is driven by EITHER activation count OR cumulative referral
+    # deposits (whichever qualifies higher) — same logic the commission
+    # engine pays on.
+    activations, ref_amount = await compute_ib_qualification(db, profile.id)
+    ref_amount_f = float(ref_amount or 0)
+    current_tier = resolve_tier(activations, ref_amount, tiers)
+    current_lot = float(current_tier.get("per_lot") or 0) if current_tier else -1.0
+    # Next tier = the cheapest tier richer than the current one the IB
+    # hasn't reached yet; surface how many more activations OR how much
+    # more deposit volume unlocks it.
     next_tier = None
-    needed_for_next = None
-    for t in tiers:
-        lo = int(t.get("min_referrals") or 0)
-        if lo > int(total_referrals or 0):
-            next_tier = t
-            needed_for_next = lo - int(total_referrals or 0)
-            break
+    needed_activations = None
+    needed_amount = None
+    for t in sorted(tiers, key=lambda x: float(x.get("per_lot") or 0)):
+        if float(t.get("per_lot") or 0) <= current_lot:
+            continue
+        min_act = int(t.get("min_activations") or 0)
+        min_amt = float(t.get("min_amount") or 0)
+        if (min_act and activations >= min_act) or (min_amt and ref_amount_f >= min_amt):
+            continue  # already qualifies (shouldn't happen — current_tier would be this)
+        next_tier = t
+        needed_activations = max(0, min_act - activations) if min_act else None
+        needed_amount = max(0.0, min_amt - ref_amount_f) if min_amt else None
+        break
 
     # Accumulated commission pool — populated by the IB engine on each
     # qualifying trade. The IB sees this number on /business and can
@@ -291,7 +308,11 @@ async def ib_dashboard(user_id: UUID, db: AsyncSession) -> dict:
         "is_active": profile.is_active,
         "tier": current_tier,
         "next_tier": next_tier,
-        "needed_for_next_tier": needed_for_next,
+        # Activation/amount progress toward the next tier (either unlocks it).
+        "activations": activations,
+        "referral_deposit_total": ref_amount_f,
+        "needed_activations_for_next": needed_activations,
+        "needed_amount_for_next": needed_amount,
         "tier_ladder": tiers,
     }
 

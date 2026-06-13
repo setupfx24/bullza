@@ -90,13 +90,18 @@ async def list_pending_withdrawals(page: int, per_page: int, db: AsyncSession):
     return PaginatedResponse(items=items, total=total, page=page, per_page=per_page)
 
 
-async def list_all_deposits(page: int, per_page: int, status: str | None, db: AsyncSession):
+async def list_all_deposits(page: int, per_page: int, status: str | None, db: AsyncSession,
+                            start_date=None, end_date=None):
     query = select(Deposit)
     if status and status != "all":
         if status == "approved":
             query = query.where(Deposit.status.in_(["approved", "auto_approved"]))
         else:
             query = query.where(Deposit.status == status)
+    if start_date is not None:
+        query = query.where(Deposit.created_at >= start_date)
+    if end_date is not None:
+        query = query.where(Deposit.created_at <= end_date)
     count_q = select(func.count()).select_from(query.subquery())
     total = (await db.execute(count_q)).scalar() or 0
 
@@ -113,10 +118,15 @@ async def list_all_deposits(page: int, per_page: int, status: str | None, db: As
     return PaginatedResponse(items=items, total=total, page=page, per_page=per_page)
 
 
-async def list_all_withdrawals(page: int, per_page: int, status: str | None, db: AsyncSession):
+async def list_all_withdrawals(page: int, per_page: int, status: str | None, db: AsyncSession,
+                               start_date=None, end_date=None):
     query = select(Withdrawal)
     if status and status != "all":
         query = query.where(Withdrawal.status == status)
+    if start_date is not None:
+        query = query.where(Withdrawal.created_at >= start_date)
+    if end_date is not None:
+        query = query.where(Withdrawal.created_at <= end_date)
     count_q = select(func.count()).select_from(query.subquery())
     total = (await db.execute(count_q)).scalar() or 0
 
