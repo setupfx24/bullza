@@ -335,6 +335,7 @@ async def list_my_referrals(db: AsyncSession, user_id: UUID) -> dict:
     )).scalars().all()
 
     items = []
+    did_stamp = False  # set if we lazily qualify any friend below
     # Pull the active gate config ONCE — used both to decide per-row
     # pending reason AND surfaced on the response so the trader page can
     # render an explainer footer.
@@ -367,6 +368,22 @@ async def list_my_referrals(db: AsyncSession, user_id: UUID) -> dict:
         funded_ok = funded_count > 0
 
         trades_ok = int(trade_count) >= int(required_trades)
+
+        # Lazy finalization: if every gate is satisfied but the qualification
+        # stamp was never written (it normally lands on the friend's next
+        # trade-close), stamp it NOW so simply viewing/refreshing the page
+        # finalizes the referral — which is exactly what the "refresh shortly"
+        # copy promises. No wallet credit happens here; the referrer still
+        # presses Claim (manual-claim flow).
+        if (
+            r.referral_claimed_at is None
+            and r.referral_qualified_at is None
+            and (kyc_ok or not requires_kyc)
+            and (funded_ok or not requires_funded)
+            and trades_ok
+        ):
+            r.referral_qualified_at = datetime.now(timezone.utc)
+            did_stamp = True
 
         if r.referral_claimed_at is not None:
             status = "claimed"
@@ -412,6 +429,10 @@ async def list_my_referrals(db: AsyncSession, user_id: UUID) -> dict:
             "qualified_at": r.referral_qualified_at.isoformat() if r.referral_qualified_at else None,
             "claimed_at": r.referral_claimed_at.isoformat() if r.referral_claimed_at else None,
         })
+
+    # Persist any lazy-qualification stamps we made above.
+    if did_stamp:
+        await db.commit()
 
     # What the trader would earn for their NEXT claim, given the tier
     # ladder + how many they've already claimed. Computed once here so the
