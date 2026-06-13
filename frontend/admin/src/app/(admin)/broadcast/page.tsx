@@ -40,6 +40,49 @@ export default function BroadcastPage() {
   const [previewing, setPreviewing] = useState(false);
   const [sending, setSending] = useState(false);
 
+  // ── Custom announcement (free title + body + audience segment) ──
+  const [anSubject, setAnSubject] = useState('');
+  const [anHeading, setAnHeading] = useState('');
+  const [anIntro, setAnIntro] = useState('');
+  const [anMessage, setAnMessage] = useState('');
+  const [anCtaLabel, setAnCtaLabel] = useState('');
+  const [anCtaUrl, setAnCtaUrl] = useState('');
+  const [anAudience, setAnAudience] = useState<'all' | 'funded_only' | 'ib' | 'pamm_mam' | 'fixed_return'>('all');
+  const [anPreview, setAnPreview] = useState<number | null>(null);
+  const [anSending, setAnSending] = useState(false);
+
+  const anPayload = (dry: boolean) => ({
+    subject: anSubject.trim(),
+    heading: anHeading.trim(),
+    intro: anIntro.trim() || null,
+    message_html: anMessage.trim(),
+    cta_label: anCtaLabel.trim() || null,
+    cta_url: anCtaUrl.trim() || null,
+    audience: anAudience,
+    dry_run: dry,
+  });
+  const anValid = anSubject.trim().length > 2 && anHeading.trim().length > 2 && anMessage.trim().length > 2;
+
+  const anRun = async (dry: boolean) => {
+    if (!anValid) { toast.error('Fill subject, heading and message'); return; }
+    if (!dry) {
+      const c = anPreview != null ? `Send to ${anPreview.toLocaleString()} users?` : 'Send announcement now?';
+      if (!confirm(c)) return;
+    }
+    setAnSending(true);
+    try {
+      const res = await adminApi.post<{ would_send_to?: number; recipients?: number; message?: string }>(
+        '/broadcast/announce', anPayload(dry),
+      );
+      if (dry) { setAnPreview(res.would_send_to ?? 0); }
+      else { toast.success(res.message || 'Queued', { duration: 6000 }); setAnPreview(null); }
+    } catch (e: any) {
+      toast.error(e.message || 'Failed');
+    } finally {
+      setAnSending(false);
+    }
+  };
+
   const buildPayload = (dry: boolean) => ({
     window_label: windowLabel.trim(),
     expected_duration: duration.trim(),
@@ -246,6 +289,86 @@ export default function BroadcastPage() {
           >
             {sending ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />}
             {sending ? 'Sending…' : 'Send to recipients'}
+          </button>
+        </div>
+      </div>
+
+      {/* ── Custom Announcement (any title/body, targeted audience) ── */}
+      <div className="flex items-center gap-2 pt-2">
+        <Megaphone size={18} className="text-accent" />
+        <div>
+          <h2 className="text-lg font-semibold text-text-primary">Custom Announcement</h2>
+          <p className="text-xxs text-text-tertiary mt-0.5">
+            Send any message (event, offer, update) with your own title to a chosen audience — All / IB / PAMM-MAM / Fixed-return / Funded.
+          </p>
+        </div>
+      </div>
+
+      <div className="bg-bg-secondary border border-border-primary rounded-md p-5 space-y-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label className="block text-xxs text-text-tertiary uppercase mb-1">Email subject</label>
+            <input value={anSubject} onChange={(e) => { setAnSubject(e.target.value); setAnPreview(null); }}
+              placeholder="New: Diwali bonus is live 🎉"
+              className="w-full px-3 py-2 text-xs bg-bg-tertiary border border-border-primary rounded-md focus:outline-none focus:border-accent" />
+          </div>
+          <div>
+            <label className="block text-xxs text-text-tertiary uppercase mb-1">Heading (in email)</label>
+            <input value={anHeading} onChange={(e) => setAnHeading(e.target.value)}
+              placeholder="Celebrate with 50% deposit bonus"
+              className="w-full px-3 py-2 text-xs bg-bg-tertiary border border-border-primary rounded-md focus:outline-none focus:border-accent" />
+          </div>
+        </div>
+        <div>
+          <label className="block text-xxs text-text-tertiary uppercase mb-1">Intro line (optional)</label>
+          <input value={anIntro} onChange={(e) => setAnIntro(e.target.value)}
+            placeholder="A short lead under the heading."
+            className="w-full px-3 py-2 text-xs bg-bg-tertiary border border-border-primary rounded-md focus:outline-none focus:border-accent" maxLength={300} />
+        </div>
+        <div>
+          <label className="block text-xxs text-text-tertiary uppercase mb-1">Message (HTML allowed)</label>
+          <textarea rows={4} value={anMessage} onChange={(e) => setAnMessage(e.target.value)}
+            placeholder="<p>Full details of your event or offer…</p>"
+            className="w-full px-3 py-2 text-xs bg-bg-tertiary border border-border-primary rounded-md focus:outline-none focus:border-accent resize-none font-mono" maxLength={8000} />
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label className="block text-xxs text-text-tertiary uppercase mb-1">Button label (optional)</label>
+            <input value={anCtaLabel} onChange={(e) => setAnCtaLabel(e.target.value)} placeholder="Claim now"
+              className="w-full px-3 py-2 text-xs bg-bg-tertiary border border-border-primary rounded-md focus:outline-none focus:border-accent" />
+          </div>
+          <div>
+            <label className="block text-xxs text-text-tertiary uppercase mb-1">Button link (optional)</label>
+            <input value={anCtaUrl} onChange={(e) => setAnCtaUrl(e.target.value)} placeholder="https://trade.swisdex.com/bonus"
+              className="w-full px-3 py-2 text-xs bg-bg-tertiary border border-border-primary rounded-md focus:outline-none focus:border-accent" />
+          </div>
+        </div>
+        <div>
+          <label className="block text-xxs text-text-tertiary uppercase mb-1">Audience</label>
+          <select value={anAudience} onChange={(e) => { setAnAudience(e.target.value as any); setAnPreview(null); }}
+            className="w-full px-3 py-2 text-xs bg-bg-tertiary border border-border-primary rounded-md focus:outline-none focus:border-accent">
+            <option value="all">All active verified users</option>
+            <option value="funded_only">Funded only (balance &gt; 0)</option>
+            <option value="ib">IB / Affiliates</option>
+            <option value="pamm_mam">PAMM / MAM managers</option>
+            <option value="fixed_return">Fixed Return holders</option>
+          </select>
+        </div>
+
+        {anPreview != null && (
+          <div className="rounded-md bg-accent/10 border border-accent/30 px-3 py-2 text-xs text-accent">
+            Dry-run: would email <strong>{anPreview.toLocaleString()}</strong> user(s).
+          </div>
+        )}
+
+        <div className="flex justify-end gap-2">
+          <button onClick={() => anRun(true)} disabled={!anValid || anSending}
+            className="px-3 py-1.5 rounded-md text-xs text-text-secondary border border-border-primary hover:bg-bg-hover disabled:opacity-50 inline-flex items-center gap-1.5">
+            {anSending ? <Loader2 size={13} className="animate-spin" /> : <Megaphone size={13} />} Preview audience
+          </button>
+          <button onClick={() => anRun(false)} disabled={!anValid || anSending}
+            className="px-3 py-1.5 rounded-md text-xs font-medium bg-accent/15 text-accent border border-accent/30 hover:bg-accent/25 disabled:opacity-50 inline-flex items-center gap-1.5">
+            {anSending ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />} Send announcement
           </button>
         </div>
       </div>
