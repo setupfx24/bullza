@@ -38,7 +38,7 @@ interface UserRow { user_id: string | null; name: string; email: string | null; 
 /** Second-level drill: who (per user) is behind a card/source row. Supports a
  *  client-side name/email search and, for the trading section, a top
  *  gainers / top losers sort. */
-function UserBreakdown({ section, method, tenure, initialSort }: { section: string; method?: string; tenure?: string; initialSort?: string }) {
+function UserBreakdown({ section, method, tenure, initialSort, startDate, endDate }: { section: string; method?: string; tenure?: string; initialSort?: string; startDate?: string; endDate?: string }) {
   const [rows, setRows] = useState<UserRow[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -55,6 +55,8 @@ function UserBreakdown({ section, method, tenure, initialSort }: { section: stri
         if (method) params.method = method;
         if (tenure) params.tenure = tenure;
         if (isTrading) params.sort = sort;
+        if (startDate) params.start_date = startDate;
+        if (endDate) params.end_date = endDate;
         const d = await adminApi.get<{ users: UserRow[]; total: number }>('/analytics/finance-overview/drill', params);
         if (alive) { setRows(d.users || []); setTotal(d.total || 0); }
       } catch (e: any) {
@@ -64,7 +66,7 @@ function UserBreakdown({ section, method, tenure, initialSort }: { section: stri
       }
     })();
     return () => { alive = false; };
-  }, [section, method, tenure, sort, isTrading]);
+  }, [section, method, tenure, sort, isTrading, startDate, endDate]);
 
   const q = search.trim().toLowerCase();
   const shown = q
@@ -133,21 +135,26 @@ export default function FinanceOverviewPage() {
   const [loading, setLoading] = useState(true);
   const [drill, setDrill] = useState<Drill>(null);
   const [userDrill, setUserDrill] = useState<UserDrill>(null);
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const d = await adminApi.get<Overview>('/analytics/finance-overview');
+      const params: Record<string, string> = {};
+      if (dateFrom) params.start_date = dateFrom;
+      if (dateTo) params.end_date = dateTo;
+      const d = await adminApi.get<Overview>('/analytics/finance-overview', params);
       setData(d);
     } catch (e: any) {
       toast.error(e?.message || 'Failed to load finance overview');
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [dateFrom, dateTo]);
   useEffect(() => { load(); }, [load]);
 
-  if (loading) {
+  if (loading && !data) {
     return <div className="flex items-center justify-center h-96"><Loader2 className="animate-spin text-text-tertiary" size={22} /></div>;
   }
   if (!data) return null;
@@ -300,12 +307,30 @@ export default function FinanceOverviewPage() {
 
   return (
     <div className="p-4 sm:p-6 space-y-5 max-w-6xl">
-      <div className="flex items-center justify-between">
+      <div className="flex items-start justify-between gap-3 flex-wrap">
         <div>
           <h1 className="text-lg font-semibold text-text-primary">Finance Overview</h1>
-          <p className="text-xxs text-text-tertiary mt-0.5">Company-wide real-time money. Click any card to drill down.</p>
+          <p className="text-xxs text-text-tertiary mt-0.5">
+            {dateFrom || dateTo ? 'Flow figures filtered by date. Net Credit stays a live balance.' : 'Company-wide real-time money. Click any card to drill down.'}
+          </p>
         </div>
-        <button onClick={load} className="text-xxs text-text-secondary border border-border-primary rounded-md px-3 py-1.5 hover:bg-bg-hover">Refresh</button>
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Custom date range — restricts flow figures (P&L, deposits,
+              withdrawals, fixed-return collected) to the window. */}
+          <span className="text-xxs text-text-tertiary">From</span>
+          <input type="date" value={dateFrom} max={dateTo || undefined}
+            onChange={(e) => setDateFrom(e.target.value)}
+            className="text-xs py-1.5 px-2 bg-bg-input border border-border-primary rounded-md text-text-primary" />
+          <span className="text-xxs text-text-tertiary">To</span>
+          <input type="date" value={dateTo} min={dateFrom || undefined}
+            onChange={(e) => setDateTo(e.target.value)}
+            className="text-xs py-1.5 px-2 bg-bg-input border border-border-primary rounded-md text-text-primary" />
+          {(dateFrom || dateTo) && (
+            <button type="button" onClick={() => { setDateFrom(''); setDateTo(''); }}
+              className="text-xxs text-text-tertiary hover:text-text-primary underline">Clear</button>
+          )}
+          <button onClick={load} className="text-xxs text-text-secondary border border-border-primary rounded-md px-3 py-1.5 hover:bg-bg-hover">Refresh</button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -356,7 +381,7 @@ export default function FinanceOverviewPage() {
               <button onClick={() => setUserDrill(null)} className="p-1.5 rounded-md text-text-tertiary hover:bg-bg-hover hover:text-text-primary"><X size={16} /></button>
             </div>
             <div className="p-5">
-              <UserBreakdown section={userDrill.section} method={userDrill.method} tenure={userDrill.tenure} initialSort={userDrill.sort} />
+              <UserBreakdown section={userDrill.section} method={userDrill.method} tenure={userDrill.tenure} initialSort={userDrill.sort} startDate={dateFrom} endDate={dateTo} />
             </div>
           </div>
         </div>

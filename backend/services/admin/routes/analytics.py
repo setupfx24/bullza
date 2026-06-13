@@ -40,12 +40,18 @@ async def analytics_dashboard(
 
 @router.get("/finance-overview")
 async def finance_overview(
+    start_date: str | None = Query(None, description="YYYY-MM-DD; restrict flow figures to this window"),
+    end_date:   str | None = Query(None, description="YYYY-MM-DD; restrict flow figures to this window"),
     # Company-wide financial overview = sensitive; super_admin-only via a
     # permission no employee role holds (analytics.finance).
     admin: User = Depends(require_permission("analytics.finance")),
     db: AsyncSession = Depends(get_db),
 ):
-    return await analytics_service.finance_overview(db=db)
+    return await analytics_service.finance_overview(
+        db=db,
+        start_date=_parse_date_bound(start_date, end_of_day=False),
+        end_date=_parse_date_bound(end_date, end_of_day=True),
+    )
 
 
 @router.get("/finance-overview/drill")
@@ -54,12 +60,16 @@ async def finance_overview_drill(
     method: str | None = Query(None, description="filter deposit/withdrawal rows by method"),
     tenure: str | None = Query(None, description="filter fixed_return locks by tenure label"),
     sort: str = Query("amount", description="amount | gainers | losers (trading only)"),
+    start_date: str | None = Query(None),
+    end_date:   str | None = Query(None),
     admin: User = Depends(require_permission("analytics.finance")),
     db: AsyncSession = Depends(get_db),
 ):
     """Per-user drill-down behind a Finance Overview card (super_admin only)."""
     return await analytics_service.finance_overview_drill(
         db=db, section=section, method=method, tenure=tenure, sort=sort,
+        start_date=_parse_date_bound(start_date, end_of_day=False),
+        end_date=_parse_date_bound(end_date, end_of_day=True),
     )
 
 
