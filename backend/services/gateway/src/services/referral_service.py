@@ -227,7 +227,13 @@ async def _bounty_for_next_claim(
     more referral right now. Walks the tier ladder by counting how
     many referrals they've already CLAIMED (+1 for the new one).
     Falls back to the legacy flat amount if tiers aren't configured."""
-    tiers_raw = await get_system_setting("ib_commission_tiers", None)
+    # Personal-referral ladder is SEPARATE from the IB MLM ladder. It uses
+    # its own setting key + row shape ({min_referrals, max_referrals,
+    # per_referral_bounty}); the IB ladder ({per_lot, min_activations…})
+    # never matched this resolver anyway, so referral always fell back to
+    # the flat bounty. Reading the dedicated key makes the referral tiers
+    # actually work AND keeps the two programs independent.
+    tiers_raw = await get_system_setting("referral_tiers", None)
     if isinstance(tiers_raw, list) and tiers_raw:
         claimed_count = (await db.execute(
             select(func.count()).select_from(User).where(
