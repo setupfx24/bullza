@@ -26,7 +26,10 @@ class RejectBody(BaseModel):
 
 @router.get("")
 async def list_pending(
-    admin: User = Depends(require_permission("audit_logs.view")),
+    # Tied to funds.approve so the whole Approvals section unlocks with a
+    # single permission — granting Finance (which now holds funds.approve)
+    # gives the admin the queue + approve/reject in one go.
+    admin: User = Depends(require_permission("funds.approve")),
     db: AsyncSession = Depends(get_db),
 ):
     """List all pending approval requests (filterable client-side)."""

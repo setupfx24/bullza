@@ -55,6 +55,10 @@ EMPLOYEE_ROLE_PERMISSIONS = {
         # Finance admins clear RM funding requests (the two-admin approve →
         # credit flow) and assign users to RMs.
         "rm.manage", "rm.assign",
+        # Dual-approval (4-eyes) sign-off. Two finance admins approve each
+        # other's fund/withdrawal requests; the "can't approve your own"
+        # rule still blocks self-approval, so the control stays intact.
+        "funds.approve",
     },
     "risk_manager": {
         "trades.view", "positions.view", "users.view",
