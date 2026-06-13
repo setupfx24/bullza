@@ -75,7 +75,8 @@ async def finance_overview_drill(
 
 @router.get("/exposure")
 async def get_exposure(
+    profitable_sort: str = Query("profit", description="profit | win_rate — ranking for top profitable users"),
     admin: User = Depends(require_permission("analytics.view")),
     db: AsyncSession = Depends(get_db),
 ):
-    return await analytics_service.get_exposure(db=db)
+    return await analytics_service.get_exposure(db=db, profitable_sort=profitable_sort)

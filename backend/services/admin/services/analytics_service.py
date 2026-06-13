@@ -648,7 +648,7 @@ async def finance_overview_drill(
     }
 
 
-async def get_exposure(db: AsyncSession) -> dict:
+async def get_exposure(db: AsyncSession, profitable_sort: str = "profit") -> dict:
     result = await db.execute(
         select(
             Position.instrument_id,
@@ -686,17 +686,28 @@ async def get_exposure(db: AsyncSession) -> dict:
             "risk_level": risk,
         })
 
-    top_users_q = await db.execute(
+    # Top profitable users — sortable by total profit (default) or by win
+    # rate. Win-rate ranking requires a minimum number of trades so a single
+    # 1-for-1 win doesn't sit at 100% above genuine performers.
+    pnl_expr = func.sum(TradeHistory.profit)
+    cnt_expr = func.count(TradeHistory.id)
+    wins_expr = func.sum(case((TradeHistory.profit > 0, 1), else_=0))
+    top_q = (
         select(
             TradeHistory.account_id,
-            func.sum(TradeHistory.profit).label("total_pnl"),
-            func.count(TradeHistory.id).label("trades_count"),
-            func.sum(case((TradeHistory.profit > 0, 1), else_=0)).label("wins"),
+            pnl_expr.label("total_pnl"),
+            cnt_expr.label("trades_count"),
+            wins_expr.label("wins"),
         )
         .group_by(TradeHistory.account_id)
-        .order_by(func.sum(TradeHistory.profit).desc())
-        .limit(10)
     )
+    if profitable_sort == "win_rate":
+        top_q = top_q.having(cnt_expr >= 5).order_by(
+            (wins_expr * 1.0 / cnt_expr).desc(), pnl_expr.desc()
+        )
+    else:
+        top_q = top_q.order_by(pnl_expr.desc())
+    top_users_q = await db.execute(top_q.limit(10))
     user_rows = top_users_q.all()
 
     profitable_users = []
