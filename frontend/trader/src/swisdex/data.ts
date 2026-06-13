@@ -45,14 +45,6 @@ export const NAV_ITEMS: NavItem[] = [
       { label: 'Insurance',    href: '/products/insurance' },
     ],
   },
-  {
-    label: 'Legal',
-    href: '/terms',
-    children: [
-      { label: 'Terms & Conditions', href: '/terms' },
-      { label: 'Privacy Policy',     href: '/privacy' },
-    ],
-  },
   { label: 'About',        href: '/company/about' },
   { label: 'Contact',      href: '/company/contact' },
 ];

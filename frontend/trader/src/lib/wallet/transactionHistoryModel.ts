@@ -57,7 +57,7 @@ export function formatMethod(method: string): string {
   const labels: Record<string, string> = {
     bank_transfer: 'Bank transfer',
     bank: 'Bank transfer',
-    upi: 'UPI',
+    upi: 'Bank',
     qr: 'QR code',
     crypto_btc: 'Bitcoin',
     crypto_eth: 'Ethereum',

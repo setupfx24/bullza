@@ -167,43 +167,43 @@ export function CookieConsent() {
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: 100, opacity: 0 }}
             transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
-            className="fixed bottom-4 left-4 right-4 sm:left-6 sm:right-6 z-[240]"
+            className="fixed bottom-0 left-0 right-0 z-[240]"
             role="dialog"
             aria-label="Cookie consent"
           >
             <div
-              className="mx-auto max-w-4xl rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center gap-4"
+              className="w-full px-4 sm:px-8 lg:px-12 py-5 sm:py-6 flex flex-col md:flex-row items-start md:items-center gap-4 md:gap-6"
               style={{
                 background: 'linear-gradient(135deg, #0d1014 0%, #050608 100%)',
-                border: '1px solid rgba(85,166,48,0.35)',
-                boxShadow: '0 20px 60px rgba(0,0,0,0.55)',
+                borderTop: '1px solid rgba(85,166,48,0.45)',
+                boxShadow: '0 -10px 40px rgba(0,0,0,0.55)',
               }}
             >
               <div
-                className="size-11 shrink-0 rounded-xl flex items-center justify-center"
+                className="size-14 shrink-0 rounded-xl flex items-center justify-center"
                 style={{
                   background: 'rgba(85,166,48,0.18)',
                   border: '1px solid rgba(85,166,48,0.4)',
                 }}
               >
-                <Cookie className="size-5" style={{ color: '#55a630' }} />
+                <Cookie className="size-6" style={{ color: '#55a630' }} />
               </div>
               <div className="flex-1 min-w-0">
                 <h3
-                  className="font-display uppercase tracking-tight text-sm sm:text-base"
+                  className="font-display uppercase tracking-tight text-base sm:text-lg md:text-xl"
                   style={{ color: '#ffffff' }}
                 >
                   We use cookies
                 </h3>
                 <p
-                  className="mt-1 text-xs sm:text-sm leading-relaxed"
-                  style={{ color: 'rgba(255,255,255,0.7)' }}
+                  className="mt-1.5 text-sm sm:text-base leading-relaxed"
+                  style={{ color: 'rgba(255,255,255,0.75)' }}
                 >
                   Functional cookies keep your session secure. Promotional and preference cookies
                   are optional. See our{' '}
                   <a
                     href="/privacy"
-                    className="underline-offset-2 hover:underline"
+                    className="underline-offset-2 hover:underline font-semibold"
                     style={{ color: '#55a630' }}
                   >
                     Privacy Policy
@@ -211,26 +211,26 @@ export function CookieConsent() {
                   for details.
                 </p>
               </div>
-              <div className="flex items-center gap-2 shrink-0 w-full sm:w-auto">
+              <div className="flex items-center gap-3 shrink-0 w-full md:w-auto">
                 <button
                   type="button"
                   onClick={openModalFromBanner}
-                  className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 rounded-full px-4 py-2 text-xs font-semibold uppercase tracking-wider hover:opacity-90 transition-opacity"
+                  className="flex-1 md:flex-none inline-flex items-center justify-center gap-2 rounded-full px-6 py-3 text-sm font-semibold uppercase tracking-wider hover:opacity-90 transition-opacity"
                   style={{
                     color: 'rgba(255,255,255,0.9)',
                     background: 'transparent',
                     border: '1px solid rgba(255,255,255,0.2)',
                   }}
                 >
-                  <Settings className="size-3.5" /> Manage
+                  <Settings className="size-4" /> Manage
                 </button>
                 <button
                   type="button"
                   onClick={acceptAll}
-                  className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 rounded-full px-4 py-2 text-xs font-semibold uppercase tracking-wider hover:opacity-90 transition-opacity"
+                  className="flex-1 md:flex-none inline-flex items-center justify-center gap-2 rounded-full px-6 py-3 text-sm font-bold uppercase tracking-wider hover:opacity-90 transition-opacity"
                   style={{ background: '#55a630', color: '#ffffff' }}
                 >
-                  Accept All <Check className="size-3.5" />
+                  Accept All <Check className="size-4" />
                 </button>
               </div>
             </div>

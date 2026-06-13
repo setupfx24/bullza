@@ -196,14 +196,12 @@ export default function Footer() {
           style={{ borderTop: '1px solid var(--fx-line)' }}
         >
           {[
-            { name: 'Privacy Policy',           href: '/pdfs/terms/privcy%20policy.pdf' },
-            { name: 'Terms & Conditions',       href: '/pdfs/terms/terms%20and%20condition.pdf' },
-            { name: 'AML Policy',               href: '/pdfs/terms/aml-policy.pdf' },
-            { name: 'Deposit & withdrawal Policy', href: '/pdfs/terms/deposit%20and%20withdrawal.pdf' },
-            { name: 'Restricted Countries',     href: '/pdfs/terms/restricted-countries.pdf' },
-            { name: 'Risk Warning',             href: '/pdfs/terms/risk-warning.pdf' },
-            { name: 'Legal Documents',          href: '/pdfs/terms/SwisDex%20Promotional%20%26%20Service%20Terms%20and%20Conditions.pdf' },
-            { name: 'Risk Disclosure',          href: '/pdfs/terms/Client%20Fund%20Security.pdf' },
+            { name: 'Privacy Policy',              href: '/privacy' },
+            { name: 'Terms & Conditions',          href: '/terms' },
+            { name: 'Deposit & withdrawal Policy', href: '/deposit-withdrawal' },
+            { name: 'Restricted Countries',        href: '/restricted-countries' },
+            { name: 'Risk Warning',                href: '/risk-warning' },
+            { name: 'Risk Disclosure',             href: '/risk' },
           ].map((doc) => (
             <a
               key={doc.name}
