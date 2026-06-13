@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { useShellStore } from '@/stores/shellStore';
+import { usePlatformStatusStore } from '@/stores/platformStatusStore';
 import { cn } from '@/lib/utils';
 import {
   Home,
@@ -65,6 +66,20 @@ function isGroup(e: NavEntry): e is GroupItem {
 export default function AppSidebar() {
   const pathname = usePathname();
   const { sidebarOpen, setSidebarOpen } = useShellStore();
+  const pammEnabled = usePlatformStatusStore((s) => s.pamm_enabled);
+  const mamEnabled = usePlatformStatusStore((s) => s.mam_enabled);
+
+  // Hide PAMM (/pamm) and/or MAMM-Copy-Trading (/social) when the admin
+  // has switched the product off for customers.
+  const navItems = useMemo(
+    () => NAV_ITEMS.filter((e) => {
+      const href = (e as LeafItem).href;
+      if (href === '/pamm' && !pammEnabled) return false;
+      if (href === '/social' && !mamEnabled) return false;
+      return true;
+    }),
+    [pammEnabled, mamEnabled],
+  );
 
   // Auto-expand the group whose children include the current route, but let
   // the user collapse/expand manually after that.
@@ -132,7 +147,7 @@ export default function AppSidebar() {
         </div>
 
         <nav className="flex-1 min-h-0 overflow-y-auto overscroll-contain py-2 px-2 sidebar-scroll">
-          {NAV_ITEMS.map((entry) => {
+          {navItems.map((entry) => {
             if (isGroup(entry)) {
               const expanded = openGroups.has(entry.key);
               const groupActive = entry.children.some((c) => pathname === c.href || pathname.startsWith(`${c.href}/`));
