@@ -42,6 +42,26 @@ class AuthServiceError(Exception):
         super().__init__(detail)
 
 
+# Statuses that block sign-in. "suspended" is a temporary admin hold,
+# "terminated" / "deleted" are end-of-life (soft-delete keeps the data but
+# the user can never log in again). Centralised so every auth path agrees.
+_LOGIN_BLOCKED_STATUSES = {"banned", "blocked", "suspended", "terminated", "deleted"}
+
+
+def login_block_message(status: str | None) -> str | None:
+    """Return a user-facing reason if this account status blocks login, else None."""
+    s = (status or "").lower()
+    if s not in _LOGIN_BLOCKED_STATUSES:
+        return None
+    return {
+        "banned": "Account has been banned",
+        "blocked": "Account has been blocked",
+        "suspended": "Your account is temporarily suspended. Please contact support.",
+        "terminated": "Account has been terminated",
+        "deleted": "Account no longer exists",
+    }.get(s, "Account is not active")
+
+
 # ─── Utility: IP parsing ─────────────────────────────────────────────────
 
 def _parse_one_ip(raw: str) -> str | None:
@@ -689,6 +709,21 @@ async def register_user(
         except Exception as _ce:
             logger.debug("company-IB attach failed: %s", _ce)
 
+    # Audit the registration so it shows on the admin Audit Logs page under
+    # the "Registration" filter (action_type=REGISTER). Previously email
+    # signups wrote no audit row at register time, so that filter was always
+    # empty.
+    try:
+        _ua = request.headers.get("user-agent") if request else None
+    except Exception:
+        _ua = None
+    db.add(UserAuditLog(
+        user_id=user.id,
+        action_type="REGISTER",
+        ip_address=client_ip_for_inet(request) if request else None,
+        device_info=_ua[:2048] if _ua else None,
+    ))
+
     await db.commit()
 
     # Email/password signups do NOT receive a session cookie here — the user
@@ -744,10 +779,9 @@ async def login_user(
             403,
         )
 
-    if user.status == "banned":
-        raise AuthServiceError("Account has been banned", 403)
-    if user.status == "blocked":
-        raise AuthServiceError("Account has been blocked", 403)
+    _blk = login_block_message(user.status)
+    if _blk:
+        raise AuthServiceError(_blk, 403)
 
     # Maintenance mode: only admin / super_admin / employee roles may log in.
     if user.role not in ("admin", "super_admin", "employee"):
@@ -861,10 +895,9 @@ async def demo_login(request: Request, db: AsyncSession) -> JSONResponse:
     await rate_limit_http(request, "demo-login", 30, 60.0)
     user = await _ensure_shared_demo_user(db)
     await _ensure_demo_trading_account(db, user)
-    if user.status == "banned":
-        raise AuthServiceError("Account has been banned", 403)
-    if user.status == "blocked":
-        raise AuthServiceError("Account has been blocked", 403)
+    _blk = login_block_message(user.status)
+    if _blk:
+        raise AuthServiceError(_blk, 403)
     return await issue_auth_json_response(user, request, db, user_audit_action="LOGIN")
 
 
@@ -982,10 +1015,9 @@ async def google_oauth(
                 except Exception as _ce:
                     logger.debug("company-IB attach (google) failed: %s", _ce)
 
-    if user.status == "banned":
-        raise AuthServiceError("Account has been banned", 403)
-    if user.status == "blocked":
-        raise AuthServiceError("Account has been blocked", 403)
+    _blk = login_block_message(user.status)
+    if _blk:
+        raise AuthServiceError(_blk, 403)
 
     # Single commit point — issue_auth_json_response below adds session + refresh
     # rows and commits once. Any failure above raises before commit, so the
@@ -1031,7 +1063,7 @@ async def refresh_token(
     if not row:
         raise AuthServiceError("Invalid or expired session", 401)
     user = await db.get(User, row.user_id)
-    if not user or user.status in ("banned", "blocked"):
+    if not user or login_block_message(user.status):
         raise AuthServiceError("Not authenticated", 401)
     row.revoked = True
     await db.flush()
@@ -1053,10 +1085,9 @@ async def bootstrap_session(access_token: str, request: Request, db: AsyncSessio
     user = await db.get(User, uid)
     if not user:
         raise AuthServiceError("Invalid token", 401)
-    if user.status == "banned":
-        raise AuthServiceError("Account has been banned", 403)
-    if user.status == "blocked":
-        raise AuthServiceError("Account has been blocked", 403)
+    _blk = login_block_message(user.status)
+    if _blk:
+        raise AuthServiceError(_blk, 403)
     return await issue_auth_json_response(user, request, db)
 
 

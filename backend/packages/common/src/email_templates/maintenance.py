@@ -22,6 +22,8 @@ def render_maintenance_notice(
     reason: str | None = None,   # short admin-supplied explanation
     custom_message_html: str | None = None,  # raw HTML override block
     trader_app_url: str = "https://trade.swisdex.com",
+    subject_override: str | None = None,  # admin-set email subject line
+    title_override: str | None = None,    # admin-set heading inside the email
 ) -> tuple[str, str, str]:
     name = (first_name or "trader").strip() or "trader"
 
@@ -59,13 +61,13 @@ def render_maintenance_notice(
     </p>
     """
 
-    subject = f"Scheduled maintenance — {window_label}"
+    subject = (subject_override or "").strip() or f"Scheduled maintenance — {window_label}"
     html = render_layout(
-        title="Scheduled maintenance",
+        title=(title_override or "").strip() or "Scheduled maintenance",
         intro=intro,
         body_html=body,
         cta_label="Check your positions",
-        cta_url=f"{trader_app_url.rstrip('/')}/trade",
+        cta_url=f"{trader_app_url.rstrip('/')}/trading",
         hero_eyebrow="Service notice",
         footer_note=(
             "We schedule maintenance for the quietest part of the trading "
@@ -87,7 +89,7 @@ def render_maintenance_notice(
     text_lines += [
         "",
         f"Close or hedge positions you don't want held through the outage.",
-        f"Check positions: {trader_app_url.rstrip('/')}/trade",
+        f"Check positions: {trader_app_url.rstrip('/')}/trading",
         "",
         "Support: support@swisdex.com",
     ]

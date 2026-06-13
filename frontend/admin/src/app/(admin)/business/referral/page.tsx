@@ -62,6 +62,11 @@ export default function ReferralAdminPage() {
   const [requiresFunded, setRequiresFunded] = useState<boolean>(true);
   const [savingRules, setSavingRules] = useState(false);
 
+  // Referral tier ladder — SEPARATE from the IB ladder. Rows of
+  // {min_referrals, max_referrals|null, per_referral_bounty}.
+  type RefTier = { min_referrals: number; max_referrals: number | null; per_referral_bounty: number };
+  const [tiers, setTiers] = useState<RefTier[]>([]);
+
   const load = useCallback(async () => {
     setRefreshing(true);
     try {
@@ -71,6 +76,17 @@ export default function ReferralAdminPage() {
       setQualifyingTrades(d.qualifying_trades ?? 3);
       setRequiresKyc(d.requires_kyc ?? true);
       setRequiresFunded(d.requires_funded ?? true);
+      // Load the dedicated referral tier ladder from settings.
+      try {
+        const settings = await adminApi.get<{ key: string; value: any }[]>('/settings');
+        const row = Array.isArray(settings) ? settings.find((s) => s.key === 'referral_tiers') : null;
+        const raw = row?.value;
+        setTiers(Array.isArray(raw) ? raw.map((r: any) => ({
+          min_referrals: Number(r.min_referrals) || 0,
+          max_referrals: r.max_referrals == null || r.max_referrals === '' ? null : Number(r.max_referrals),
+          per_referral_bounty: Number(r.per_referral_bounty) || 0,
+        })) : []);
+      } catch { /* settings optional */ }
     } catch (e: any) {
       toast.error(e?.message || 'Failed to load referral overview');
     } finally {
@@ -92,12 +108,21 @@ export default function ReferralAdminPage() {
     }
     setSavingRules(true);
     try {
+      // Clean + sort the tier ladder before saving.
+      const cleanTiers = tiers
+        .map((t) => ({
+          min_referrals: Math.max(0, Math.floor(t.min_referrals || 0)),
+          max_referrals: t.max_referrals == null ? null : Math.max(0, Math.floor(t.max_referrals)),
+          per_referral_bounty: Math.max(0, Number(t.per_referral_bounty) || 0),
+        }))
+        .sort((a, b) => a.min_referrals - b.min_referrals);
       await adminApi.put('/settings', {
         settings: {
           referral_commission_amount_usd: bountyUsd,
           referral_qualifying_trades: qualifyingTrades,
           referral_requires_kyc: requiresKyc,
           referral_requires_funded: requiresFunded,
+          referral_tiers: cleanTiers,
         },
       });
       toast.success('Referral rules saved');
@@ -149,9 +174,9 @@ export default function ReferralAdminPage() {
             <h2 className="text-sm font-semibold text-text-primary">Qualifying rules</h2>
             <p className="text-xxs text-text-tertiary mt-0.5">
               Gates the engine enforces before a referrer can press Claim. The per-referral
-              payout itself comes from the <a href="/config/ib-tiers" className="text-buy hover:text-buy-light underline underline-offset-2">tier ladder</a>{' '}
-              (by the referrer's active referral count); the bounty input below is the
-              fallback used only when no tier matches.
+              payout comes from the <span className="text-text-primary font-semibold">Referral tier ladder</span>{' '}
+              below (its OWN ladder, separate from the IB program — by the referrer's claimed
+              referral count); the fallback bounty applies only when no tier matches.
             </p>
           </div>
           <button
@@ -230,6 +255,52 @@ export default function ReferralAdminPage() {
             </span>
           </label>
         </div>
+      </div>
+
+      {/* Referral tier ladder — separate from IB. Pays per-referral by the
+          referrer's claimed-referral count (1-indexed position). */}
+      <div className="bg-bg-secondary border border-border-primary rounded-md p-4 space-y-3">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <h2 className="text-sm font-semibold text-text-primary">Referral tier ladder</h2>
+            <p className="text-xxs text-text-tertiary mt-0.5">
+              Its own ladder (independent of the IB program). Each row = a referral-count band
+              and the bounty paid per qualifying referral in that band. Leave the last row&apos;s
+              &quot;to&quot; empty for &quot;and above&quot;. No matching row → fallback bounty above. Save with the button up top.
+            </p>
+          </div>
+          <button
+            onClick={() => setTiers((t) => [...t, { min_referrals: t.length ? (t[t.length - 1].max_referrals ?? t[t.length - 1].min_referrals) + 1 : 1, max_referrals: null, per_referral_bounty: 0 }])}
+            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-medium text-buy border border-buy/40 hover:bg-buy/10 shrink-0"
+          >
+            + Add tier
+          </button>
+        </div>
+
+        {tiers.length === 0 ? (
+          <p className="text-xs text-text-tertiary">No tiers — every qualifying referral pays the fallback bounty. Add a tier to scale payouts by volume.</p>
+        ) : (
+          <div className="space-y-2">
+            <div className="grid grid-cols-[1fr_1fr_1fr_auto] gap-2 text-xxs text-text-tertiary uppercase tracking-wide px-1">
+              <span>From (referral #)</span><span>To (#, empty = +)</span><span>Bounty / referral ($)</span><span></span>
+            </div>
+            {tiers.map((t, i) => (
+              <div key={i} className="grid grid-cols-[1fr_1fr_1fr_auto] gap-2 items-center">
+                <input type="number" min={0} value={t.min_referrals}
+                  onChange={(e) => setTiers((arr) => arr.map((x, j) => j === i ? { ...x, min_referrals: parseInt(e.target.value, 10) || 0 } : x))}
+                  className="text-xs py-1.5 px-2 bg-bg-input border border-border-primary rounded-md font-mono tabular-nums text-right text-text-primary" />
+                <input type="number" min={0} value={t.max_referrals ?? ''} placeholder="∞"
+                  onChange={(e) => setTiers((arr) => arr.map((x, j) => j === i ? { ...x, max_referrals: e.target.value === '' ? null : (parseInt(e.target.value, 10) || 0) } : x))}
+                  className="text-xs py-1.5 px-2 bg-bg-input border border-border-primary rounded-md font-mono tabular-nums text-right text-text-primary" />
+                <input type="number" min={0} step={0.5} value={t.per_referral_bounty}
+                  onChange={(e) => setTiers((arr) => arr.map((x, j) => j === i ? { ...x, per_referral_bounty: parseFloat(e.target.value) || 0 } : x))}
+                  className="text-xs py-1.5 px-2 bg-bg-input border border-border-primary rounded-md font-mono tabular-nums text-right text-text-primary" />
+                <button onClick={() => setTiers((arr) => arr.filter((_, j) => j !== i))}
+                  className="px-2 py-1 rounded-md text-xs text-sell border border-sell/30 hover:bg-sell/10">Remove</button>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Stat cards */}

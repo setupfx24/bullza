@@ -193,6 +193,9 @@ export default function EmployeesPage() {
       case 'super_admin': return 'bg-danger/15 text-danger';
       case 'trade_manager': return 'bg-accent/15 text-accent';
       case 'finance': return 'bg-warning/15 text-warning';
+      case 'deposit_manager': return 'bg-warning/15 text-warning';
+      case 'withdrawal_manager': return 'bg-warning/15 text-warning';
+      case 'rm': return 'bg-accent/15 text-accent';
       case 'risk_manager': return 'bg-sell/15 text-sell';
       case 'marketing': return 'bg-success/15 text-success';
       case 'support': return 'bg-buy/15 text-buy';
@@ -361,9 +364,12 @@ export default function EmployeesPage() {
                 <select value={form.role} onChange={(e) => updateForm('role', e.target.value)} className="w-full text-xs py-1.5 px-2 bg-bg-input border border-border-primary rounded-md">
                   <option value="support">Support</option>
                   <option value="trade_manager">Trade Manager</option>
-                  <option value="finance">Finance</option>
+                  <option value="finance">Finance (deposits + withdrawals)</option>
+                  <option value="deposit_manager">Deposit Manager</option>
+                  <option value="withdrawal_manager">Withdrawal Manager</option>
                   <option value="risk_manager">Risk Manager</option>
                   <option value="marketing">Marketing</option>
+                  <option value="rm">Relationship Manager (RM)</option>
                   <option value="super_admin">Super Admin</option>
                 </select>
               </div>

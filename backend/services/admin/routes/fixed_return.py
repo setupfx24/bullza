@@ -144,6 +144,26 @@ async def grant_lock(
     )
 
 
+class FRBonusRequest(BaseModel):
+    # "percent" = value% of the user's active locked principal; "fixed" = flat USD.
+    mode: str = Field("fixed", pattern="^(percent|fixed)$")
+    value: float = Field(..., gt=0)
+
+
+@router.post("/users/{user_id}/bonus")
+async def grant_fixed_return_bonus(
+    user_id: UUID,
+    body: FRBonusRequest,
+    admin: User = Depends(require_permission("fixed_return.manage")),
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    """Special bonus for a Fixed-Return holder — a % of their active locked
+    principal or a flat amount — credited to their main wallet."""
+    return await fixed_return_service.grant_bonus(
+        user_id=user_id, mode=body.mode, value=body.value, admin_id=admin.id, db=db,
+    )
+
+
 @router.put("/users/{user_id}/rate-override")
 async def set_rate_override(
     user_id: UUID,

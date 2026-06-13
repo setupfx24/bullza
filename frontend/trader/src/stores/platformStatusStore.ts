@@ -9,6 +9,8 @@ interface PlatformStatus {
   allow_new_registrations: boolean;
   allow_deposits: boolean;
   allow_withdrawals: boolean;
+  pamm_enabled: boolean;
+  mam_enabled: boolean;
 }
 
 interface PlatformStatusState extends PlatformStatus {
@@ -21,6 +23,8 @@ const DEFAULTS: PlatformStatus = {
   allow_new_registrations: true,
   allow_deposits: true,
   allow_withdrawals: true,
+  pamm_enabled: true,
+  mam_enabled: true,
 };
 
 export const usePlatformStatusStore = create<PlatformStatusState>()(
@@ -52,6 +56,8 @@ export const usePlatformStatusStore = create<PlatformStatusState>()(
         allow_new_registrations: state.allow_new_registrations,
         allow_deposits: state.allow_deposits,
         allow_withdrawals: state.allow_withdrawals,
+        pamm_enabled: state.pamm_enabled,
+        mam_enabled: state.mam_enabled,
       }),
     },
   ),

@@ -29,6 +29,8 @@ interface BonusOffer {
   sort_order: number;
   cta_label: string | null;
   tagline: string | null;
+  promo_code: string | null;
+  code_visible: boolean;
   allocations_count?: number;
 }
 
@@ -70,6 +72,8 @@ const EMPTY_FORM = {
   sort_order: '0',
   cta_label: '',
   tagline: '',
+  promo_code: '',
+  code_visible: true,
 };
 
 /** A single bracket row in the admin's welcome-bonus range table.
@@ -286,6 +290,8 @@ export default function BonusPage() {
       sort_order: String(offer.sort_order ?? 0),
       cta_label: offer.cta_label || '',
       tagline: offer.tagline || '',
+      promo_code: offer.promo_code || '',
+      code_visible: offer.code_visible ?? true,
     });
     setShowModal(true);
   };
@@ -322,6 +328,8 @@ export default function BonusPage() {
         sort_order: parseInt(form.sort_order, 10) || 0,
         cta_label: form.cta_label.trim() || null,
         tagline: form.tagline.trim() || null,
+        promo_code: (form.promo_code as string).trim() || null,
+        code_visible: form.code_visible,
       };
       if (editId) {
         await adminApi.put(`/bonus/offers/${editId}`, body);
@@ -788,6 +796,32 @@ export default function BonusPage() {
                   <input type="date" value={form.expires_at} onChange={(e) => updateForm('expires_at', e.target.value)} className="w-full text-xs py-1.5 px-2 bg-bg-input border border-border-primary rounded-md" />
                 </div>
               </div>
+
+              {/* Promo code (optional) + whether it's shown to users */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xxs text-text-tertiary mb-1">Promo code (optional)</label>
+                  <input
+                    value={form.promo_code as string}
+                    onChange={(e) => updateForm('promo_code', e.target.value.toUpperCase())}
+                    className="w-full text-xs py-1.5 px-2 bg-bg-input border border-border-primary rounded-md font-mono uppercase"
+                    placeholder="e.g. DIWALI50"
+                    maxLength={40}
+                  />
+                </div>
+                <label className="flex items-end gap-2 text-xs text-text-secondary cursor-pointer pb-1.5">
+                  <input
+                    type="checkbox"
+                    checked={form.code_visible as boolean}
+                    onChange={(e) => updateForm('code_visible', e.target.checked)}
+                    className="w-3.5 h-3.5"
+                  />
+                  Show code to users on /bonus page
+                </label>
+              </div>
+              <p className="text-xxs text-text-tertiary -mt-2">
+                Untick &quot;Show code&quot; to keep the promo code hidden (share it privately for a targeted campaign).
+              </p>
 
               <label className="flex items-center gap-2 text-xs text-text-secondary cursor-pointer">
                 <input

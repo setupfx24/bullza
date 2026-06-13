@@ -594,6 +594,10 @@ class BonusOfferIn(BaseModel):
     sort_order: int = 0
     cta_label: Optional[str] = None
     tagline: Optional[str] = None
+    # Promo-code flow. promo_code = optional code; code_visible = show it on
+    # the public /bonus page (True) or keep it hidden (False).
+    promo_code: Optional[str] = None
+    code_visible: bool = True
 
 
 class BonusOfferOut(BaseModel):
@@ -615,6 +619,8 @@ class BonusOfferOut(BaseModel):
     sort_order: int = 0
     cta_label: Optional[str] = None
     tagline: Optional[str] = None
+    promo_code: Optional[str] = None
+    code_visible: bool = True
     created_at: Optional[datetime] = None
 
     class Config:

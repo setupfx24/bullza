@@ -18,6 +18,7 @@ type Tier = {
   features: string[];
   cta: string;
   popular?: boolean;
+  code?: string | null;
 };
 
 /** Wire shape — what /api/v1/bonus/tiers returns. */
@@ -33,6 +34,7 @@ type ApiTier = {
   is_popular: boolean;
   cta_label: string | null;
   tagline: string | null;
+  promo_code?: string | null;
 };
 
 const fmtUsd = (n: number) =>
@@ -70,6 +72,7 @@ function adaptApi(t: ApiTier): Tier {
     features: t.perks?.length ? t.perks : [],
     cta,
     popular: t.is_popular,
+    code: t.promo_code || null,
   };
 }
 
@@ -238,6 +241,13 @@ export default function BonusPage() {
                 </div>
                 <div className="mt-1 text-[11px] uppercase tracking-[0.16em] text-primary/80">{t.cap}</div>
               </div>
+
+              {t.code && (
+                <div className="mt-4 rounded-xl bg-primary/10 border border-primary/30 px-3 py-2 text-center">
+                  <div className="text-[10px] uppercase tracking-[0.16em] text-foreground/55">Use promo code</div>
+                  <div className="font-display text-lg text-primary tracking-widest tabular-nums">{t.code}</div>
+                </div>
+              )}
 
               <ul className="mt-5 space-y-2.5 text-sm text-foreground/75 flex-1">
                 {t.features.map((f) => (

@@ -228,7 +228,7 @@ async def analytics_dashboard(
     }
 
 
-async def finance_overview(db: AsyncSession) -> dict:
+async def finance_overview(db: AsyncSession, start_date=None, end_date=None) -> dict:
     """Super-admin financial overview with clickable-breakdown data.
 
     Every headline number ships with its segregation so the dashboard can
@@ -240,46 +240,59 @@ async def finance_overview(db: AsyncSession) -> dict:
         − user trading PROFIT, − insurance payouts, − IB commission,
         − referral commission
     Fixed Return is reported separately (NOT part of Net P&L).
+
+    start_date/end_date (optional UTC datetimes) restrict the FLOW figures
+    (P&L sources, deposits, withdrawals, pending, fixed-return collected) to
+    that window. Net Credit stays a live snapshot (it's a current balance,
+    not a flow) and ignores the date range.
     """
     from packages.common.src.models import FixedReturnLock
 
+    def _dr(q, col):
+        """Apply the optional [start_date, end_date] window to a query."""
+        if start_date is not None:
+            q = q.where(col >= start_date)
+        if end_date is not None:
+            q = q.where(col <= end_date)
+        return q
+
     # ── Net P&L sources ───────────────────────────────────────────────
     user_pnl = float((await db.execute(
-        select(func.coalesce(func.sum(TradeHistory.profit), 0))
+        _dr(select(func.coalesce(func.sum(TradeHistory.profit), 0)), TradeHistory.closed_at)
     )).scalar() or 0)
     broker_trading = -user_pnl  # user loss = broker gain
 
     commission = abs(float((await db.execute(
-        select(func.coalesce(func.sum(Position.commission), 0)).where(Position.commission != 0)
+        _dr(select(func.coalesce(func.sum(Position.commission), 0)).where(Position.commission != 0), Position.created_at)
     )).scalar() or 0))
     swap = abs(float((await db.execute(
-        select(func.coalesce(func.sum(Position.swap), 0)).where(Position.swap != 0)
+        _dr(select(func.coalesce(func.sum(Position.swap), 0)).where(Position.swap != 0), Position.created_at)
     )).scalar() or 0))
 
     admin_commission = float((await db.execute(
-        select(func.coalesce(func.sum(Transaction.amount), 0)).where(
+        _dr(select(func.coalesce(func.sum(Transaction.amount), 0)).where(
             Transaction.type == "admin_commission",
-        )
+        ), Transaction.created_at)
     )).scalar() or 0)
 
     insurance_fees = abs(float((await db.execute(
-        select(func.coalesce(func.sum(Transaction.amount), 0)).where(
+        _dr(select(func.coalesce(func.sum(Transaction.amount), 0)).where(
             Transaction.type == "insurance_fee",
-        )
+        ), Transaction.created_at)
     )).scalar() or 0))
     insurance_payouts = abs(float((await db.execute(
-        select(func.coalesce(func.sum(Transaction.amount), 0)).where(
+        _dr(select(func.coalesce(func.sum(Transaction.amount), 0)).where(
             Transaction.type == "insurance_payout",
-        )
+        ), Transaction.created_at)
     )).scalar() or 0))
 
     ib_commission = float((await db.execute(
-        select(func.coalesce(func.sum(IBCommission.amount), 0))
+        _dr(select(func.coalesce(func.sum(IBCommission.amount), 0)), IBCommission.created_at)
     )).scalar() or 0)
     referral_commission = abs(float((await db.execute(
-        select(func.coalesce(func.sum(Transaction.amount), 0)).where(
+        _dr(select(func.coalesce(func.sum(Transaction.amount), 0)).where(
             Transaction.type.in_(["referral_commission", "ib_referral_bounty"]),
-        )
+        ), Transaction.created_at)
     )).scalar() or 0))
 
     pnl_sources = [
@@ -297,9 +310,11 @@ async def finance_overview(db: AsyncSession) -> dict:
     # ── Deposits / Withdrawals by method ──────────────────────────────
     async def _by_method(model, statuses):
         rows = (await db.execute(
-            select(model.method, func.coalesce(func.sum(model.amount), 0), func.count(model.id))
-            .where(model.status.in_(statuses))
-            .group_by(model.method)
+            _dr(
+                select(model.method, func.coalesce(func.sum(model.amount), 0), func.count(model.id))
+                .where(model.status.in_(statuses)),
+                model.created_at,
+            ).group_by(model.method)
         )).all()
         out = [{"method": (m or "other"), "amount": round(float(a or 0), 2), "count": int(c or 0)} for m, a, c in rows]
         out.sort(key=lambda x: x["amount"], reverse=True)
@@ -327,12 +342,19 @@ async def finance_overview(db: AsyncSession) -> dict:
     )).scalar() or 0))
 
     # ── Fixed Return (separate from P&L) ──────────────────────────────
+    # When a date window is given, scope to locks OPENED in that window
+    # ("collected in this period"); otherwise all currently-active locks.
     active_locks = (await db.execute(
-        select(FixedReturnLock).where(FixedReturnLock.state.in_(["active", "early_pending"]))
+        _dr(
+            select(FixedReturnLock).where(FixedReturnLock.state.in_(["active", "early_pending"])),
+            FixedReturnLock.locked_at,
+        )
     )).scalars().all()
     fr_collected = 0.0
     fr_interest_paid = 0.0
     fr_payable = 0.0
+    fr_accrued = 0.0   # interest that has BUILT UP day-by-day up to today
+    _now = datetime.now(timezone.utc)
     by_tenure: dict[str, dict] = {}
     maturing: dict[str, dict] = {}
     for lk in active_locks:
@@ -347,6 +369,16 @@ async def finance_overview(db: AsyncSession) -> dict:
         cycles = max(1, months // cyc_months)
         projected = p * float(lk.rate_pct or 0) / 100.0 * cycles
         fr_payable += max(0.0, projected - paid)
+        # Accrued-to-date: how much interest has built up on a per-day basis
+        # from lock start until today (capped at maturity / projected total).
+        td = int(lk.tenure_days or 30) or 30
+        daily_interest = p * float(lk.rate_pct or 0) / 100.0 / td
+        try:
+            days_elapsed = max(0, (_now - lk.locked_at).days) if lk.locked_at else 0
+        except Exception:
+            days_elapsed = 0
+        total_days = max(1, cycles * td)
+        fr_accrued += min(projected, daily_interest * min(days_elapsed, total_days))
         t = lk.tenure_label or "—"
         by_tenure.setdefault(t, {"tenure": t, "principal": 0.0, "count": 0})
         by_tenure[t]["principal"] += p
@@ -379,6 +411,10 @@ async def finance_overview(db: AsyncSession) -> dict:
             "collected": round(fr_collected, 2),
             "interest_paid_to_date": round(fr_interest_paid, 2),
             "projected_payable": round(fr_payable, 2),
+            # Interest accrued day-by-day up to today, and the slice of it not
+            # yet paid out (what the broker effectively owes as of now).
+            "accrued_to_date": round(fr_accrued, 2),
+            "accrued_unpaid": round(max(0.0, fr_accrued - fr_interest_paid), 2),
             "by_tenure": fr_by_tenure,
             "maturing": fr_maturing,
         },
@@ -404,18 +440,30 @@ async def _user_label_map(db: AsyncSession, user_ids: list) -> dict:
 
 async def finance_overview_drill(
     db: AsyncSession, section: str, method: str | None = None, tenure: str | None = None,
+    sort: str = "amount", start_date=None, end_date=None,
 ) -> dict:
     """Per-user drill-down for a Finance Overview card.
 
     section ∈ {deposits, withdrawals, pending_deposits, pending_withdrawals,
-               net_credit, fixed_return}. `method` filters deposit/withdrawal
-               rows; `tenure` filters fixed_return locks.
+               net_credit, fixed_return,
+               trading, commission, swap, pamm_mam, insurance_fees,
+               insurance_payouts, ib_commission, referral}.
+    `method` filters deposit/withdrawal rows; `tenure` filters fixed_return
+    locks; `sort` ∈ {amount, gainers, losers} (gainers/losers only meaningful
+    for the trading P&L section).
     Returns {section, method, users:[{user_id,name,email,amount,count}], total}.
     """
     from packages.common.src.models import FixedReturnLock
 
     section = (section or "").strip()
     users: list[dict] = []
+
+    def _dr(q, col):
+        if start_date is not None:
+            q = q.where(col >= start_date)
+        if end_date is not None:
+            q = q.where(col <= end_date)
+        return q
 
     if section in ("deposits", "pending_deposits", "withdrawals", "pending_withdrawals"):
         if section.endswith("deposits"):
@@ -430,7 +478,7 @@ async def finance_overview_drill(
         )
         if method and method != "all":
             q = q.where(func.coalesce(model.method, "other") == method)
-        q = q.group_by(model.user_id)
+        q = _dr(q, model.created_at).group_by(model.user_id)
         rows = (await db.execute(q)).all()
         umap = await _user_label_map(db, [r[0] for r in rows if r[0]])
         for uid, amt, cnt in rows:
@@ -477,6 +525,7 @@ async def finance_overview_drill(
         q = select(FixedReturnLock).where(FixedReturnLock.state.in_(["active", "early_pending"]))
         if tenure:
             q = q.where(FixedReturnLock.tenure_label == tenure)
+        q = _dr(q, FixedReturnLock.locked_at)
         locks = (await db.execute(q)).scalars().all()
         acc: dict = {}
         for lk in locks:
@@ -495,17 +544,111 @@ async def finance_overview_drill(
                 "count": e["count"],
             })
 
-    users.sort(key=lambda x: x["amount"], reverse=True)
+    elif section == "trading":
+        # Per-user realised P&L (from closed trades). The shown amount is the
+        # USER's net P&L: negative = the user lost (broker gained). This lets
+        # the dashboard sort top gainers / top losers.
+        rows = (await db.execute(
+            _dr(
+                select(TradeHistory.user_id, func.coalesce(func.sum(TradeHistory.profit), 0), func.count(TradeHistory.id)),
+                TradeHistory.closed_at,
+            ).group_by(TradeHistory.user_id)
+        )).all()
+        umap = await _user_label_map(db, [r[0] for r in rows if r[0]])
+        for uid, profit, cnt in rows:
+            info = umap.get(uid, {})
+            users.append({
+                "user_id": str(uid) if uid else None,
+                "name": info.get("name", "—"),
+                "email": info.get("email"),
+                "amount": round(float(profit or 0), 2),  # user P&L (− = broker profit)
+                "count": int(cnt or 0),
+            })
+
+    elif section in ("commission", "swap"):
+        col = Position.commission if section == "commission" else Position.swap
+        rows = (await db.execute(
+            _dr(
+                select(Position.user_id, func.coalesce(func.sum(col), 0), func.count(Position.id))
+                .where(col != 0),
+                Position.created_at,
+            ).group_by(Position.user_id)
+        )).all()
+        umap = await _user_label_map(db, [r[0] for r in rows if r[0]])
+        for uid, amt, cnt in rows:
+            info = umap.get(uid, {})
+            users.append({
+                "user_id": str(uid) if uid else None,
+                "name": info.get("name", "—"),
+                "email": info.get("email"),
+                "amount": round(abs(float(amt or 0)), 2),
+                "count": int(cnt or 0),
+            })
+
+    elif section in ("pamm_mam", "insurance_fees", "insurance_payouts", "referral"):
+        type_map = {
+            "pamm_mam": ["admin_commission"],
+            "insurance_fees": ["insurance_fee"],
+            "insurance_payouts": ["insurance_payout"],
+            "referral": ["referral_commission", "ib_referral_bounty"],
+        }
+        rows = (await db.execute(
+            _dr(
+                select(Transaction.user_id, func.coalesce(func.sum(Transaction.amount), 0), func.count(Transaction.id))
+                .where(Transaction.type.in_(type_map[section])),
+                Transaction.created_at,
+            ).group_by(Transaction.user_id)
+        )).all()
+        umap = await _user_label_map(db, [r[0] for r in rows if r[0]])
+        for uid, amt, cnt in rows:
+            info = umap.get(uid, {})
+            users.append({
+                "user_id": str(uid) if uid else None,
+                "name": info.get("name", "—"),
+                "email": info.get("email"),
+                "amount": round(abs(float(amt or 0)), 2),
+                "count": int(cnt or 0),
+            })
+
+    elif section == "ib_commission":
+        # IBCommission.ib_id → ib_profiles.id → user. Group by the IB's user.
+        rows = (await db.execute(
+            _dr(
+                select(IBProfile.user_id, func.coalesce(func.sum(IBCommission.amount), 0), func.count(IBCommission.id))
+                .join(IBProfile, IBProfile.id == IBCommission.ib_id),
+                IBCommission.created_at,
+            ).group_by(IBProfile.user_id)
+        )).all()
+        umap = await _user_label_map(db, [r[0] for r in rows if r[0]])
+        for uid, amt, cnt in rows:
+            info = umap.get(uid, {})
+            users.append({
+                "user_id": str(uid) if uid else None,
+                "name": info.get("name", "—"),
+                "email": info.get("email"),
+                "amount": round(abs(float(amt or 0)), 2),
+                "count": int(cnt or 0),
+            })
+
+    # Sorting: trading supports gainers (most profit first) / losers (most
+    # loss first); everything else sorts by amount descending.
+    if section == "trading" and sort == "losers":
+        users.sort(key=lambda x: x["amount"])           # most negative first
+    elif section == "trading" and sort == "gainers":
+        users.sort(key=lambda x: x["amount"], reverse=True)
+    else:
+        users.sort(key=lambda x: x["amount"], reverse=True)
     return {
         "section": section,
         "method": method,
         "tenure": tenure,
+        "sort": sort,
         "users": users,
         "total": round(sum(u["amount"] for u in users), 2),
     }
 
 
-async def get_exposure(db: AsyncSession) -> dict:
+async def get_exposure(db: AsyncSession, profitable_sort: str = "profit") -> dict:
     result = await db.execute(
         select(
             Position.instrument_id,
@@ -543,17 +686,28 @@ async def get_exposure(db: AsyncSession) -> dict:
             "risk_level": risk,
         })
 
-    top_users_q = await db.execute(
+    # Top profitable users — sortable by total profit (default) or by win
+    # rate. Win-rate ranking requires a minimum number of trades so a single
+    # 1-for-1 win doesn't sit at 100% above genuine performers.
+    pnl_expr = func.sum(TradeHistory.profit)
+    cnt_expr = func.count(TradeHistory.id)
+    wins_expr = func.sum(case((TradeHistory.profit > 0, 1), else_=0))
+    top_q = (
         select(
             TradeHistory.account_id,
-            func.sum(TradeHistory.profit).label("total_pnl"),
-            func.count(TradeHistory.id).label("trades_count"),
-            func.sum(case((TradeHistory.profit > 0, 1), else_=0)).label("wins"),
+            pnl_expr.label("total_pnl"),
+            cnt_expr.label("trades_count"),
+            wins_expr.label("wins"),
         )
         .group_by(TradeHistory.account_id)
-        .order_by(func.sum(TradeHistory.profit).desc())
-        .limit(10)
     )
+    if profitable_sort == "win_rate":
+        top_q = top_q.having(cnt_expr >= 5).order_by(
+            (wins_expr * 1.0 / cnt_expr).desc(), pnl_expr.desc()
+        )
+    else:
+        top_q = top_q.order_by(pnl_expr.desc())
+    top_users_q = await db.execute(top_q.limit(10))
     user_rows = top_users_q.all()
 
     profitable_users = []
