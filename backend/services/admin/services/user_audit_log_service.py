@@ -36,7 +36,14 @@ def _apply_filters(
     if user_id:
         stmt = stmt.where(UserAuditLog.user_id == user_id)
     if action_type:
-        stmt = stmt.where(UserAuditLog.action_type == action_type)
+        # "REGISTER" / "LOGIN" filters also catch the Google-OAuth variants
+        # so the admin sees ALL registrations / logins under one filter.
+        if action_type == "REGISTER":
+            stmt = stmt.where(UserAuditLog.action_type.in_(["REGISTER", "OAUTH_GOOGLE_REGISTER"]))
+        elif action_type == "LOGIN":
+            stmt = stmt.where(UserAuditLog.action_type.in_(["LOGIN", "OAUTH_GOOGLE_LOGIN"]))
+        else:
+            stmt = stmt.where(UserAuditLog.action_type == action_type)
     if date_from:
         stmt = stmt.where(UserAuditLog.created_at >= datetime.combine(date_from, time.min, tzinfo=timezone.utc))
     if date_to:

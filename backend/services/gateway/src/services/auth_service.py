@@ -709,6 +709,21 @@ async def register_user(
         except Exception as _ce:
             logger.debug("company-IB attach failed: %s", _ce)
 
+    # Audit the registration so it shows on the admin Audit Logs page under
+    # the "Registration" filter (action_type=REGISTER). Previously email
+    # signups wrote no audit row at register time, so that filter was always
+    # empty.
+    try:
+        _ua = request.headers.get("user-agent") if request else None
+    except Exception:
+        _ua = None
+    db.add(UserAuditLog(
+        user_id=user.id,
+        action_type="REGISTER",
+        ip_address=client_ip_for_inet(request) if request else None,
+        device_info=_ua[:2048] if _ua else None,
+    ))
+
     await db.commit()
 
     # Email/password signups do NOT receive a session cookie here — the user
