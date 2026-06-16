@@ -63,10 +63,38 @@ async def approve(
     then re-invoke the original endpoint with `?approval_request_id=...`
     to actually execute the change."""
     rec = await approval_service.approve(db, request_id=request_id, approver_id=admin.id)
+    ip = request.client.host if request.client else None
+    action = rec["action"]
+
+    # Deposit/withdrawal approvals EXECUTE on the super-admin's sign-off
+    # (client 2026-06-16): the authority admin requested it, this second
+    # super-admin approval actually credits/debits the user. add_fund /
+    # deduct_fund keep the re-invoke pattern (the requesting admin re-calls
+    # the original endpoint with ?approval_request_id=).
+    if action in ("deposit_approve", "withdrawal_approve"):
+        from decimal import Decimal as _D
+        from services import deposit_service
+        tid = uuid.UUID(str(rec["target_id"]))
+        payload = rec["payload"] or {}
+        if action == "deposit_approve":
+            va = payload.get("verified_amount")
+            result = await deposit_service.approve_deposit(
+                tid, admin.id, ip, db,
+                verified_amount=_D(str(va)) if va not in (None, "") else None,
+                approval_request_id=request_id,
+            )
+        else:
+            result = await deposit_service.approve_withdrawal(
+                tid, admin.id, ip, db, approval_request_id=request_id,
+            )
+        # approve_deposit/withdrawal commit internally (incl. the approval
+        # status flip + mark_executed).
+        return {"message": "Approved and executed", "request_id": str(request_id), "result": result}
+
     await write_audit_log(
         db, admin.id, "approval_grant", "admin_approval_request", request_id,
         new_values={"action": rec["action"], "target_id": str(rec["target_id"])},
-        ip_address=request.client.host if request.client else None,
+        ip_address=ip,
     )
     await db.commit()
     return {"message": "Approved", "request_id": str(request_id)}

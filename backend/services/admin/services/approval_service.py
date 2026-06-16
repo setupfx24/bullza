@@ -68,6 +68,7 @@ async def request_or_execute(
     amount: Decimal,
     payload: dict[str, Any],
     requested_by: uuid.UUID,
+    always: bool = False,
 ) -> Optional[uuid.UUID]:
     """Gate a financial action through the approval rules.
 
@@ -78,11 +79,20 @@ async def request_or_execute(
                     a custom 202 themselves). The action will run when a
                     second admin calls execute_approved_request().
 
+    `always=True` forces dual approval regardless of the amount threshold —
+    used for deposit/withdrawal approval where EVERY amount needs a second
+    super-admin sign-off (client 2026-06-16).
+
     Raises HTTPException(400) when the absolute cap is exceeded.
     """
-    _check_cap(amount)
-    if not needs_dual_approval(amount):
-        return None
+    # The absolute per-action cap guards admin-initiated fund moves
+    # (add_fund/deduct_fund). It does NOT apply to deposit/withdrawal
+    # approval (always=True) — that's the user's own money and may legitimately
+    # exceed the cap; the two-admin sign-off is the control there.
+    if not always:
+        _check_cap(amount)
+        if not needs_dual_approval(amount):
+            return None
 
     # Snapshot the requested change so the executing admin sees exactly
     # what was approved.

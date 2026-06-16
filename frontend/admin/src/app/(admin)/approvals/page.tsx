@@ -56,6 +56,8 @@ function formatPayload(p: Record<string, unknown> | null | undefined): string {
 const ACTION_LABEL: Record<string, string> = {
   add_fund: 'Add Fund',
   deduct_fund: 'Deduct Fund',
+  deposit_approve: 'Approve Deposit',
+  withdrawal_approve: 'Approve Withdrawal',
 };
 
 export default function ApprovalsPage() {
@@ -91,8 +93,12 @@ export default function ApprovalsPage() {
     setConfirmRow(null);
     setBusyId(row.id);
     try {
-      await adminApi.post(`/approvals/${row.id}/approve`, {});
-      toast.success('Approved — original admin must re-invoke to execute.');
+      // Deposit/withdrawal approvals execute on this sign-off (backend returns
+      // "Approved and executed"); add_fund/deduct_fund still need the original
+      // admin to re-invoke.
+      const resp: any = await adminApi.post(`/approvals/${row.id}/approve`, {});
+      const msg = resp?.message || 'Approved';
+      toast.success(msg.includes('executed') ? msg : `${msg} — original admin must re-invoke to execute.`);
       await fetchData();
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Approve failed';
