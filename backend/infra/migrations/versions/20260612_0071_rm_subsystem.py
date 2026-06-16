@@ -29,43 +29,59 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.add_column(
-        "users",
-        sa.Column("assigned_rm_id", UUID(as_uuid=True), sa.ForeignKey("users.id"), nullable=True),
+    # IDEMPOTENT: the admin service's startup self-heal DDL
+    # (services/admin/main.py:_apply_startup_ddl) may have already created
+    # users.assigned_rm_id and rm_funding_requests on a prior boot. Plain
+    # add_column / create_table would then fail with DuplicateColumn /
+    # DuplicateTable and block the whole migration chain (observed
+    # 2026-06-16). Raw IF NOT EXISTS makes this safe on both fresh and
+    # already-healed databases.
+    op.execute(
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS assigned_rm_id UUID REFERENCES users(id)"
     )
-    op.create_index("ix_users_assigned_rm_id", "users", ["assigned_rm_id"])
-
-    op.create_table(
-        "rm_funding_requests",
-        sa.Column("id", UUID(as_uuid=True), primary_key=True, server_default=sa.text("uuid_generate_v4()")),
-        sa.Column("rm_id", UUID(as_uuid=True), sa.ForeignKey("users.id"), nullable=False),
-        sa.Column("user_id", UUID(as_uuid=True), sa.ForeignKey("users.id"), nullable=False),
-        sa.Column("amount", sa.Numeric(18, 2), nullable=False),
-        sa.Column("currency", sa.String(10), nullable=False, server_default="USD"),
-        sa.Column("method", sa.String(40), nullable=True),
-        sa.Column("note", sa.Text(), nullable=True),
-        sa.Column("proof_path", sa.Text(), nullable=True),
-        # pending | approved | credited | rejected
-        sa.Column("status", sa.String(20), nullable=False, server_default="pending"),
-        sa.Column("approved_by", UUID(as_uuid=True), sa.ForeignKey("users.id"), nullable=True),
-        sa.Column("approved_at", sa.DateTime(timezone=True), nullable=True),
-        sa.Column("credited_by", UUID(as_uuid=True), sa.ForeignKey("users.id"), nullable=True),
-        sa.Column("credited_at", sa.DateTime(timezone=True), nullable=True),
-        sa.Column("rejected_by", UUID(as_uuid=True), sa.ForeignKey("users.id"), nullable=True),
-        sa.Column("rejected_at", sa.DateTime(timezone=True), nullable=True),
-        sa.Column("rejection_reason", sa.Text(), nullable=True),
-        sa.Column("deposit_id", UUID(as_uuid=True), sa.ForeignKey("deposits.id"), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("NOW()"), nullable=False),
-        # The admin who releases the money must NOT be the one who approved the
-        # proof — enforce the four-eyes rule at the DB level.
-        sa.CheckConstraint(
-            "credited_by IS NULL OR approved_by IS NULL OR credited_by <> approved_by",
-            name="chk_rm_distinct_crediter",
-        ),
+    op.execute(
+        "CREATE INDEX IF NOT EXISTS ix_users_assigned_rm_id ON users (assigned_rm_id)"
     )
-    op.create_index("ix_rm_funding_requests_rm_id", "rm_funding_requests", ["rm_id"])
-    op.create_index("ix_rm_funding_requests_user_id", "rm_funding_requests", ["user_id"])
-    op.create_index("ix_rm_funding_requests_status", "rm_funding_requests", ["status"])
+    op.execute("""
+        CREATE TABLE IF NOT EXISTS rm_funding_requests (
+            id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+            rm_id UUID NOT NULL REFERENCES users(id),
+            user_id UUID NOT NULL REFERENCES users(id),
+            amount NUMERIC(18,2) NOT NULL,
+            currency VARCHAR(10) NOT NULL DEFAULT 'USD',
+            method VARCHAR(40),
+            note TEXT,
+            proof_path TEXT,
+            status VARCHAR(20) NOT NULL DEFAULT 'pending',
+            approved_by UUID REFERENCES users(id),
+            approved_at TIMESTAMPTZ,
+            credited_by UUID REFERENCES users(id),
+            credited_at TIMESTAMPTZ,
+            rejected_by UUID REFERENCES users(id),
+            rejected_at TIMESTAMPTZ,
+            rejection_reason TEXT,
+            deposit_id UUID REFERENCES deposits(id),
+            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            CONSTRAINT chk_rm_distinct_crediter CHECK (
+                credited_by IS NULL OR approved_by IS NULL OR credited_by <> approved_by
+            )
+        )
+    """)
+    op.execute("CREATE INDEX IF NOT EXISTS ix_rm_funding_requests_rm_id ON rm_funding_requests (rm_id)")
+    op.execute("CREATE INDEX IF NOT EXISTS ix_rm_funding_requests_user_id ON rm_funding_requests (user_id)")
+    op.execute("CREATE INDEX IF NOT EXISTS ix_rm_funding_requests_status ON rm_funding_requests (status)")
+    # If the table pre-existed via startup DDL (which created it WITHOUT the
+    # four-eyes check), add the constraint now — guarded so it's a no-op when
+    # already present.
+    op.execute("""
+        DO $$ BEGIN
+            ALTER TABLE rm_funding_requests
+                ADD CONSTRAINT chk_rm_distinct_crediter CHECK (
+                    credited_by IS NULL OR approved_by IS NULL OR credited_by <> approved_by
+                );
+        EXCEPTION WHEN duplicate_object THEN NULL;
+        END $$;
+    """)
 
 
 def downgrade() -> None:

@@ -19,10 +19,12 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.add_column("bonus_offers", sa.Column("promo_code", sa.String(40), nullable=True))
-    op.add_column(
-        "bonus_offers",
-        sa.Column("code_visible", sa.Boolean(), nullable=False, server_default=sa.text("true")),
+    # IDEMPOTENT: admin startup self-heal DDL may have already added these
+    # columns on a prior boot (see services/admin/main.py). Plain add_column
+    # would fail with DuplicateColumn and block the migration chain.
+    op.execute("ALTER TABLE bonus_offers ADD COLUMN IF NOT EXISTS promo_code VARCHAR(40)")
+    op.execute(
+        "ALTER TABLE bonus_offers ADD COLUMN IF NOT EXISTS code_visible BOOLEAN NOT NULL DEFAULT true"
     )
 
 
