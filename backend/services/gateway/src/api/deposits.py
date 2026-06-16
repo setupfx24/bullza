@@ -48,10 +48,13 @@ async def create_manual_deposit(
     account_id: Optional[UUID] = Form(default=None),
     amount: Decimal = Form(...),
     transaction_id: str = Form(...),
-    file: UploadFile = File(...),
+    # Screenshot/proof is OPTIONAL (client 2026-06-16, XM-style): finance
+    # reconciles bank transfers by the unique reference instead of forcing a
+    # proof upload.
+    file: Optional[UploadFile] = File(default=None),
     bonus_code: Optional[str] = Form(default=None),
 ):
-    """Bank / UPI manual deposit: user pays admin bank (see bank-details), uploads proof + reference."""
+    """Bank / UPI manual deposit: user pays admin bank (see bank-details), includes the unique reference; proof upload optional."""
     # UI gating alone is bypassable, so the same admin flag the
     # /payment-methods endpoint exposes also hard-rejects API calls
     # when manual is disabled.
@@ -284,6 +287,18 @@ async def get_bank_info(
     db: AsyncSession = Depends(get_db),
 ):
     return await wallet_service.get_bank_info(amount=amount, db=db)
+
+
+@router.get("/deposit/banks")
+async def list_deposit_banks(
+    amount: Decimal | None = Query(default=None),
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """XM-style: list ALL active bank accounts so the user can pick one
+    (instead of an auto-selected single bank). Optional `amount` filters to
+    banks whose tier covers that amount."""
+    return await wallet_service.list_deposit_banks(amount=amount, db=db)
 
 
 class RmRequestBody(BaseModel):
