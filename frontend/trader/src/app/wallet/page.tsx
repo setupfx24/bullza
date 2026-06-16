@@ -155,6 +155,7 @@ const CRYPTO_ASSETS = [
 type FundingChannel = 'crypto' | 'manual' | 'p2p';
 
 interface ManualBankDetailsResponse {
+  id?: string;
   bank_name?: string;
   account_holder?: string;
   account_number?: string;
@@ -219,6 +220,14 @@ function WalletPageContent() {
   const [depositTxId, setDepositTxId] = useState('');
   const [depositProofFile, setDepositProofFile] = useState<File | null>(null);
   const [manualBankInfo, setManualBankInfo] = useState<ManualBankDetailsResponse | null>(null);
+  // XM-style: all active banks to choose from + the currently selected one.
+  const [manualBanks, setManualBanks] = useState<ManualBankDetailsResponse[]>([]);
+  const [selectedBankId, setSelectedBankId] = useState<string | null>(null);
+  // Unique payment reference the user must add in their bank transfer remark
+  // so finance can match it (generated once per page load).
+  const [depositReference] = useState(
+    () => 'SWD-' + Math.random().toString(36).slice(2, 8).toUpperCase(),
+  );
   const [depositSubmitting, setDepositSubmitting] = useState(false);
   // Optional promo / bonus code typed at deposit time. Pending → admin
   // reviews + grants manually from the admin deposits page. Empty by
@@ -424,14 +433,46 @@ function WalletPageContent() {
   const loadManualBankDetails = useCallback(async () => {
     try {
       const amt = parseFloat(depositAmount);
-      const body =
-        !Number.isNaN(amt) && amt > 0 ? { amount: amt } : {};
-      const d = await api.post<ManualBankDetailsResponse>('/wallet/deposit/bank-details', body);
-      setManualBankInfo(d && Object.keys(d).length > 0 ? d : null);
+      // XM-style: fetch ALL active banks so the user can pick one.
+      const qs = !Number.isNaN(amt) && amt > 0 ? `?amount=${amt}` : '';
+      const res = await api.get<{ banks: ManualBankDetailsResponse[] }>(
+        `/wallet/deposit/banks${qs}`,
+      );
+      const banks = Array.isArray(res?.banks) ? res.banks : [];
+      setManualBanks(banks);
+      // Keep the current selection if it's still in the list; else default to
+      // the first bank.
+      setSelectedBankId((prev) => {
+        const keep = prev && banks.some((b) => b.id === prev) ? prev : (banks[0]?.id ?? null);
+        const chosen = banks.find((b) => b.id === keep) ?? null;
+        setManualBankInfo(chosen);
+        return keep;
+      });
     } catch {
-      setManualBankInfo(null);
+      // Fallback to the legacy single-bank endpoint if the list isn't available.
+      try {
+        const amt = parseFloat(depositAmount);
+        const body = !Number.isNaN(amt) && amt > 0 ? { amount: amt } : {};
+        const d = await api.post<ManualBankDetailsResponse>('/wallet/deposit/bank-details', body);
+        setManualBankInfo(d && Object.keys(d).length > 0 ? d : null);
+        setManualBanks([]);
+      } catch {
+        setManualBankInfo(null);
+        setManualBanks([]);
+      }
     }
   }, [depositAmount]);
+
+  const selectManualBank = useCallback((bank: ManualBankDetailsResponse) => {
+    setSelectedBankId(bank.id ?? null);
+    setManualBankInfo(bank);
+  }, []);
+
+  // Pre-fill the reference field with the generated code so it's submitted
+  // (the user includes it in their bank transfer remark).
+  useEffect(() => {
+    setDepositTxId((prev) => prev || depositReference);
+  }, [depositReference]);
 
   const scrollToFundPanel = () => {
     requestAnimationFrame(() => {
@@ -686,19 +727,16 @@ function WalletPageContent() {
     }
 
     if (!depositTxId.trim()) {
-      toast.error('Enter your bank transaction or reference ID');
+      toast.error('Enter your payment reference');
       return;
     }
-    if (!depositProofFile) {
-      toast.error('Upload a screenshot of your payment');
-      return;
-    }
+    // Screenshot is OPTIONAL now (XM-style) — finance matches the reference.
     setDepositSubmitting(true);
     try {
       const fd = new FormData();
       fd.append('amount', String(amt));
       fd.append('transaction_id', depositTxId.trim());
-      fd.append('file', depositProofFile);
+      if (depositProofFile) fd.append('file', depositProofFile);
       const bonusTrim = depositBonusCode.trim();
       if (bonusTrim) fd.append('bonus_code', bonusTrim);
       const token = api.getToken();
@@ -1267,6 +1305,34 @@ function WalletPageContent() {
 
                       <div className="rounded-xl border border-border-primary bg-bg-secondary px-3 py-3 sm:px-4 space-y-2 min-w-0">
                         <p className="text-xs font-bold text-text-primary">Pay to this account (from admin)</p>
+                        {/* XM-style bank picker — choose which bank to pay. */}
+                        {manualBanks.length > 1 ? (
+                          <div className="grid grid-cols-2 gap-2">
+                            {manualBanks.map((b) => (
+                              <button
+                                key={b.id}
+                                type="button"
+                                onClick={() => selectManualBank(b)}
+                                className={clsx(
+                                  'text-left px-3 py-2 rounded-lg border text-[11px] transition-colors min-w-0',
+                                  selectedBankId === b.id
+                                    ? 'border-accent bg-accent/10 text-text-primary'
+                                    : 'border-border-primary bg-bg-base hover:border-accent/40 text-text-secondary',
+                                )}
+                              >
+                                <span className="block font-semibold truncate">{b.bank_name || 'Bank'}</span>
+                                <span className="block font-mono text-[10px] text-text-tertiary truncate">{b.account_number}</span>
+                              </button>
+                            ))}
+                          </div>
+                        ) : null}
+                        {/* Unique payment reference — finance matches this. */}
+                        <div className="rounded-lg bg-amber-500/10 border border-amber-500/30 px-3 py-2">
+                          <p className="text-[10px] uppercase tracking-wide text-amber-500/90 font-sans">
+                            Payment reference — add this in your transfer remark
+                          </p>
+                          <p className="font-mono font-bold text-sm text-text-primary select-all break-all">{depositReference}</p>
+                        </div>
                         {manualBankInfo && (manualBankInfo.bank_name || manualBankInfo.account_number) ? (
                           <div className="text-[11px] sm:text-xs text-text-secondary font-mono min-w-0 space-y-2">
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1.5">
@@ -1327,19 +1393,20 @@ function WalletPageContent() {
                       </div>
                       <div className="space-y-1 min-w-0">
                         <label className="text-xs text-text-secondary">
-                          Transaction / reference ID <span className="text-red-400">*</span>
+                          Reference / transaction ID <span className="text-red-400">*</span>
+                          <span className="text-text-tertiary font-normal"> — pre-filled with your payment reference; you can add your bank UTR too</span>
                         </label>
                         <input
                           type="text"
                           value={depositTxId}
                           onChange={(e) => setDepositTxId(e.target.value)}
-                          placeholder="UTR or reference from your bank app"
+                          placeholder="Payment reference (and optional bank UTR)"
                           className="w-full px-4 py-3 rounded-xl border border-border-primary bg-bg-secondary text-text-primary placeholder:text-text-tertiary outline-none focus:border-accent/50 font-mono text-sm"
                         />
                       </div>
                       <div className="space-y-1 min-w-0">
                         <label className="text-xs text-text-secondary">
-                          Payment screenshot <span className="text-red-400">*</span>
+                          Payment screenshot <span className="text-text-tertiary font-normal">(optional)</span>
                         </label>
                         <label
                           className={clsx(

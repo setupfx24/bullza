@@ -28,7 +28,7 @@ from packages.common.src.auth import (
 logger = logging.getLogger("auth_service")
 
 DEMO_SHARED_EMAIL = "demo@swisdex.com"
-DEMO_STARTING_BALANCE = Decimal("10000")
+DEMO_STARTING_BALANCE = Decimal("1000")
 
 _rate_buckets: dict[str, list[float]] = {}
 

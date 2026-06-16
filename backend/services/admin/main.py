@@ -106,6 +106,18 @@ async def _apply_startup_ddl():
             await conn.execute(text(
                 "ALTER TABLE ib_profiles ADD COLUMN IF NOT EXISTS tier_override VARCHAR(40)"
             ))
+            # notifications.type CHECK was too narrow — type='bonus' (and
+            # others) violated it and 500'd features like Fixed-Return bonus.
+            # Drop it; type is validated in app code (migration 0075).
+            await conn.execute(text(
+                "ALTER TABLE notifications DROP CONSTRAINT IF EXISTS notifications_type_check"
+            ))
+            # employees.role CHECK predated rm/deposit_manager/withdrawal_manager
+            # — creating those employees 500'd. Role is validated in app code
+            # (employee_service.VALID_EMPLOYEE_ROLES). Drop it (migration 0076).
+            await conn.execute(text(
+                "ALTER TABLE employees DROP CONSTRAINT IF EXISTS employees_role_check"
+            ))
     except Exception as e:
         logger.warning("startup DDL skipped: %s", e)
 

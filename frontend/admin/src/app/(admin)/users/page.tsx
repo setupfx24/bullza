@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { adminApi } from '@/lib/api';
+import DateField from '@/components/ui/DateField';
 import toast from 'react-hot-toast';
 import Link from 'next/link';
 import {
@@ -603,21 +604,9 @@ export default function UsersPage() {
                 </button>
               ))}
               <span className="mx-1 text-text-tertiary text-xxs">|</span>
-              <input
-                type="date"
-                value={dateFrom}
-                max={dateTo || undefined}
-                onChange={(e) => { setDateFrom(e.target.value); setActiveDatePreset('custom'); setPage(1); }}
-                className="px-2 py-1 rounded-md text-xs bg-bg-input border border-border-primary text-text-primary"
-              />
+              <DateField value={dateFrom} max={dateTo || undefined} onChange={(v) => { setDateFrom(v); setActiveDatePreset('custom'); setPage(1); }} />
               <span className="text-xxs text-text-tertiary">to</span>
-              <input
-                type="date"
-                value={dateTo}
-                min={dateFrom || undefined}
-                onChange={(e) => { setDateTo(e.target.value); setActiveDatePreset('custom'); setPage(1); }}
-                className="px-2 py-1 rounded-md text-xs bg-bg-input border border-border-primary text-text-primary"
-              />
+              <DateField value={dateTo} min={dateFrom || undefined} onChange={(v) => { setDateTo(v); setActiveDatePreset('custom'); setPage(1); }} />
             </div>
           </div>
         </div>
@@ -795,6 +784,15 @@ export default function UsersPage() {
       <Modal open={isFundAction(modalType)} onClose={closeModal} title={modalType && isFundAction(modalType) ? `${FUND_LABELS[modalType]} — ${modalUser?.name}` : ''}>
         <div className="space-y-4">
 
+          {/* Amount FIRST so it's visible immediately — no scrolling needed. */}
+          <div>
+            <label className="block text-xs font-medium text-text-tertiary mb-1.5">Amount (USD)</label>
+            <div className="relative">
+              <DollarSign size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-text-tertiary" />
+              <input type="number" min="0" step="0.01" autoFocus value={modalAmount} onChange={e => setModalAmount(e.target.value)} placeholder="0.00" className="w-full pl-11 pr-4 py-3 text-sm bg-bg-input border border-border-primary rounded-lg font-mono tabular-nums placeholder:text-text-tertiary focus:border-buy transition-fast" />
+            </div>
+          </div>
+
           {/* Add Fund: goes to Main Wallet — inform admin */}
           {modalType === 'add-fund' && (
             <div className="p-3.5 rounded-lg bg-buy/10 border border-buy/25 flex items-start gap-2.5">
@@ -873,13 +871,6 @@ export default function UsersPage() {
             </div>
           )}
 
-          <div>
-            <label className="block text-xs font-medium text-text-tertiary mb-1.5">Amount (USD)</label>
-            <div className="relative">
-              <DollarSign size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-text-tertiary" />
-              <input type="number" min="0" step="0.01" value={modalAmount} onChange={e => setModalAmount(e.target.value)} placeholder="0.00" className="w-full pl-11 pr-4 py-3 text-sm bg-bg-input border border-border-primary rounded-lg font-mono tabular-nums placeholder:text-text-tertiary focus:border-buy transition-fast" />
-            </div>
-          </div>
           <div>
             <label className="block text-xs font-medium text-text-tertiary mb-1.5">Reason</label>
             <textarea value={modalReason} onChange={e => setModalReason(e.target.value)} rows={2} placeholder="Optional reason..." className="w-full px-4 py-3 text-sm bg-bg-input border border-border-primary rounded-lg placeholder:text-text-tertiary focus:border-buy transition-fast resize-none" />

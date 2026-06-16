@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { cn } from '@/lib/utils';
 import { adminApi, getAdminApiBase } from '@/lib/api';
+import DateField from '@/components/ui/DateField';
 import toast from 'react-hot-toast';
 import { Check, X, Loader2, FileText, Eye, AlertCircle } from 'lucide-react';
 
@@ -195,13 +196,9 @@ export default function KYCPage() {
             {/* Custom date range (filters by user signup date) */}
             <div className="flex items-center gap-1.5 pr-1">
               <span className="text-xxs text-text-tertiary">From</span>
-              <input type="date" value={dateFrom} max={dateTo || undefined}
-                onChange={(e) => setDateFrom(e.target.value)}
-                className="text-xs py-1 px-2 bg-bg-input border border-border-primary rounded-md text-text-primary" />
+              <DateField value={dateFrom} max={dateTo || undefined} onChange={setDateFrom} />
               <span className="text-xxs text-text-tertiary">To</span>
-              <input type="date" value={dateTo} min={dateFrom || undefined}
-                onChange={(e) => setDateTo(e.target.value)}
-                className="text-xs py-1 px-2 bg-bg-input border border-border-primary rounded-md text-text-primary" />
+              <DateField value={dateTo} min={dateFrom || undefined} onChange={setDateTo} />
               {(dateFrom || dateTo) && (
                 <button type="button" onClick={() => { setDateFrom(''); setDateTo(''); }}
                   className="text-xxs text-text-tertiary hover:text-text-primary underline">Clear</button>

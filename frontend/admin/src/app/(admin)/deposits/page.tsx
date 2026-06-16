@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { cn } from '@/lib/utils';
 import { adminApi, getAdminApiBase } from '@/lib/api';
+import DateField from '@/components/ui/DateField';
 import toast from 'react-hot-toast';
 import {
   ArrowDownCircle,
@@ -370,11 +371,24 @@ export default function DepositsPage() {
           }
           verified = v;
         }
-        await adminApi.post(`${basePath}/approve`, {
+        // Every deposit/withdrawal approval now needs a 2nd super-admin
+        // sign-off (any amount). The backend returns HTTP 202 with
+        // detail.code='approval_required' on the first (authority-admin)
+        // approval — the money is NOT moved yet; a super admin must approve
+        // it in /approvals. adminApi treats 202 as success and returns the
+        // body, so we branch on the code.
+        const resp: any = await adminApi.post(`${basePath}/approve`, {
           note: actionNote.trim() || undefined,
           verified_amount: verified,
         });
-        toast.success('Approved successfully');
+        if (resp?.detail?.code === 'approval_required') {
+          toast.success(
+            'Sent for super-admin approval. It will be credited once a super admin approves it in /approvals.',
+            { duration: 6000 },
+          );
+        } else {
+          toast.success('Approved successfully');
+        }
       } else {
         await adminApi.post(`${basePath}/reject`, {
           reason: actionReason.trim(),
@@ -439,21 +453,9 @@ export default function DepositsPage() {
               {/* Custom date range — applies to all tabs (filters created_at) */}
               <div className="flex items-center gap-1.5">
                 <span className="text-xxs text-text-tertiary">From</span>
-                <input
-                  type="date"
-                  value={dateFrom}
-                  max={dateTo || undefined}
-                  onChange={(e) => setDateFrom(e.target.value)}
-                  className="text-xs py-1 px-2 bg-bg-input border border-border-primary rounded-md text-text-primary"
-                />
+                <DateField value={dateFrom} max={dateTo || undefined} onChange={setDateFrom} />
                 <span className="text-xxs text-text-tertiary">To</span>
-                <input
-                  type="date"
-                  value={dateTo}
-                  min={dateFrom || undefined}
-                  onChange={(e) => setDateTo(e.target.value)}
-                  className="text-xs py-1 px-2 bg-bg-input border border-border-primary rounded-md text-text-primary"
-                />
+                <DateField value={dateTo} min={dateFrom || undefined} onChange={setDateTo} />
                 {(dateFrom || dateTo) && (
                   <button
                     type="button"

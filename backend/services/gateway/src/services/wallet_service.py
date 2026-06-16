@@ -448,7 +448,7 @@ async def create_manual_deposit(
     account_id: UUID | None,
     amount: Decimal,
     transaction_id: str,
-    file: UploadFile,
+    file: UploadFile | None,
     db: AsyncSession,
     bonus_code: str | None = None,
 ) -> dict:
@@ -483,40 +483,45 @@ async def create_manual_deposit(
         if not account:
             raise HTTPException(status_code=404, detail="Account not found")
 
-    if not file.filename:
-        raise HTTPException(status_code=400, detail="Payment screenshot or proof file is required")
-    suffix = Path(file.filename).suffix.lower()
-    if suffix not in DEPOSIT_PROOF_EXT:
-        raise HTTPException(status_code=400, detail="Allowed file types: JPG, PNG, PDF, WEBP")
-    content = await file.read()
-    if len(content) > MAX_PROOF_BYTES:
-        raise HTTPException(status_code=400, detail="File too large (max 10 MB)")
+    # Proof upload is OPTIONAL (XM-style): finance matches the unique
+    # reference (transaction_id) against the bank statement. When a file IS
+    # provided we still fully validate it (type + size + magic-bytes).
+    screenshot_url = None
+    if file is not None and getattr(file, "filename", None):
+        suffix = Path(file.filename).suffix.lower()
+        if suffix not in DEPOSIT_PROOF_EXT:
+            raise HTTPException(status_code=400, detail="Allowed file types: JPG, PNG, PDF, WEBP")
+        content = await file.read()
+        if len(content) > MAX_PROOF_BYTES:
+            raise HTTPException(status_code=400, detail="File too large (max 10 MB)")
 
-    # Magic-byte sniffing — extension + Content-Type are attacker-controlled.
-    # Rejects polyglots and bypass-via-spoofed-MIME (e.g. .png with .exe bytes).
-    from packages.common.src.upload_safety import assert_matches, UnsafeUploadError
-    try:
-        kind = assert_matches(content, declared_suffix=suffix, allowed_suffixes=DEPOSIT_PROOF_EXT)
-    except UnsafeUploadError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    suffix = kind.suffix  # use the canonical extension going forward
+        # Magic-byte sniffing — extension + Content-Type are attacker-controlled.
+        # Rejects polyglots and bypass-via-spoofed-MIME (e.g. .png with .exe bytes).
+        from packages.common.src.upload_safety import assert_matches, UnsafeUploadError
+        try:
+            kind = assert_matches(content, declared_suffix=suffix, allowed_suffixes=DEPOSIT_PROOF_EXT)
+        except UnsafeUploadError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+        suffix = kind.suffix  # use the canonical extension going forward
+
+        try:
+            user_dir = safe_join_under_base(_wallet_upload_root(), "deposits", str(user_id))
+        except PathTraversalError:
+            raise HTTPException(status_code=400, detail="Invalid upload path")
+        user_dir.mkdir(parents=True, exist_ok=True)
+        safe = f"deposit_{uuid_lib.uuid4().hex}{suffix}"
+        try:
+            out_path = safe_join_under_base(user_dir, safe)
+        except PathTraversalError:
+            raise HTTPException(status_code=400, detail="Invalid file path")
+        try:
+            out_path.write_bytes(content)
+        except OSError as e:
+            logger.exception("manual deposit write failed: %s", out_path)
+            raise HTTPException(status_code=503, detail="Could not save file") from e
+        screenshot_url = str(out_path.resolve())
 
     bank = await _get_bank_for_tier(amount, db)
-    try:
-        user_dir = safe_join_under_base(_wallet_upload_root(), "deposits", str(user_id))
-    except PathTraversalError:
-        raise HTTPException(status_code=400, detail="Invalid upload path")
-    user_dir.mkdir(parents=True, exist_ok=True)
-    safe = f"deposit_{uuid_lib.uuid4().hex}{suffix}"
-    try:
-        out_path = safe_join_under_base(user_dir, safe)
-    except PathTraversalError:
-        raise HTTPException(status_code=400, detail="Invalid file path")
-    try:
-        out_path.write_bytes(content)
-    except OSError as e:
-        logger.exception("manual deposit write failed: %s", out_path)
-        raise HTTPException(status_code=503, detail="Could not save file") from e
 
     _bonus_code_clean = (bonus_code or "").strip().upper() or None
     deposit = Deposit(
@@ -525,7 +530,7 @@ async def create_manual_deposit(
         amount=amount,
         method="manual",
         transaction_id=tid[:100],
-        screenshot_url=str(out_path.resolve()),
+        screenshot_url=screenshot_url,
         bank_account_id=bank.id if bank else None,
         status="pending",
         bonus_code=_bonus_code_clean,
@@ -1829,6 +1834,30 @@ async def get_deposit_bank_details(amount: Decimal | None, db: AsyncSession) -> 
     if bank.qr_code_url:
         resp["qr_code_url"] = bank.qr_code_url
     return resp
+
+
+async def list_deposit_banks(amount: Decimal | None, db: AsyncSession) -> dict:
+    """All active bank accounts for the XM-style deposit picker. When `amount`
+    is given, only banks whose [min,max] tier covers it are returned."""
+    q = select(BankAccount).where(BankAccount.is_active == True)
+    if amount is not None and amount > 0:
+        q = q.where(BankAccount.min_amount <= amount, BankAccount.max_amount >= amount)
+    q = q.order_by(BankAccount.rotation_order, BankAccount.tier)
+    rows = (await db.execute(q)).scalars().all()
+    banks = []
+    for b in rows:
+        banks.append({
+            "id": str(b.id),
+            "bank_name": b.bank_name,
+            "account_holder": b.account_name,
+            "account_number": b.account_number,
+            "ifsc_code": b.ifsc_code,
+            "upi_id": b.upi_id,
+            "qr_code_url": b.qr_code_url,
+            "min_amount": float(b.min_amount or 0),
+            "max_amount": float(b.max_amount or 0),
+        })
+    return {"banks": banks}
 
 
 async def get_bank_info(amount: Decimal, db: AsyncSession) -> dict:

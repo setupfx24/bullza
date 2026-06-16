@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { adminApi } from '@/lib/api';
 import { cn } from '@/lib/utils';
+import DateField from '@/components/ui/DateField';
 import { Loader2, Plus, Pencil, RefreshCw, Gift } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -789,11 +790,11 @@ export default function BonusPage() {
                 </div>
                 <div>
                   <label className="block text-xxs text-text-tertiary mb-1">Starts At</label>
-                  <input type="date" value={form.starts_at} onChange={(e) => updateForm('starts_at', e.target.value)} className="w-full text-xs py-1.5 px-2 bg-bg-input border border-border-primary rounded-md" />
+                  <DateField value={form.starts_at as string} onChange={(v) => updateForm('starts_at', v)} className="w-full" />
                 </div>
                 <div>
                   <label className="block text-xxs text-text-tertiary mb-1">Expires At</label>
-                  <input type="date" value={form.expires_at} onChange={(e) => updateForm('expires_at', e.target.value)} className="w-full text-xs py-1.5 px-2 bg-bg-input border border-border-primary rounded-md" />
+                  <DateField value={form.expires_at as string} min={(form.starts_at as string) || undefined} onChange={(v) => updateForm('expires_at', v)} className="w-full" />
                 </div>
               </div>
 

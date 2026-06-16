@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { cn } from '@/lib/utils';
 import { adminApi } from '@/lib/api';
+import DateField from '@/components/ui/DateField';
 import toast from 'react-hot-toast';
 import { ChevronDown, ChevronLeft, ChevronRight, Loader2, ScrollText } from 'lucide-react';
 
@@ -125,21 +126,11 @@ export default function AuditLogsPage() {
           </div>
           <div>
             <span className="text-xxs text-text-tertiary block mb-1">From</span>
-            <input
-              type="date"
-              value={dateFrom}
-              onChange={(e) => setDateFrom(e.target.value)}
-              className="text-xs py-1.5 px-2 bg-bg-input border border-border-primary rounded-md text-text-primary"
-            />
+            <DateField value={dateFrom} max={dateTo || undefined} onChange={setDateFrom} />
           </div>
           <div>
             <span className="text-xxs text-text-tertiary block mb-1">To</span>
-            <input
-              type="date"
-              value={dateTo}
-              onChange={(e) => setDateTo(e.target.value)}
-              className="text-xs py-1.5 px-2 bg-bg-input border border-border-primary rounded-md text-text-primary"
-            />
+            <DateField value={dateTo} min={dateFrom || undefined} onChange={setDateTo} />
           </div>
           <form onSubmit={applyUserFilter} className="flex items-end gap-2">
             <div>
