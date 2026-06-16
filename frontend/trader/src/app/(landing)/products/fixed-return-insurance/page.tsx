@@ -118,12 +118,8 @@ export default function FixedReturnInsurancePage() {
             performance-linked. It is, however, subject to the underwriter's solvency — see the risk disclosure.
           </FaqItem>
           <FaqItem q="Can I withdraw early?">
-            12-month and 24-month plans allow early withdrawal after an initial lock-up. An early-withdrawal
-            fee applies and forfeits the yield earned to date.
-          </FaqItem>
-          <FaqItem q="How are returns paid?">
-            For 12- and 24-month plans, returns are paid quarterly into your SwisDex wallet, with the
-            principal returned at maturity. The 6-month plan pays principal + yield at maturity.
+            No — the lock-in is 2 years. If you withdraw before maturity, an early-withdrawal
+            penalty will be applied and the yield earned to date is forfeited.
           </FaqItem>
           <FaqItem q="Do I need to be a SwisDex trading client to apply?">
             No. The plans are open to non-trading investors. KYC and AML verification is still required.
