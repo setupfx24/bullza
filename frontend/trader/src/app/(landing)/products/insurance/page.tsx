@@ -16,7 +16,7 @@ const FEATURES = [
   {
     Icon: ShieldCheck,
     title: 'On-Chain Policy Backing',
-    body: 'Every covered position is policy-backed by an on-chain insurance contract. No paperwork, no claims queue.',
+    body: 'Every covered position is backed by an on-chain insurance contract. Eligible losses are claimable — once approved, the payout is credited to your account as tradable funds.',
   },
   {
     Icon: Zap,
@@ -25,8 +25,8 @@ const FEATURES = [
   },
   {
     Icon: Lock,
-    title: 'Automatic Payouts',
-    body: 'If your covered trade closes at a loss within the policy terms, the refund is credited to your wallet the moment the position closes.',
+    title: 'Claimable Tradable Credit',
+    body: 'If your covered trade closes at a loss within the policy terms, file a claim from your account. Once approved the payout is issued as a credit — tradable only (usable on new positions), not directly withdrawable as cash.',
   },
   {
     Icon: ScrollText,
@@ -60,9 +60,10 @@ export default function InsurancePage() {
             Protect every <span className="text-primary">position</span>.
           </h2>
           <p className="mt-4 text-foreground/70 text-sm sm:text-base leading-relaxed">
-            Activate Insurance on the order ticket and earn an automatic refund if the trade closes
-            at a loss within the policy terms. On-chain, transparent, and live the moment you fund
-            the premium — no claims queue.
+            Activate Insurance on the order ticket and, if your covered trade closes at a loss
+            within the policy terms, file a claim — once approved, the payout is credited to your
+            account as tradable funds. On-chain, transparent, and live the moment you fund the
+            premium.
           </p>
         </div>
 

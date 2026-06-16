@@ -1,143 +1,16 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
 import {
-  ArrowUpRight, Gift, Wallet, CheckCircle2, Star, Sparkles,
+  ArrowUpRight, Gift, Wallet, CheckCircle2, Sparkles,
   Zap, ShieldCheck, Clock, ChevronDown,
 } from 'lucide-react';
 import { BannerPlaceholder } from '@/swisdex/components/BannerPlaceholder';
 
 const SIGNUP_HREF = '/auth/register';
 
-/** Display shape — what each card renders. */
-type Tier = {
-  range: string;
-  percent: string;
-  cap: string;
-  features: string[];
-  cta: string;
-  popular?: boolean;
-  code?: string | null;
-};
-
-/** Wire shape — what /api/v1/bonus/tiers returns. */
-type ApiTier = {
-  id: string;
-  name: string;
-  min_deposit: number;
-  max_deposit: number | null;
-  percentage: number | null;
-  fixed_amount: number | null;
-  max_bonus: number | null;
-  perks: string[];
-  is_popular: boolean;
-  cta_label: string | null;
-  tagline: string | null;
-  promo_code?: string | null;
-};
-
-const fmtUsd = (n: number) =>
-  n >= 1000 ? `$${(n / 1000).toFixed(n % 1000 === 0 ? 0 : 1).replace('.0', '')},000`.replace('$,', '$1,').replace('$1,000', '$1,000')
-    : `$${Math.round(n).toLocaleString('en-US')}`;
-
-/** ApiTier → display Tier so admin-driven rows render with the same look
- *  as the legacy hardcoded array. min_deposit is auto-rounded to whole
- *  dollars for the "$X – $Y" label; cents stay on the server. */
-function adaptApi(t: ApiTier): Tier {
-  const lo = `$${Math.round(t.min_deposit).toLocaleString('en-US')}`;
-  const hi = t.max_deposit == null ? '+' : ` – $${Math.round(t.max_deposit).toLocaleString('en-US')}`;
-  const range = t.max_deposit == null ? `${lo}+` : `${lo}${hi}`;
-
-  const percent = t.percentage != null
-    ? `${Number.isInteger(t.percentage) ? t.percentage : t.percentage.toFixed(1)}%`
-    : t.fixed_amount != null
-      ? `${fmtUsd(t.fixed_amount)}`
-      : '—';
-
-  const cap = t.max_bonus != null
-    ? `Up to ${fmtUsd(t.max_bonus)}`
-    : t.fixed_amount != null
-      ? 'Flat bonus'
-      : '';
-
-  const cta = t.cta_label && t.cta_label.trim() !== ''
-    ? t.cta_label
-    : `Deposit ${lo}`;
-
-  return {
-    range,
-    percent,
-    cap,
-    features: t.perks?.length ? t.perks : [],
-    cta,
-    popular: t.is_popular,
-    code: t.promo_code || null,
-  };
-}
-
-// Fallback tiers — bonus matches dollar-for-dollar up to a $200 ceiling.
-// Render this when the admin API is unreachable so the page never goes blank.
-const FALLBACK_TIERS: Tier[] = [
-  {
-    range: '$50 – $99',
-    percent: '100%',
-    cap: 'Up to $99',
-    features: [
-      'Auto-credited within minutes',
-      'Tradeable on all instruments',
-      'Email + chat support',
-    ],
-    cta: 'Deposit $50',
-  },
-  {
-    range: '$100 – $199',
-    percent: '100%',
-    cap: 'Up to $199',
-    features: [
-      'Auto-credited within minutes',
-      'Tradeable on all instruments',
-      'Priority chat support',
-      'Free risk-management webinar',
-    ],
-    cta: 'Deposit $100',
-  },
-  {
-    range: '$200+',
-    percent: '100%',
-    cap: 'Up to $200',
-    popular: true,
-    features: [
-      'Auto-credited within minutes',
-      'Tradeable on all instruments',
-      'Dedicated account manager',
-    ],
-    cta: 'Claim Full $200',
-  },
-];
-
 export default function BonusPage() {
-  // Admin-managed tiers (from /api/v1/bonus/tiers). Falls back to the
-  // hardcoded list if the API is empty or down so the page never goes
-  // blank on a fresh install or a deploy outage.
-  const [tiers, setTiers] = useState<Tier[]>(FALLBACK_TIERS);
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await fetch('/api/v1/bonus/tiers', { credentials: 'omit' });
-        if (!res.ok) return;
-        const data: { tiers?: ApiTier[] } = await res.json();
-        if (cancelled) return;
-        const list = (data.tiers || []).map(adaptApi);
-        if (list.length > 0) setTiers(list);
-      } catch {
-        /* keep fallback — public marketing page must never error out */
-      }
-    })();
-    return () => { cancelled = true; };
-  }, []);
-
   return (
     <main className="min-h-screen bg-background">
       <BannerPlaceholder
@@ -185,8 +58,8 @@ export default function BonusPage() {
               <Link href={SIGNUP_HREF} className="inline-flex items-center gap-2 rounded-full bg-primary text-white px-6 py-3 text-sm font-semibold uppercase tracking-wider hover:opacity-90">
                 Claim Bonus <ArrowUpRight className="size-4" />
               </Link>
-              <Link href="#tiers" className="inline-flex items-center gap-2 rounded-full liquid-glass px-6 py-3 text-sm font-semibold uppercase tracking-wider hover:bg-foreground/10">
-                See Tiers
+              <Link href="#faq" className="inline-flex items-center gap-2 rounded-full liquid-glass px-6 py-3 text-sm font-semibold uppercase tracking-wider hover:bg-foreground/10">
+                See FAQ
               </Link>
             </div>
           </div>
@@ -201,81 +74,9 @@ export default function BonusPage() {
         </div>
       </section>
 
-      {/* Tiers */}
-      <section id="tiers" className="mx-auto max-w-[1200px] px-[var(--gutter)] py-12 sm:py-16">
-        <div className="text-center mb-10">
-          <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full liquid-glass text-[11px] uppercase tracking-[0.16em] text-foreground/70">
-            <span className="size-1.5 rounded-full bg-primary" /> Three Bonus Tiers
-          </span>
-          <h2 className="mt-5 font-display uppercase text-2xl sm:text-3xl md:text-4xl tracking-tight">Pick Your Tier</h2>
-          <p className="mt-3 text-foreground/65 max-w-xl mx-auto text-sm sm:text-base">
-            Your bonus is determined automatically by the size of your first deposit. No code, no opt-in — it just lands.
-          </p>
-        </div>
-
-        <div className="grid md:grid-cols-3 gap-5">
-          {tiers.map((t) => (
-            <article
-              key={t.range}
-              className={`relative rounded-3xl p-6 sm:p-8 flex flex-col h-full ${
-                t.popular ? 'liquid-glass-strong ring-1 ring-primary/40' : 'liquid-glass'
-              }`}
-            >
-              {/* Badge sits as a normal flex child so the article's
-                  overflow:hidden (used for the gradient border) doesn't
-                  clip it. */}
-              {t.popular && (
-                <span className="self-center mb-4 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary text-white text-[10px] uppercase tracking-[0.18em] font-bold whitespace-nowrap">
-                  <Star className="size-3" /> Most Popular
-                </span>
-              )}
-
-              <div className="text-[11px] uppercase tracking-[0.16em] text-foreground/55">Deposit</div>
-              <div className="mt-1 font-display text-xl text-foreground tabular-nums">{t.range}</div>
-
-              <div className="mt-6 pb-5 border-b border-foreground/10">
-                <div className="text-[11px] uppercase tracking-[0.16em] text-foreground/55">You Get</div>
-                <div className="mt-1 flex items-baseline gap-2">
-                  <span className="font-display text-5xl text-primary tabular-nums">{t.percent}</span>
-                  <span className="text-xs text-foreground/55">bonus</span>
-                </div>
-                <div className="mt-1 text-[11px] uppercase tracking-[0.16em] text-primary/80">{t.cap}</div>
-              </div>
-
-              {t.code && (
-                <div className="mt-4 rounded-xl bg-primary/10 border border-primary/30 px-3 py-2 text-center">
-                  <div className="text-[10px] uppercase tracking-[0.16em] text-foreground/55">Use promo code</div>
-                  <div className="font-display text-lg text-primary tracking-widest tabular-nums">{t.code}</div>
-                </div>
-              )}
-
-              <ul className="mt-5 space-y-2.5 text-sm text-foreground/75 flex-1">
-                {t.features.map((f) => (
-                  <li key={f} className="flex items-start gap-2.5">
-                    <CheckCircle2 className="size-4 text-primary shrink-0 mt-0.5" />
-                    <span>{f}</span>
-                  </li>
-                ))}
-              </ul>
-
-              <Link
-                href={SIGNUP_HREF}
-                className={`mt-7 inline-flex items-center justify-center gap-2 rounded-full px-5 py-3 text-sm font-semibold uppercase tracking-wider transition ${
-                  t.popular
-                    ? 'bg-primary text-white hover:opacity-90'
-                    : 'liquid-glass hover:bg-foreground/10'
-                }`}
-              >
-                {t.cta} <ArrowUpRight className="size-4" />
-              </Link>
-            </article>
-          ))}
-        </div>
-
-        <p className="mt-6 text-center text-xs text-foreground/45 max-w-2xl mx-auto leading-relaxed">
-          Bonus is credited as tradeable equity on your first qualifying deposit only. Standard programme terms apply.
-        </p>
-      </section>
+      {/* "Pick Your Tier" section removed per client request — the
+          welcome bonus rules are explained inline in the intro callout
+          and FAQ; visitors land on /auth/register from the page CTA. */}
 
       {/* How it works */}
       <section className="mx-auto max-w-[1200px] px-[var(--gutter)] py-12 sm:py-16">
