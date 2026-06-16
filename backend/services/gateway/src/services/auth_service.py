@@ -676,11 +676,12 @@ async def register_user(
         role="user",
         status="active",
         kyc_status="pending",
-        # New email-password sign-ups must verify before they can log in.
-        # Google / wallet sign-ups stay verified=True (third-party already
-        # confirmed ownership). Migration 0038 backfills True for existing
-        # users so this gate doesn't lock anyone out on deploy.
-        email_verified=False,
+        # Client 2026-06-16: AUTO-VERIFY on register so users can sign in
+        # immediately (no more 403 "email_unverified"). The verification email
+        # is still sent below (welcome + confirm link) but it no longer BLOCKS
+        # sign-in. Clicking the link later is idempotent (already verified).
+        email_verified=True,
+        email_verified_at=datetime.now(timezone.utc),
     )
     db.add(user)
     await db.flush()
@@ -726,16 +727,14 @@ async def register_user(
 
     await db.commit()
 
-    # Email/password signups do NOT receive a session cookie here — the user
-    # must click the verify link in their inbox, which is the ONLY path that
-    # issues cookies + lets them into the app. This is the email-verification
-    # gate the platform relies on; previously the cookies-on-register flow
-    # let traders skip verification entirely (regression closed 2026-05-12).
+    # Still send the verification/welcome email (client 2026-06-16 wants the
+    # email to go out), but the account is already verified so it does NOT
+    # block sign-in — the user can log in right away.
     _send_verify_email(user, request)
     return {
         "email": user.email,
         "verification_sent": True,
-        "message": "Account created. Check your email to verify and sign in.",
+        "message": "Account created. You can sign in now.",
     }
 
 
