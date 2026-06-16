@@ -31,6 +31,7 @@ ADMIN_COOKIE_NAME = "swisdex_admin"
 #   settings.manage     — edit platform/system settings (withdrawal flags…)
 #   fixed_return.manage — grant/approve fixed-return locks (payouts)
 #   insurance.manage    — edit insurance fee/payout economics
+#   funds.approve       — approve/reject a 2nd-admin financial sign-off
 EMPLOYEE_ROLE_PERMISSIONS = {
     "super_admin": {"*"},
     "trade_manager": {
@@ -51,6 +52,13 @@ EMPLOYEE_ROLE_PERMISSIONS = {
         "banks.view", "banks.create", "banks.update",
         "ib.view",
         "kyc.view", "kyc.manage",
+        # Finance admins clear RM funding requests (the two-admin approve →
+        # credit flow) and assign users to RMs.
+        "rm.manage", "rm.assign",
+        # Dual-approval (4-eyes) sign-off. Two finance admins approve each
+        # other's fund/withdrawal requests; the "can't approve your own"
+        # rule still blocks self-approval, so the control stays intact.
+        "funds.approve",
     },
     "risk_manager": {
         "trades.view", "positions.view", "users.view",
@@ -62,6 +70,24 @@ EMPLOYEE_ROLE_PERMISSIONS = {
         "banners.view", "banners.create", "banners.update", "banners.delete",
         "bonus.view", "bonus.create", "bonus.update",
         "ib.view", "ib.manage",
+    },
+    # Relationship Manager — a limited role that only sees its own assigned
+    # users and can raise funding requests (with proof) for them. It cannot
+    # approve/credit (that's rm.manage, held by finance/super_admin).
+    "rm": {
+        # Deliberately NOT users.view — an RM must only ever see the users
+        # assigned to them, which the /rm endpoints scope by assigned_rm_id.
+        "rm.view", "rm.request",
+    },
+    # Split finance duties — an employee can be given ONLY deposits or ONLY
+    # withdrawals (the combined "finance" role still exists for both).
+    "deposit_manager": {
+        "deposits.view", "deposits.approve", "deposits.reject",
+        "users.view", "kyc.view",
+    },
+    "withdrawal_manager": {
+        "withdrawals.view", "withdrawals.approve", "withdrawals.reject",
+        "users.view",
     },
 }
 

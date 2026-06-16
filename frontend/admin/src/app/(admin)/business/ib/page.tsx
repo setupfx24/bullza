@@ -30,6 +30,7 @@ interface IBAgent {
   commission_plan_id?: string;
   custom_commission_per_lot?: number;
   custom_commission_per_trade?: number;
+  tier_override?: string | null;
   created_at: string;
 }
 
@@ -102,6 +103,7 @@ export default function IBPage() {
   const [commissionPlan, setCommissionPlan] = useState('default');
   const [customPerLot, setCustomPerLot] = useState('');
   const [customPerTrade, setCustomPerTrade] = useState('');
+  const [tierOverride, setTierOverride] = useState(''); // '' = Auto
   const [rejectReason, setRejectReason] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
@@ -347,6 +349,8 @@ export default function IBPage() {
         // Default — clear everything
         body.commission_plan_id = null;
       }
+      // Manual tier override — always sent so '' clears it back to Auto.
+      body.tier_override = tierOverride;
       await adminApi.put(`/business/ib/agents/${editCommissionModal.id}/commission`, body);
       toast.success('Commission updated successfully');
       setEditCommissionModal(null);
@@ -759,7 +763,7 @@ export default function IBPage() {
                             <td className="px-4 py-2.5 text-right">
                               <div className="flex items-center justify-end gap-2">
                                 <button
-                                  onClick={() => { setEditCommissionModal(agent); setCommissionPlan(agent.commission_plan_id || 'default'); setCustomPerLot(agent.custom_commission_per_lot?.toString() || ''); setCustomPerTrade(agent.custom_commission_per_trade?.toString() || ''); }}
+                                  onClick={() => { setEditCommissionModal(agent); setCommissionPlan(agent.commission_plan_id || 'default'); setCustomPerLot(agent.custom_commission_per_lot?.toString() || ''); setCustomPerTrade(agent.custom_commission_per_trade?.toString() || ''); setTierOverride(agent.tier_override || ''); }}
                                   className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xxs font-medium bg-primary/15 text-primary border border-primary/30 hover:bg-primary/25 transition-fast"
                                 >
                                   <Edit size={12} /> Edit
@@ -997,6 +1001,17 @@ export default function IBPage() {
                   ))}
                   <option value="custom">Custom Rates</option>
                 </select>
+              </div>
+              <div>
+                <label className="block text-xxs text-text-tertiary mb-1">Tier override</label>
+                <select value={tierOverride} onChange={(e) => setTierOverride(e.target.value)} className="w-full text-xs py-1.5 px-2 bg-bg-input border border-border-primary rounded-md">
+                  <option value="">Auto (by activations / deposits)</option>
+                  <option value="Bronze">Bronze</option>
+                  <option value="Silver">Silver</option>
+                  <option value="Gold">Gold</option>
+                  <option value="Platinum">Platinum</option>
+                </select>
+                <p className="text-[10px] text-text-tertiary mt-1">Forces this IB/sub-IB onto a fixed tier rate. A custom per-lot rate above still wins over this.</p>
               </div>
               {commissionPlan === 'custom' && (
                 <>

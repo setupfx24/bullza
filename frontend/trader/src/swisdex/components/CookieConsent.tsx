@@ -1,31 +1,34 @@
 'use client';
 
 /**
- * Cookie consent dialog.
+ * Cookie consent — two surfaces, one preference store.
  *
- * Lifecycle (standard GDPR — dialog shows once, then is suppressed):
- *   1. On the user's FIRST visit (no localStorage entry yet), the full
- *      3-tab dialog opens automatically ~600 ms after first paint.
- *      Centered modal, dark backdrop with blur.
- *   2. The dialog has 3 tabs:
+ * Lifecycle (standard GDPR — surfaces once, then suppressed):
+ *   1. On the user's FIRST visit (no localStorage entry yet), a small
+ *      banner slides up from the BOTTOM of the viewport (~600 ms after
+ *      first paint) with a one-line explainer + 'Manage' / 'Accept All'
+ *      buttons. The banner doesn't block clicks above it.
+ *   2. 'Accept All' on the banner writes consent and dismisses it.
+ *      'Manage' opens the full 3-tab settings modal:
  *        - Change Settings (toggles for promotional / preference cookies;
  *          functional is always-on per the brief).
  *        - What are Cookies? (educational copy).
  *        - Why are Cookies Useful? (educational copy).
- *   3. Saving / accepting writes prefs + an ISO timestamp under
- *      `swisdex_cookie_consent`. The dialog will NOT auto-open again
- *      on subsequent visits — the user is no longer interrupted.
+ *   3. Saving / accepting from EITHER surface writes prefs + an ISO
+ *      timestamp under `swisdex_cookie_consent`. Banner + modal will
+ *      NOT auto-open again on subsequent visits — the user is no
+ *      longer interrupted.
  *   4. Users can revisit the dialog at any time via the footer
  *      'Cookie Settings' link, which calls openCookieSettings(). The
- *      dialog re-opens with the previously saved toggles pre-loaded
- *      so the user can change their mind.
+ *      modal re-opens with the previously saved toggles pre-loaded so
+ *      the user can change their mind.
  *
  * Mounted once in src/app/layout.tsx so it shows on every route.
  */
 
 import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Cookie, X, Check } from 'lucide-react';
+import { Cookie, X, Check, Settings } from 'lucide-react';
 
 const STORAGE_KEY = 'swisdex_cookie_consent';
 
@@ -86,12 +89,11 @@ export function CookieConsent() {
   const [tab, setTab] = useState<Tab>('settings');
   const [prefs, setPrefs] = useState<EditablePrefs>(DEFAULT_PREFS);
 
-  // Show a slim BOTTOM banner (not a centered modal) when no preference
-  // is saved yet — like the consent bars on major financial sites. The
-  // detailed 3-tab dialog never auto-opens; it surfaces only when the
-  // user clicks "Manage cookies" in the banner or the footer link. Once
-  // the user Accepts / Refuses / Saves, the localStorage entry suppresses
-  // the banner on every subsequent visit (no more repeated pop-ups).
+  // Auto-open the bottom banner ONLY when no preference is saved yet.
+  // Once the user clicks Save / Accept All from either the banner or
+  // the modal, the localStorage entry suppresses every subsequent
+  // auto-open — the user can still re-surface the modal via the footer
+  // 'Cookie Settings' link, but the page no longer interrupts them.
   useEffect(() => {
     setMounted(true);
     const existing = readPrefs();
@@ -103,20 +105,20 @@ export function CookieConsent() {
       });
       return;
     }
-    // No saved preference → slide the banner up 600 ms after first paint
-    // so the splash overlay finishes first.
+    // No saved preference → schedule the banner 600 ms after first
+    // paint so the splash overlay finishes first.
     const t = window.setTimeout(() => setShowBanner(true), 600);
     return () => window.clearTimeout(t);
   }, []);
 
-  // Listen for footer/nav-triggered open events (re-open settings modal).
+  // Listen for footer/nav-triggered open events.
   useEffect(() => {
     const handler = () => setShowModal(true);
     window.addEventListener('swisdex:open-cookie-settings', handler);
     return () => window.removeEventListener('swisdex:open-cookie-settings', handler);
   }, []);
 
-  // Lock body scroll while the detailed modal is open.
+  // Lock body scroll while modal open.
   useEffect(() => {
     if (!showModal) return;
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setShowModal(false); };
@@ -133,95 +135,102 @@ export function CookieConsent() {
     const all: EditablePrefs = { functional: true, promotional: true, preference: true };
     setPrefs(all);
     writePrefs(all);
-    setShowModal(false);
     setShowBanner(false);
-  };
-
-  // Refuse = keep only the essential functional cookies (always-on), opt
-  // out of promotional + preference. Persists like Accept so the banner
-  // doesn't return.
-  const refuseAll = () => {
-    const minimal: EditablePrefs = { functional: true, promotional: false, preference: false };
-    setPrefs(minimal);
-    writePrefs(minimal);
     setShowModal(false);
-    setShowBanner(false);
   };
 
   const saveAndClose = () => {
     writePrefs(prefs);
-    setShowModal(false);
     setShowBanner(false);
+    setShowModal(false);
   };
 
-  // Closing the modal via X just hides the modal; the banner stays so the
-  // user still makes an explicit choice (ePrivacy "no implicit consent").
+  // Closing the modal without explicitly saving leaves localStorage
+  // empty — the banner will reappear on the next visit, which is the
+  // ePrivacy "no implicit consent" requirement.
   const dismiss = () => setShowModal(false);
+
+  const openModalFromBanner = () => {
+    setShowBanner(false);
+    setShowModal(true);
+  };
 
   if (!mounted) return null;
 
   return (
     <>
-      {/* Slim bottom consent banner (replaces the auto-opening modal). */}
+      {/* Bottom-fixed banner — first surface on first visit. */}
       <AnimatePresence>
         {showBanner && !showModal && (
           <motion.div
-            initial={{ opacity: 0, y: 24 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 24 }}
-            transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
-            className="fixed inset-x-0 bottom-0 z-[200] p-3 sm:p-4"
-            role="region"
+            initial={{ y: 100, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: 100, opacity: 0 }}
+            transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+            className="fixed bottom-0 left-0 right-0 z-[240]"
+            role="dialog"
             aria-label="Cookie consent"
           >
             <div
-              className="mx-auto max-w-[1200px] rounded-2xl px-4 sm:px-6 py-4 flex flex-col lg:flex-row lg:items-center gap-3 lg:gap-6"
+              className="w-full px-4 sm:px-8 lg:px-12 py-5 sm:py-6 flex flex-col md:flex-row items-start md:items-center gap-4 md:gap-6"
               style={{
-                background: 'linear-gradient(180deg, #0d1014 0%, #07090c 100%)',
-                border: '1px solid rgba(85,166,48,0.35)',
-                boxShadow: '0 20px 60px rgba(0,0,0,0.55)',
+                background: 'linear-gradient(135deg, #0d1014 0%, #050608 100%)',
+                borderTop: '1px solid rgba(85,166,48,0.45)',
+                boxShadow: '0 -10px 40px rgba(0,0,0,0.55)',
               }}
             >
-              <div className="flex items-start gap-3 flex-1 min-w-0">
-                <div
-                  className="size-9 rounded-xl flex items-center justify-center shrink-0"
-                  style={{ background: 'rgba(85,166,48,0.18)', border: '1px solid rgba(85,166,48,0.4)' }}
+              <div
+                className="size-14 shrink-0 rounded-xl flex items-center justify-center"
+                style={{
+                  background: 'rgba(85,166,48,0.18)',
+                  border: '1px solid rgba(85,166,48,0.4)',
+                }}
+              >
+                <Cookie className="size-6" style={{ color: '#55a630' }} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h3
+                  className="font-display uppercase tracking-tight text-base sm:text-lg md:text-xl"
+                  style={{ color: '#ffffff' }}
                 >
-                  <Cookie className="size-4" style={{ color: '#55a630' }} />
-                </div>
-                <p className="text-xs sm:text-sm leading-relaxed" style={{ color: 'rgba(255,255,255,0.75)' }}>
-                  We use cookies to keep SwisDex secure, run essential trading services, and improve your
-                  experience.{' '}
-                  <button
-                    type="button"
-                    onClick={() => setShowModal(true)}
-                    className="underline underline-offset-2 font-semibold"
+                  We use cookies
+                </h3>
+                <p
+                  className="mt-1.5 text-sm sm:text-base leading-relaxed"
+                  style={{ color: 'rgba(255,255,255,0.75)' }}
+                >
+                  Functional cookies keep your session secure. Promotional and preference cookies
+                  are optional. See our{' '}
+                  <a
+                    href="/privacy"
+                    className="underline-offset-2 hover:underline font-semibold"
                     style={{ color: '#55a630' }}
                   >
-                    Manage cookies
-                  </button>
-                  {' · '}
-                  <a href="/terms" className="underline underline-offset-2" style={{ color: 'rgba(255,255,255,0.6)' }}>
-                    Terms of Use
-                  </a>
+                    Privacy Policy
+                  </a>{' '}
+                  for details.
                 </p>
               </div>
-              <div className="flex items-center gap-2 shrink-0 lg:justify-end">
+              <div className="flex items-center gap-3 shrink-0 w-full md:w-auto">
                 <button
                   type="button"
-                  onClick={refuseAll}
-                  className="flex-1 lg:flex-none rounded-full px-5 py-2 text-xs font-semibold uppercase tracking-wider hover:opacity-90 transition-opacity"
-                  style={{ color: 'rgba(255,255,255,0.9)', background: 'transparent', border: '1px solid rgba(255,255,255,0.25)' }}
+                  onClick={openModalFromBanner}
+                  className="flex-1 md:flex-none inline-flex items-center justify-center gap-2 rounded-full px-6 py-3 text-sm font-semibold uppercase tracking-wider hover:opacity-90 transition-opacity"
+                  style={{
+                    color: 'rgba(255,255,255,0.9)',
+                    background: 'transparent',
+                    border: '1px solid rgba(255,255,255,0.2)',
+                  }}
                 >
-                  Refuse
+                  <Settings className="size-4" /> Manage
                 </button>
                 <button
                   type="button"
                   onClick={acceptAll}
-                  className="flex-1 lg:flex-none rounded-full px-5 py-2 text-xs font-semibold uppercase tracking-wider hover:opacity-90 transition-opacity"
+                  className="flex-1 md:flex-none inline-flex items-center justify-center gap-2 rounded-full px-6 py-3 text-sm font-bold uppercase tracking-wider hover:opacity-90 transition-opacity"
                   style={{ background: '#55a630', color: '#ffffff' }}
                 >
-                  Accept
+                  Accept All <Check className="size-4" />
                 </button>
               </div>
             </div>

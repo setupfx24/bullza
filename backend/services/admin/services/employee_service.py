@@ -14,7 +14,8 @@ from packages.common.src.admin_schemas import (
 from dependencies import write_audit_log
 
 VALID_EMPLOYEE_ROLES = [
-    "super_admin", "trade_manager", "support", "finance", "risk_manager", "marketing"
+    "super_admin", "trade_manager", "support", "finance", "risk_manager", "marketing", "rm",
+    "deposit_manager", "withdrawal_manager",
 ]
 
 

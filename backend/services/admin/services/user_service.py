@@ -6,10 +6,12 @@ from decimal import Decimal
 import jwt
 from fastapi import HTTPException
 from sqlalchemy import select, func, or_
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from packages.common.src.config import get_settings
 from sqlalchemy import delete as sql_delete
+from sqlalchemy import update as sa_update
 from packages.common.src.models import (
     User, TradingAccount, Position, Order, Transaction, Deposit, Withdrawal,
     PositionStatus, OrderStatus, TradeHistory,
@@ -224,6 +226,12 @@ async def get_user_detail(user_id: uuid.UUID, db: AsyncSession):
         )
         open_positions = pos_q.scalar() or 0
 
+    assigned_rm_name = None
+    if user.assigned_rm_id:
+        rm = (await db.execute(select(User).where(User.id == user.assigned_rm_id))).scalar_one_or_none()
+        if rm:
+            assigned_rm_name = f"{rm.first_name or ''} {rm.last_name or ''}".strip() or rm.email
+
     return UserDetailOut(
         user=UserOut(**_user_to_out(user)),
         accounts=[TradingAccountOut(**_account_to_out(a)) for a in accounts],
@@ -231,7 +239,45 @@ async def get_user_detail(user_id: uuid.UUID, db: AsyncSession):
         total_withdrawal=total_withdrawal,
         total_trades=total_trades,
         open_positions=open_positions,
+        assigned_rm_id=str(user.assigned_rm_id) if user.assigned_rm_id else None,
+        assigned_rm_name=assigned_rm_name,
     )
+
+
+async def get_user_deposits(user_id: uuid.UUID, db: AsyncSession) -> list[dict]:
+    """Per-deposit history for a user — how each deposit was made (method),
+    its status, and WHICH admin approved it (client 2026-06-12)."""
+    from sqlalchemy.orm import aliased
+    Approver = aliased(User)
+    rows = (await db.execute(
+        select(
+            Deposit.id, Deposit.amount, Deposit.method, Deposit.status,
+            Deposit.created_at, Deposit.approved_at,
+            Deposit.transaction_id,
+            Approver.first_name, Approver.last_name, Approver.email,
+        )
+        .select_from(Deposit)
+        .outerjoin(Approver, Approver.id == Deposit.approved_by)
+        .where(Deposit.user_id == user_id)
+        .order_by(Deposit.created_at.desc())
+        .limit(200)
+    )).all()
+    out = []
+    for r in rows:
+        approver = None
+        if r.first_name or r.last_name or r.email:
+            approver = (" ".join(filter(None, [r.first_name, r.last_name])).strip() or r.email)
+        out.append({
+            "id": str(r.id),
+            "amount": float(r.amount or 0),
+            "method": r.method or "—",
+            "status": r.status,
+            "created_at": r.created_at.isoformat() if r.created_at else None,
+            "approved_at": r.approved_at.isoformat() if r.approved_at else None,
+            "approved_by": approver,
+            "reference": r.transaction_id,
+        })
+    return out
 
 
 async def add_fund(
@@ -607,6 +653,64 @@ async def unban_user(
     return {"message": "User unbanned successfully"}
 
 
+async def _set_user_status(
+    user_id: uuid.UUID, new_status: str, action: str, message: str,
+    admin_id: uuid.UUID, ip_address: str | None, db: AsyncSession,
+    revoke_sessions: bool = True,
+) -> dict:
+    """Shared status transition for suspend / terminate / soft-delete /
+    reactivate. The user's data is fully retained — only the `status` column
+    changes, which the login paths honour (see login_block_message). When the
+    new status blocks login we also revoke any live sessions so an already
+    signed-in user is kicked out immediately."""
+    user = (await db.execute(select(User).where(User.id == user_id))).scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    old_status = user.status
+    user.status = new_status
+
+    if revoke_sessions and new_status != "active":
+        await db.execute(
+            sa_update(UserSession)
+            .where(UserSession.user_id == user_id, UserSession.is_active.is_(True))
+            .values(is_active=False)
+        )
+
+    await write_audit_log(
+        db, admin_id, action, "user", user_id,
+        old_values={"status": old_status},
+        new_values={"status": new_status},
+        ip_address=ip_address,
+    )
+    await db.commit()
+    return {"message": message, "status": new_status}
+
+
+async def suspend_user(user_id, admin_id, ip_address, db):
+    """Temporary hold — user can't log in until reactivated. Data kept."""
+    return await _set_user_status(user_id, "suspended", "suspend_user",
+                                  "User suspended", admin_id, ip_address, db)
+
+
+async def terminate_user(user_id, admin_id, ip_address, db):
+    """Account closed (end of relationship) but full history retained."""
+    return await _set_user_status(user_id, "terminated", "terminate_user",
+                                  "User terminated", admin_id, ip_address, db)
+
+
+async def soft_delete_user(user_id, admin_id, ip_address, db):
+    """Soft delete — user can never log in again, but every record (ledger,
+    deposits, trades) stays with the broker for audit/compliance."""
+    return await _set_user_status(user_id, "deleted", "soft_delete_user",
+                                  "User soft-deleted (records retained)", admin_id, ip_address, db)
+
+
+async def reactivate_user(user_id, admin_id, ip_address, db):
+    """Bring a suspended / terminated / soft-deleted user back to active."""
+    return await _set_user_status(user_id, "active", "reactivate_user",
+                                  "User reactivated", admin_id, ip_address, db, revoke_sessions=False)
+
+
 async def block_trading(
     user_id: uuid.UUID, admin_id: uuid.UUID, ip_address: str | None, db: AsyncSession,
 ) -> dict:
@@ -834,6 +938,26 @@ async def delete_user(
     await db.execute(update(SystemSetting).where(SystemSetting.updated_by == user_id).values(updated_by=None))
     await db.execute(update(AuditLog).where(AuditLog.admin_id == user_id).values(admin_id=None))
 
+    # ── 9b. RESTRICT FKs that block the delete (no ON DELETE CASCADE) ──
+    # Most user-owned tables (insurance_policies, rewards_*, staking_positions,
+    # fixed_return_locks, vip_passes, shared_trades, spin/lottery/bids) use
+    # ON DELETE CASCADE, so the DB clears them automatically. These do NOT and
+    # would otherwise raise a ForeignKeyViolation on the final delete — which
+    # surfaced to the admin as a silent "nothing happened". Raw SQL avoids
+    # importing each model. Self-references are the most common blocker for a
+    # master/IB user (they referred others).
+    from sqlalchemy import text
+    p = {"uid": str(user_id)}
+    await db.execute(text("UPDATE users SET referred_by_user_id = NULL WHERE referred_by_user_id = :uid"), p)
+    await db.execute(text("UPDATE users SET assigned_rm_id = NULL WHERE assigned_rm_id = :uid"), p)
+    await db.execute(text("DELETE FROM insurance_claims WHERE user_id = :uid"), p)
+    await db.execute(text("DELETE FROM insurance_policies WHERE user_id = :uid"), p)
+    await db.execute(text("DELETE FROM rm_funding_requests WHERE rm_id = :uid OR user_id = :uid"), p)
+    await db.execute(text("UPDATE rm_funding_requests SET approved_by = NULL WHERE approved_by = :uid"), p)
+    await db.execute(text("UPDATE rm_funding_requests SET credited_by = NULL WHERE credited_by = :uid"), p)
+    await db.execute(text("UPDATE rm_funding_requests SET rejected_by = NULL WHERE rejected_by = :uid"), p)
+    await db.execute(text("UPDATE lifestyle_fulfillments SET handled_by = NULL WHERE handled_by = :uid"), p)
+
     # ── 10. Finally the user row ──
     await db.execute(sql_delete(User).where(User.id == user_id))
 
@@ -842,7 +966,19 @@ async def delete_user(
         new_values={"email": user_email},
         ip_address=ip_address,
     )
-    await db.commit()
+    try:
+        await db.commit()
+    except IntegrityError as e:
+        # A table we don't yet clean up still references this user. Surface
+        # WHICH constraint so it's a clear, fixable message in the admin UI
+        # instead of a silent "Internal server error".
+        await db.rollback()
+        orig = getattr(e, "orig", e)
+        raise HTTPException(
+            status_code=409,
+            detail=f"Cannot permanently delete this user — a record still references them ({orig}). "
+                   "Use Soft Delete to disable the account while keeping records.",
+        )
 
     return {"message": f"User {user_email} permanently deleted"}
 

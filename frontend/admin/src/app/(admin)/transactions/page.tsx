@@ -120,6 +120,8 @@ export default function TransactionsPage() {
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('all');
   const [search, setSearch] = useState('');
   const [searchInput, setSearchInput] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
   const [page, setPage] = useState(1);
 
   const [transactions, setTransactions] = useState<TransactionRecord[]>([]);
@@ -140,6 +142,8 @@ export default function TransactionsPage() {
       };
       if (typeFilter !== 'all') params.type = typeFilter;
       if (search) params.search = search;
+      if (dateFrom) params.start_date = dateFrom;
+      if (dateTo) params.end_date = dateTo;
 
       const res = await adminApi.get<{ items: TransactionRecord[]; total: number }>(
         '/transactions',
@@ -153,7 +157,7 @@ export default function TransactionsPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, typeFilter, search]);
+  }, [page, typeFilter, search, dateFrom, dateTo]);
 
   const fetchSummary = useCallback(async () => {
     try {
@@ -172,7 +176,7 @@ export default function TransactionsPage() {
 
   useEffect(() => {
     setPage(1);
-  }, [typeFilter, search]);
+  }, [typeFilter, search, dateFrom, dateTo]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -293,6 +297,35 @@ export default function TransactionsPage() {
                 Search
               </button>
             </form>
+
+            {/* Custom date range (filters created_at) */}
+            <div className="flex items-center gap-1.5">
+              <span className="text-xxs text-text-tertiary">From</span>
+              <input
+                type="date"
+                value={dateFrom}
+                max={dateTo || undefined}
+                onChange={(e) => setDateFrom(e.target.value)}
+                className="text-xs py-1.5 px-2 bg-bg-input border border-border-primary rounded-md text-text-primary"
+              />
+              <span className="text-xxs text-text-tertiary">To</span>
+              <input
+                type="date"
+                value={dateTo}
+                min={dateFrom || undefined}
+                onChange={(e) => setDateTo(e.target.value)}
+                className="text-xs py-1.5 px-2 bg-bg-input border border-border-primary rounded-md text-text-primary"
+              />
+              {(dateFrom || dateTo) && (
+                <button
+                  type="button"
+                  onClick={() => { setDateFrom(''); setDateTo(''); }}
+                  className="text-xxs text-text-tertiary hover:text-text-primary underline"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
 
             {/* Type filter */}
             <div className="flex items-center gap-2">

@@ -11,6 +11,7 @@ import {
   UserCog, ChevronDown, ChevronRight, Network, Share2,
   DollarSign, Percent, ArrowLeftRight, PanelLeftClose, PanelLeft,
   Receipt, Layers, ShieldCheck, ScrollText, BookOpen, Sparkles, Package, Megaphone,
+  UserCheck, HandCoins,
 } from 'lucide-react';
 
 interface NavItem {
@@ -24,6 +25,7 @@ interface NavItem {
 
 const NAV_ITEMS: NavItem[] = [
   { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+  { label: 'Finance Overview', href: '/finance-overview', icon: BarChart3, perm: 'analytics.finance' },
   { label: 'Users', href: '/users', icon: Users, perm: 'users.view' },
   {
     label: 'Identity verification',
@@ -34,7 +36,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Trades', href: '/trades', icon: CandlestickChart, perm: 'trades.view' },
   { label: 'Book Management', href: '/book', icon: BookOpen, perm: 'trades.view' },
   { label: 'Deposits', href: '/deposits', icon: Wallet, perm: 'deposits.view' },
-  { label: 'Approvals', href: '/approvals', icon: ShieldCheck, perm: 'audit_logs.view' },
+  { label: 'Approvals', href: '/approvals', icon: ShieldCheck, perm: 'funds.approve' },
   { label: 'Transactions', href: '/transactions', icon: Receipt, perm: 'deposits.view' },
   { label: 'Banks', href: '/banks', icon: Landmark, perm: 'banks.view' },
   { label: 'Account types', href: '/account-types', icon: Layers, perm: 'config.view' },
@@ -48,6 +50,7 @@ const NAV_ITEMS: NavItem[] = [
       { label: 'Fixed Return', href: '/config/fixed-return' },
       { label: 'PAMM', href: '/config/pamm' },
       { label: 'IB Tiers', href: '/config/ib-tiers' },
+      { label: 'Referral Tiers', href: '/config/referral-tiers' },
     ],
   },
   { label: 'Social', href: '/social', icon: Share2, perm: 'social.view' },
@@ -63,12 +66,17 @@ const NAV_ITEMS: NavItem[] = [
       { label: 'MLM Config', href: '/business/mlm' },
     ],
   },
+  { label: 'My Clients (RM)', href: '/rm-portal', icon: HandCoins, perm: 'rm.view' },
+  { label: 'RM Requests', href: '/rm-requests', icon: UserCheck, perm: 'rm.manage' },
   { label: 'Analytics', href: '/analytics', icon: BarChart3, perm: 'analytics.view' },
   { label: 'Audit logs', href: '/audit-logs', icon: ScrollText, perm: 'audit_logs.view' },
   { label: 'Bonus', href: '/bonus', icon: Gift, perm: 'bonus.view' },
   { label: 'Trade Insurance', href: '/insurance', icon: ShieldCheck, perm: '*' },
-  { label: 'Play Zone', href: '/play-zone', icon: Sparkles, perm: '*' },
-  { label: 'Lifestyle Queue', href: '/lifestyle', icon: Package, perm: '*' },
+  // Play Zone + Lifestyle Fulfillment (gamification/rewards) are not used on
+  // this platform — hidden from the sidebar. The pages + APIs still exist, so
+  // re-add these entries to bring them back.
+  // { label: 'Play Zone', href: '/play-zone', icon: Sparkles, perm: '*' },
+  // { label: 'Lifestyle Queue', href: '/lifestyle', icon: Package, perm: '*' },
   { label: 'Banners', href: '/banners', icon: Image, perm: 'banners.view' },
   { label: 'Support', href: '/support', icon: HeadphonesIcon, perm: 'tickets.view' },
   { label: 'Broadcast', href: '/broadcast', icon: Megaphone, perm: '_super_admin' },

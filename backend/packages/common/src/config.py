@@ -79,11 +79,12 @@ class Settings(BaseSettings):
     # EMAIL_LOGO_URL must be an absolute https URL because email clients
     # cannot resolve relative paths or render images from blob/data URIs.
     # If empty, the layout falls back to the styled "SwisDex" wordmark text.
-    # Updated 2026-06-10 — emails render on a white/light background, so
-    # they use the light-background logo (swisdex_png.png, dark lettering)
-    # rather than swisdex_png5.png (white lettering, which is invisible on
-    # white). Override in .env if a tenant ships a custom logo. Must be an
-    # absolute https URL because email clients can't resolve relative paths.
+    # The email layout (email_templates/base.py) now renders on a LIGHT/white
+    # background (client request 2026-06-15), so the logo must be the
+    # dark-lettered asset (swisdex_png.png) — it is clearly visible on white,
+    # whereas the white-lettered swisdex_png5.png would disappear. Override in
+    # .env if a tenant ships a custom logo. Must be an absolute https URL
+    # because email clients can't resolve relative paths.
     EMAIL_LOGO_URL: str = "https://swisdex.com/images/swisdex_png.png"
 
     # Mobile app store links — when set, the email footer renders the
@@ -224,7 +225,9 @@ class Settings(BaseSettings):
     # ─── Admin financial-action thresholds (USD) ──────────────────────────
     # Withdrawals at or above this amount require a second admin to approve
     # (4-eyes rule). Add-fund / deduct-fund go through the same gate.
-    ADMIN_DUAL_APPROVAL_THRESHOLD: float = 1000.0
+    # 0 ⇒ EVERY admin fund add/deduct/withdrawal-approval needs a second
+    # admin's sign-off (client 2026-06-12 — no direct admin funding at all).
+    ADMIN_DUAL_APPROVAL_THRESHOLD: float = 0.0
     # Hard cap for any single admin balance mutation (defense-in-depth, even
     # for a super_admin). Set to 0 to disable.
     ADMIN_BALANCE_MUTATION_CAP: float = 100_000.0

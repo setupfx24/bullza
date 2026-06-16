@@ -18,10 +18,10 @@ from .base import render_layout
 def _bullet(title: str, body: str) -> str:
     return f"""
     <li style="margin:0 0 14px;padding:0;">
-      <strong style="color:#f5f5f5;font-size:14px;display:block;line-height:1.4;">
+      <strong style="color:#1a1a1a;font-size:14px;display:block;line-height:1.4;">
         {escape(title)}
       </strong>
-      <span style="color:#9a9a9a;font-size:13px;line-height:1.6;display:block;margin-top:2px;">
+      <span style="color:#6b7280;font-size:13px;line-height:1.6;display:block;margin-top:2px;">
         {escape(body)}
       </span>
     </li>
@@ -52,10 +52,10 @@ def render_welcome(
         )
 
     experience_html = (
-        '<p style="margin:24px 0 12px;color:#f5f5f5;font-size:14px;font-weight:700;">'
+        '<p style="margin:24px 0 12px;color:#1a1a1a;font-size:14px;font-weight:700;">'
         "Here's what you're about to experience:"
         '</p>'
-        '<ul style="margin:0 0 24px;padding:0 0 0 18px;color:#f5f5f5;">'
+        '<ul style="margin:0 0 24px;padding:0 0 0 18px;color:#1a1a1a;">'
         + _bullet(
             "Powerful Web & Mobile Trading Platform",
             "Access fast and responsive trading tools designed for both beginners and professional traders.",
@@ -78,28 +78,28 @@ def render_welcome(
     credentials_html = ""
     if username or trading_id:
         credentials_html = (
-            '<div style="margin:0 0 24px;padding:18px 20px;border:1px solid #2a2a2a;'
-            'border-radius:8px;background:#0e0e0e;">'
+            '<div style="margin:0 0 24px;padding:18px 20px;border:1px solid #e5e7eb;'
+            'border-radius:8px;background:#f4f5f7;">'
             '<p style="margin:0 0 10px;color:#55a630;font-size:12px;font-weight:700;'
             'letter-spacing:0.8px;text-transform:uppercase;">Your Account Credentials</p>'
         )
         if username:
             credentials_html += (
-                '<p style="margin:0 0 6px;color:#9a9a9a;font-size:13px;">'
+                '<p style="margin:0 0 6px;color:#6b7280;font-size:13px;">'
                 "To access your SwisDex Dashboard:"
                 '</p>'
-                '<p style="margin:0 0 14px;color:#f5f5f5;font-size:14px;">'
-                f'<strong style="color:#f5f5f5;">Username:</strong> '
+                '<p style="margin:0 0 14px;color:#1a1a1a;font-size:14px;">'
+                f'<strong style="color:#1a1a1a;">Username:</strong> '
                 f'<span style="color:#55a630;">{escape(username)}</span>'
                 '</p>'
             )
         if trading_id:
             credentials_html += (
-                '<p style="margin:14px 0 6px;color:#9a9a9a;font-size:13px;">'
+                '<p style="margin:14px 0 6px;color:#6b7280;font-size:13px;">'
                 "To access your Trading Terminal:"
                 '</p>'
-                '<p style="margin:0;color:#f5f5f5;font-size:14px;">'
-                f'<strong style="color:#f5f5f5;">Trading ID:</strong> '
+                '<p style="margin:0;color:#1a1a1a;font-size:14px;">'
+                f'<strong style="color:#1a1a1a;">Trading ID:</strong> '
                 f'<span style="color:#55a630;font-variant-numeric:tabular-nums;">{escape(trading_id)}</span>'
                 '</p>'
             )
@@ -107,11 +107,11 @@ def render_welcome(
 
     def li(text: str) -> str:
         return (
-            f'<li style="margin:0 0 6px;color:#f5f5f5;font-size:13px;line-height:1.6;">'
+            f'<li style="margin:0 0 6px;color:#1a1a1a;font-size:13px;line-height:1.6;">'
             f'{escape(text)}</li>'
         )
     why_html = (
-        '<p style="margin:28px 0 10px;color:#f5f5f5;font-size:14px;font-weight:700;">'
+        '<p style="margin:28px 0 10px;color:#1a1a1a;font-size:14px;font-weight:700;">'
         "Why Trade with SwisDex"
         '</p>'
         '<ul style="margin:0 0 8px;padding:0 0 0 18px;">'
@@ -127,14 +127,14 @@ def render_welcome(
     )
 
     closing = (
-        '<p style="margin:28px 0 6px;color:#9a9a9a;font-size:13px;line-height:1.6;">'
+        '<p style="margin:28px 0 6px;color:#6b7280;font-size:13px;line-height:1.6;">'
         "If you have any questions or require assistance, our support team is always available."
         '</p>'
-        '<p style="margin:14px 0 0;color:#f5f5f5;font-size:13px;line-height:1.6;">'
+        '<p style="margin:14px 0 0;color:#1a1a1a;font-size:13px;line-height:1.6;">'
         "Best regards,<br>"
         '<strong>The SwisDex Broker House Team</strong>'
         '</p>'
-        '<p style="margin:18px 0 0;color:#9a9a9a;font-size:11px;line-height:1.6;">'
+        '<p style="margin:18px 0 0;color:#6b7280;font-size:11px;line-height:1.6;">'
         "Trading digital assets and leveraged products involves risk and may "
         "result in the loss of capital. Please trade responsibly."
         '</p>'

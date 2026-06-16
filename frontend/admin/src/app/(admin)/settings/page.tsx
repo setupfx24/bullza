@@ -30,6 +30,9 @@ interface Settings {
   allow_new_registrations: boolean;
   allow_deposits: boolean;
   allow_withdrawals: boolean;
+  // Show/hide the PAMM and MAM (copy-trading) products in the trader app.
+  pamm_enabled: boolean;
+  mam_enabled: boolean;
   // Admin-controlled payment-method tabs in the trader wallet.
   // Crypto (NOWPayments) is always on; these two toggle the
   // remaining tabs in real time via /wallet/payment-methods.
@@ -66,6 +69,8 @@ const DEFAULT_SETTINGS: Settings = {
   allow_new_registrations: true,
   allow_deposits: true,
   allow_withdrawals: true,
+  pamm_enabled: true,
+  mam_enabled: true,
   'wallet.manual_enabled': true,
   'wallet.p2p_enabled': false,
   'wallet.rm_email': '',
@@ -119,6 +124,8 @@ function rowsToSettings(rows: SystemSettingRow[]): Settings {
     allow_new_registrations: bool('allow_new_registrations', DEFAULT_SETTINGS.allow_new_registrations),
     allow_deposits: bool('allow_deposits', DEFAULT_SETTINGS.allow_deposits),
     allow_withdrawals: bool('allow_withdrawals', DEFAULT_SETTINGS.allow_withdrawals),
+    pamm_enabled: bool('pamm_enabled', DEFAULT_SETTINGS.pamm_enabled),
+    mam_enabled: bool('mam_enabled', DEFAULT_SETTINGS.mam_enabled),
     'wallet.manual_enabled': bool('wallet.manual_enabled', DEFAULT_SETTINGS['wallet.manual_enabled']),
     'wallet.p2p_enabled': bool('wallet.p2p_enabled', DEFAULT_SETTINGS['wallet.p2p_enabled']),
     'wallet.rm_email': (() => {
@@ -140,9 +147,9 @@ function settingsToPayload(s: Settings): Record<string, unknown> {
     ib_min_deposit_usd: s.ib_min_deposit_usd,
     min_deposit_amount_usd: s.min_deposit_amount_usd,
     min_withdrawal_amount_usd: s.min_withdrawal_amount_usd,
-    // Fallback flat USD bounty — used only when ib_commission_tiers
-    // (the by-active-referral-count ladder, editable at /config/ib-tiers)
-    // has no matching tier for the referrer's position.
+    // Fallback flat USD bounty — used only when referral_tiers
+    // (the by-active-referral-count ladder, editable at /config/referral-tiers,
+    // independent of IB) has no matching tier for the referrer's position.
     referral_commission_amount_usd: s.referral_commission_amount_usd,
     referral_qualifying_trades: s.referral_qualifying_trades,
     ib_commission_requires_kyc: s.ib_commission_requires_kyc,
@@ -151,6 +158,8 @@ function settingsToPayload(s: Settings): Record<string, unknown> {
     allow_new_registrations: s.allow_new_registrations,
     allow_deposits: s.allow_deposits,
     allow_withdrawals: s.allow_withdrawals,
+    pamm_enabled: s.pamm_enabled,
+    mam_enabled: s.mam_enabled,
     'wallet.manual_enabled': s['wallet.manual_enabled'],
     'wallet.p2p_enabled': s['wallet.p2p_enabled'],
     'wallet.rm_email': s['wallet.rm_email'],
@@ -339,6 +348,8 @@ export default function SettingsPage() {
                     { key: 'allow_new_registrations', label: 'Allow New Registrations', desc: 'Enable or disable new user sign-ups' },
                     { key: 'allow_deposits', label: 'Allow Deposits', desc: 'Enable or disable deposit functionality' },
                     { key: 'allow_withdrawals', label: 'Allow Withdrawals', desc: 'Enable or disable withdrawal requests' },
+                    { key: 'pamm_enabled', label: 'Show PAMM to customers', desc: 'Off = hide the PAMM product from the trader app' },
+                    { key: 'mam_enabled', label: 'Show MAM / Copy Trading to customers', desc: 'Off = hide MAM / copy-trading from the trader app' },
                     // Per-method tabs in the trader wallet. Crypto (NOWPayments)
                     // is always on; these two toggle the Manual + P2P tabs in
                     // real time. Gateway also hard-rejects API calls on the
@@ -539,13 +550,14 @@ export default function SettingsPage() {
                   <p className="text-xxs text-text-tertiary">
                     Bounty scales with the <span className="text-text-secondary">referrer's</span> number of qualified referrals
                     (e.g. 1–20 → $5, 21–100 → $7, 101+ → $10) — NOT by the referred user's account type.
-                    Edit the ladder on the dedicated tier-editor page so per-lot IB rates stay in sync.
+                    This ladder is <span className="text-text-secondary">independent of IB</span>: edit it on its own
+                    Referral Tiers page (the IB per-lot ladder lives separately under Config → IB Tiers).
                   </p>
                   <a
-                    href="/config/ib-tiers"
+                    href="/config/referral-tiers"
                     className="inline-flex items-center gap-1.5 mt-1 text-xs text-buy hover:text-buy-light underline underline-offset-2"
                   >
-                    Open tier editor →
+                    Open referral tier editor →
                   </a>
                 </div>
                 <div className="flex flex-wrap items-center justify-between gap-4">

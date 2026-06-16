@@ -132,6 +132,10 @@ export default function TradesPage() {
   const [activeTab, setActiveTab] = useState<TabId>('open');
   const [searchFilter, setSearchFilter] = useState('');
   const [symbolFilter, setSymbolFilter] = useState('');
+  // Custom date range + gainers/losers sort (client 2026-06-12).
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const [sortMode, setSortMode] = useState<'recent' | 'gainers' | 'losers'>('recent');
 
   const [positions, setPositions] = useState<Position[]>([]);
   const [posPage, setPosPage] = useState(1);
@@ -218,7 +222,9 @@ export default function TradesPage() {
   const fetchPositions = useCallback(async (silent = false) => {
     if (!silent) setPosLoading(true);
     try {
-      const params: Record<string, string> = { page: String(posPage), limit: '20' };
+      const params: Record<string, string> = { page: String(posPage), limit: '20', sort: sortMode };
+      if (dateFrom) params.start_date = dateFrom;
+      if (dateTo) params.end_date = dateTo;
       const data = await adminApi.get<any>('/trades/positions', params);
       setPositions(data.items || data.positions || []);
       setPosTotal(data.total || 0);
@@ -228,7 +234,7 @@ export default function TradesPage() {
     } finally {
       if (!silent) setPosLoading(false);
     }
-  }, [posPage]);
+  }, [posPage, dateFrom, dateTo, sortMode]);
 
   const fetchOrders = useCallback(async (silent = false) => {
     if (!silent) setOrdersLoading(true);
@@ -246,7 +252,9 @@ export default function TradesPage() {
   const fetchHistory = useCallback(async (silent = false) => {
     if (!silent) setHistLoading(true);
     try {
-      const params: Record<string, string> = { page: String(histPage), limit: '20' };
+      const params: Record<string, string> = { page: String(histPage), limit: '20', sort: sortMode };
+      if (dateFrom) params.start_date = dateFrom;
+      if (dateTo) params.end_date = dateTo;
       const data = await adminApi.get<any>('/trades/history', params);
       setHistory(data.items || data.trades || []);
       setHistTotal(data.total || 0);
@@ -256,7 +264,7 @@ export default function TradesPage() {
     } finally {
       if (!silent) setHistLoading(false);
     }
-  }, [histPage]);
+  }, [histPage, dateFrom, dateTo, sortMode]);
 
   /** Initial load — shows spinner. */
   useEffect(() => {
@@ -500,6 +508,18 @@ export default function TradesPage() {
             <input type="search" value={searchFilter} onChange={e => setSearchFilter(e.target.value)} placeholder="Filter by user..." className="w-full pl-9 pr-3 py-1.5 text-xs bg-bg-input border border-border-primary rounded-md placeholder:text-text-tertiary focus:border-buy transition-fast" />
           </div>
           <input type="text" value={symbolFilter} onChange={e => setSymbolFilter(e.target.value)} placeholder="Symbol..." className="w-28 px-3 py-1.5 text-xs bg-bg-input border border-border-primary rounded-md placeholder:text-text-tertiary focus:border-buy transition-fast uppercase" />
+          {/* Custom date range (server-side) */}
+          <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} title="From date" className="px-2 py-1.5 text-xs bg-bg-input border border-border-primary rounded-md text-text-primary focus:border-buy transition-fast" />
+          <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} title="To date" className="px-2 py-1.5 text-xs bg-bg-input border border-border-primary rounded-md text-text-primary focus:border-buy transition-fast" />
+          {/* Top gainers / losers */}
+          <select value={sortMode} onChange={e => setSortMode(e.target.value as 'recent' | 'gainers' | 'losers')} className="px-2 py-1.5 text-xs bg-bg-input border border-border-primary rounded-md text-text-primary focus:border-buy transition-fast">
+            <option value="recent">Most recent</option>
+            <option value="gainers">Top gainers</option>
+            <option value="losers">Top losers</option>
+          </select>
+          {(dateFrom || dateTo || sortMode !== 'recent') && (
+            <button type="button" onClick={() => { setDateFrom(''); setDateTo(''); setSortMode('recent'); }} className="px-2 py-1.5 text-xs text-text-secondary border border-border-primary rounded-md hover:bg-bg-hover">Clear</button>
+          )}
         </div>
 
         {/* Tabs & Tables */}

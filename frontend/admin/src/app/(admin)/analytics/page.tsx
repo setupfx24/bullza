@@ -5,6 +5,7 @@ import { adminApi } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { Loader2, RefreshCw, DollarSign, TrendingUp, AlertTriangle, BarChart3, Users, CreditCard, Gift, GitBranch, Calendar } from 'lucide-react';
 import toast from 'react-hot-toast';
+import DateField from '@/components/ui/DateField';
 
 /** YYYY-MM-DD in local time (avoids the UTC-shift `toISOString()` pitfall). */
 function ymd(d: Date): string {
@@ -104,6 +105,7 @@ export default function AnalyticsPage() {
   const [profitableUsers, setProfitableUsers] = useState<ProfitableUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [activePreset, setActivePreset] = useState<PresetKey | 'custom' | null>(null);
+  const [profitSort, setProfitSort] = useState<'profit' | 'win_rate'>('profit');
   // Default to "Today" when the page first loads — gives the admin instant
   // numbers without forcing a click. They can switch presets or pick custom.
   const [startDate, setStartDate] = useState<string>(() => ymd(new Date()));
@@ -126,7 +128,15 @@ export default function AnalyticsPage() {
       const dashUrl = `/analytics/dashboard${params.toString() ? `?${params}` : ''}`;
       const [dashRes, expRes] = await Promise.all([
         adminApi.get<any>(dashUrl),
-        adminApi.get<{ exposure: ExposureRow[]; profitable_users?: ProfitableUser[] }>('/analytics/exposure'),
+        adminApi.get<{ exposure: ExposureRow[]; profitable_users?: ProfitableUser[] }>(
+          '/analytics/exposure', {
+            profitable_sort: profitSort,
+            // Apply the page's custom date window to the profit / win-rate
+            // ranking too (open-position exposure stays live server-side).
+            ...(startDate ? { start_date: startDate } : {}),
+            ...(endDate ? { end_date: endDate } : {}),
+          },
+        ),
       ]);
       setData(dashRes);
       setExposure(expRes.exposure || []);
@@ -136,7 +146,7 @@ export default function AnalyticsPage() {
     } finally {
       setLoading(false);
     }
-  }, [startDate, endDate]);
+  }, [startDate, endDate, profitSort]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
@@ -192,20 +202,16 @@ export default function AnalyticsPage() {
               </button>
             ))}
             <span className="mx-1 text-text-tertiary text-xxs">|</span>
-            <input
-              type="date"
+            <DateField
               value={startDate}
               max={endDate || undefined}
-              onChange={(e) => { setStartDate(e.target.value); setActivePreset('custom'); }}
-              className="px-2 py-1 rounded-md text-xs bg-bg-input border border-border-primary text-text-primary"
+              onChange={(v) => { setStartDate(v); setActivePreset('custom'); }}
             />
             <span className="text-xxs text-text-tertiary">to</span>
-            <input
-              type="date"
+            <DateField
               value={endDate}
               min={startDate || undefined}
-              onChange={(e) => { setEndDate(e.target.value); setActivePreset('custom'); }}
-              className="px-2 py-1 rounded-md text-xs bg-bg-input border border-border-primary text-text-primary"
+              onChange={(v) => { setEndDate(v); setActivePreset('custom'); }}
             />
           </div>
         </div>
@@ -330,9 +336,20 @@ export default function AnalyticsPage() {
 
         {/* Top Profitable Users (Admin Losses) */}
         <div className="bg-bg-secondary border border-border-primary rounded-md">
-          <div className="px-4 py-3 border-b border-border-primary">
-            <h2 className="text-sm font-medium text-text-primary">Top Profitable Users</h2>
-            <p className="text-xxs text-text-tertiary mt-0.5">Users with highest realized P&L (admin B-book losses)</p>
+          <div className="px-4 py-3 border-b border-border-primary flex items-center justify-between gap-2 flex-wrap">
+            <div>
+              <h2 className="text-sm font-medium text-text-primary">Top Profitable Users</h2>
+              <p className="text-xxs text-text-tertiary mt-0.5">Users with highest realized P&L (admin B-book losses)</p>
+            </div>
+            <div className="flex items-center gap-1">
+              <span className="text-xxs text-text-tertiary mr-1">Rank by</span>
+              {([['profit', 'Profit'], ['win_rate', 'Win rate']] as const).map(([val, label]) => (
+                <button key={val} type="button" onClick={() => setProfitSort(val)}
+                  className={cn('text-xxs px-2 py-1 rounded-md border', profitSort === val ? 'bg-bg-hover text-text-primary border-border-primary' : 'text-text-secondary border-transparent hover:bg-bg-hover/60')}>
+                  {label}
+                </button>
+              ))}
+            </div>
           </div>
           {profitableUsers.length === 0 ? (
             <div className="text-center text-xs text-text-tertiary py-12">No data</div>

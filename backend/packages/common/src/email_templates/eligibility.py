@@ -44,7 +44,7 @@ def render_fr_insurance_eligibility(
             ("Payout cadence", "Periodic — credited to your wallet automatically"),
             ("Lock", "24-month maximum; early-unlock available with a small fee"),
         ]) + f"""
-        <p style="margin:16px 0 0;color:#9a9a9a;font-size:13px;line-height:1.6;">
+        <p style="margin:16px 0 0;color:#6b7280;font-size:13px;line-height:1.6;">
           Cash on the sidelines costs you yield. Allocate any portion of your
           balance to a Fixed Return plan and SwisDex pays interest on the
           allocated amount until you withdraw — no trading required.
@@ -67,7 +67,7 @@ def render_fr_insurance_eligibility(
             ("Eligible instruments", "Major FX, gold, indices, top crypto"),
             ("Cap", "Per-trade + lifetime caps set by the platform"),
         ]) + """
-        <p style="margin:16px 0 0;color:#9a9a9a;font-size:13px;line-height:1.6;">
+        <p style="margin:16px 0 0;color:#6b7280;font-size:13px;line-height:1.6;">
           Toggle insurance on the trade ticket — the premium is shown
           before you confirm, and the refund is automatic if your trade
           closes in loss within the eligible window.
@@ -88,13 +88,13 @@ def render_fr_insurance_eligibility(
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0"
                border="0" style="border-collapse:separate;border-spacing:0 12px;">
           <tr>
-            <td style="padding:14px 16px;border:1px solid #2a2a2a;border-radius:8px;
-                       background:#0a0a0a;">
+            <td style="padding:14px 16px;border:1px solid #e5e7eb;border-radius:8px;
+                       background:#f4f5f7;">
               <p style="margin:0 0 6px;color:#55a630;font-size:12px;font-weight:700;
                         letter-spacing:0.4px;text-transform:uppercase;">
                 Fixed Return
               </p>
-              <p style="margin:0;color:#f5f5f5;font-size:14px;line-height:1.6;">
+              <p style="margin:0;color:#1a1a1a;font-size:14px;line-height:1.6;">
                 Earn {fr_min_rate_pct:.0f}–{fr_max_rate_pct:.0f}% p.a. on
                 idle cash. Lock terms up to 24 months, periodic interest
                 payouts.
@@ -102,13 +102,13 @@ def render_fr_insurance_eligibility(
             </td>
           </tr>
           <tr>
-            <td style="padding:14px 16px;border:1px solid #2a2a2a;border-radius:8px;
-                       background:#0a0a0a;">
+            <td style="padding:14px 16px;border:1px solid #e5e7eb;border-radius:8px;
+                       background:#f4f5f7;">
               <p style="margin:0 0 6px;color:#55a630;font-size:12px;font-weight:700;
                         letter-spacing:0.4px;text-transform:uppercase;">
                 Trade Insurance
               </p>
-              <p style="margin:0;color:#f5f5f5;font-size:14px;line-height:1.6;">
+              <p style="margin:0;color:#1a1a1a;font-size:14px;line-height:1.6;">
                 Refund up to {insurance_base_payout_pct:.0f}% of a losing
                 trade's lost amount. Toggle per trade.
               </p>

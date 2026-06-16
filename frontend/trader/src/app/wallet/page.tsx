@@ -151,7 +151,7 @@ const CRYPTO_ASSETS = [
 ] as const;
 
 // 'crypto' = automated provider flow (NOWPayments for deposits, OxaPay-style
-// payout details for withdrawals). 'manual' = legacy bank/UPI manual path.
+// payout details for withdrawals). 'manual' = legacy bank manual path.
 type FundingChannel = 'crypto' | 'manual' | 'p2p';
 
 interface ManualBankDetailsResponse {
@@ -582,7 +582,7 @@ function WalletPageContent() {
 
     const upi = manualWithdrawUpi.trim();
     if (!upi && !manualWithdrawQrFile) {
-      toast.error('Enter your UPI ID and/or upload a QR code for manual payout');
+      toast.error('Enter your bank details and/or upload a QR code for manual payout');
       return;
     }
     setWithdrawSubmitting(true);
@@ -686,7 +686,7 @@ function WalletPageContent() {
     }
 
     if (!depositTxId.trim()) {
-      toast.error('Enter your bank / UPI transaction or reference ID');
+      toast.error('Enter your bank transaction or reference ID');
       return;
     }
     if (!depositProofFile) {
@@ -1166,7 +1166,7 @@ function WalletPageContent() {
                           {method === 'crypto'
                             ? 'Crypto (NOWPayments)'
                             : method === 'manual'
-                            ? 'Manual (Bank/UPI)'
+                            ? 'Manual (Bank)'
                             : 'Request to RM'}
                         </button>
                       );
@@ -1298,13 +1298,9 @@ function WalletPageContent() {
                                   {manualBankInfo.ifsc_code}
                                 </p>
                               ) : null}
-                              {manualBankInfo.upi_id ? (
-                                <p className="break-all sm:col-span-2">
-                                  <span className="text-text-tertiary font-sans text-[10px] uppercase tracking-wide">UPI</span>
-                                  <br />
-                                  {manualBankInfo.upi_id}
-                                </p>
-                              ) : null}
+                              {/* Backend may still surface a `upi_id` field on
+                                  ManualBankDetailsResponse — block its render so
+                                  the visible bank details panel never shows UPI. */}
                             </div>
                             {manualBankInfo.qr_code_url ? (
                               <div className="pt-1 flex justify-center">
@@ -1337,7 +1333,7 @@ function WalletPageContent() {
                           type="text"
                           value={depositTxId}
                           onChange={(e) => setDepositTxId(e.target.value)}
-                          placeholder="UTR or reference from your bank/UPI app"
+                          placeholder="UTR or reference from your bank app"
                           className="w-full px-4 py-3 rounded-xl border border-border-primary bg-bg-secondary text-text-primary placeholder:text-text-tertiary outline-none focus:border-accent/50 font-mono text-sm"
                         />
                       </div>
@@ -1555,7 +1551,7 @@ function WalletPageContent() {
                           placeholder={
                             withdrawUiSection === 'crypto'
                               ? 'Your crypto wallet address (network must match the withdrawal asset)'
-                              : 'Bank account / UPI ID / payout instructions'
+                              : 'Bank account / payout instructions'
                           }
                           rows={3}
                           className="w-full px-4 py-3 rounded-xl border border-border-primary bg-bg-secondary text-text-primary placeholder:text-text-tertiary outline-none focus:border-accent/50 text-sm resize-none"
@@ -1622,18 +1618,18 @@ function WalletPageContent() {
                       </div>
 
                       <div className="rounded-xl border border-border-primary bg-bg-secondary px-4 py-3 space-y-2">
-                        <p className="text-xs font-bold text-text-primary">Bank / UPI payout</p>
+                        <p className="text-xs font-bold text-text-primary">Bank payout</p>
                         <p className="text-[11px] text-text-secondary leading-relaxed">
-                          Provide the UPI ID and/or upload a QR code. Finance processes after approval.
+                          Provide your bank details and/or upload a QR code. Finance processes after approval.
                         </p>
                       </div>
                       <div className="space-y-1">
-                        <label className="text-xs text-text-secondary">UPI ID</label>
+                        <label className="text-xs text-text-secondary">Bank details</label>
                         <input
                           type="text"
                           value={manualWithdrawUpi}
                           onChange={(e) => setManualWithdrawUpi(e.target.value)}
-                          placeholder="yourname@upi"
+                          placeholder="Account number / IFSC / SWIFT"
                           className="w-full px-4 py-3 rounded-xl border border-border-primary bg-bg-secondary text-text-primary placeholder:text-text-tertiary outline-none focus:border-accent/50 font-mono text-sm"
                         />
                       </div>
@@ -1728,7 +1724,7 @@ function WalletPageContent() {
             <div>
               <h5 className="text-text-primary font-bold text-xs uppercase tracking-wide">Processing Time</h5>
               <p className="text-text-tertiary text-[10px] leading-relaxed mt-0.5">
-                Crypto and manual bank/UPI withdrawals are reviewed by finance; most requests are processed within 24 hours.
+                Crypto and manual bank withdrawals are reviewed by finance; most requests are processed within 24 hours.
               </p>
             </div>
           </div>

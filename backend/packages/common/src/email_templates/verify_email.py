@@ -32,7 +32,7 @@ def render_verify_email(
     )
 
     body_html = (
-        f'<p style="margin:18px 0 0;color:#9a9a9a;font-size:13px;line-height:1.6;">'
+        f'<p style="margin:18px 0 0;color:#6b7280;font-size:13px;line-height:1.6;">'
         f"For your security, this link will expire in {expires_hours} hours. "
         "If it expires, sign in to request a new one."
         '</p>'

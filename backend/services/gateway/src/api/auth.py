@@ -48,6 +48,10 @@ async def platform_status():
         "allow_new_registrations": await get_bool_setting("allow_new_registrations", True),
         "allow_deposits": await get_bool_setting("allow_deposits", True),
         "allow_withdrawals": await get_bool_setting("allow_withdrawals", True),
+        # Copy-trading product visibility — admin can hide PAMM and/or
+        # MAM/Copy-Trading from the trader app entirely.
+        "pamm_enabled": await get_bool_setting("pamm_enabled", True),
+        "mam_enabled": await get_bool_setting("mam_enabled", True),
         # Wallet minimums so the deposit/withdraw form can show the limit
         # up-front instead of only rejecting on submit.
         "min_deposit_amount_usd": float(await get_float_setting("min_deposit_amount_usd", 50.0)),

@@ -136,6 +136,9 @@ class UserDetailOut(BaseModel):
     total_withdrawal: float = 0
     total_trades: int = 0
     open_positions: int = 0
+    # RM subsystem — who manages this user (if anyone).
+    assigned_rm_id: Optional[str] = None
+    assigned_rm_name: Optional[str] = None
 
 
 class PaginatedResponse(BaseModel):
@@ -464,6 +467,7 @@ class IBProfileOut(BaseModel):
     commission_plan_id: Optional[str] = None
     custom_commission_per_lot: Optional[float] = None
     custom_commission_per_trade: Optional[float] = None
+    tier_override: Optional[str] = None
     total_earned: float
     pending_payout: float
     is_active: bool
@@ -480,6 +484,9 @@ class UpdateIBCommissionIn(BaseModel):
     commission_plan_id: Optional[str] = None
     custom_commission_per_lot: Optional[float] = None
     custom_commission_per_trade: Optional[float] = None
+    # Manual tier override (Bronze/Silver/Gold/Platinum). "" or "auto" clears
+    # it back to automatic tier resolution. Sentinel None = leave unchanged.
+    tier_override: Optional[str] = None
 
 
 class RejectIBIn(BaseModel):
@@ -591,6 +598,10 @@ class BonusOfferIn(BaseModel):
     sort_order: int = 0
     cta_label: Optional[str] = None
     tagline: Optional[str] = None
+    # Promo-code flow. promo_code = optional code; code_visible = show it on
+    # the public /bonus page (True) or keep it hidden (False).
+    promo_code: Optional[str] = None
+    code_visible: bool = True
 
 
 class BonusOfferOut(BaseModel):
@@ -612,6 +623,8 @@ class BonusOfferOut(BaseModel):
     sort_order: int = 0
     cta_label: Optional[str] = None
     tagline: Optional[str] = None
+    promo_code: Optional[str] = None
+    code_visible: bool = True
     created_at: Optional[datetime] = None
 
     class Config:

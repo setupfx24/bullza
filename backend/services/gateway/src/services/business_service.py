@@ -51,6 +51,37 @@ def _get_frontend_url() -> str:
     return origins[0] if origins else "http://localhost:3000"
 
 
+async def _get_super_ib_profile_id(db: AsyncSession) -> UUID | None:
+    """The Super IB is the root every real IB hangs under. It's the IBProfile
+    whose referral_code matches the `super_ib_code` setting (default 'SDA05';
+    admin-editable). Returns None if no such IB exists yet."""
+    from packages.common.src.settings_store import get_system_setting
+    code = str(await get_system_setting("super_ib_code", None) or "SDA05").strip()
+    if not code:
+        return None
+    row = (await db.execute(
+        select(IBProfile.id).where(IBProfile.referral_code == code)
+    )).first()
+    return row[0] if row else None
+
+
+async def _resolve_ib_type(db: AsyncSession, profile: IBProfile) -> str:
+    """Classify an IB profile per client spec 2026-06-16:
+      - 'super_ib' : the Super IB itself (SDA05 root).
+      - 'ib'       : introduced DIRECTLY by the Super IB → full IB dashboard.
+      - 'sub_ib'   : introduced by anyone else (deeper) → Sub-IB dashboard.
+    Fallback when no Super IB is configured: a profile with no parent is an IB.
+    """
+    super_id = await _get_super_ib_profile_id(db)
+    if super_id is not None:
+        if profile.id == super_id:
+            return "super_ib"
+        if profile.parent_ib_id == super_id:
+            return "ib"
+        return "sub_ib"
+    return "ib" if profile.parent_ib_id is None else "sub_ib"
+
+
 async def ib_status(user_id: UUID, db: AsyncSession) -> dict:
     profile_result = await db.execute(
         select(IBProfile).where(IBProfile.user_id == user_id)
@@ -64,8 +95,11 @@ async def ib_status(user_id: UUID, db: AsyncSession) -> dict:
     application = app_result.scalars().first()
 
     if profile:
+        ib_type = await _resolve_ib_type(db, profile)
         return {
             "is_ib": True,
+            "ib_type": ib_type,             # 'super_ib' | 'ib' | 'sub_ib'
+            "is_sub_ib": ib_type == "sub_ib",
             "referral_code": profile.referral_code,
             "level": profile.level,
             "total_earned": float(profile.total_earned),
@@ -203,6 +237,8 @@ async def ib_dashboard(user_id: UUID, db: AsyncSession) -> dict:
     if not profile:
         raise HTTPException(status_code=404, detail="IB profile not found")
 
+    ib_type = await _resolve_ib_type(db, profile)
+
     referral_count = await db.execute(
         select(func.count()).select_from(Referral).where(Referral.ib_profile_id == profile.id)
     )
@@ -296,6 +332,12 @@ async def ib_dashboard(user_id: UUID, db: AsyncSession) -> dict:
     ]
 
     return {
+        # Client spec 2026-06-16: only someone introduced by the Super IB
+        # (SDA05) is a full IB; everyone else is a Sub-IB. The frontend shows
+        # the matching dashboard and a "Contact SwisDex" upgrade for sub-IBs.
+        "ib_type": ib_type,                 # 'super_ib' | 'ib' | 'sub_ib'
+        "is_sub_ib": ib_type == "sub_ib",
+        "can_request_ib_upgrade": ib_type == "sub_ib",
         "referral_code": profile.referral_code,
         "referral_link": f"{base_url}/auth/register?ref={profile.referral_code}",
         "level": profile.level,

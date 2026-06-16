@@ -27,7 +27,7 @@ def render_mission_completed(
         rows.append(("Reward", _fmt_money(reward_amount, reward_currency)))
 
     body = kv_table(rows) + """
-    <p style="margin:16px 0 0;color:#9a9a9a;font-size:13px;line-height:1.6;">
+    <p style="margin:16px 0 0;color:#6b7280;font-size:13px;line-height:1.6;">
       Keep climbing the ranks — more missions are waiting in the Earn hub.
     </p>
     """
@@ -71,10 +71,10 @@ def render_tier_upgraded(
             f'<li>{p}</li>' for p in perks
         )
         perks_html = f"""
-        <p style="margin:0 0 8px;color:#f5f5f5;font-size:14px;line-height:1.6;">
+        <p style="margin:0 0 8px;color:#1a1a1a;font-size:14px;line-height:1.6;">
           New perks unlocked at <strong>{new_tier}</strong>:
         </p>
-        <ul style="margin:0;padding-left:20px;color:#f5f5f5;font-size:14px;line-height:1.7;">
+        <ul style="margin:0;padding-left:20px;color:#1a1a1a;font-size:14px;line-height:1.7;">
           {items}
         </ul>
         """

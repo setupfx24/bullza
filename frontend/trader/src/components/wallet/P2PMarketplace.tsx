@@ -64,7 +64,7 @@ export default function P2PMarketplace({ mode }: { mode: Side }) {
       return;
     }
     if (side === 'withdraw' && !payoutDetails.trim()) {
-      toast.error('Add your payout details (UPI ID / bank A/C)');
+      toast.error('Add your payout details (bank A/C)');
       return;
     }
     setSubmitting(true);
@@ -171,11 +171,11 @@ export default function P2PMarketplace({ mode }: { mode: Side }) {
         </Field>
 
         {side === 'withdraw' && (
-          <Field label="Payout details (UPI ID / bank A/C / IFSC)">
+          <Field label="Payout details (bank A/C / IFSC)">
             <textarea
               value={payoutDetails}
               onChange={(e) => setPayoutDetails(e.target.value)}
-              placeholder="e.g. UPI: name@upi  |  Bank: HDFC, A/C 123456789, IFSC HDFC0001234"
+              placeholder="e.g. Bank: HDFC, A/C 123456789, IFSC HDFC0001234"
               rows={3}
               className="w-full px-3 py-2.5 rounded-xl border border-border-primary bg-bg-secondary text-text-primary placeholder:text-text-tertiary outline-none focus:border-accent/50 text-sm resize-none"
             />

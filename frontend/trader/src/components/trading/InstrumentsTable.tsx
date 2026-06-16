@@ -173,7 +173,12 @@ export default function InstrumentsTable({ onExitMarkets, onViewNews }: Instrume
       : watchlist;
     const q = search.toLowerCase();
     return source
-      .filter((s) => prices[s] != null)
+      // NOTE: do NOT filter out symbols that lack a live price. Previously this
+      // hid every instrument the price feed wasn't currently publishing, which
+      // — when market-data only emitted Gold — collapsed the picker to a single
+      // row, so no other instrument could be selected or charted. Rows render
+      // bid/ask/spread as '—' until a tick arrives (see render below), so a
+      // price-less symbol is still selectable and its TradingView chart loads.
       .filter((s) => {
         if (hasQuery) {
           const inst = instruments.find((i) => i.symbol === s);
@@ -184,7 +189,10 @@ export default function InstrumentsTable({ onExitMarkets, onViewNews }: Instrume
         if (segment !== 'All' && segmentOf(s, instruments) !== segment) return false;
         return true;
       });
-  }, [watchlist, prices, search, segment, starred, starredOnly, instruments]);
+    // `prices` intentionally NOT a dep: the row list no longer filters by
+    // price, so it must not recompute on every tick. Per-row bid/ask still
+    // reads `prices[symbol]` live in the render below.
+  }, [watchlist, search, segment, starred, starredOnly, instruments]);
 
   const leverage = activeAccount?.leverage ?? 500;
 

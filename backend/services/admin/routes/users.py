@@ -42,6 +42,16 @@ async def get_user_detail(
     return await user_service.get_user_detail(user_id=user_id, db=db)
 
 
+@router.get("/{user_id}/deposits")
+async def get_user_deposits(
+    user_id: uuid.UUID,
+    admin: User = Depends(require_permission("users.view")),
+    db: AsyncSession = Depends(get_db),
+):
+    """Per-deposit history (method + which admin approved it)."""
+    return {"deposits": await user_service.get_user_deposits(user_id=user_id, db=db)}
+
+
 @router.post("/{user_id}/add-fund")
 async def add_fund(
     user_id: uuid.UUID,
@@ -133,6 +143,55 @@ async def unban_user(
         user_id=user_id, admin_id=admin.id,
         ip_address=request.client.host if request.client else None, db=db,
     )
+
+
+@router.post("/{user_id}/suspend")
+async def suspend_user(
+    user_id: uuid.UUID,
+    request: Request,
+    admin: User = Depends(require_permission("users.ban")),
+    db: AsyncSession = Depends(get_db),
+):
+    """Temporary hold — blocks login + kicks live sessions. Data retained."""
+    return await user_service.suspend_user(
+        user_id, admin.id, request.client.host if request.client else None, db)
+
+
+@router.post("/{user_id}/terminate")
+async def terminate_user(
+    user_id: uuid.UUID,
+    request: Request,
+    admin: User = Depends(require_permission("users.ban")),
+    db: AsyncSession = Depends(get_db),
+):
+    """Close the account (end of relationship) but keep full history."""
+    return await user_service.terminate_user(
+        user_id, admin.id, request.client.host if request.client else None, db)
+
+
+@router.post("/{user_id}/soft-delete")
+async def soft_delete_user(
+    user_id: uuid.UUID,
+    request: Request,
+    admin: User = Depends(require_permission("users.ban")),
+    db: AsyncSession = Depends(get_db),
+):
+    """Soft delete — user can never log in again, but every record stays with
+    the broker (ledger / deposits / trades). Reversible via reactivate."""
+    return await user_service.soft_delete_user(
+        user_id, admin.id, request.client.host if request.client else None, db)
+
+
+@router.post("/{user_id}/reactivate")
+async def reactivate_user(
+    user_id: uuid.UUID,
+    request: Request,
+    admin: User = Depends(require_permission("users.ban")),
+    db: AsyncSession = Depends(get_db),
+):
+    """Bring a suspended / terminated / soft-deleted user back to active."""
+    return await user_service.reactivate_user(
+        user_id, admin.id, request.client.host if request.client else None, db)
 
 
 @router.post("/{user_id}/block-trading")

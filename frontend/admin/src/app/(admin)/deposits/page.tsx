@@ -221,6 +221,8 @@ export default function DepositsPage() {
   })();
   const [activeTab, setActiveTab] = useState<TabId>(initialTab);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('pending');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
   const [page, setPage] = useState(1);
 
   const [deposits, setDeposits] = useState<Deposit[]>([]);
@@ -256,6 +258,8 @@ export default function DepositsPage() {
         endpoint = '/finance/deposits';
         if (statusFilter !== 'all') params.status = statusFilter;
       }
+      if (dateFrom) params.start_date = dateFrom;
+      if (dateTo) params.end_date = dateTo;
 
       const res = await adminApi.get<{ items: Deposit[]; total: number }>(
         endpoint,
@@ -269,7 +273,7 @@ export default function DepositsPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, statusFilter]);
+  }, [page, statusFilter, dateFrom, dateTo]);
 
   const fetchWithdrawals = useCallback(async () => {
     setLoading(true);
@@ -287,6 +291,8 @@ export default function DepositsPage() {
         endpoint = '/finance/withdrawals';
         if (statusFilter !== 'all') params.status = statusFilter;
       }
+      if (dateFrom) params.start_date = dateFrom;
+      if (dateTo) params.end_date = dateTo;
 
       const res = await adminApi.get<{ items: Withdrawal[]; total: number }>(
         endpoint,
@@ -300,7 +306,7 @@ export default function DepositsPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, statusFilter]);
+  }, [page, statusFilter, dateFrom, dateTo]);
 
   const fetchTransactions = useCallback(async () => {
     setLoading(true);
@@ -310,6 +316,8 @@ export default function DepositsPage() {
         page: String(page),
         per_page: String(PAGE_SIZE),
       };
+      if (dateFrom) params.start_date = dateFrom;
+      if (dateTo) params.end_date = dateTo;
       const res = await adminApi.get<{ items: TransactionRecord[]; total: number }>(
         '/transactions', params,
       );
@@ -321,7 +329,7 @@ export default function DepositsPage() {
     } finally {
       setLoading(false);
     }
-  }, [page]);
+  }, [page, dateFrom, dateTo]);
 
   useEffect(() => {
     if (activeTab === 'deposits') fetchDeposits();
@@ -331,7 +339,7 @@ export default function DepositsPage() {
 
   useEffect(() => {
     setPage(1);
-  }, [activeTab, statusFilter]);
+  }, [activeTab, statusFilter, dateFrom, dateTo]);
 
   const handleAction = async () => {
     if (!actionModal) return;
@@ -427,25 +435,56 @@ export default function DepositsPage() {
               })}
             </div>
 
-            {/* Status filter — hide for history tab */}
-            <div className={cn('pr-3 flex items-center gap-2', activeTab === 'history' && 'hidden')}>
-              <span className="text-xxs text-text-tertiary">Status:</span>
-              <div className="relative">
-                <select
-                  value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
-                  className="text-xs py-1 pl-2 pr-7 appearance-none bg-bg-input border border-border-primary rounded-md text-text-primary"
-                >
-                  {STATUS_FILTERS.map((f) => (
-                    <option key={f.value} value={f.value}>
-                      {f.label}
-                    </option>
-                  ))}
-                </select>
-                <ChevronDown
-                  size={12}
-                  className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-text-tertiary"
+            <div className="pr-3 flex items-center gap-3 flex-wrap justify-end py-1">
+              {/* Custom date range — applies to all tabs (filters created_at) */}
+              <div className="flex items-center gap-1.5">
+                <span className="text-xxs text-text-tertiary">From</span>
+                <input
+                  type="date"
+                  value={dateFrom}
+                  max={dateTo || undefined}
+                  onChange={(e) => setDateFrom(e.target.value)}
+                  className="text-xs py-1 px-2 bg-bg-input border border-border-primary rounded-md text-text-primary"
                 />
+                <span className="text-xxs text-text-tertiary">To</span>
+                <input
+                  type="date"
+                  value={dateTo}
+                  min={dateFrom || undefined}
+                  onChange={(e) => setDateTo(e.target.value)}
+                  className="text-xs py-1 px-2 bg-bg-input border border-border-primary rounded-md text-text-primary"
+                />
+                {(dateFrom || dateTo) && (
+                  <button
+                    type="button"
+                    onClick={() => { setDateFrom(''); setDateTo(''); }}
+                    className="text-xxs text-text-tertiary hover:text-text-primary underline"
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
+
+              {/* Status filter — hide for history tab */}
+              <div className={cn('flex items-center gap-2', activeTab === 'history' && 'hidden')}>
+                <span className="text-xxs text-text-tertiary">Status:</span>
+                <div className="relative">
+                  <select
+                    value={statusFilter}
+                    onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
+                    className="text-xs py-1 pl-2 pr-7 appearance-none bg-bg-input border border-border-primary rounded-md text-text-primary"
+                  >
+                    {STATUS_FILTERS.map((f) => (
+                      <option key={f.value} value={f.value}>
+                        {f.label}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown
+                    size={12}
+                    className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-text-tertiary"
+                  />
+                </div>
               </div>
             </div>
           </div>

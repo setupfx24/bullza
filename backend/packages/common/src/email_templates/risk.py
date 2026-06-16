@@ -30,11 +30,11 @@ def render_margin_call(
         ("Free margin", _fmt_money(free_margin, currency)),
     ]
     body = kv_table(rows) + """
-    <p style="margin:16px 0 0;color:#f5f5f5;font-size:14px;line-height:1.6;">
+    <p style="margin:16px 0 0;color:#1a1a1a;font-size:14px;line-height:1.6;">
       Your account is approaching the stop-out threshold. To avoid forced
       position closure, do one of the following now:
     </p>
-    <ul style="margin:8px 0 0;padding-left:20px;color:#f5f5f5;font-size:14px;line-height:1.7;">
+    <ul style="margin:8px 0 0;padding-left:20px;color:#1a1a1a;font-size:14px;line-height:1.7;">
       <li>Add funds to your trading account</li>
       <li>Close one or more open positions</li>
       <li>Reduce position size</li>
@@ -88,7 +88,7 @@ def render_stop_out(
         ("New equity", _fmt_money(new_equity, currency)),
     ]
     body = kv_table(rows) + """
-    <p style="margin:16px 0 0;color:#f5f5f5;font-size:14px;line-height:1.6;">
+    <p style="margin:16px 0 0;color:#1a1a1a;font-size:14px;line-height:1.6;">
       The system closed positions automatically because margin level fell
       below the stop-out threshold. Your remaining equity is shown above.
       You can resume trading once you top up the account.

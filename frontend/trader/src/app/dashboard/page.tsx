@@ -182,6 +182,9 @@ function BrokerHome() {
 
   return (
     <div className="space-y-5 pb-8 max-w-[1200px] mx-auto w-full">
+      {/* Promotional banners sit at the TOP so a new banner pushes the rest
+          of the dashboard down rather than hiding at the bottom. */}
+      {banners.length > 0 && <BannerStrip banners={banners} />}
       <AccountBalanceCard
         accounts={accounts}
         active={activeAccount}
@@ -193,7 +196,6 @@ function BrokerHome() {
         <InviteFriendsCard />
         <BonusCard />
       </div>
-      {banners.length > 0 && <BannerStrip banners={banners} />}
     </div>
   );
 }

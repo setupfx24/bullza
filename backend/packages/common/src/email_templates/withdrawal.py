@@ -152,7 +152,7 @@ def render_withdrawal_rejected(
 
     subject = f"Withdrawal rejected — {_fmt_money(amount, currency)}"
     body = kv_table(rows) + (
-        '<p style="margin:18px 0 0;color:#9a9a9a;font-size:13px;line-height:1.6;">'
+        '<p style="margin:18px 0 0;color:#6b7280;font-size:13px;line-height:1.6;">'
         "Your funds have been returned to your main wallet. You can submit a "
         "new withdrawal request once you've addressed the issue above, or "
         "contact support if anything is unclear."

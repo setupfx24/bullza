@@ -26,7 +26,10 @@ class RejectBody(BaseModel):
 
 @router.get("")
 async def list_pending(
-    admin: User = Depends(require_permission("audit_logs.view")),
+    # Tied to funds.approve so the whole Approvals section unlocks with a
+    # single permission — granting Finance (which now holds funds.approve)
+    # gives the admin the queue + approve/reject in one go.
+    admin: User = Depends(require_permission("funds.approve")),
     db: AsyncSession = Depends(get_db),
 ):
     """List all pending approval requests (filterable client-side)."""
@@ -49,7 +52,10 @@ async def list_pending(
 async def approve(
     request_id: uuid.UUID,
     request: Request,
-    admin: User = Depends(require_permission("users.add_fund")),
+    # Second-admin sign-off on a financial action. Gated on funds.approve,
+    # a permission no employee role holds → super_admin only (client
+    # 2026-06-12: every admin funding needs super-admin approval).
+    admin: User = Depends(require_permission("funds.approve")),
     db: AsyncSession = Depends(get_db),
 ):
     """Second-admin approval. Cannot be the same admin who requested it.
@@ -71,7 +77,7 @@ async def reject(
     request_id: uuid.UUID,
     body: RejectBody,
     request: Request,
-    admin: User = Depends(require_permission("users.add_fund")),
+    admin: User = Depends(require_permission("funds.approve")),
     db: AsyncSession = Depends(get_db),
 ):
     rec = await approval_service.reject(

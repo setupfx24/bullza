@@ -30,6 +30,10 @@ import {
   ShieldOff,
   Trash2,
   UserRound,
+  UserCheck,
+  PauseCircle,
+  XCircle,
+  Archive,
   X,
 } from 'lucide-react';
 
@@ -129,9 +133,9 @@ function kycBadge(k: string) {
 function Modal({ open, onClose, title, children }: { open: boolean; onClose: () => void; title: string; children: React.ReactNode }) {
   if (!open) return null;
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center animate-fade-in">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center py-4 animate-fade-in">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-bg-secondary border border-border-primary rounded-t-xl sm:rounded-xl shadow-modal w-full sm:max-w-lg sm:mx-4 p-6 animate-slide-down">
+      <div className="relative bg-bg-secondary border border-border-primary rounded-t-xl sm:rounded-xl shadow-modal w-full sm:max-w-lg sm:mx-4 p-6 animate-slide-down max-h-[90vh] overflow-y-auto overscroll-contain">
         <div className="flex items-center justify-between mb-5">
           <h3 className="text-base font-bold text-text-primary">{title}</h3>
           <button onClick={onClose} className="p-2 rounded-lg hover:bg-bg-hover transition-fast text-text-tertiary hover:text-text-primary">
@@ -431,6 +435,23 @@ export default function UsersPage() {
     }
   };
 
+  // Lifecycle status actions (suspend / terminate / soft-delete / reactivate).
+  // All keep the user's data — only `status` changes. Simple confirm flow.
+  const quickStatusAction = async (
+    u: { id: string; name?: string; email?: string },
+    endpoint: string, confirmMsg: string, successMsg: string,
+  ) => {
+    setOpenActionsId(null); setMenuPos(null);
+    if (!window.confirm(confirmMsg)) return;
+    try {
+      await adminApi.post(`/users/${u.id}/${endpoint}`);
+      toast.success(successMsg);
+      fetchUsers();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Action failed');
+    }
+  };
+
   const submitDeleteUser = async () => {
     if (!modalUser) return;
     setModalSubmitting(true);
@@ -527,7 +548,7 @@ export default function UsersPage() {
           </div>
           <div className="flex flex-wrap gap-4">
             {([
-              { label: 'Status', value: statusFilter, onChange: (v: string) => { setStatusFilter(v); setPage(1); }, options: [{ v: '', t: 'All statuses' }, { v: 'active', t: 'Active' }, { v: 'suspended', t: 'Suspended' }, { v: 'banned', t: 'Banned' }, { v: 'pending', t: 'Pending' }] },
+              { label: 'Status', value: statusFilter, onChange: (v: string) => { setStatusFilter(v); setPage(1); }, options: [{ v: '', t: 'All statuses' }, { v: 'active', t: 'Active' }, { v: 'suspended', t: 'Suspended' }, { v: 'banned', t: 'Banned' }, { v: 'terminated', t: 'Terminated' }, { v: 'deleted', t: 'Soft-deleted' }, { v: 'pending', t: 'Pending' }] },
               { label: 'KYC', value: kycFilter, onChange: (v: string) => { setKycFilter(v); setPage(1); }, options: [{ v: '', t: 'All KYC' }, { v: 'verified', t: 'Verified' }, { v: 'pending', t: 'Pending' }, { v: 'rejected', t: 'Rejected' }] },
               { label: 'Group', value: groupFilter, onChange: setGroupFilter, options: [{ v: '', t: 'All groups' }, { v: 'Retail', t: 'Retail' }, { v: 'IB', t: 'IB' }, { v: 'VIP', t: 'VIP' }] },
             ] as const).map(f => (
@@ -722,9 +743,19 @@ export default function UsersPage() {
           { label: u.status?.toLowerCase() === 'banned' ? 'Unban User' : 'Ban User', icon: Ban, action: () => openModal(u.status?.toLowerCase() === 'banned' ? 'unban' : 'ban', u), danger: true },
           { label: 'Kill Switch', icon: Power, action: () => openModal('kill-switch', u), danger: true },
           { divider: true } as any,
+          // Lifecycle: reactivate is offered when the account is in any
+          // login-blocked state; otherwise suspend / terminate / soft-delete.
+          ...(['suspended', 'terminated', 'deleted'].includes((u.status || '').toLowerCase())
+            ? [{ label: 'Reactivate User', icon: UserCheck, action: () => quickStatusAction(u, 'reactivate', `Reactivate ${u.name}? They will be able to log in again.`, 'User reactivated') }]
+            : [
+                { label: 'Suspend (temporary)', icon: PauseCircle, action: () => quickStatusAction(u, 'suspend', `Suspend ${u.name}? They can't log in until reactivated. Data is kept.`, 'User suspended'), danger: true },
+                { label: 'Terminate Account', icon: XCircle, action: () => quickStatusAction(u, 'terminate', `Terminate ${u.name}? Account closes but all history stays.`, 'User terminated'), danger: true },
+              ]),
+          { divider: true } as any,
           { label: 'Login As User', icon: LogIn, action: () => handleLoginAs(u) },
           { divider: true } as any,
-          { label: 'Delete User', icon: Trash2, action: () => openModal('delete', u), danger: true },
+          { label: 'Soft Delete (keep records)', icon: Archive, action: () => quickStatusAction(u, 'soft-delete', `Soft-delete ${u.name}? They can never log in, but ALL records stay with the broker. Reversible.`, 'User soft-deleted'), danger: true },
+          { label: 'Delete Permanently', icon: Trash2, action: () => openModal('delete', u), danger: true },
         ];
         // Portal the dropdown to document.body so `position: fixed` stays
         // viewport-relative even when an ancestor has a CSS `transform`
@@ -736,8 +767,8 @@ export default function UsersPage() {
             <div className="fixed inset-0 z-40" onMouseDown={closeMenu} />
             <div
               data-actions-menu
-              className="fixed z-50 w-[190px] py-1 rounded-lg border border-border-primary bg-bg-secondary shadow-dropdown text-left animate-slide-down"
-              style={{ top: menuPos.top, left: menuPos.left }}
+              className="fixed z-50 w-[190px] py-1 rounded-lg border border-border-primary bg-bg-secondary shadow-dropdown text-left animate-slide-down overflow-y-auto overscroll-contain"
+              style={{ top: menuPos.top, left: menuPos.left, maxHeight: `calc(100vh - ${menuPos.top}px - 8px)` }}
               onMouseDown={e => e.stopPropagation()}
               onClick={e => e.stopPropagation()}
             >

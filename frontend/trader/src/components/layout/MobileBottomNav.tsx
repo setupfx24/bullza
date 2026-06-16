@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import { useUIStore } from '@/stores/uiStore';
 import { useAuthStore } from '@/stores/authStore';
+import { usePlatformStatusStore } from '@/stores/platformStatusStore';
 import { useTradingStore } from '@/stores/tradingStore';
 import {
   getPersistedTradingAccountId,
@@ -98,6 +99,16 @@ export default function MobileBottomNav() {
   const activeAccount = useTradingStore((s) => s.activeAccount);
   const setActiveAccount = useTradingStore((s) => s.setActiveAccount);
   const [showMore, setShowMore] = useState(false);
+  const pammEnabled = usePlatformStatusStore((s) => s.pamm_enabled);
+  const mamEnabled = usePlatformStatusStore((s) => s.mam_enabled);
+  const sheetItems = useMemo(
+    () => SHEET_ITEMS.filter((it) => {
+      if (it.path === '/pamm' && !pammEnabled) return false;
+      if (it.path === '/social' && !mamEnabled) return false;
+      return true;
+    }),
+    [pammEnabled, mamEnabled],
+  );
 
   const tradingAccountId = useMemo(() => {
     if (pathname?.startsWith('/trading/terminal')) return searchParams.get('account');
@@ -262,7 +273,7 @@ export default function MobileBottomNav() {
             </div>
 
             <div className="grid grid-cols-5 gap-y-5 gap-x-2 px-4 pb-5">
-              {SHEET_ITEMS.map((item) => {
+              {sheetItems.map((item) => {
                 const Icon = item.icon;
                 return (
                   <Link

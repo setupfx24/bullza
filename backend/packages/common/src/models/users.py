@@ -82,6 +82,10 @@ class User(Base):
     # Who referred this user (set once at signup). Drives the one-shot
     # first-deposit commission payout in deposit_service.
     referred_by_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    # Relationship Manager assigned to this user (RM subsystem, migration
+    # 0071). An RM can raise funding requests + upload proof only for the
+    # users assigned to them.
+    assigned_rm_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
     # Last time we emailed the user a KYC-pending nudge. NULL means
     # we've never nudged them — the engine sends the first at +24h, then
     # every 7 days while KYC stays pending.

@@ -22,6 +22,10 @@ class IBProfile(Base):
     commission_plan_id = Column(UUID(as_uuid=True))
     custom_commission_per_lot = Column(Numeric(18, 8))
     custom_commission_per_trade = Column(Numeric(18, 8))
+    # Admin manual tier override (client spec 2026-06-16): when set to a tier
+    # label (Bronze/Silver/Gold/Platinum), the commission engine uses that
+    # tier's per-lot rate instead of the auto-resolved tier. NULL = auto.
+    tier_override = Column(String(40))
     total_earned = Column(Numeric(18, 8), default=0)
     pending_payout = Column(Numeric(18, 8), default=0)
     is_active = Column(Boolean, default=True)

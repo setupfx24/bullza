@@ -59,6 +59,8 @@ interface UserDetail {
   total_withdrawal: number;
   total_trades: number;
   open_positions: number;
+  assigned_rm_id?: string | null;
+  assigned_rm_name?: string | null;
 }
 
 function fmt(n: number) {
@@ -71,6 +73,59 @@ function statusColor(s: string) {
     case 'banned': case 'suspended': return 'bg-danger/15 text-danger';
     default: return 'bg-warning/15 text-warning';
   }
+}
+
+/** Assign a user to a Relationship Manager. Renders only for admins who hold
+ *  rm.assign (the /rm/list call 403s otherwise → we hide the card). */
+function RMAssignCard({ userId, currentRmId, currentRmName, onSaved }: {
+  userId: string; currentRmId: string | null | undefined; currentRmName: string | null | undefined; onSaved: () => void;
+}) {
+  const [rms, setRms] = useState<Array<{ id: string; name: string; email: string | null }>>([]);
+  const [allowed, setAllowed] = useState(false);
+  const [sel, setSel] = useState(currentRmId || '');
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    adminApi.get<{ rms: typeof rms }>('/rm/list')
+      .then((d) => { setRms(d.rms || []); setAllowed(true); })
+      .catch(() => setAllowed(false));
+  }, []);
+  useEffect(() => { setSel(currentRmId || ''); }, [currentRmId]);
+
+  if (!allowed) return null;
+
+  const save = async () => {
+    setSaving(true);
+    try {
+      await adminApi.post(`/rm/assign/${userId}`, { rm_id: sel || null });
+      toast.success('RM assignment updated');
+      onSaved();
+    } catch (e: any) {
+      toast.error(e?.message || 'Failed to update');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="bg-bg-secondary border border-border-primary rounded-lg p-5">
+      <h2 className="text-base font-bold text-text-primary mb-1">Relationship Manager</h2>
+      <p className="text-xxs text-text-tertiary mb-3">
+        {currentRmName ? <>Currently managed by <span className="text-text-secondary">{currentRmName}</span>.</> : 'No RM assigned.'}
+      </p>
+      <div className="flex items-center gap-2 flex-wrap">
+        <select value={sel} onChange={(e) => setSel(e.target.value)}
+          className="text-sm py-1.5 px-2 bg-bg-input border border-border-primary rounded-md text-text-primary min-w-[220px]">
+          <option value="">— Unassigned —</option>
+          {rms.map((r) => <option key={r.id} value={r.id}>{r.name} {r.email ? `(${r.email})` : ''}</option>)}
+        </select>
+        <button onClick={save} disabled={saving || sel === (currentRmId || '')}
+          className="text-sm font-medium bg-accent text-white rounded-md px-3 py-1.5 disabled:opacity-50">
+          {saving ? 'Saving…' : 'Save'}
+        </button>
+      </div>
+    </div>
+  );
 }
 
 function kycColor(k: string) {
@@ -88,6 +143,7 @@ export default function UserDetailPage() {
   const userId = params.id as string;
 
   const [data, setData] = useState<UserDetail | null>(null);
+  const [deposits, setDeposits] = useState<Array<{ id: string; amount: number; method: string; status: string; created_at: string | null; approved_at: string | null; approved_by: string | null; reference: string | null }>>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -97,6 +153,10 @@ export default function UserDetailPage() {
     try {
       const res = await adminApi.get<UserDetail>(`/users/${userId}`);
       setData(res);
+      adminApi
+        .get<{ deposits: typeof deposits }>(`/users/${userId}/deposits`)
+        .then((d) => setDeposits(d.deposits || []))
+        .catch(() => {});
     } catch (e: any) {
       setError(e.message || 'Failed to load user');
     } finally {
@@ -175,6 +235,51 @@ export default function UserDetailPage() {
           ))}
         </div>
 
+        {/* RM assignment (only visible to admins with rm.assign) */}
+        <RMAssignCard
+          userId={userId}
+          currentRmId={data.assigned_rm_id}
+          currentRmName={data.assigned_rm_name}
+          onSaved={fetchUser}
+        />
+
+        {/* Deposit history — how each deposit was made + which admin approved */}
+        <div className="bg-bg-secondary border border-border-primary rounded-lg p-5">
+          <h2 className="text-base font-bold text-text-primary mb-4">Deposit history</h2>
+          {deposits.length === 0 ? (
+            <p className="text-xs text-text-tertiary">No deposits.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="text-text-tertiary text-left uppercase tracking-wide">
+                    <th className="py-2 pr-3">Date</th>
+                    <th className="py-2 pr-3">Amount</th>
+                    <th className="py-2 pr-3">Method</th>
+                    <th className="py-2 pr-3">Status</th>
+                    <th className="py-2 pr-3">Approved by</th>
+                    <th className="py-2 pr-3">Reference</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {deposits.map((d) => (
+                    <tr key={d.id} className="border-t border-border-primary/50">
+                      <td className="py-2 pr-3 text-text-secondary whitespace-nowrap">{d.created_at ? new Date(d.created_at).toLocaleString() : '—'}</td>
+                      <td className="py-2 pr-3 font-mono text-text-primary">${fmt(d.amount)}</td>
+                      <td className="py-2 pr-3 text-text-primary capitalize">{(d.method || '—').replace(/_/g, ' ')}</td>
+                      <td className="py-2 pr-3">
+                        <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold ${['approved', 'auto_approved'].includes(d.status) ? 'bg-success/15 text-success' : d.status === 'pending' ? 'bg-warning/15 text-warning' : 'bg-bg-tertiary text-text-tertiary'}`}>{d.status}</span>
+                      </td>
+                      <td className="py-2 pr-3 text-text-secondary">{d.approved_by || (['approved', 'auto_approved'].includes(d.status) ? 'auto' : '—')}</td>
+                      <td className="py-2 pr-3 text-text-tertiary font-mono truncate max-w-[160px]">{d.reference || '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+
         {/* User Details */}
         <div className="bg-bg-secondary border border-border-primary rounded-lg p-5">
           <h2 className="text-base font-bold text-text-primary mb-4">Personal Information</h2>
@@ -203,6 +308,9 @@ export default function UserDetailPage() {
 
         {/* Fixed Return — admin grants a lock to this user with custom terms */}
         <FixedReturnGrantCard userId={userId} />
+
+        {/* Fixed Return — special bonus (% of principal or flat amount) */}
+        <FixedReturnBonusCard userId={userId} />
 
         {/* Trading Accounts */}
         <div className="bg-bg-secondary border border-border-primary rounded-lg p-5">
@@ -673,6 +781,65 @@ function Flag({ label, value, good }: { label: string; value: string; good: bool
 // locked position — once created, the gateway interest engine drives
 // payouts the same way.
 const GRANT_TENURES = ['Month', 'Quarter', 'Half-Year', 'Year', '2 Year'] as const;
+
+function FixedReturnBonusCard({ userId }: { userId: string }) {
+  const [mode, setMode] = useState<'percent' | 'fixed'>('percent');
+  const [value, setValue] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
+  const submit = async () => {
+    const v = parseFloat(value);
+    if (!Number.isFinite(v) || v <= 0) { toast.error('Enter a positive value'); return; }
+    if (!window.confirm(
+      mode === 'percent'
+        ? `Grant a bonus of ${v}% of this user's active Fixed-Return principal?`
+        : `Grant a flat $${v.toFixed(2)} Fixed-Return bonus to this user?`
+    )) return;
+    setSubmitting(true);
+    try {
+      const res = await adminApi.post<{ amount: number }>(`/fixed-return/users/${userId}/bonus`, { mode, value: v });
+      toast.success(`Bonus of $${(res.amount ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2 })} credited`);
+      setValue('');
+    } catch (e: any) {
+      toast.error(e?.message || 'Bonus failed');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="bg-bg-secondary border border-border-primary rounded-lg p-5">
+      <div className="mb-3">
+        <h2 className="text-base font-bold text-text-primary">Fixed Return — Special Bonus</h2>
+        <p className="text-xs text-text-tertiary mt-0.5 max-w-2xl">
+          Reward a Fixed-Return holder with a one-off bonus credited to their main wallet —
+          either a <span className="text-text-primary font-semibold">percentage of their active locked principal</span> or a
+          <span className="text-text-primary font-semibold"> flat amount</span>.
+        </p>
+      </div>
+      <div className="flex items-end gap-3 flex-wrap">
+        <label className="block">
+          <span className="block text-[10px] uppercase text-text-tertiary mb-1">Type</span>
+          <select value={mode} onChange={(e) => setMode(e.target.value as any)}
+            className="px-3 py-2 rounded-md bg-bg-tertiary border border-border-primary text-sm text-text-primary outline-none focus:border-accent/50">
+            <option value="percent">% of active principal</option>
+            <option value="fixed">Flat amount (USD)</option>
+          </select>
+        </label>
+        <label className="block">
+          <span className="block text-[10px] uppercase text-text-tertiary mb-1">{mode === 'percent' ? 'Percent (%)' : 'Amount (USD)'}</span>
+          <input type="number" step="0.01" min="0" value={value} onChange={(e) => setValue(e.target.value)}
+            placeholder={mode === 'percent' ? 'e.g. 5' : 'e.g. 100'}
+            className="w-40 px-3 py-2 rounded-md bg-bg-tertiary border border-border-primary text-sm text-text-primary font-mono outline-none focus:border-accent/50" />
+        </label>
+        <button onClick={submit} disabled={submitting}
+          className="px-4 py-2 rounded-md text-sm font-medium bg-accent text-white disabled:opacity-50">
+          {submitting ? 'Granting…' : 'Grant bonus'}
+        </button>
+      </div>
+    </div>
+  );
+}
 
 function FixedReturnGrantCard({ userId }: { userId: string }) {
   const [principal, setPrincipal] = useState('');

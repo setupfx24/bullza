@@ -86,6 +86,20 @@ async def notifications_summary(
     )
     new_users_24h = int(new_users_q.scalar() or 0)
 
+    # RM funding requests awaiting an admin (pending proof, or approved but
+    # not yet credited). Surfaced so admins get notified when an RM uploads.
+    # Run last + in its own savepoint so a pre-migration missing table can't
+    # poison the surrounding session.
+    rm_pending = 0
+    try:
+        async with db.begin_nested():
+            rm_pending_q = await db.execute(
+                text("SELECT COUNT(*) FROM rm_funding_requests WHERE status IN ('pending','approved')")
+            )
+            rm_pending = int(rm_pending_q.scalar() or 0)
+    except Exception:
+        rm_pending = 0
+
     # `link` values are admin-frontend route paths. Withdrawals share the
     # /deposits page (tab=withdrawals); approvals get their own page; the
     # rest map 1:1 to existing routes.
@@ -94,6 +108,8 @@ async def notifications_summary(
          "label": "Pending withdrawals", "link": "/deposits?tab=withdrawals", "severity": "critical"},
         {"kind": "approvals",   "count": pending_approvals,
          "label": "Approval requests", "link": "/approvals", "severity": "critical"},
+        {"kind": "rm_funding",  "count": rm_pending,
+         "label": "RM funding requests", "link": "/rm-requests", "severity": "critical"},
         {"kind": "deposits",    "count": pending_deposits,
          "label": "Pending deposits", "link": "/deposits", "severity": "normal"},
         {"kind": "kyc",         "count": pending_kyc,
