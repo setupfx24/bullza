@@ -800,7 +800,7 @@ export default function BonusPage() {
               {/* Promo code (optional) + whether it's shown to users */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xxs text-text-tertiary mb-1">Promo code (optional)</label>
+                  <label className="block text-xxs text-text-tertiary mb-1">Promo code — set this for an event bonus</label>
                   <input
                     value={form.promo_code as string}
                     onChange={(e) => updateForm('promo_code', e.target.value.toUpperCase())}
@@ -820,7 +820,9 @@ export default function BonusPage() {
                 </label>
               </div>
               <p className="text-xxs text-text-tertiary -mt-2">
-                Untick &quot;Show code&quot; to keep the promo code hidden (share it privately for a targeted campaign).
+                <strong>Leave blank</strong> → automatic welcome/deposit bonus (granted to every qualifying deposit).
+                <strong> Set a code</strong> → code-gated <strong>event bonus</strong>: granted ONLY when the user enters
+                this exact code on their deposit. Untick &quot;Show code&quot; to keep it hidden for a private/targeted campaign.
               </p>
 
               <label className="flex items-center gap-2 text-xs text-text-secondary cursor-pointer">

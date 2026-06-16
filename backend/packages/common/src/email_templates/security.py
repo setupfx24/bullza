@@ -22,7 +22,7 @@ def render_new_login(
         rows.append(("Device", _shorten(user_agent, 80)))
 
     body = kv_table(rows) + """
-    <p style="margin:16px 0 0;color:#f5f5f5;font-size:14px;line-height:1.6;">
+    <p style="margin:16px 0 0;color:#1a1a1a;font-size:14px;line-height:1.6;">
       If this was you, no action needed. If you don't recognise this device,
       change your password and review active sessions immediately.
     </p>

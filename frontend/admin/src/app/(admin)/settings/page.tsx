@@ -147,9 +147,9 @@ function settingsToPayload(s: Settings): Record<string, unknown> {
     ib_min_deposit_usd: s.ib_min_deposit_usd,
     min_deposit_amount_usd: s.min_deposit_amount_usd,
     min_withdrawal_amount_usd: s.min_withdrawal_amount_usd,
-    // Fallback flat USD bounty — used only when ib_commission_tiers
-    // (the by-active-referral-count ladder, editable at /config/ib-tiers)
-    // has no matching tier for the referrer's position.
+    // Fallback flat USD bounty — used only when referral_tiers
+    // (the by-active-referral-count ladder, editable at /config/referral-tiers,
+    // independent of IB) has no matching tier for the referrer's position.
     referral_commission_amount_usd: s.referral_commission_amount_usd,
     referral_qualifying_trades: s.referral_qualifying_trades,
     ib_commission_requires_kyc: s.ib_commission_requires_kyc,
@@ -550,13 +550,14 @@ export default function SettingsPage() {
                   <p className="text-xxs text-text-tertiary">
                     Bounty scales with the <span className="text-text-secondary">referrer's</span> number of qualified referrals
                     (e.g. 1–20 → $5, 21–100 → $7, 101+ → $10) — NOT by the referred user's account type.
-                    Edit the ladder on the dedicated tier-editor page so per-lot IB rates stay in sync.
+                    This ladder is <span className="text-text-secondary">independent of IB</span>: edit it on its own
+                    Referral Tiers page (the IB per-lot ladder lives separately under Config → IB Tiers).
                   </p>
                   <a
-                    href="/config/ib-tiers"
+                    href="/config/referral-tiers"
                     className="inline-flex items-center gap-1.5 mt-1 text-xs text-buy hover:text-buy-light underline underline-offset-2"
                   >
-                    Open tier editor →
+                    Open referral tier editor →
                   </a>
                 </div>
                 <div className="flex flex-wrap items-center justify-between gap-4">

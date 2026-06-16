@@ -30,20 +30,20 @@ def render_dashboard_access(
     )
 
     body_html = (
-        '<div style="margin:0 0 22px;padding:18px 20px;border:1px solid #2a2a2a;'
-        'border-radius:8px;background:#0e0e0e;">'
+        '<div style="margin:0 0 22px;padding:18px 20px;border:1px solid #e5e7eb;'
+        'border-radius:8px;background:#f4f5f7;">'
         '<p style="margin:0 0 8px;color:#55a630;font-size:12px;font-weight:700;'
         'letter-spacing:0.8px;text-transform:uppercase;">You\'re all set</p>'
-        '<p style="margin:0;color:#9a9a9a;font-size:13px;line-height:1.6;">'
+        '<p style="margin:0;color:#6b7280;font-size:13px;line-height:1.6;">'
         "We've saved your profile details. The dashboard is where you'll "
         "fund your account, open positions, follow top traders, and claim "
         "Earn Hub rewards."
         '</p>'
         '</div>'
-        '<p style="margin:0 0 8px;color:#f5f5f5;font-size:14px;font-weight:700;">'
+        '<p style="margin:0 0 8px;color:#1a1a1a;font-size:14px;font-weight:700;">'
         "What you can do next:"
         '</p>'
-        '<ul style="margin:0 0 16px;padding:0 0 0 18px;color:#f5f5f5;">'
+        '<ul style="margin:0 0 16px;padding:0 0 0 18px;color:#1a1a1a;">'
         '<li style="margin:0 0 6px;font-size:13px;line-height:1.6;">'
         "Open your first trading account (live or demo)"
         '</li>'
@@ -57,7 +57,7 @@ def render_dashboard_access(
         "Complete KYC to unlock higher leverage and withdrawal limits"
         '</li>'
         '</ul>'
-        '<p style="margin:18px 0 0;color:#9a9a9a;font-size:12px;line-height:1.6;">'
+        '<p style="margin:18px 0 0;color:#6b7280;font-size:12px;line-height:1.6;">'
         "If the button doesn't work, copy and paste this link into your browser:<br>"
         f'<span style="color:#55a630;word-break:break-all;">{escape(dashboard_url)}</span>'
         '</p>'

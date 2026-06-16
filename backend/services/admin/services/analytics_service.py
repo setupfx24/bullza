@@ -548,11 +548,19 @@ async def finance_overview_drill(
         # Per-user realised P&L (from closed trades). The shown amount is the
         # USER's net P&L: negative = the user lost (broker gained). This lets
         # the dashboard sort top gainers / top losers.
+        # NOTE: trade_history has NO user_id column — it keys off account_id —
+        # so we resolve the owner by joining trading_accounts. Selecting
+        # TradeHistory.user_id directly raised an AttributeError → HTTP 500 on
+        # this drill.
         rows = (await db.execute(
             _dr(
-                select(TradeHistory.user_id, func.coalesce(func.sum(TradeHistory.profit), 0), func.count(TradeHistory.id)),
+                select(
+                    TradingAccount.user_id,
+                    func.coalesce(func.sum(TradeHistory.profit), 0),
+                    func.count(TradeHistory.id),
+                ).join(TradingAccount, TradingAccount.id == TradeHistory.account_id),
                 TradeHistory.closed_at,
-            ).group_by(TradeHistory.user_id)
+            ).group_by(TradingAccount.user_id)
         )).all()
         umap = await _user_label_map(db, [r[0] for r in rows if r[0]])
         for uid, profit, cnt in rows:
@@ -566,13 +574,17 @@ async def finance_overview_drill(
             })
 
     elif section in ("commission", "swap"):
+        # Same as trading: positions has no user_id, so join trading_accounts
+        # to attribute commission/swap to the owning user (selecting
+        # Position.user_id would raise → HTTP 500).
         col = Position.commission if section == "commission" else Position.swap
         rows = (await db.execute(
             _dr(
-                select(Position.user_id, func.coalesce(func.sum(col), 0), func.count(Position.id))
+                select(TradingAccount.user_id, func.coalesce(func.sum(col), 0), func.count(Position.id))
+                .join(TradingAccount, TradingAccount.id == Position.account_id)
                 .where(col != 0),
                 Position.created_at,
-            ).group_by(Position.user_id)
+            ).group_by(TradingAccount.user_id)
         )).all()
         umap = await _user_label_map(db, [r[0] for r in rows if r[0]])
         for uid, amt, cnt in rows:
@@ -648,7 +660,12 @@ async def finance_overview_drill(
     }
 
 
-async def get_exposure(db: AsyncSession, profitable_sort: str = "profit") -> dict:
+async def get_exposure(
+    db: AsyncSession,
+    profitable_sort: str = "profit",
+    start_date: datetime | None = None,
+    end_date: datetime | None = None,
+) -> dict:
     result = await db.execute(
         select(
             Position.instrument_id,
@@ -701,6 +718,13 @@ async def get_exposure(db: AsyncSession, profitable_sort: str = "profit") -> dic
         )
         .group_by(TradeHistory.account_id)
     )
+    # Custom date window — restricts the profit / win-rate ranking to trades
+    # CLOSED inside [start_date, end_date]. Open-position exposure above stays
+    # live (it has no close date). When both are None this is unfiltered.
+    if start_date is not None:
+        top_q = top_q.where(TradeHistory.closed_at >= start_date)
+    if end_date is not None:
+        top_q = top_q.where(TradeHistory.closed_at <= end_date)
     if profitable_sort == "win_rate":
         top_q = top_q.having(cnt_expr >= 5).order_by(
             (wins_expr * 1.0 / cnt_expr).desc(), pnl_expr.desc()

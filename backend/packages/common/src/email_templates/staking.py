@@ -30,7 +30,7 @@ def render_staking_digest(
         ("Earned", _fmt_money(accrued_amount, currency)),
     ]
     body = kv_table(rows) + """
-    <p style="margin:16px 0 0;color:#9a9a9a;font-size:13px;line-height:1.6;">
+    <p style="margin:16px 0 0;color:#6b7280;font-size:13px;line-height:1.6;">
       Earnings accrue hourly and compound back into your stake. Withdraw any
       time after the lock period from the Staking page.
     </p>

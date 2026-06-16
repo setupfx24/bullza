@@ -127,9 +127,17 @@ function TradingSession({ children }: { children: React.ReactNode }) {
       try {
         const raw = await api.get<unknown>('/instruments/prices/all', undefined, { timeoutMs: 15000 });
         if (pollCancelled) return;
-        for (const t of extractTicksFromPayload(raw)) updatePrice(t);
-      } catch {
-        /* ignore */
+        const ticks = extractTicksFromPayload(raw);
+        // Diagnostic: a silent empty response here is the usual reason the
+        // terminal shows only Gold — it means the price feed (market-data)
+        // is publishing few/no symbols, NOT a UI bug. Surfacing it in the
+        // console makes a partial/empty feed visible instead of mysterious.
+        if (ticks.length <= 1) {
+          console.warn(`[prices] /instruments/prices/all returned ${ticks.length} tick(s) — feed may be publishing only one symbol`);
+        }
+        for (const t of ticks) updatePrice(t);
+      } catch (err) {
+        console.warn('[prices] poll of /instruments/prices/all failed:', err);
       }
     };
     void pollPricesFromApi();

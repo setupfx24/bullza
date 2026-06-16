@@ -208,6 +208,56 @@ async def count_active_referrals(db: AsyncSession, ib_profile_id: UUID) -> int:
     return int(n)
 
 
+async def _resolve_ib_per_lot(
+    db: AsyncSession, ib: IBProfile, acct_type_key: str, plan,
+) -> Decimal | None:
+    """Per-lot commission rate for ONE earner, using THEIR OWN tier.
+
+    Client spec 2026-06-16: every IB/sub-IB earns on their own tier rate
+    (a Bronze IB earns on $5/lot, a Gold sub-IB on $10/lot), NOT on a shared
+    pool. Priority:
+      1. per-IB custom $/lot override (admin-set on the profile)
+      2. admin manual tier override (forced Bronze/Silver/Gold/Platinum)
+      3. auto tier, by the referred account type
+      4. auto tier flat per_lot
+      5. plan default
+    Returns None when nothing resolves (this earner gets nothing this trade).
+    """
+    if ib.custom_commission_per_lot is not None and ib.custom_commission_per_lot > 0:
+        return Decimal(str(ib.custom_commission_per_lot))
+
+    tiers = await get_ib_tiers(db)
+    tier = None
+    # Admin manual tier override (tier_override column, added 2026-06-16).
+    # getattr-safe so the engine still runs before the column exists.
+    override_label = (getattr(ib, "tier_override", None) or "").strip().lower()
+    if override_label:
+        for t in tiers:
+            if str(t.get("label") or "").strip().lower() == override_label:
+                tier = t
+                break
+    if tier is None:
+        activations, amount = await compute_ib_qualification(db, ib.id)
+        tier = resolve_tier(activations, amount, tiers)
+
+    if tier:
+        type_map = tier.get("per_lot_by_account_type") or {}
+        raw = type_map.get(acct_type_key) if acct_type_key else None
+        if raw in (None, "") and isinstance(type_map, dict):
+            raw = type_map.get("standard")  # last-resort default
+        if raw in (None, ""):
+            raw = tier.get("per_lot")
+        if raw not in (None, ""):
+            try:
+                return Decimal(str(raw))
+            except Exception:
+                pass
+
+    if plan and plan.commission_per_lot is not None:
+        return Decimal(str(plan.commission_per_lot))
+    return None
+
+
 async def distribute_ib_commission(
     db: AsyncSession,
     trader_user_id: UUID,
@@ -279,96 +329,48 @@ async def distribute_ib_commission(
         )
         plan = plan_q.scalar_one_or_none()
 
-    # Effective per-lot rate priority:
-    #   1. Direct IB's custom override (admin sets this per-agent).
-    #   2. Tier ladder, BY ACCOUNT TYPE of the referred user. A trade
-    #      on a Standard account can pay a different per-lot than the
-    #      same trade on ECN/VIP — Standard pays less, ECN/VIP more.
-    #      Lookup key is the AccountGroup.name lowercased.
-    #   3. Tier ladder's flat per_lot (fallback when the account type
-    #      isn't keyed in per_lot_by_account_type).
-    #   4. Plan default.
-    per_lot = None
-    if direct_ib.custom_commission_per_lot is not None and direct_ib.custom_commission_per_lot > 0:
-        per_lot = Decimal(str(direct_ib.custom_commission_per_lot))
-
-    if per_lot is None:
-        tiers = await get_ib_tiers(db)
-        activations, amount = await compute_ib_qualification(db, direct_ib.id)
-        tier = resolve_tier(activations, amount, tiers)
-        if tier:
-            # Look up the referred user's account-type bucket. The
-            # commission row that pays is the one tied to the same
-            # account that placed the order. Falls through to the
-            # flat per_lot if the account-type bucket is missing.
-            acct_type_key = await _referred_account_type_key(db, order_id) or ""
-            type_map = tier.get("per_lot_by_account_type") or {}
-            raw = type_map.get(acct_type_key) if acct_type_key else None
-            if raw in (None, "") and isinstance(type_map, dict):
-                raw = type_map.get("standard")  # last-resort default
-            if raw in (None, ""):
-                raw = tier.get("per_lot")
-            if raw not in (None, ""):
-                try:
-                    per_lot = Decimal(str(raw))
-                except Exception:
-                    per_lot = None
-
-    if per_lot is None and plan and plan.commission_per_lot is not None:
-        per_lot = Decimal(str(plan.commission_per_lot))
-
-    if per_lot is None or per_lot <= 0:
-        return
-
-    total_commission = per_lot * lots
-    if total_commission <= 0:
-        return
-
-    # Prefer plan's MLM distribution; fall back to global SystemSetting; then default.
-    mlm_dist: list[int] | None = None
-    if plan and plan.mlm_distribution:
-        raw = plan.mlm_distribution
-        if isinstance(raw, str):
-            try:
-                raw = json.loads(raw)
-            except Exception:
-                raw = None
-        if isinstance(raw, list) and raw:
-            mlm_dist = [int(x) for x in raw]
-    if mlm_dist is None:
-        mlm_dist = await get_mlm_distribution(db)
+    # ── Commission distribution (client spec 2026-06-16) ──────────────
+    # Each IB/sub-IB earns on THEIR OWN tier per-lot rate (Bronze $5, Gold
+    # $10, ...), NOT a shared pool. Walking UP from the trader's direct
+    # sponsor:
+    #   • direct sponsor earns 100% of their own per-lot rate × lots
+    #   • each upline earns its level % of ITS OWN per-lot rate × lots
+    #   • the ladder going up is 40 / 20 / 10 / 10 / 5 (max 5 uplines)
+    # Shares STACK up the chain (the broker funds the overage from the
+    # spread). The account-type bucket is the trader's order account; each
+    # earner looks up THEIR rate for that bucket.
+    acct_type_key = await _referred_account_type_key(db, order_id) or ""
+    LEVEL_PCTS = [100, 40, 20, 10, 10, 5]  # [0] = direct sponsor, [1..5] = uplines
 
     current_ib = direct_ib
-    for level, pct in enumerate(mlm_dist, start=1):
+    for depth, pct in enumerate(LEVEL_PCTS):
         if current_ib is None:
             break
 
-        share = total_commission * Decimal(str(pct)) / Decimal("100")
+        earner_per_lot = await _resolve_ib_per_lot(db, current_ib, acct_type_key, plan)
+        if earner_per_lot is None or earner_per_lot <= 0:
+            current_ib = await _get_parent_ib(current_ib, db)
+            continue
+
+        share = earner_per_lot * lots * Decimal(str(pct)) / Decimal("100")
         if share <= 0:
             current_ib = await _get_parent_ib(current_ib, db)
             continue
 
-        commission_record = IBCommission(
+        db.add(IBCommission(
             ib_id=current_ib.id,
             source_user_id=trader_user_id,
             source_trade_id=order_id,
             commission_type="trade_lot",
             amount=share,
-            mlm_level=level,
+            mlm_level=depth + 1,  # 1 = direct sponsor, 2..6 = uplines
             status="paid",
-        )
-        db.add(commission_record)
+        ))
 
         current_ib.total_earned = (current_ib.total_earned or Decimal("0")) + share
 
-        # 2026-05-26 client change: commissions now accumulate in a
-        # separate `users.ib_commission_balance` pool on the IB's user
-        # row, not directly into their trading account. The IB sees
-        # the pool on /business and presses "Transfer to Main Wallet"
-        # to move it into main_wallet_balance (which the existing
-        # withdraw flow already drains). No Transaction is written at
-        # accrual time — one row lands at transfer time covering the
-        # whole sweep, matching the referral_commission_balance flow.
+        # Commissions accumulate in users.ib_commission_balance; the IB
+        # sweeps it to their main wallet from /business (2026-05-26 flow).
         ib_user = (await db.execute(
             select(User).where(User.id == current_ib.user_id).with_for_update()
         )).scalar_one_or_none()
@@ -377,7 +379,10 @@ async def distribute_ib_commission(
                 Decimal(str(ib_user.ib_commission_balance or 0)) + share
             )
 
-        logger.info(f"IB commission L{level}: ${share:.2f} to {current_ib.referral_code} ({instrument_symbol} {lots} lots)")
+        logger.info(
+            f"IB commission depth {depth} ({pct}% of ${earner_per_lot}/lot): "
+            f"${share:.2f} to {current_ib.referral_code} ({instrument_symbol} {lots} lots)"
+        )
 
         current_ib = await _get_parent_ib(current_ib, db)
 

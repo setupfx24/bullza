@@ -147,7 +147,7 @@ export default function DOBPicker({
             setOpen(false);
           }
         }}
-        showOutsideDays={false}
+        showOutsideDays
         captionLayout="dropdown"
         startMonth={minDate}
         endMonth={maxDate}

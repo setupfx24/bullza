@@ -1,13 +1,17 @@
 """Public referral-tier feed for the trader /products/referral page.
 
-Reads the `ib_commission_tiers` JSON the admin manages on the admin
-/config/ib-tiers page (persisted in system_settings) and exposes the
-subset of fields the marketing page renders:
+Reads the `referral_tiers` JSON the admin manages on the admin
+/config/referral-tiers page (persisted in system_settings) and exposes
+the fields the marketing page renders:
 
   label, min_referrals, max_referrals, per_referral_bounty, instant_payout
 
-Per-lot rates and per-account-type rates are deliberately NOT exposed —
-those are payout details for active IBs, not public marketing copy.
+This is the PERSONAL friend-referral program and is independent of the IB
+/ sub-broker MLM ladder (`ib_commission_tiers`, /config/ib-tiers). The two
+used to share the IB key, which coupled them; the referral program now owns
+its own key — the same key the money path reads
+(referral_service._bounty_for_next_claim), so the public ladder and the
+actual payout ladder always agree.
 
 Public — no JWT. If no tiers are configured, returns an empty list and
 the trader page falls back to its built-in defaults so the page never
@@ -47,7 +51,7 @@ def _coerce_float(v: Any) -> float:
 
 @router.get("/tiers")
 async def list_referral_tiers():
-    raw = await get_system_setting("ib_commission_tiers", None)
+    raw = await get_system_setting("referral_tiers", None)
     if not isinstance(raw, list):
         return {"tiers": []}
 
@@ -58,28 +62,20 @@ async def list_referral_tiers():
         label = str(row.get("label") or "").strip()
         if not label:
             continue
-        # New model (2026-06-11): per-lot commission, reached by activations
-        # OR cumulative referral deposit amount. Legacy min_referrals fields
-        # are still emitted (0 when absent) for backward compat.
-        per_lot = _coerce_float(row.get("per_lot"))
-        min_act = _coerce_int(row.get("min_activations"))
-        min_amt = _coerce_float(row.get("min_amount"))
+        # Personal-referral row shape: a per-referral bounty earned across a
+        # claimed-referral position range [min_referrals, max_referrals].
         instant = row.get("instant_payout")
         tiers.append({
             "label": label,
-            "per_lot": per_lot,
-            "min_activations": min_act if min_act is not None else 0,
-            "min_amount": min_amt,
-            # Legacy fields kept so older clients don't break.
             "min_referrals": _coerce_int(row.get("min_referrals")) or 0,
             "max_referrals": _coerce_int(row.get("max_referrals")),
             "per_referral_bounty": _coerce_float(row.get("per_referral_bounty")),
             "instant_payout": True if instant is None else bool(instant),
         })
 
-    # Order low → high by per-lot so the trader page renders the ladder
-    # from entry tier to top tier.
-    tiers.sort(key=lambda t: t["per_lot"])
+    # Order low → high by entry position so the trader page renders the
+    # ladder from entry tier to top tier.
+    tiers.sort(key=lambda t: t["min_referrals"])
 
     # Activation conditions the trader page renders under
     # "How a Referral Qualifies". Defaults match the documented promise

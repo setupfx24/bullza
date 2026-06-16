@@ -10,10 +10,10 @@ def render_kyc_approved(
 ) -> tuple[str, str, str]:
     name = (first_name or "trader").strip() or "trader"
     body = """
-    <p style="margin:0 0 12px;color:#f5f5f5;font-size:14px;line-height:1.6;">
+    <p style="margin:0 0 12px;color:#1a1a1a;font-size:14px;line-height:1.6;">
       Now unlocked on your account:
     </p>
-    <ul style="margin:0;padding-left:20px;color:#f5f5f5;font-size:14px;line-height:1.7;">
+    <ul style="margin:0;padding-left:20px;color:#1a1a1a;font-size:14px;line-height:1.7;">
       <li>Higher leverage tiers</li>
       <li>Larger withdrawal limits</li>
       <li>Faster deposit settlement</li>
@@ -51,10 +51,10 @@ def render_kyc_rejected(
     if reason:
         rows.append(("Reason", reason))
     body = (kv_table(rows) if rows else "") + """
-    <p style="margin:16px 0 0;color:#f5f5f5;font-size:14px;line-height:1.6;">
+    <p style="margin:16px 0 0;color:#1a1a1a;font-size:14px;line-height:1.6;">
       Please re-upload corrected documents from the KYC page. Common fixes:
     </p>
-    <ul style="margin:8px 0 0;padding-left:20px;color:#f5f5f5;font-size:14px;line-height:1.7;">
+    <ul style="margin:8px 0 0;padding-left:20px;color:#1a1a1a;font-size:14px;line-height:1.7;">
       <li>All four corners of the document visible</li>
       <li>Clear, readable photo (no glare or blur)</li>
       <li>Address proof issued within the last 3 months</li>

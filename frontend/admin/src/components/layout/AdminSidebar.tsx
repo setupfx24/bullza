@@ -50,6 +50,7 @@ const NAV_ITEMS: NavItem[] = [
       { label: 'Fixed Return', href: '/config/fixed-return' },
       { label: 'PAMM', href: '/config/pamm' },
       { label: 'IB Tiers', href: '/config/ib-tiers' },
+      { label: 'Referral Tiers', href: '/config/referral-tiers' },
     ],
   },
   { label: 'Social', href: '/social', icon: Share2, perm: 'social.view' },
