@@ -258,6 +258,27 @@ async def _resolve_ib_per_lot(
     return None
 
 
+async def _is_full_ib(db: AsyncSession, ib: IBProfile) -> bool:
+    """A 'full IB' is the Super IB (SDA05) itself or someone introduced
+    DIRECTLY by it. Full IBs earn 100% on their direct referrals; Sub-IBs
+    (anyone deeper in the tree) earn the standard 40% even on their own
+    direct referrals (client correction 2026-06-16). Mirrors
+    business_service._resolve_ib_type. Fallback when no Super IB is
+    configured: a top-level profile (no parent) counts as a full IB.
+    """
+    from packages.common.src.settings_store import get_system_setting
+    code = str(await get_system_setting("super_ib_code", None) or "SDA05").strip()
+    if not code:
+        return ib.parent_ib_id is None
+    super_row = (await db.execute(
+        select(IBProfile.id).where(IBProfile.referral_code == code)
+    )).first()
+    super_id = super_row[0] if super_row else None
+    if super_id is None:
+        return ib.parent_ib_id is None
+    return ib.id == super_id or ib.parent_ib_id == super_id
+
+
 async def distribute_ib_commission(
     db: AsyncSession,
     trader_user_id: UUID,
@@ -329,23 +350,28 @@ async def distribute_ib_commission(
         )
         plan = plan_q.scalar_one_or_none()
 
-    # ── Commission distribution (client spec 2026-06-16) ──────────────
+    # ── Commission distribution (client spec 2026-06-16, corrected) ───
     # Each IB/sub-IB earns on THEIR OWN tier per-lot rate (Bronze $5, Gold
     # $10, ...), NOT a shared pool. Walking UP from the trader's direct
-    # sponsor:
-    #   • direct sponsor earns 100% of their own per-lot rate × lots
-    #   • each upline earns its level % of ITS OWN per-lot rate × lots
-    #   • the ladder going up is 40 / 20 / 10 / 10 / 5 (max 5 uplines)
-    # Shares STACK up the chain (the broker funds the overage from the
-    # spread). The account-type bucket is the trader's order account; each
-    # earner looks up THEIR rate for that bucket.
+    # sponsor (index 0), the override ladder by RELATIVE depth is:
+    #   level 1 (direct) = 40%, level 2 = 20%, 3 = 10%, 4 = 10%, 5 = 5%.
+    # EXCEPTION (client correction): a FULL IB — the Super IB (SDA05) or
+    # someone introduced directly by it — earns 100% (not 40%) on traders
+    # DIRECTLY under them. A Sub-IB earns the standard 40% even on their own
+    # direct referrals. Shares STACK up the chain (broker funds the overage
+    # from the spread). The account-type bucket is the trader's order
+    # account; each earner looks up THEIR rate for that bucket.
     acct_type_key = await _referred_account_type_key(db, order_id) or ""
-    LEVEL_PCTS = [100, 40, 20, 10, 10, 5]  # [0] = direct sponsor, [1..5] = uplines
+    LADDER = [40, 20, 10, 10, 5]  # relative depth 1..5; nothing beyond 5
 
     current_ib = direct_ib
-    for depth, pct in enumerate(LEVEL_PCTS):
+    for depth, base_pct in enumerate(LADDER):
         if current_ib is None:
             break
+
+        # Direct sponsor (depth 0): 100% if a full IB, else 40%. Uplines
+        # always use the ladder rate.
+        pct = 100 if (depth == 0 and await _is_full_ib(db, current_ib)) else base_pct
 
         earner_per_lot = await _resolve_ib_per_lot(db, current_ib, acct_type_key, plan)
         if earner_per_lot is None or earner_per_lot <= 0:
