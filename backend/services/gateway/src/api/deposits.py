@@ -307,6 +307,10 @@ class RmRequestBody(BaseModel):
     side: str = "deposit"  # 'deposit' or 'withdraw'
     payout_details: Optional[str] = None  # bank/UPI for withdraw
     note: Optional[str] = None
+    # Preferred payment method the trader picked (Cryptocurrency / BinancePay /
+    # UPI / USDT / Local Bank Transfer). The RM coordinates payment via this
+    # method. Free-text label so new methods don't need a backend change.
+    method: Optional[str] = None
 
 
 @router.post("/deposit/rm-request", status_code=201)
@@ -375,6 +379,8 @@ async def create_rm_request(
         else ""
     )
     note_block = f"\nNote: {body.note}\n" if body.note else ""
+    pay_method = (body.method or "").strip()
+    method_block = f"\nPayment method: {pay_method}\n" if pay_method else ""
 
     text_body = (
         f"A trader has filed a manual {side} request.\n\n"
@@ -385,7 +391,7 @@ async def create_rm_request(
         f"Amount: ${float(amount):,.2f}\n"
         f"Type: {side}\n"
         f"Filed at: {datetime.utcnow().isoformat()}Z"
-        f"{payout_block}{note_block}"
+        f"{method_block}{payout_block}{note_block}"
         f"\nPlease reach out to coordinate payment."
     )
     html_body = (
@@ -398,6 +404,7 @@ async def create_rm_request(
         f"<tr><td><b>Amount</b></td><td>${float(amount):,.2f}</td></tr>"
         f"<tr><td><b>Type</b></td><td>{side}</td></tr>"
         f"<tr><td><b>Filed at</b></td><td>{datetime.utcnow().isoformat()}Z</td></tr>"
+        + (f"<tr><td><b>Payment method</b></td><td>{pay_method}</td></tr>" if pay_method else "")
         + (
             f"<tr><td><b>Payout</b></td><td>{body.payout_details}</td></tr>"
             if side == "withdraw" and body.payout_details else ""
