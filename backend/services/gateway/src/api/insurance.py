@@ -195,9 +195,14 @@ async def activate(
         cnt = (await db.execute(
             select(func.count())
             .select_from(InsurancePolicy)
+            # Count only policies of the SAME account type (demo vs real) being
+            # insured, so demo activations don't eat into the real daily limit
+            # and vice versa (client 2026-06-16 — keep demo + real separate).
+            .join(TradingAccount, TradingAccount.id == InsurancePolicy.account_id)
             .where(
                 InsurancePolicy.user_id == user_id,
                 InsurancePolicy.activated_at >= since,
+                TradingAccount.is_demo == acct.is_demo,
             )
         )).scalar() or 0
         if int(cnt) >= int(cfg.max_policies_per_day):
@@ -314,7 +319,10 @@ async def list_claims(
         select(InsuranceClaim, InsurancePolicy, Instrument.symbol)
         .join(InsurancePolicy, InsurancePolicy.id == InsuranceClaim.policy_id)
         .join(Instrument, Instrument.id == InsurancePolicy.instrument_id)
+        # Real-account claims only — keep demo separate from real (2026-06-16).
+        .join(TradingAccount, TradingAccount.id == InsurancePolicy.account_id)
         .where(InsuranceClaim.user_id == current_user["user_id"])
+        .where(TradingAccount.is_demo == False)
         .order_by(desc(InsuranceClaim.paid_at), desc(InsuranceClaim.id))
         .limit(max(1, min(limit, 200)))
     )
@@ -380,7 +388,12 @@ async def _list_policies(
     stmt = (
         select(InsurancePolicy, Instrument.symbol)
         .join(Instrument, Instrument.id == InsurancePolicy.instrument_id)
+        # Exclude DEMO-account policies so the insurance dashboard shows REAL
+        # protection only — demo insurance must not merge with real
+        # (client 2026-06-16).
+        .join(TradingAccount, TradingAccount.id == InsurancePolicy.account_id)
         .where(InsurancePolicy.user_id == user_id)
+        .where(TradingAccount.is_demo == False)
         .order_by(desc(InsurancePolicy.activated_at))
         .limit(max(1, min(limit, 200)))
     )
