@@ -11,14 +11,18 @@ from ..config import get_settings
 
 # Brand palette — kept inline because Outlook/Gmail/iOS Mail strip <style>
 # blocks, so every colour has to live on a style="" attribute.
+# LIGHT theme (client request 2026-06-15): emails render on a white/light
+# background so the dark-lettered brand logo (swisdex_png.png) is clearly
+# visible. Every element below references these tokens, so flipping them here
+# re-themes all ~25 templates.
 _BRAND       = "#55a630"   # SwisDex green (primary CTAs, logo accent)
 _BRAND_DARK  = "#3f7d22"
 _GOLD        = "#d6a93d"   # legacy accent — still used for secondary action
-_BG          = "#0a0a0a"
-_CARD        = "#141414"
-_TEXT        = "#f5f5f5"
-_TEXT_DIM    = "#9a9a9a"
-_BORDER      = "#2a2a2a"
+_BG          = "#f4f5f7"   # light page background (outside the card)
+_CARD        = "#ffffff"   # white card
+_TEXT        = "#1a1a1a"   # near-black primary text
+_TEXT_DIM    = "#6b7280"   # muted grey secondary text
+_BORDER      = "#e5e7eb"   # light hairline border
 
 
 def _header_brand_html() -> str:
@@ -205,7 +209,7 @@ def render_layout(
                       border:1px solid {_BORDER};border-radius:12px;overflow:hidden;">
           <tr>
             <td style="padding:24px 32px;border-bottom:1px solid {_BORDER};
-                       background:linear-gradient(180deg,#181818 0%,{_CARD} 100%);">
+                       background:linear-gradient(180deg,#f7f8fa 0%,{_CARD} 100%);">
               {_header_brand_html()}
             </td>
           </tr>

@@ -52,7 +52,7 @@ def render_deposit_failed(
         rows.append(("Reference", reference))
 
     body = kv_table(rows) + f"""
-    <p style="margin:16px 0 0;color:#f5f5f5;font-size:14px;line-height:1.6;">
+    <p style="margin:16px 0 0;color:#1a1a1a;font-size:14px;line-height:1.6;">
       {human}
     </p>
     """

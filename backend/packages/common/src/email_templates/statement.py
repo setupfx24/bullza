@@ -56,9 +56,9 @@ def render_statement_digest(
 
     pnl_row_color = "#55a630" if float(realized_pnl) >= 0 else "#e0524d"
     pnl_html = f"""
-    <div style="margin:0 0 20px;padding:18px 20px;border:1px solid #2a2a2a;
-                border-radius:10px;background:#0a0a0a;">
-      <p style="margin:0 0 6px;color:#9a9a9a;font-size:12px;
+    <div style="margin:0 0 20px;padding:18px 20px;border:1px solid #e5e7eb;
+                border-radius:10px;background:#f4f5f7;">
+      <p style="margin:0 0 6px;color:#6b7280;font-size:12px;
                 letter-spacing:0.4px;text-transform:uppercase;">
         Realized P/L
       </p>
@@ -86,7 +86,7 @@ def render_statement_digest(
     rows.append(("Closing balance", _fmt_money(closing_balance, currency)))
 
     body = pnl_html + kv_table(rows) + """
-    <p style="margin:16px 0 0;color:#9a9a9a;font-size:13px;line-height:1.6;">
+    <p style="margin:16px 0 0;color:#6b7280;font-size:13px;line-height:1.6;">
       Open the trader app for a per-trade breakdown and to download a CSV
       for your records.
     </p>

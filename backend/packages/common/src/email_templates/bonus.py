@@ -31,7 +31,7 @@ def render_bonus_credited(
         rows.append(("Use before", expires_at))
 
     body = kv_table(rows) + """
-    <p style="margin:16px 0 0;color:#9a9a9a;font-size:13px;line-height:1.6;">
+    <p style="margin:16px 0 0;color:#6b7280;font-size:13px;line-height:1.6;">
       Bonus funds expand your trading margin. Profit from bonus-funded trades
       converts to cash once you meet the volume requirement on your trading
       account.

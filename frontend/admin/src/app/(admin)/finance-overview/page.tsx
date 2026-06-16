@@ -14,6 +14,7 @@ import { useCallback, useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 import { Loader2, X, TrendingUp, ArrowDownCircle, ArrowUpCircle, Gift, Lock, Clock, ChevronRight } from 'lucide-react';
 import { adminApi } from '@/lib/api';
+import DateField from '@/components/ui/DateField';
 
 interface Row { label?: string; method?: string; tenure?: string; month?: string; amount?: number; principal?: number; count?: number; key?: string }
 interface Overview {
@@ -318,13 +319,9 @@ export default function FinanceOverviewPage() {
           {/* Custom date range — restricts flow figures (P&L, deposits,
               withdrawals, fixed-return collected) to the window. */}
           <span className="text-xxs text-text-tertiary">From</span>
-          <input type="date" value={dateFrom} max={dateTo || undefined}
-            onChange={(e) => setDateFrom(e.target.value)}
-            className="text-xs py-1.5 px-2 bg-bg-input border border-border-primary rounded-md text-text-primary" />
+          <DateField value={dateFrom} max={dateTo || undefined} onChange={setDateFrom} />
           <span className="text-xxs text-text-tertiary">To</span>
-          <input type="date" value={dateTo} min={dateFrom || undefined}
-            onChange={(e) => setDateTo(e.target.value)}
-            className="text-xs py-1.5 px-2 bg-bg-input border border-border-primary rounded-md text-text-primary" />
+          <DateField value={dateTo} min={dateFrom || undefined} onChange={setDateTo} />
           {(dateFrom || dateTo) && (
             <button type="button" onClick={() => { setDateFrom(''); setDateTo(''); }}
               className="text-xxs text-text-tertiary hover:text-text-primary underline">Clear</button>

@@ -6,6 +6,7 @@ from decimal import Decimal
 import jwt
 from fastapi import HTTPException
 from sqlalchemy import select, func, or_
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from packages.common.src.config import get_settings
@@ -937,6 +938,26 @@ async def delete_user(
     await db.execute(update(SystemSetting).where(SystemSetting.updated_by == user_id).values(updated_by=None))
     await db.execute(update(AuditLog).where(AuditLog.admin_id == user_id).values(admin_id=None))
 
+    # ── 9b. RESTRICT FKs that block the delete (no ON DELETE CASCADE) ──
+    # Most user-owned tables (insurance_policies, rewards_*, staking_positions,
+    # fixed_return_locks, vip_passes, shared_trades, spin/lottery/bids) use
+    # ON DELETE CASCADE, so the DB clears them automatically. These do NOT and
+    # would otherwise raise a ForeignKeyViolation on the final delete — which
+    # surfaced to the admin as a silent "nothing happened". Raw SQL avoids
+    # importing each model. Self-references are the most common blocker for a
+    # master/IB user (they referred others).
+    from sqlalchemy import text
+    p = {"uid": str(user_id)}
+    await db.execute(text("UPDATE users SET referred_by_user_id = NULL WHERE referred_by_user_id = :uid"), p)
+    await db.execute(text("UPDATE users SET assigned_rm_id = NULL WHERE assigned_rm_id = :uid"), p)
+    await db.execute(text("DELETE FROM insurance_claims WHERE user_id = :uid"), p)
+    await db.execute(text("DELETE FROM insurance_policies WHERE user_id = :uid"), p)
+    await db.execute(text("DELETE FROM rm_funding_requests WHERE rm_id = :uid OR user_id = :uid"), p)
+    await db.execute(text("UPDATE rm_funding_requests SET approved_by = NULL WHERE approved_by = :uid"), p)
+    await db.execute(text("UPDATE rm_funding_requests SET credited_by = NULL WHERE credited_by = :uid"), p)
+    await db.execute(text("UPDATE rm_funding_requests SET rejected_by = NULL WHERE rejected_by = :uid"), p)
+    await db.execute(text("UPDATE lifestyle_fulfillments SET handled_by = NULL WHERE handled_by = :uid"), p)
+
     # ── 10. Finally the user row ──
     await db.execute(sql_delete(User).where(User.id == user_id))
 
@@ -945,7 +966,19 @@ async def delete_user(
         new_values={"email": user_email},
         ip_address=ip_address,
     )
-    await db.commit()
+    try:
+        await db.commit()
+    except IntegrityError as e:
+        # A table we don't yet clean up still references this user. Surface
+        # WHICH constraint so it's a clear, fixable message in the admin UI
+        # instead of a silent "Internal server error".
+        await db.rollback()
+        orig = getattr(e, "orig", e)
+        raise HTTPException(
+            status_code=409,
+            detail=f"Cannot permanently delete this user — a record still references them ({orig}). "
+                   "Use Soft Delete to disable the account while keeping records.",
+        )
 
     return {"message": f"User {user_email} permanently deleted"}
 

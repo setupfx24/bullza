@@ -467,6 +467,7 @@ class IBProfileOut(BaseModel):
     commission_plan_id: Optional[str] = None
     custom_commission_per_lot: Optional[float] = None
     custom_commission_per_trade: Optional[float] = None
+    tier_override: Optional[str] = None
     total_earned: float
     pending_payout: float
     is_active: bool
@@ -483,6 +484,9 @@ class UpdateIBCommissionIn(BaseModel):
     commission_plan_id: Optional[str] = None
     custom_commission_per_lot: Optional[float] = None
     custom_commission_per_trade: Optional[float] = None
+    # Manual tier override (Bronze/Silver/Gold/Platinum). "" or "auto" clears
+    # it back to automatic tier resolution. Sentinel None = leave unchanged.
+    tier_override: Optional[str] = None
 
 
 class RejectIBIn(BaseModel):

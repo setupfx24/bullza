@@ -79,11 +79,12 @@ class Settings(BaseSettings):
     # EMAIL_LOGO_URL must be an absolute https URL because email clients
     # cannot resolve relative paths or render images from blob/data URIs.
     # If empty, the layout falls back to the styled "SwisDex" wordmark text.
-    # Updated 2026-06-10 — emails render on a white/light background, so
-    # they use the light-background logo (swisdex_png.png, dark lettering)
-    # rather than swisdex_png5.png (white lettering, which is invisible on
-    # white). Override in .env if a tenant ships a custom logo. Must be an
-    # absolute https URL because email clients can't resolve relative paths.
+    # The email layout (email_templates/base.py) now renders on a LIGHT/white
+    # background (client request 2026-06-15), so the logo must be the
+    # dark-lettered asset (swisdex_png.png) — it is clearly visible on white,
+    # whereas the white-lettered swisdex_png5.png would disappear. Override in
+    # .env if a tenant ships a custom logo. Must be an absolute https URL
+    # because email clients can't resolve relative paths.
     EMAIL_LOGO_URL: str = "https://swisdex.com/images/swisdex_png.png"
 
     # Mobile app store links — when set, the email footer renders the

@@ -133,9 +133,9 @@ function kycBadge(k: string) {
 function Modal({ open, onClose, title, children }: { open: boolean; onClose: () => void; title: string; children: React.ReactNode }) {
   if (!open) return null;
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center animate-fade-in">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center py-4 animate-fade-in">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-bg-secondary border border-border-primary rounded-t-xl sm:rounded-xl shadow-modal w-full sm:max-w-lg sm:mx-4 p-6 animate-slide-down">
+      <div className="relative bg-bg-secondary border border-border-primary rounded-t-xl sm:rounded-xl shadow-modal w-full sm:max-w-lg sm:mx-4 p-6 animate-slide-down max-h-[90vh] overflow-y-auto overscroll-contain">
         <div className="flex items-center justify-between mb-5">
           <h3 className="text-base font-bold text-text-primary">{title}</h3>
           <button onClick={onClose} className="p-2 rounded-lg hover:bg-bg-hover transition-fast text-text-tertiary hover:text-text-primary">
@@ -767,8 +767,8 @@ export default function UsersPage() {
             <div className="fixed inset-0 z-40" onMouseDown={closeMenu} />
             <div
               data-actions-menu
-              className="fixed z-50 w-[190px] py-1 rounded-lg border border-border-primary bg-bg-secondary shadow-dropdown text-left animate-slide-down"
-              style={{ top: menuPos.top, left: menuPos.left }}
+              className="fixed z-50 w-[190px] py-1 rounded-lg border border-border-primary bg-bg-secondary shadow-dropdown text-left animate-slide-down overflow-y-auto overscroll-contain"
+              style={{ top: menuPos.top, left: menuPos.left, maxHeight: `calc(100vh - ${menuPos.top}px - 8px)` }}
               onMouseDown={e => e.stopPropagation()}
               onClick={e => e.stopPropagation()}
             >

@@ -412,6 +412,35 @@ function IBTab() {
 
     <div className="space-y-4">
 
+      {/* IB vs Sub-IB header (client spec 2026-06-16). Only someone introduced
+          by the Super IB (SDA05) is a full IB; everyone else is a Sub-IB and
+          can request an upgrade by contacting SwisDex. */}
+      <div className="flex items-center justify-between gap-3 rounded-lg border border-border-primary bg-bg-secondary px-4 py-3">
+        <div className="flex items-center gap-2 min-w-0">
+          <span className={clsx(
+            'text-xs font-semibold px-2 py-0.5 rounded-md shrink-0',
+            dashboard?.ib_type === 'super_ib' ? 'bg-accent/15 text-accent'
+              : dashboard?.is_sub_ib ? 'bg-warning/15 text-warning'
+              : 'bg-success/15 text-success',
+          )}>
+            {dashboard?.ib_type === 'super_ib' ? 'Super IB' : dashboard?.is_sub_ib ? 'Sub-IB' : 'IB'}
+          </span>
+          <span className="text-xs text-text-secondary truncate">
+            {dashboard?.is_sub_ib
+              ? 'You are a Sub-IB — you earn on your own referrals and downline.'
+              : 'You are a full IB.'}
+          </span>
+        </div>
+        {dashboard?.can_request_ib_upgrade && (
+          <a
+            href="/support?topic=ib-upgrade"
+            className="text-xs font-medium px-3 py-1.5 rounded-md bg-accent/15 text-accent border border-accent/30 hover:bg-accent/25 whitespace-nowrap shrink-0"
+          >
+            Contact SwisDex to become IB
+          </a>
+        )}
+      </div>
+
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
 
         {[

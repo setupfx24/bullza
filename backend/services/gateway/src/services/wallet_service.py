@@ -4,10 +4,10 @@ import uuid as uuid_lib
 from pathlib import Path
 from decimal import Decimal
 from uuid import UUID
-from datetime import datetime
+from datetime import datetime, timezone
 
 from fastapi import HTTPException, UploadFile
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from packages.common.src.models import (
@@ -627,7 +627,7 @@ async def handle_oxapay_webhook(
         # tier configurations keep working.
         bonus_msg = ""
         applied_bonuses: list[tuple[str, Decimal]] = []
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)  # tz-aware: offer dates are TIMESTAMPTZ
         skip_auto_bonus = (
             bool(deposit.bonus_code)
             or not await is_first_deposit_bonus_eligible(db, deposit.user_id, deposit.id)
@@ -664,6 +664,12 @@ async def handle_oxapay_webhook(
                     ["deposit", "welcome", "percentage", "fixed"]
                 ),
                 BonusOffer.min_deposit <= deposit.amount,
+                # Auto-apply ONLY no-code offers. An offer carrying a
+                # promo_code is a code-gated EVENT bonus and must be granted
+                # solely via the bonus_code path (only when the user actually
+                # entered the matching code), never auto-applied to every
+                # qualifying deposit.
+                or_(BonusOffer.promo_code.is_(None), BonusOffer.promo_code == ""),
             )
         ) if not skip_auto_bonus else None
         for offer in (offers_q.scalars().all() if offers_q is not None else []):
@@ -999,7 +1005,7 @@ async def handle_nowpayments_webhook(
         # Simple admin welcome_bonus_* settings win over the tier matrix.
         bonus_msg = ""
         applied_bonuses: list[tuple[str, Decimal]] = []
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)  # tz-aware: offer dates are TIMESTAMPTZ
         skip_auto_bonus = (
             bool(deposit.bonus_code)
             or not await is_first_deposit_bonus_eligible(db, deposit.user_id, deposit.id)
@@ -1036,6 +1042,12 @@ async def handle_nowpayments_webhook(
                     ["deposit", "welcome", "percentage", "fixed"]
                 ),
                 BonusOffer.min_deposit <= deposit.amount,
+                # Auto-apply ONLY no-code offers. An offer carrying a
+                # promo_code is a code-gated EVENT bonus and must be granted
+                # solely via the bonus_code path (only when the user actually
+                # entered the matching code), never auto-applied to every
+                # qualifying deposit.
+                or_(BonusOffer.promo_code.is_(None), BonusOffer.promo_code == ""),
             )
         ) if not skip_auto_bonus else None
         for offer in (offers_q.scalars().all() if offers_q is not None else []):
@@ -1901,7 +1913,7 @@ async def charge_insurance_fee(
 #      whether admin granted / denied / is still reviewing.
 
 async def get_bonus_overview(*, user_id: UUID, db: AsyncSession) -> dict:
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)  # tz-aware: offer dates are TIMESTAMPTZ
 
     offers_q = await db.execute(
         select(BonusOffer)

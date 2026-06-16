@@ -5,6 +5,7 @@ import { adminApi } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { Loader2, RefreshCw, DollarSign, TrendingUp, AlertTriangle, BarChart3, Users, CreditCard, Gift, GitBranch, Calendar } from 'lucide-react';
 import toast from 'react-hot-toast';
+import DateField from '@/components/ui/DateField';
 
 /** YYYY-MM-DD in local time (avoids the UTC-shift `toISOString()` pitfall). */
 function ymd(d: Date): string {
@@ -128,7 +129,13 @@ export default function AnalyticsPage() {
       const [dashRes, expRes] = await Promise.all([
         adminApi.get<any>(dashUrl),
         adminApi.get<{ exposure: ExposureRow[]; profitable_users?: ProfitableUser[] }>(
-          '/analytics/exposure', { profitable_sort: profitSort },
+          '/analytics/exposure', {
+            profitable_sort: profitSort,
+            // Apply the page's custom date window to the profit / win-rate
+            // ranking too (open-position exposure stays live server-side).
+            ...(startDate ? { start_date: startDate } : {}),
+            ...(endDate ? { end_date: endDate } : {}),
+          },
         ),
       ]);
       setData(dashRes);
@@ -195,20 +202,16 @@ export default function AnalyticsPage() {
               </button>
             ))}
             <span className="mx-1 text-text-tertiary text-xxs">|</span>
-            <input
-              type="date"
+            <DateField
               value={startDate}
               max={endDate || undefined}
-              onChange={(e) => { setStartDate(e.target.value); setActivePreset('custom'); }}
-              className="px-2 py-1 rounded-md text-xs bg-bg-input border border-border-primary text-text-primary"
+              onChange={(v) => { setStartDate(v); setActivePreset('custom'); }}
             />
             <span className="text-xxs text-text-tertiary">to</span>
-            <input
-              type="date"
+            <DateField
               value={endDate}
               min={startDate || undefined}
-              onChange={(e) => { setEndDate(e.target.value); setActivePreset('custom'); }}
-              className="px-2 py-1 rounded-md text-xs bg-bg-input border border-border-primary text-text-primary"
+              onChange={(v) => { setEndDate(v); setActivePreset('custom'); }}
             />
           </div>
         </div>

@@ -6,7 +6,7 @@ from pathlib import Path
 
 from fastapi import HTTPException
 from fastapi.responses import FileResponse
-from sqlalchemy import select, func
+from sqlalchemy import select, func, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from packages.common.src.models import User, TradingAccount, Deposit, Withdrawal, Transaction, BonusOffer
@@ -198,7 +198,11 @@ async def approve_deposit(
 
     bonus_msg = ""
     applied_bonuses: list[tuple[str, Decimal]] = []
-    now = datetime.utcnow()
+    # tz-AWARE: bonus-offer starts_at/expires_at are TIMESTAMPTZ (tz-aware),
+    # so `now` must be tz-aware too — comparing a naive utcnow() against them
+    # raised "can't compare offset-naive and offset-aware datetimes", which
+    # silently killed the bonus grant for any offer that had a date window set.
+    now = datetime.now(timezone.utc)
     # Two gates only (2026-05-27 client fix):
     #   - user already had a prior approved deposit? → skip (first deposit only)
     #   - user already had a withdrawal approved? → skip (bonus_forfeited_at
@@ -332,6 +336,13 @@ async def approve_deposit(
                 ["deposit", "welcome", "percentage", "fixed"]
             ),
             BonusOffer.min_deposit <= deposit.amount,
+            # Auto-apply ONLY no-code offers. An offer that has a promo_code
+            # is a code-gated EVENT bonus: it must be granted exclusively via
+            # the bonus_code path below (only when the user actually entered
+            # the matching code), never auto-handed to every qualifying
+            # deposit. Without this, an "event" promo offer behaved like a
+            # universal welcome bonus.
+            or_(BonusOffer.promo_code.is_(None), BonusOffer.promo_code == ""),
         )
     ) if not skip_auto_bonus else None
     for offer in (offers_q.scalars().all() if offers_q is not None else []):
@@ -381,9 +392,15 @@ async def approve_deposit(
     if deposit.bonus_code and deposit.bonus_status in (None, "pending"):
         code_clean = deposit.bonus_code.strip()
         code_lower = code_clean.lower()
+        # Match against the dedicated promo_code column (added by migration
+        # 0072), NOT the offer's display name — admins set a separate
+        # human-readable name ("Summer Event") and code ("SUMMER50"), so the
+        # trader's typed code only ever matches promo_code. The isnot(None)
+        # guard stops a blank code from matching offers that have no code.
         code_offer = (await db.execute(
             select(BonusOffer).where(
-                func.lower(BonusOffer.name) == code_lower,
+                func.lower(BonusOffer.promo_code) == code_lower,
+                BonusOffer.promo_code.isnot(None),
                 BonusOffer.is_active == True,
             ).limit(1)
         )).scalar_one_or_none()
@@ -401,21 +418,27 @@ async def approve_deposit(
         notify_user = True
         bonus_amount = Decimal("0")
 
-        # ── Account-level gates FIRST (independent of which code typed) ──
-        # so a repeat depositor sees "first deposit only" instead of the
-        # generic "not a recognised promo" even if the code is unknown.
-        if prior_approved > 0:
-            denial_reason = "This bonus is applicable for your first deposit only."
+        # ── Gates ─────────────────────────────────────────────────────────
+        # IMPORTANT: a code-gated EVENT bonus (a matched offer with a promo
+        # code) is intentionally NOT first-deposit-only — it applies to ANY
+        # deposit inside the offer's active window. That's the whole point of
+        # an event/promo code vs. the automatic first-deposit welcome bonus.
+        # So the prior-deposit gate is applied ONLY when the typed code did
+        # NOT match a real offer (legacy "unknown code → first deposit only"
+        # messaging for a repeat depositor). A matched event offer skips it.
+        if code_offer is None:
+            if prior_approved > 0:
+                denial_reason = "This bonus is applicable for your first deposit only."
+            else:
+                denial_reason = f"Code '{code_clean}' is not a recognised promo."
+                if welcome_already_granted:
+                    notify_user = False  # user got the welcome bonus anyway
         elif user_row.bonus_forfeited_at is not None:
             denial_reason = (
                 "Bonus was forfeited on a prior withdrawal — it can't be "
                 "granted again."
             )
         # ── Code-specific gates ──────────────────────────────────────────
-        elif code_offer is None:
-            denial_reason = f"Code '{code_clean}' is not a recognised promo."
-            if welcome_already_granted:
-                notify_user = False  # user got the welcome bonus anyway
         elif code_offer.starts_at and code_offer.starts_at > now:
             denial_reason = f"Code '{code_clean}' is not active yet."
         elif code_offer.expires_at and code_offer.expires_at < now:

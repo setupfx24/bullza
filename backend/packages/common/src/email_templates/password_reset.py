@@ -11,10 +11,10 @@ def render_password_reset(
 ) -> tuple[str, str, str]:
     subject = f"Reset your {app_name} password"
     body = f"""
-    <p style="margin:0 0 12px;color:#f5f5f5;font-size:14px;line-height:1.6;">
+    <p style="margin:0 0 12px;color:#1a1a1a;font-size:14px;line-height:1.6;">
       You requested a password reset for your {app_name} account.
     </p>
-    <p style="margin:0;color:#9a9a9a;font-size:13px;line-height:1.6;">
+    <p style="margin:0;color:#6b7280;font-size:13px;line-height:1.6;">
       The link below expires in {expires_in_minutes} minutes. If you didn't
       request this, you can ignore this email — your password stays unchanged.
     </p>

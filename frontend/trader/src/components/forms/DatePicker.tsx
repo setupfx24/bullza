@@ -140,7 +140,7 @@ export default function DatePicker({
             setOpen(false);
           }
         }}
-        showOutsideDays={false}
+        showOutsideDays
         captionLayout="dropdown"
         startMonth={minDate}
         endMonth={maxDate}

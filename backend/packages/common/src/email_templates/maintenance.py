@@ -46,14 +46,14 @@ def render_maintenance_notice(
     body = kv_table(rows)
     if custom_message_html:
         body += f"""
-        <div style="margin:16px 0 0;padding:14px 16px;border:1px solid #2a2a2a;
-                    border-radius:8px;background:#0a0a0a;color:#f5f5f5;
+        <div style="margin:16px 0 0;padding:14px 16px;border:1px solid #e5e7eb;
+                    border-radius:8px;background:#f4f5f7;color:#1a1a1a;
                     font-size:14px;line-height:1.6;">
           {custom_message_html}
         </div>
         """
     body += """
-    <p style="margin:16px 0 0;color:#9a9a9a;font-size:13px;line-height:1.6;">
+    <p style="margin:16px 0 0;color:#6b7280;font-size:13px;line-height:1.6;">
       Status updates will be posted on swisdex.com/status throughout the
       maintenance. Need help right after? Reach
       <a href="mailto:support@swisdex.com" style="color:#55a630;text-decoration:none;">

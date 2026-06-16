@@ -16,15 +16,15 @@ def render_verification_reminder(
         "withdrawal limits — it takes about 2 minutes."
     )
     body = """
-    <p style="margin:0 0 12px;color:#f5f5f5;font-size:14px;line-height:1.6;">
+    <p style="margin:0 0 12px;color:#1a1a1a;font-size:14px;line-height:1.6;">
       You'll need:
     </p>
-    <ul style="margin:0 0 8px;padding-left:20px;color:#f5f5f5;font-size:14px;line-height:1.7;">
+    <ul style="margin:0 0 8px;padding-left:20px;color:#1a1a1a;font-size:14px;line-height:1.7;">
       <li>Government-issued photo ID (passport, driver's licence, national ID)</li>
       <li>A clear selfie holding the ID</li>
       <li>Recent address proof (utility bill, bank statement)</li>
     </ul>
-    <p style="margin:16px 0 0;color:#9a9a9a;font-size:13px;line-height:1.6;">
+    <p style="margin:16px 0 0;color:#6b7280;font-size:13px;line-height:1.6;">
       Approval is usually within 24 hours, often much sooner.
     </p>
     """

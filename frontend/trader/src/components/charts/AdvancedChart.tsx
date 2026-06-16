@@ -52,7 +52,7 @@ const SYMBOL_PREFIX: Record<string, string> = {
   SPX500: 'TVC:SPX', SPX: 'TVC:SPX', US500: 'TVC:SPX',
   NAS100: 'TVC:NDX', NDX: 'TVC:NDX', US100: 'TVC:NDX',
   US30: 'TVC:DJI', DJI: 'TVC:DJI',
-  GER30: 'TVC:DEU30', DAX: 'TVC:DEU30', DE40: 'TVC:DEU30',
+  GER30: 'TVC:DEU30', GER40: 'TVC:DEU30', DAX: 'TVC:DEU30', DE40: 'TVC:DEU30',
   UK100: 'TVC:UKX', FTSE: 'TVC:UKX',
   NI225: 'TVC:NI225', JPN225: 'TVC:NI225',
   // Crypto — broker uses USD pairs, TV uses USDT spot on Binance.
@@ -61,14 +61,23 @@ const SYMBOL_PREFIX: Record<string, string> = {
   BNBUSD: 'BINANCE:BNBUSDT', BNBUSDT: 'BINANCE:BNBUSDT',
   SOLUSD: 'BINANCE:SOLUSDT', SOLUSDT: 'BINANCE:SOLUSDT',
   XRPUSD: 'BINANCE:XRPUSDT', XRPUSDT: 'BINANCE:XRPUSDT',
-  ADAUSD: 'BINANCE:ADAUSDT', DOGEUSD: 'BINANCE:DOGEUSDT',
+  ADAUSD: 'BINANCE:ADAUSDT', DOGEUSD: 'BINANCE:DOGEUSDT', DOGUSD: 'BINANCE:DOGEUSDT',
+  LTCUSD: 'BINANCE:LTCUSDT', BCHUSD: 'BINANCE:BCHUSDT',
+  DOTUSD: 'BINANCE:DOTUSDT', LNKUSD: 'BINANCE:LINKUSDT', LINKUSD: 'BINANCE:LINKUSDT',
 };
 
 function resolveTvSymbol(sym: string | null | undefined): string {
   const s = (sym || '').toUpperCase();
   if (!s) return 'OANDA:XAUUSD';
   if (s.includes(':')) return s; // already a TV-prefixed symbol
-  return SYMBOL_PREFIX[s] || `FX:${s}`;
+  if (SYMBOL_PREFIX[s]) return SYMBOL_PREFIX[s];
+  // Only fall back to the FX: feed for forex-shaped symbols (6 letters, e.g.
+  // EURUSD). Applying FX: to an index/crypto-shaped symbol that slipped past
+  // the map (e.g. "GER40") yields an invalid TradingView symbol and a blank
+  // chart — for those, hand the bare symbol to TradingView's own resolver,
+  // which finds a sensible match far more often than "FX:GER40" would.
+  if (/^[A-Z]{6}$/.test(s)) return `FX:${s}`;
+  return s;
 }
 
 // Legacy IANA aliases → canonical names. Some browsers still report

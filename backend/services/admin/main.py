@@ -92,6 +92,20 @@ async def _apply_startup_ddl():
             await conn.execute(text(
                 "ALTER TABLE bonus_offers ADD COLUMN IF NOT EXISTS code_visible BOOLEAN NOT NULL DEFAULT true"
             ))
+            # User lifecycle statuses. The original init-db CHECK only allowed
+            # active/banned/blocked/pending_kyc/suspended, so terminate
+            # (status='terminated') and soft-delete (status='deleted') silently
+            # failed the commit — the account never changed. Drop the constraint
+            # (consistent with the project's move away from status CHECK
+            # constraints; statuses are validated in app code) so every
+            # lifecycle action persists.
+            await conn.execute(text(
+                "ALTER TABLE users DROP CONSTRAINT IF EXISTS users_status_check"
+            ))
+            # IB manual tier override (migration 0074, client spec 2026-06-16).
+            await conn.execute(text(
+                "ALTER TABLE ib_profiles ADD COLUMN IF NOT EXISTS tier_override VARCHAR(40)"
+            ))
     except Exception as e:
         logger.warning("startup DDL skipped: %s", e)
 

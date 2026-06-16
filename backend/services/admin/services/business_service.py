@@ -427,6 +427,7 @@ async def list_ib_agents(page: int, per_page: int, db: AsyncSession):
             commission_plan_id=str(p.commission_plan_id) if p.commission_plan_id else None,
             custom_commission_per_lot=float(p.custom_commission_per_lot) if p.custom_commission_per_lot else None,
             custom_commission_per_trade=float(p.custom_commission_per_trade) if p.custom_commission_per_trade else None,
+            tier_override=getattr(p, "tier_override", None),
             total_earned=float(p.total_earned or 0),
             pending_payout=float(p.pending_payout or 0),
             is_active=p.is_active,
@@ -452,7 +453,14 @@ async def update_ib_commission(
         "commission_plan_id": str(profile.commission_plan_id) if profile.commission_plan_id else None,
         "custom_commission_per_lot": float(profile.custom_commission_per_lot) if profile.custom_commission_per_lot else None,
         "custom_commission_per_trade": float(profile.custom_commission_per_trade) if profile.custom_commission_per_trade else None,
+        "tier_override": getattr(profile, "tier_override", None),
     }
+
+    # Manual tier override (client spec 2026-06-16). None = leave unchanged;
+    # "" / "auto" / "none" clears it back to automatic tier resolution.
+    if body.tier_override is not None:
+        val = body.tier_override.strip()
+        profile.tier_override = None if val.lower() in ("", "auto", "none") else val
 
     if body.commission_plan_id and body.commission_plan_id not in ('default', 'custom', 'null', ''):
         try:
@@ -472,6 +480,7 @@ async def update_ib_commission(
         "commission_plan_id": str(profile.commission_plan_id) if profile.commission_plan_id else None,
         "custom_commission_per_lot": float(profile.custom_commission_per_lot) if profile.custom_commission_per_lot else None,
         "custom_commission_per_trade": float(profile.custom_commission_per_trade) if profile.custom_commission_per_trade else None,
+        "tier_override": getattr(profile, "tier_override", None),
     }
 
     await write_audit_log(
