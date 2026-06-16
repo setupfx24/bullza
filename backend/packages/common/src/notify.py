@@ -67,4 +67,13 @@ async def create_notification(
         # reconcile on the next /notifications fetch.
         pass
 
+    # Fire a phone push (Expo) so the alert reaches the device even when the
+    # app is closed / screen locked. Fire-and-forget + best-effort — never
+    # blocks or rolls back the caller.
+    try:
+        from .push import fire_push
+        fire_push(user_id, title, message, {"type": notif_type, "id": str(n.id)})
+    except Exception:
+        pass
+
     return n
