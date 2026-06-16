@@ -16,7 +16,7 @@ const FEATURES = [
   {
     Icon: ShieldCheck,
     title: 'On-Chain Policy Backing',
-    body: 'Every covered position is policy-backed by an on-chain insurance contract. Eligible payouts are claimable and, once approved, credited to your account as tradable funds.',
+    body: 'Every covered position is backed by an on-chain insurance contract. Eligible losses are claimable — once approved, the payout is credited to your account as tradable funds.',
   },
   {
     Icon: Zap,
