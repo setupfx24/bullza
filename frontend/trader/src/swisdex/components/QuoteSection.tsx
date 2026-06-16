@@ -44,7 +44,7 @@ export function QuoteSection({
         style={{
           background:
             'linear-gradient(135deg, hsl(99 35% 18%) 0%, hsl(0 0% 8%) 55%, hsl(0 60% 14%) 100%)',
-          border: '1px solid hsl(99 55% 42% / 0.35)',
+          border: '1px solid hsl(8 87% 54% / 0.35)',
           boxShadow: '0 20px 60px rgba(0,0,0,0.45)',
         }}
       >
@@ -53,15 +53,15 @@ export function QuoteSection({
           aria-hidden
           className="absolute -right-24 -top-24 size-[360px] rounded-full pointer-events-none hidden md:block"
           style={{
-            border: '1px solid hsl(99 55% 42% / 0.25)',
+            border: '1px solid hsl(8 87% 54% / 0.25)',
             background:
-              'radial-gradient(circle at 50% 50%, hsl(99 55% 42% / 0.08) 0%, transparent 60%)',
+              'radial-gradient(circle at 50% 50%, hsl(8 87% 54% / 0.08) 0%, transparent 60%)',
           }}
         />
         <div
           aria-hidden
           className="absolute -right-44 top-12 size-[300px] rounded-full pointer-events-none hidden md:block"
-          style={{ border: '1px solid hsl(99 55% 42% / 0.18)' }}
+          style={{ border: '1px solid hsl(8 87% 54% / 0.18)' }}
         />
 
         <div className="relative grid md:grid-cols-[2fr_1fr] gap-6 sm:gap-10 p-5 sm:p-10 md:p-14 items-center">
@@ -108,10 +108,10 @@ export function QuoteSection({
               className="size-[180px] sm:size-[220px] md:size-[260px] rounded-2xl overflow-hidden flex items-center justify-center font-display font-bold"
               style={{
                 background: imgErrored
-                  ? 'linear-gradient(135deg, hsl(99 55% 42% / 0.25) 0%, hsl(0 0% 8%) 100%)'
+                  ? 'linear-gradient(135deg, hsl(8 87% 54% / 0.25) 0%, hsl(0 0% 8%) 100%)'
                   : 'transparent',
                 color: 'hsl(99 60% 78%)',
-                border: '1px solid hsl(99 55% 42% / 0.4)',
+                border: '1px solid hsl(8 87% 54% / 0.4)',
                 boxShadow: '0 12px 30px rgba(0,0,0,0.4)',
               }}
               aria-hidden
