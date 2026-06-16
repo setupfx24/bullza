@@ -19,18 +19,13 @@ services:
 
   # ── Backend services — restart policy + localhost-only ports ──
   admin-api:
-    # !override REPLACES the base compose ports (which bind 0.0.0.0) instead of
-    # appending — so prod exposes ONLY 127.0.0.1 (nginx upstream), never the
-    # public interface. Without this, docker merges the lists and the service
-    # stays reachable on 0.0.0.0 (the deploy.sh warning + the reason `down`
-    # was needed). Requires Compose >= 2.20.
-    ports: !override
+    ports:
       - "127.0.0.1:8003:8001"
     restart: always
     command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8001", "--workers", "2"]
 
   gateway:
-    ports: !override
+    ports:
       - "127.0.0.1:8002:8000"
     restart: always
     environment:
@@ -79,7 +74,7 @@ services:
         # ticket list. Either may be empty — the button hides if so.
         NEXT_PUBLIC_SUPPORT_EMAIL: ${NEXT_PUBLIC_SUPPORT_EMAIL:-support@swisdex.com}
         NEXT_PUBLIC_SUPPORT_WHATSAPP: ${NEXT_PUBLIC_SUPPORT_WHATSAPP:-}
-    ports: !override
+    ports:
       - "127.0.0.1:3012:3000"
     environment:
       INTERNAL_API_URL: http://gateway:8000/api/v1
@@ -96,7 +91,7 @@ services:
     build:
       context: ./frontend/admin
       dockerfile: Dockerfile
-    ports: !override
+    ports:
       - "127.0.0.1:3013:3001"
     environment:
       ADMIN_API_PROXY_TARGET: http://admin-api:8001
