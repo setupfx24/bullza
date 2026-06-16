@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
 import { adminApi } from '@/lib/api';
+import DateField from '@/components/ui/DateField';
 import toast from 'react-hot-toast';
 import Link from 'next/link';
 import {
@@ -509,8 +510,8 @@ export default function TradesPage() {
           </div>
           <input type="text" value={symbolFilter} onChange={e => setSymbolFilter(e.target.value)} placeholder="Symbol..." className="w-28 px-3 py-1.5 text-xs bg-bg-input border border-border-primary rounded-md placeholder:text-text-tertiary focus:border-buy transition-fast uppercase" />
           {/* Custom date range (server-side) */}
-          <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} title="From date" className="px-2 py-1.5 text-xs bg-bg-input border border-border-primary rounded-md text-text-primary focus:border-buy transition-fast" />
-          <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} title="To date" className="px-2 py-1.5 text-xs bg-bg-input border border-border-primary rounded-md text-text-primary focus:border-buy transition-fast" />
+          <DateField value={dateFrom} max={dateTo || undefined} onChange={setDateFrom} />
+          <DateField value={dateTo} min={dateFrom || undefined} onChange={setDateTo} />
           {/* Top gainers / losers */}
           <select value={sortMode} onChange={e => setSortMode(e.target.value as 'recent' | 'gainers' | 'losers')} className="px-2 py-1.5 text-xs bg-bg-input border border-border-primary rounded-md text-text-primary focus:border-buy transition-fast">
             <option value="recent">Most recent</option>
