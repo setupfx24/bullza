@@ -168,9 +168,19 @@ def require_permission(permission: str):
         )
         employee = result.scalar_one_or_none()
         if employee:
-            role_perms = EMPLOYEE_ROLE_PERMISSIONS.get(employee.role, set())
+            role_perms = EMPLOYEE_ROLE_PERMISSIONS.get(employee.role)
+            if role_perms is None:
+                # Super-admin-defined custom role (client 2026-06-16) — its
+                # permission set lives in employee_custom_roles, resolved here
+                # so custom roles behave exactly like the hardcoded ones.
+                from sqlalchemy import text as _sql_text
+                cr = (await db.execute(
+                    _sql_text("SELECT permissions FROM employee_custom_roles WHERE name = :n"),
+                    {"n": employee.role},
+                )).first()
+                role_perms = set(cr[0]) if cr and cr[0] else set()
             extra = set(employee.extra_permissions or [])
-            effective = role_perms | extra
+            effective = set(role_perms) | extra
             if "*" in effective or permission in effective:
                 return admin
 

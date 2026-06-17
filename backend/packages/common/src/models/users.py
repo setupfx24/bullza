@@ -3,7 +3,7 @@ import uuid
 from datetime import datetime
 
 from sqlalchemy import (
-    Column, String, Boolean, Integer, DateTime, ForeignKey, Text, Numeric,
+    Column, String, Boolean, Integer, DateTime, Date, ForeignKey, Text, Numeric,
 )
 from sqlalchemy.dialects.postgresql import UUID, INET, JSONB
 from sqlalchemy.orm import relationship
@@ -279,3 +279,36 @@ class Employee(Base):
     created_at = Column(DateTime(timezone=True), default=datetime.utcnow)
 
     user = relationship("User", lazy="selectin")
+
+
+class EmployeeCustomRole(Base):
+    """Super-admin-defined reusable employee role (client 2026-06-16): a named
+    role with its own permission set, assignable to many employees. Resolved
+    alongside the hardcoded EMPLOYEE_ROLE_PERMISSIONS in require_permission."""
+    __tablename__ = "employee_custom_roles"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    name = Column(String(40), unique=True, nullable=False)
+    permissions = Column(JSONB, default=list, nullable=False)
+    created_by = Column(UUID(as_uuid=True), ForeignKey("users.id"))
+    created_at = Column(DateTime(timezone=True), default=datetime.utcnow)
+
+
+class EmployeeTask(Base):
+    """Work item assigned to an employee (client 2026-06-16). The employee
+    marks each task done/undone and, when undone, writes a reason. The day's
+    tasks form the employee's daily report that admin + super-admin review."""
+    __tablename__ = "employee_tasks"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    assigned_by = Column(UUID(as_uuid=True), ForeignKey("users.id"))     # who assigned
+    assigned_to = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)  # employee's user_id
+    title = Column(String(200), nullable=False)
+    description = Column(Text)
+    due_date = Column(Date)
+    # pending | done | undone
+    status = Column(String(20), nullable=False, default="pending")
+    undone_reason = Column(Text)            # filled when the employee marks it undone
+    completed_at = Column(DateTime(timezone=True))
+    created_at = Column(DateTime(timezone=True), default=datetime.utcnow)
+    updated_at = Column(DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow)

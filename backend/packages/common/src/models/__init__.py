@@ -30,6 +30,7 @@ from ._enums import (
 from .users import (
     User, UserSession, PasswordResetToken, UserRefreshToken, KYCDocument,
     IPLog, AuditLog, UserAuditLog, Employee, WalletAuthNonce,
+    EmployeeCustomRole, EmployeeTask,
 )
 from .instruments import (
     InstrumentSegment, Instrument, InstrumentConfig, InstrumentConfigAudit,
@@ -80,6 +81,7 @@ __all__ = [
     # users
     "User", "UserSession", "PasswordResetToken", "UserRefreshToken", "KYCDocument",
     "IPLog", "AuditLog", "UserAuditLog", "Employee", "WalletAuthNonce",
+    "EmployeeCustomRole", "EmployeeTask",
     # instruments
     "InstrumentSegment", "Instrument", "InstrumentConfig", "InstrumentConfigAudit",
     # trading

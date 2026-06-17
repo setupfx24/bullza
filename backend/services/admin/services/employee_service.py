@@ -7,7 +7,7 @@ from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from packages.common.src.auth import hash_password
-from packages.common.src.models import User, Employee, AuditLog
+from packages.common.src.models import User, Employee, AuditLog, EmployeeCustomRole
 from packages.common.src.admin_schemas import (
     EmployeeIn, EmployeeUpdate, AuditLogOut, PaginatedResponse,
 )
@@ -17,6 +17,17 @@ VALID_EMPLOYEE_ROLES = [
     "super_admin", "trade_manager", "support", "finance", "risk_manager", "marketing", "rm",
     "deposit_manager", "withdrawal_manager",
 ]
+
+
+async def _is_valid_role(role: str, db: AsyncSession) -> bool:
+    """A role is valid if it's a built-in role OR a super-admin-defined custom
+    role (client 2026-06-16)."""
+    if role in VALID_EMPLOYEE_ROLES:
+        return True
+    found = (await db.execute(
+        select(EmployeeCustomRole.id).where(EmployeeCustomRole.name == role)
+    )).first()
+    return found is not None
 
 
 async def list_employees(db: AsyncSession) -> dict:
@@ -53,8 +64,8 @@ async def create_employee(
     if admin.role != "super_admin":
         raise HTTPException(status_code=403, detail="Only super admins can create employees")
 
-    if body.role not in VALID_EMPLOYEE_ROLES:
-        raise HTTPException(status_code=400, detail=f"Invalid role. Must be one of: {VALID_EMPLOYEE_ROLES}")
+    if not await _is_valid_role(body.role, db):
+        raise HTTPException(status_code=400, detail=f"Invalid role. Built-in: {VALID_EMPLOYEE_ROLES}, or a custom role.")
 
     existing_q = await db.execute(select(User).where(User.email == body.email))
     if existing_q.scalar_one_or_none():
@@ -119,8 +130,8 @@ async def update_employee(
     old_values = {"role": employee.role, "is_active": employee.is_active}
 
     if body.role is not None:
-        if body.role not in VALID_EMPLOYEE_ROLES:
-            raise HTTPException(status_code=400, detail=f"Invalid role. Must be one of: {VALID_EMPLOYEE_ROLES}")
+        if not await _is_valid_role(body.role, db):
+            raise HTTPException(status_code=400, detail=f"Invalid role. Built-in: {VALID_EMPLOYEE_ROLES}, or a custom role.")
         employee.role = body.role
 
     if body.is_active is not None:
