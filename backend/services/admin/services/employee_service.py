@@ -140,6 +140,12 @@ async def update_employee(
     user_q = await db.execute(select(User).where(User.id == employee.user_id))
     user = user_q.scalar_one_or_none()
     if user:
+        # The admin UI sends a single full_name — split it into first/last so
+        # the name actually updates (it was being ignored before).
+        if body.full_name is not None and body.full_name.strip():
+            parts = body.full_name.strip().split(" ", 1)
+            user.first_name = parts[0]
+            user.last_name = parts[1] if len(parts) > 1 else ""
         if body.first_name is not None:
             user.first_name = body.first_name
         if body.last_name is not None:

@@ -744,6 +744,9 @@ class EmployeeIn(BaseModel):
 class EmployeeUpdate(BaseModel):
     first_name: Optional[str] = None
     last_name: Optional[str] = None
+    # The admin UI sends a single full_name; the service splits it into
+    # first/last. Without this the name never updated (client 2026-06-17).
+    full_name: Optional[str] = None
     role: Optional[str] = None
     is_active: Optional[bool] = None
 

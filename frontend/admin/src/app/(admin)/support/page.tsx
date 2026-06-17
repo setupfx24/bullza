@@ -32,6 +32,7 @@ interface TicketMessage {
 
 interface Employee {
   id: string;
+  user_id: string;
   full_name: string;
 }
 
@@ -179,7 +180,9 @@ export default function SupportPage() {
                 >
                   <option value="">Unassigned</option>
                   {employees.map((emp) => (
-                    <option key={emp.id} value={emp.id}>{emp.full_name}</option>
+                    // assigned_to is a FK to users.id, so send the employee's
+                    // USER id, not the employees-table PK (was causing a 500).
+                    <option key={emp.id} value={emp.user_id}>{emp.full_name}</option>
                   ))}
                 </select>
               </div>

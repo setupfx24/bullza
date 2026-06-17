@@ -152,7 +152,22 @@ async def assign_ticket(
         raise HTTPException(status_code=404, detail="Ticket not found")
 
     old_assigned = str(ticket.assigned_to) if ticket.assigned_to else None
-    ticket.assigned_to = uuid.UUID(body.admin_id)
+    # Validate the assignee: parse the UUID and confirm it's a real admin/
+    # employee user. assigned_to is a FK to users.id — sending an employees-table
+    # PK (or any non-user id) used to raise → HTTP 500. Now a clean 400.
+    try:
+        assignee_id = uuid.UUID(str(body.admin_id))
+    except (ValueError, TypeError):
+        raise HTTPException(status_code=400, detail="Invalid assignee id")
+    assignee = (await db.execute(
+        select(User).where(
+            User.id == assignee_id,
+            User.role.in_(["admin", "super_admin"]),
+        )
+    )).scalar_one_or_none()
+    if not assignee:
+        raise HTTPException(status_code=400, detail="Assignee is not a valid admin/employee")
+    ticket.assigned_to = assignee_id
     ticket.updated_at = datetime.utcnow()
 
     await write_audit_log(
