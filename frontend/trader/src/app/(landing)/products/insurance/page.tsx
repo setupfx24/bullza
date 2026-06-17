@@ -5,12 +5,38 @@
  *
  * The IB Account Tiers grid that briefly lived here has been moved to
  * the IB referral page (/products/ib-referral) where it belongs. This
- * page is now a clean Insurance pitch — hero banner, value props, and
- * a CTA. Specific cover percentages / fees are surfaced in-product on
- * the order ticket, not on this marketing page.
+ * page pitches Insurance: hero banner, value props, the two coverage
+ * tiers (50% Standard / 70% Premium promo — both share the same bullet
+ * list, only the cover % and promo flag differ), and a CTA. Exact
+ * premiums/caps are still confirmed on the order ticket at activation.
  */
 import Link from 'next/link';
-import { ArrowUpRight, ShieldCheck, Zap, Lock, ScrollText } from 'lucide-react';
+import { ArrowUpRight, ShieldCheck, Zap, Lock, ScrollText, Check } from 'lucide-react';
+
+// Two coverage tiers shown on the order ticket. Per the client, both cards
+// carry the SAME bullet list — only the headline cover % and the promo flag
+// differ between Standard (50%) and Premium (70%).
+const COVER_BULLETS = [
+  'Higher policy caps for verified accounts',
+  'Same one-click activation, no paperwork',
+  'Stackable with the welcome bonus on first deposits',
+];
+const COVER_TIERS = [
+  {
+    pct: '50%',
+    label: 'Standard Cover',
+    sub: 'From 2% of trade size',
+    promo: false,
+    bullets: ['Refunds up to 50% of any covered losing trade', ...COVER_BULLETS],
+  },
+  {
+    pct: '70%',
+    label: 'Premium Cover (Promo)',
+    sub: 'Limited-time offer',
+    promo: true,
+    bullets: ['Refunds up to 70% of any covered losing trade', ...COVER_BULLETS],
+  },
+];
 
 const FEATURES = [
   {
@@ -84,6 +110,65 @@ export default function InsurancePage() {
           Insurance premiums apply per trade and are non-refundable. Coverage percentages, caps, and
           minimum trade durations are shown on the order ticket at activation time and may change
           without notice.
+        </p>
+      </section>
+
+      {/* Coverage tiers */}
+      <section className="mx-auto max-w-[1200px] px-[var(--gutter)] pb-12 sm:pb-16">
+        <div className="text-center max-w-2xl mx-auto mb-10">
+          <h2 className="font-display uppercase text-2xl sm:text-3xl tracking-tight">Coverage Tiers</h2>
+          <p className="mt-3 text-foreground/65 text-sm sm:text-base leading-relaxed">
+            Activate insurance on the order ticket and get a refund if your trade closes at a loss.
+            Two coverage tiers — pick the one that fits your risk.
+          </p>
+        </div>
+
+        <div className="grid sm:grid-cols-2 gap-5 max-w-4xl mx-auto">
+          {COVER_TIERS.map((t) => (
+            <article
+              key={t.label}
+              className={`relative liquid-glass rounded-2xl p-7 flex flex-col border ${
+                t.promo ? 'border-[#e8b923]/40' : 'border-primary/30'
+              }`}
+            >
+              {t.promo && (
+                <span className="absolute top-5 right-5 inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-[#e8b923]/15 text-[#e8b923]">
+                  Limited Promo
+                </span>
+              )}
+              <div className="flex items-baseline gap-2">
+                <span className={`font-display text-5xl ${t.promo ? 'text-[#e8b923]' : 'text-primary'}`}>
+                  {t.pct}
+                </span>
+                <span className="text-xs uppercase tracking-wider text-foreground/55">loss cover</span>
+              </div>
+              <h3 className="mt-3 font-display text-lg uppercase tracking-tight">{t.label}</h3>
+              <p className="text-[11px] uppercase tracking-wider text-foreground/45">{t.sub}</p>
+              <ul className="mt-5 space-y-2.5 flex-1">
+                {t.bullets.map((b) => (
+                  <li key={b} className="flex items-start gap-2 text-sm text-foreground/75">
+                    <Check className={`size-4 mt-0.5 shrink-0 ${t.promo ? 'text-[#e8b923]' : 'text-primary'}`} />
+                    <span>{b}</span>
+                  </li>
+                ))}
+              </ul>
+              <Link
+                href="/auth/register"
+                className={`mt-6 inline-flex items-center justify-center gap-2 rounded-full px-5 py-3 text-sm font-semibold uppercase tracking-wider transition ${
+                  t.promo
+                    ? 'bg-[#e8b923] text-black hover:opacity-90'
+                    : 'bg-primary text-white hover:opacity-90'
+                }`}
+              >
+                Activate Now <ArrowUpRight className="size-4" />
+              </Link>
+            </article>
+          ))}
+        </div>
+
+        <p className="mt-6 text-center text-xs text-foreground/45 max-w-2xl mx-auto leading-relaxed">
+          Insurance fees apply per trade and are non-refundable. Coverage payouts are subject to
+          minimum trade duration and the policy terms shown on the order ticket at activation time.
         </p>
       </section>
 
