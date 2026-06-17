@@ -45,6 +45,8 @@ export default function EmployeesPage() {
   const [activityModal, setActivityModal] = useState<Employee | null>(null);
   const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
   const [activityLoading, setActivityLoading] = useState(false);
+  // Super-admin-defined custom roles, shown in the role dropdown.
+  const [customRoles, setCustomRoles] = useState<{ id: string; name: string }[]>([]);
 
   // Permissions modal state
   const [permModal, setPermModal] = useState<Employee | null>(null);
@@ -56,8 +58,12 @@ export default function EmployeesPage() {
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await adminApi.get<{ employees: Employee[] }>('/employees');
+      const [res, roles] = await Promise.all([
+        adminApi.get<{ employees: Employee[] }>('/employees'),
+        adminApi.get<{ items: { id: string; name: string }[] }>('/employees/roles').catch(() => ({ items: [] })),
+      ]);
       setEmployees(res.employees || []);
+      setCustomRoles(roles?.items || []);
     } catch (e: any) {
       toast.error(e.message || 'Failed to load employees');
     } finally {
@@ -371,6 +377,11 @@ export default function EmployeesPage() {
                   <option value="marketing">Marketing</option>
                   <option value="rm">Relationship Manager (RM)</option>
                   <option value="super_admin">Super Admin</option>
+                  {customRoles.length > 0 && (
+                    <optgroup label="Custom roles">
+                      {customRoles.map((r) => <option key={r.id} value={r.name}>{r.name}</option>)}
+                    </optgroup>
+                  )}
                 </select>
               </div>
               {!editId && (
