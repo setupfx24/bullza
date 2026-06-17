@@ -5,7 +5,7 @@ from sqlalchemy import select, func, case
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from packages.common.src.models import (
-    User, Position, Transaction, Deposit, Withdrawal,
+    User, Position, Order, Transaction, Deposit, Withdrawal,
     Instrument, PositionStatus, OrderSide, TradingAccount,
     TradeHistory, MasterAccount, IBProfile, IBCommission,
     InvestorAllocation, CopyTrade, UserBonus,
@@ -265,6 +265,12 @@ async def finance_overview(db: AsyncSession, start_date=None, end_date=None) -> 
     commission = abs(float((await db.execute(
         _dr(select(func.coalesce(func.sum(Position.commission), 0)).where(Position.commission != 0), Position.created_at)
     )).scalar() or 0))
+    # Spread revenue — its OWN line, separate from commission (client
+    # 2026-06-16). Tracked per filled order from 2026-06-17; older trades
+    # show 0 (spread wasn't stored before).
+    spread = float((await db.execute(
+        _dr(select(func.coalesce(func.sum(Order.spread_revenue), 0)).where(Order.status == "filled"), Order.created_at)
+    )).scalar() or 0)
     swap = abs(float((await db.execute(
         _dr(select(func.coalesce(func.sum(Position.swap), 0)).where(Position.swap != 0), Position.created_at)
     )).scalar() or 0))
@@ -298,6 +304,7 @@ async def finance_overview(db: AsyncSession, start_date=None, end_date=None) -> 
     pnl_sources = [
         {"key": "trading",        "label": "Trading P&L (user loss − profit)", "amount": round(broker_trading, 2)},
         {"key": "commission",     "label": "Commission",                       "amount": round(commission, 2)},
+        {"key": "spread",         "label": "Spread",                           "amount": round(spread, 2)},
         {"key": "swap",           "label": "Swap / overnight",                 "amount": round(swap, 2)},
         {"key": "pamm_mam",       "label": "PAMM / MAM admin cut",             "amount": round(admin_commission, 2)},
         {"key": "insurance_fees", "label": "Insurance fees",                   "amount": round(insurance_fees, 2)},
@@ -584,6 +591,28 @@ async def finance_overview_drill(
                 .join(TradingAccount, TradingAccount.id == Position.account_id)
                 .where(col != 0),
                 Position.created_at,
+            ).group_by(TradingAccount.user_id)
+        )).all()
+        umap = await _user_label_map(db, [r[0] for r in rows if r[0]])
+        for uid, amt, cnt in rows:
+            info = umap.get(uid, {})
+            users.append({
+                "user_id": str(uid) if uid else None,
+                "name": info.get("name", "—"),
+                "email": info.get("email"),
+                "amount": round(abs(float(amt or 0)), 2),
+                "count": int(cnt or 0),
+            })
+
+    elif section == "spread":
+        # Spread revenue per user — from filled orders (orders.spread_revenue),
+        # joined to trading_accounts for the owner (client 2026-06-16).
+        rows = (await db.execute(
+            _dr(
+                select(TradingAccount.user_id, func.coalesce(func.sum(Order.spread_revenue), 0), func.count(Order.id))
+                .join(TradingAccount, TradingAccount.id == Order.account_id)
+                .where(Order.status == "filled", Order.spread_revenue != 0),
+                Order.created_at,
             ).group_by(TradingAccount.user_id)
         )).all()
         umap = await _user_label_map(db, [r[0] for r in rows if r[0]])

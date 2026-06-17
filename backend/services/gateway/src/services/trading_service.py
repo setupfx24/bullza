@@ -445,6 +445,22 @@ async def place_order(
         order.filled_price = fill_price
         order.filled_at = datetime.utcnow()
         order.commission = commission
+        # Broker's gross spread revenue on this fill, in USD — its own number,
+        # separate from commission (client 2026-06-16). (ask − bid) is the
+        # markup the trader crosses; × effective lots × contract size, then
+        # converted from the quote currency to USD. Best-effort: never blocks
+        # the fill.
+        try:
+            _sp = Decimal(str(ask)) - Decimal(str(bid))
+            if _sp > 0:
+                _sr_raw = _sp * effective_lots * contract_size
+                order.spread_revenue = await convert_to_account_currency(
+                    _sr_raw,
+                    getattr(instrument, "quote_currency", None)
+                    or (instrument.symbol[3:6].upper() if instrument.symbol and len(instrument.symbol) >= 6 else None),
+                )
+        except Exception:
+            order.spread_revenue = Decimal("0")
 
         position = Position(
             account_id=account.id,

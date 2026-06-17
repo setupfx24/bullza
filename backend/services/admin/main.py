@@ -146,6 +146,11 @@ async def _apply_startup_ddl():
             await conn.execute(text(
                 "CREATE INDEX IF NOT EXISTS ix_employee_tasks_assigned_to ON employee_tasks(assigned_to)"
             ))
+            # Broker spread revenue per trade (migration 0078) — its own Finance
+            # Overview line, separate from commission.
+            await conn.execute(text(
+                "ALTER TABLE orders ADD COLUMN IF NOT EXISTS spread_revenue NUMERIC(18,8) DEFAULT 0"
+            ))
     except Exception as e:
         logger.warning("startup DDL skipped: %s", e)
 
