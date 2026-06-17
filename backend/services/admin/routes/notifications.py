@@ -100,6 +100,27 @@ async def notifications_summary(
     except Exception:
         rm_pending = 0
 
+    # Fixed-Return activity (client 2026-06-17): admins want a bell ping when a
+    # user requests an early withdrawal (actionable queue) and when a new
+    # deposit/lock comes in (informational). Own savepoint so a missing table
+    # can't poison the session.
+    fr_withdrawals = 0
+    fr_new_locks = 0
+    try:
+        async with db.begin_nested():
+            fr_w_q = await db.execute(
+                text("SELECT COUNT(*) FROM fixed_return_locks WHERE state = 'early_pending'")
+            )
+            fr_withdrawals = int(fr_w_q.scalar() or 0)
+            fr_n_q = await db.execute(
+                text("SELECT COUNT(*) FROM fixed_return_locks WHERE locked_at >= :since"),
+                {"since": since_24h},
+            )
+            fr_new_locks = int(fr_n_q.scalar() or 0)
+    except Exception:
+        fr_withdrawals = 0
+        fr_new_locks = 0
+
     # `link` values are admin-frontend route paths. Withdrawals share the
     # /deposits page (tab=withdrawals); approvals get their own page; the
     # rest map 1:1 to existing routes.
@@ -110,8 +131,12 @@ async def notifications_summary(
          "label": "Approval requests", "link": "/approvals", "severity": "critical"},
         {"kind": "rm_funding",  "count": rm_pending,
          "label": "RM funding requests", "link": "/rm-requests", "severity": "critical"},
+        {"kind": "fixed_return_withdrawals", "count": fr_withdrawals,
+         "label": "Fixed-Return withdrawal requests", "link": "/config/fixed-return", "severity": "critical"},
         {"kind": "deposits",    "count": pending_deposits,
          "label": "Pending deposits", "link": "/deposits", "severity": "normal"},
+        {"kind": "fixed_return_new", "count": fr_new_locks,
+         "label": "New Fixed-Return deposits (24h)", "link": "/config/fixed-return", "severity": "normal"},
         {"kind": "kyc",         "count": pending_kyc,
          "label": "KYC submissions", "link": "/kyc", "severity": "normal"},
         {"kind": "tickets",     "count": open_tickets,
