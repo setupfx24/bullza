@@ -174,11 +174,11 @@ export default function EmployeesPage() {
   const handleDelete = async (id: string) => {
     try {
       await adminApi.delete(`/employees/${id}`);
-      toast.success('Employee deactivated');
+      toast.success('Employee deleted');
       setDeleteConfirm(null);
       fetchData();
     } catch (e: any) {
-      toast.error(e.message || 'Failed to deactivate');
+      toast.error(e.message || 'Failed to delete');
     }
   };
 
@@ -405,14 +405,15 @@ export default function EmployeesPage() {
         <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" onClick={() => setDeleteConfirm(null)}>
           <div className="bg-bg-secondary border border-border-primary rounded-md shadow-modal w-full max-w-sm" onClick={(e) => e.stopPropagation()}>
             <div className="px-5 py-4 border-b border-border-primary">
-              <h3 className="text-sm font-semibold text-text-primary">Deactivate Employee</h3>
+              <h3 className="text-sm font-semibold text-text-primary">Delete Employee</h3>
             </div>
             <div className="px-5 py-4">
-              <p className="text-xs text-text-secondary">Are you sure you want to deactivate this employee? They will lose access to the admin panel.</p>
+              <p className="text-xs text-text-secondary">Are you sure you want to <span className="text-danger font-semibold">permanently delete</span> this employee? They will be removed from the employee list and lose all admin access. This cannot be undone.</p>
+              <p className="text-xxs text-text-tertiary mt-2">Tip: to only temporarily disable them, use the <span className="font-medium">Active/Inactive</span> toggle instead.</p>
             </div>
             <div className="px-5 py-3 border-t border-border-primary flex justify-end gap-2">
               <button onClick={() => setDeleteConfirm(null)} className="px-3 py-1.5 rounded-md text-xs text-text-secondary border border-border-primary hover:bg-bg-hover transition-fast">Cancel</button>
-              <button onClick={() => handleDelete(deleteConfirm)} className="px-3 py-1.5 rounded-md text-xs font-medium bg-danger/15 text-danger border border-danger/30 hover:bg-danger/25 transition-fast">Deactivate</button>
+              <button onClick={() => handleDelete(deleteConfirm)} className="px-3 py-1.5 rounded-md text-xs font-medium bg-danger/15 text-danger border border-danger/30 hover:bg-danger/25 transition-fast">Delete Permanently</button>
             </div>
           </div>
         </div>

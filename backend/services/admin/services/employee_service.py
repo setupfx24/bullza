@@ -167,6 +167,15 @@ async def delete_employee(
     ip_address: str | None,
     db: AsyncSession,
 ) -> dict:
+    """Permanently remove an employee from the roster.
+
+    We hard-delete the Employee row (so it disappears from the list) and demote
+    the linked user out of admin (role=user, status=terminated, sessions revoked)
+    — we do NOT delete the users row, because audit_logs / support_tickets / etc.
+    FK-reference users.id and deleting it would break history. (Previously this
+    only set is_active=False, so the row stayed in the list — the "delete nahi ho
+    raha" complaint.)
+    """
     if admin.role != "super_admin":
         raise HTTPException(status_code=403, detail="Only super admins can delete employees")
 
@@ -175,20 +184,29 @@ async def delete_employee(
     if not employee:
         raise HTTPException(status_code=404, detail="Employee not found")
 
-    employee.is_active = False
+    # Guard: deleting your own employee record would lock you out.
+    if employee.user_id == admin.id:
+        raise HTTPException(status_code=400, detail="You cannot delete your own account")
 
     user_q = await db.execute(select(User).where(User.id == employee.user_id))
     user = user_q.scalar_one_or_none()
+    user_email = user.email if user else None
+
+    await db.delete(employee)
     if user:
-        user.status = "suspended"
+        user.role = "user"
+        user.status = "terminated"
+        # Revoke any live admin sessions for this account.
+        if hasattr(user, "password_epoch"):
+            user.password_epoch = (user.password_epoch or 0) + 1
 
     await write_audit_log(
         db, admin.id, "delete_employee", "employee", employee_id,
-        new_values={"is_active": False, "user_status": "suspended"},
+        new_values={"deleted": True, "email": user_email, "demoted_to": "user", "status": "terminated"},
         ip_address=ip_address,
     )
     await db.commit()
-    return {"message": "Employee deactivated"}
+    return {"message": "Employee deleted"}
 
 
 async def get_employee_activity(
