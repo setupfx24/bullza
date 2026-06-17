@@ -1,6 +1,7 @@
 import uuid
 
 from fastapi import APIRouter, Depends, Query, Request
+from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from packages.common.src.database import get_db
@@ -248,6 +249,29 @@ async def trigger_password_reset(
     or stored anywhere (hashed at rest). 2026-06-01 #5."""
     return await user_service.trigger_password_reset(
         user_id=user_id, admin_id=admin.id,
+        ip_address=request.client.host if request.client else None, db=db,
+    )
+
+
+class SetPasswordBody(BaseModel):
+    # Optional — leave blank to auto-generate a strong one.
+    password: str | None = None
+
+
+@router.post("/{user_id}/set-password")
+async def set_password(
+    user_id: uuid.UUID,
+    body: SetPasswordBody,
+    request: Request,
+    admin: User = Depends(require_permission("users.set_password")),
+    db: AsyncSession = Depends(get_db),
+):
+    """Admin SETS a password for the user and SEES it (client 2026-06-16).
+    The old password can never be shown (bcrypt at rest); this sets a known
+    one — provided or auto-generated — and returns it once so the admin can
+    hand it to the user. Revokes the user's existing sessions."""
+    return await user_service.set_password_by_admin(
+        user_id=user_id, admin_id=admin.id, new_password=body.password,
         ip_address=request.client.host if request.client else None, db=db,
     )
 

@@ -18,7 +18,7 @@ router = APIRouter(prefix="/employees", tags=["Employees"])
 # Static catalog of permissions the admin UI renders as checkboxes. Keep in sync
 # with require_permission() call sites across the admin backend.
 PERMISSION_CATALOG = {
-    "Users":       ["users.view", "users.add_fund", "users.deduct_fund", "users.ban", "users.block_trading", "users.kill_switch"],
+    "Users":       ["users.view", "users.add_fund", "users.deduct_fund", "users.ban", "users.block_trading", "users.kill_switch", "users.set_password"],
     "KYC":         ["kyc.view", "kyc.manage"],
     "Deposits":    ["deposits.view", "deposits.approve", "deposits.reject"],
     "Withdrawals": ["withdrawals.view", "withdrawals.approve", "withdrawals.reject"],
