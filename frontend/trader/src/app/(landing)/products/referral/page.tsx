@@ -24,6 +24,8 @@ type DisplayTier = {
   label: string;        // "Bronze"
   perLot: string;       // "$5 / lot"
   requirement: string;  // "5+ activations or $500+"
+  range: string;        // activation count range shown in the header, e.g. "1-20", "500+"
+  deposit: string;      // deposit-based alternative threshold, e.g. "$500+"
 };
 
 /** Admin-driven qualification conditions surfaced under the table.
@@ -46,10 +48,10 @@ const DEFAULT_QUALIFICATION: Qualification = {
  *  design the client signed off on, so a fresh install still renders the
  *  ladder rather than going blank. */
 const FALLBACK_TIERS: DisplayTier[] = [
-  { label: 'Bronze',   perLot: '$5 / lot',  requirement: '5+ activations or $500+' },
-  { label: 'Silver',   perLot: '$7 / lot',  requirement: '20+ activations or $5,000+' },
-  { label: 'Gold',     perLot: '$10 / lot', requirement: '50+ activations or $20,000+' },
-  { label: 'Platinum', perLot: '$12 / lot', requirement: '100+ activations or $50,000+' },
+  { label: 'Bronze',   perLot: '$5 / lot',  requirement: '5+ activations or $500+',     range: '1-20',    deposit: '$500+' },
+  { label: 'Silver',   perLot: '$7 / lot',  requirement: '20+ activations or $5,000+',  range: '21-100',  deposit: '$5,000+' },
+  { label: 'Gold',     perLot: '$10 / lot', requirement: '50+ activations or $20,000+', range: '101-500', deposit: '$20,000+' },
+  { label: 'Platinum', perLot: '$12 / lot', requirement: '100+ activations or $50,000+', range: '500+',   deposit: '$50,000+' },
 ];
 
 const fmtUsd = (n: number) => `$${(n || 0).toLocaleString('en-US', { maximumFractionDigits: 2 })}`;
@@ -62,7 +64,24 @@ function adaptApi(t: ApiTier): DisplayTier {
     label: t.label,
     perLot: `${fmtUsd(t.per_lot || 0)} / lot`,
     requirement,
+    range: t.min_activations > 0 ? `${t.min_activations}+` : '—', // refined below once neighbours are known
+    deposit: t.min_amount > 0 ? `${fmtUsd(t.min_amount)}+` : '—',
   };
+}
+
+/** Turn a sorted list of API tiers into display rows whose activation header
+ *  reads as a range ("1-20", "21-100", … last "+"). A tier's range runs from
+ *  its own activation threshold up to one below the next tier's threshold. */
+function buildTiers(apiTiers: ApiTier[]): DisplayTier[] {
+  return apiTiers.map((t, i) => {
+    const d = adaptApi(t);
+    const lo = t.min_activations > 0 ? t.min_activations : 1;
+    const next = apiTiers[i + 1];
+    d.range = next
+      ? `${lo}-${Math.max(lo, (next.min_activations || lo) - 1)}`
+      : `${lo}+`;
+    return d;
+  });
 }
 
 /** Header gradient cycles through (neutral / brand / accent) so the third
@@ -107,7 +126,7 @@ export default function ReferralPage() {
           qualification?: Partial<Qualification>;
         } = await res.json();
         if (cancelled) return;
-        const list = (data.tiers || []).map(adaptApi);
+        const list = buildTiers(data.tiers || []);
         if (list.length > 0) setTiers(list);
         if (data.qualification) {
           setQual({
@@ -181,7 +200,7 @@ export default function ReferralPage() {
       {/* Referral payout tiers */}
       <section id="tiers" className="mx-auto max-w-[1200px] px-[var(--gutter)] py-12 sm:py-16">
         <div className="text-center mb-10">
-          <h2 className="font-display uppercase text-2xl sm:text-3xl md:text-4xl tracking-tight">Per-Referral Payouts</h2>
+          <h2 className="font-display uppercase text-2xl sm:text-3xl md:text-4xl tracking-tight">Referral Payouts</h2>
           <p className="mt-3 text-foreground/65 max-w-xl mx-auto text-sm sm:text-base">
             Move up the ladder automatically as your active referrals grow — no manual upgrade.
           </p>
@@ -193,7 +212,7 @@ export default function ReferralPage() {
               <thead>
                 <tr>
                   <th className="bg-foreground/[0.04] border-r border-foreground/15 px-5 py-4 text-left text-xs uppercase tracking-[0.16em] text-foreground/55">
-                    Tier
+                    Activation
                   </th>
                   {tiers.map((t, i) => (
                     <th
@@ -203,7 +222,7 @@ export default function ReferralPage() {
                       }`}
                       style={{ background: TIER_HEADER_GRADIENTS[i % TIER_HEADER_GRADIENTS.length] }}
                     >
-                      {t.label}
+                      {t.range}
                     </th>
                   ))}
                 </tr>
@@ -228,10 +247,11 @@ export default function ReferralPage() {
                     );
                   })}
                 </tr>
-                {/* Qualification row (activations OR amount) */}
+                {/* Deposit-based alternative (you also unlock a tier when your
+                    referrals' total deposits cross the threshold). */}
                 <tr className="border-t border-foreground/10">
                   <td className="px-5 py-4 text-sm text-foreground/75 bg-foreground/[0.04] border-r border-foreground/15">
-                    Qualify (either)
+                    Or total deposits
                   </td>
                   {tiers.map((t, i) => {
                     const isMid = tiers.length >= 3 && i === Math.floor(tiers.length / 2);
@@ -242,7 +262,7 @@ export default function ReferralPage() {
                           isMid ? 'text-foreground bg-primary/[0.08]' : 'text-foreground/80 bg-foreground/[0.02]'
                         }${i < tiers.length - 1 ? ' border-r border-foreground/10' : ''}`}
                       >
-                        {t.requirement}
+                        {t.deposit}
                       </td>
                     );
                   })}
