@@ -11,15 +11,18 @@ from ..config import get_settings
 
 # Brand palette — kept inline because Outlook/Gmail/iOS Mail strip <style>
 # blocks, so every colour has to live on a style="" attribute.
-# LIGHT theme (client request 2026-06-15): emails render on a white/light
-# background so the dark-lettered brand logo (swisdex_png.png) is clearly
-# visible. Every element below references these tokens, so flipping them here
+# LIGHT body + DARK header band. The body stays white/light, but the header
+# that holds the logo is a fixed dark band so the WHITE-lettered logo
+# (swisdex_png5.png) stays visible in EVERY client — Gmail's dark mode darkens
+# light backgrounds (which hid the old dark logo) but never lightens a dark
+# one. Every element below references these tokens, so flipping them here
 # re-themes all ~25 templates.
 _BRAND       = "#55a630"   # SwisDex green (primary CTAs, logo accent)
 _BRAND_DARK  = "#3f7d22"
 _GOLD        = "#d6a93d"   # legacy accent — still used for secondary action
 _BG          = "#f4f5f7"   # light page background (outside the card)
 _CARD        = "#ffffff"   # white card
+_HEADER_BG   = "#0a0a0a"   # dark header band behind the white logo
 _TEXT        = "#1a1a1a"   # near-black primary text
 _TEXT_DIM    = "#6b7280"   # muted grey secondary text
 _BORDER      = "#e5e7eb"   # light hairline border
@@ -52,7 +55,7 @@ def _header_brand_html() -> str:
     return (
         f'<span style="font-weight:700;font-size:22px;letter-spacing:0.2px;'
         f'font-family:-apple-system,BlinkMacSystemFont,\'Segoe UI\',Helvetica,Arial,sans-serif;">'
-        f'<span style="color:{_TEXT};">Swis</span>'
+        f'<span style="color:#ffffff;">Swis</span>'
         f'<span style="color:{_BRAND};">Dex</span>'
         f'</span>'
     )
@@ -209,7 +212,7 @@ def render_layout(
                       border:1px solid {_BORDER};border-radius:12px;overflow:hidden;">
           <tr>
             <td style="padding:24px 32px;border-bottom:1px solid {_BORDER};
-                       background:linear-gradient(180deg,#f7f8fa 0%,{_CARD} 100%);">
+                       background:{_HEADER_BG};">
               {_header_brand_html()}
             </td>
           </tr>
