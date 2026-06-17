@@ -12,57 +12,59 @@ const DEFAULT_TV       = 'OANDA:US30USD';
 /* TradingView symbol mapping for every directory item below. */
 const INSTRUMENT_MAP: Record<string, string> = {
   // Indices
-  'SMI':              'BLACKBULL:SMI20',
-  'US_500':           'OANDA:SPX500USD',
-  'CANNABIS INDEX':   'AMEX:MJ',
-  'US_TECH100':       'OANDA:NAS100USD',
-  'US_30':            'OANDA:US30USD',
-  'US_2000':          'OANDA:US2000USD',
-  'DOLLAR INDEX':     'CAPITALCOM:DXY',
-  'SPAIN 35':         'OANDA:ESP35EUR',
+  'US30':         'OANDA:US30USD',
+  'US100':        'OANDA:NAS100USD',
+  'US500':        'OANDA:SPX500USD',
   // Commodities
-  'Crude Oil':        'OANDA:WTICOUSD',
-  'Copper':           'OANDA:XCUUSD',
-  'Brent Oil':        'OANDA:BCOUSD',
-  'Heating Oil':      'NYMEX:HO1!',
-  'Gasoline':         'NYMEX:RB1!',
-  'Natural Gas':      'BLACKBULL:NGAS',
-  'Gold Trading':     'OANDA:XAUUSD',
-  'Silver':           'OANDA:XAGUSD',
-  'Wheat':            'CBOT:ZW1!',
-  'Corn':             'CBOT:ZC1!',
+  'Gold':         'OANDA:XAUUSD',
+  'Silver':       'OANDA:XAGUSD',
+  'Copper':       'OANDA:XCUUSD',
+  'Crude Oil':    'OANDA:WTICOUSD',
+  'Brent Oil':    'OANDA:BCOUSD',
+  'Wheat':        'CBOT:ZW1!',
+  'Corn':         'CBOT:ZC1!',
+  'Natural Gas':  'BLACKBULL:NGAS',
+  'Gasoline':     'NYMEX:RB1!',
+  'Heating Oil':  'NYMEX:HO1!',
   // Stocks
-  'Apple':            'NASDAQ:AAPL',
-  'Amazon':           'NASDAQ:AMZN',
-  'Microsoft':        'NASDAQ:MSFT',
-  'Netflix':          'NASDAQ:NFLX',
-  'Pfizer':           'NYSE:PFE',
-  'Adobe':            'NASDAQ:ADBE',
-  'Alibaba':          'NYSE:BABA',
-  'Intel':            'NASDAQ:INTC',
-  'Teva':             'NYSE:TEVA',
-  'American Express': 'NYSE:AXP',
-  // Forex pairs
-  'EUR/USD':          'FX:EURUSD',
-  'GBP/USD':          'FX:GBPUSD',
-  'USD/JPY':          'FX:USDJPY',
-  'AUD/USD':          'FX:AUDUSD',
-  'EUR/GBP':          'FX:EURGBP',
-  'USD/CAD':          'FX:USDCAD',
-  'USD/CHF':          'FX:USDCHF',
-  'GBP/JPY':          'FX:GBPJPY',
-  'EUR/CAD':          'FX:EURCAD',
-  'EUR/AUD':          'FX:EURAUD',
-  'AUD/CHF':          'FX:AUDCHF',
-  // Options (forex options → underlying spot pair)
-  'AUD/CAD Options':  'FX:AUDCAD',
-  'AUD/CHF Options':  'FX:AUDCHF',
-  'AUD/JPY Options':  'FX:AUDJPY',
-  'AUD/NZD Options':  'FX:AUDNZD',
-  'AUD/USD Options':  'FX:AUDUSD',
-  'CAD/CHF Options':  'FX:CADCHF',
-  'CAD/JPY Options':  'FX:CADJPY',
-  'CHF/JPY Options':  'FX:CHFJPY',
+  'Tesla':        'NASDAQ:TSLA',
+  'AT&T':         'NYSE:T',
+  'Google':       'NASDAQ:GOOGL',
+  'Netflix':      'NASDAQ:NFLX',
+  'Nvidia':       'NASDAQ:NVDA',
+  'Amazon':       'NASDAQ:AMZN',
+  'Apple':        'NASDAQ:AAPL',
+  'Meta':         'NASDAQ:META',
+  // Forex — Major
+  'AUD/USD':      'FX:AUDUSD',
+  'EUR/USD':      'FX:EURUSD',
+  'GBP/USD':      'FX:GBPUSD',
+  'NZD/USD':      'FX:NZDUSD',
+  'USD/CAD':      'FX:USDCAD',
+  'USD/CHF':      'FX:USDCHF',
+  'USD/JPY':      'FX:USDJPY',
+  // Forex — Minor
+  'AUD/CAD':      'FX:AUDCAD',
+  'AUD/CHF':      'FX:AUDCHF',
+  'AUD/JPY':      'FX:AUDJPY',
+  'AUD/NZD':      'FX:AUDNZD',
+  'CAD/CHF':      'FX:CADCHF',
+  'CAD/JPY':      'FX:CADJPY',
+  'CHF/JPY':      'FX:CHFJPY',
+  'EUR/AUD':      'FX:EURAUD',
+  'EUR/CAD':      'FX:EURCAD',
+  'EUR/CHF':      'FX:EURCHF',
+  'EUR/GBP':      'FX:EURGBP',
+  'EUR/JPY':      'FX:EURJPY',
+  'EUR/NZD':      'FX:EURNZD',
+  'GBP/AUD':      'FX:GBPAUD',
+  'GBP/CAD':      'FX:GBPCAD',
+  'GBP/CHF':      'FX:GBPCHF',
+  'GBP/JPY':      'FX:GBPJPY',
+  'GBP/NZD':      'FX:GBPNZD',
+  'NZD/CAD':      'FX:NZDCAD',
+  'NZD/CHF':      'FX:NZDCHF',
+  'NZD/JPY':      'FX:NZDJPY',
 };
 
 interface Column {
@@ -75,22 +77,32 @@ const COLUMNS: Column[] = [
   {
     heading: 'Indices',
     viewAllHref: '/trading/indices',
-    items: ['SMI', 'US_500', 'CANNABIS INDEX', 'US_TECH100', 'US_30', 'US_2000', 'DOLLAR INDEX', 'SPAIN 35'],
+    items: ['US30', 'US100', 'US500'],
   },
   {
     heading: 'Commodities',
     viewAllHref: '/trading/commodities',
-    items: ['Crude Oil', 'Copper', 'Brent Oil', 'Heating Oil', 'Gasoline', 'Natural Gas', 'Gold Trading', 'Silver', 'Wheat', 'Corn'],
+    items: ['Gold', 'Silver', 'Copper', 'Crude Oil', 'Brent Oil', 'Wheat', 'Corn', 'Natural Gas', 'Gasoline', 'Heating Oil'],
   },
   {
     heading: 'Stocks',
     viewAllHref: '/markets',
-    items: ['Apple', 'Amazon', 'Microsoft', 'Netflix', 'Pfizer', 'Adobe', 'Alibaba', 'Intel', 'Teva', 'American Express'],
+    items: ['Tesla', 'AT&T', 'Google', 'Netflix', 'Nvidia', 'Amazon', 'Apple', 'Meta'],
   },
   {
-    heading: 'Forex Pairs',
+    heading: 'Forex Major',
     viewAllHref: '/trading/forex',
-    items: ['EUR/USD', 'GBP/USD', 'USD/JPY', 'AUD/USD', 'EUR/GBP', 'USD/CAD', 'USD/CHF', 'GBP/JPY', 'EUR/CAD', 'EUR/AUD', 'AUD/CHF'],
+    items: ['AUD/USD', 'EUR/USD', 'GBP/USD', 'NZD/USD', 'USD/CAD', 'USD/CHF', 'USD/JPY'],
+  },
+  {
+    heading: 'Forex Minor',
+    viewAllHref: '/trading/forex',
+    items: [
+      'AUD/CAD', 'AUD/CHF', 'AUD/JPY', 'AUD/NZD', 'CAD/CHF', 'CAD/JPY', 'CHF/JPY',
+      'EUR/AUD', 'EUR/CAD', 'EUR/CHF', 'EUR/GBP', 'EUR/JPY', 'EUR/NZD',
+      'GBP/AUD', 'GBP/CAD', 'GBP/CHF', 'GBP/JPY', 'GBP/NZD',
+      'NZD/CAD', 'NZD/CHF', 'NZD/JPY',
+    ],
   },
 ];
 
@@ -206,7 +218,7 @@ function InstrumentDirectory({
         </span>
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 items-start">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4 items-start">
         {COLUMNS.map((col, i) => {
           const isOpen = openIdx === i;
           return (
