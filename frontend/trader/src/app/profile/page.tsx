@@ -396,11 +396,32 @@ export default function ProfilePage() {
                     </div>
                   </div>
 
-                  {/* Postal */}
-                  <div>
-                    <label className={labelCls}>Postal / Zip Code</label>
-                    <input type="text" value={postal} onChange={(e) => setPostal(e.target.value)} className={inputCls} placeholder="" />
+                  {/* Postal + Country */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className={labelCls}>Postal / Zip Code</label>
+                      <input type="text" value={postal} onChange={(e) => setPostal(e.target.value)} className={inputCls} placeholder="" />
+                    </div>
+                    <div>
+                      <label className={labelCls}>Country</label>
+                      <input type="text" value={country} onChange={(e) => setCountry(e.target.value)} className={inputCls} placeholder="e.g. India" />
+                    </div>
                   </div>
+
+                  {/* Registration date — read-only (client 2026-06-19: user
+                      should see when they joined). Per-account creation dates
+                      live on the Accounts page. */}
+                  {profile?.created_at && (
+                    <div>
+                      <label className={labelCls}>Member since</label>
+                      <input
+                        type="text"
+                        value={new Date(profile.created_at).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })}
+                        disabled
+                        className={`${inputCls} opacity-60 cursor-not-allowed`}
+                      />
+                    </div>
+                  )}
 
                   <div className="flex justify-end pt-1">
                     <Button variant="primary" onClick={handleSaveProfile} loading={savingProfile}>
