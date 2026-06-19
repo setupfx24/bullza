@@ -135,22 +135,32 @@ function MyTasks() {
                 <p className="text-[11px] text-danger mt-1">Reason: {t.undone_reason}</p>
               ) : null}
             </div>
-            <div className="flex items-center gap-1.5 shrink-0">
-              <button
-                disabled={busy === t.id}
-                onClick={() => mark(t.id, 'done')}
-                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xxs font-medium bg-success/15 text-success border border-success/30 hover:bg-success/25 disabled:opacity-50"
-              >
-                <CheckCircle2 size={13} /> Done
-              </button>
-              <button
-                disabled={busy === t.id}
-                onClick={() => { setReasonFor(reasonFor === t.id ? null : t.id); setReason(t.undone_reason || ''); }}
-                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xxs font-medium bg-danger/15 text-danger border border-danger/30 hover:bg-danger/25 disabled:opacity-50"
-              >
-                <XCircle size={13} /> Undone
-              </button>
-            </div>
+            {/* Once a task is reported (done / undone) the buttons disappear —
+                the status badge + reason show the final report. Only PENDING
+                tasks are actionable (client 2026-06-19). */}
+            {t.status === 'pending' ? (
+              <div className="flex items-center gap-1.5 shrink-0">
+                <button
+                  disabled={busy === t.id}
+                  onClick={() => mark(t.id, 'done')}
+                  className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xxs font-medium bg-success/15 text-success border border-success/30 hover:bg-success/25 disabled:opacity-50"
+                >
+                  <CheckCircle2 size={13} /> Done
+                </button>
+                <button
+                  disabled={busy === t.id}
+                  onClick={() => { setReasonFor(reasonFor === t.id ? null : t.id); setReason(t.undone_reason || ''); }}
+                  className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xxs font-medium bg-danger/15 text-danger border border-danger/30 hover:bg-danger/25 disabled:opacity-50"
+                >
+                  <XCircle size={13} /> Undone
+                </button>
+              </div>
+            ) : (
+              <span className="shrink-0 inline-flex items-center gap-1 text-[10px] text-text-tertiary">
+                {t.status === 'done' ? <CheckCircle2 size={12} className="text-success" /> : <XCircle size={12} className="text-danger" />}
+                Reported
+              </span>
+            )}
           </div>
           {reasonFor === t.id && (
             <div className="mt-2 flex items-center gap-2">
