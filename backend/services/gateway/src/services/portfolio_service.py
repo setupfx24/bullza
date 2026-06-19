@@ -377,7 +377,13 @@ async def trade_history(
             "side": side_val, "lots": float(t.lots),
             "open_price": float(t.open_price), "close_price": float(t.close_price),
             "swap": float(t.swap), "commission": float(t.commission),
-            "pnl": float(t.profit), "close_reason": t.close_reason or "manual",
+            # NET P&L (price P&L minus commission + swap) so the Trade History
+            # row matches the terminal's closed-position card and the dashboard
+            # (client 2026-06-19 — it showed gross here, a different number).
+            # gross_pnl kept for anyone who needs the pre-cost figure.
+            "gross_pnl": float(t.profit),
+            "pnl": float((t.profit or Decimal("0")) - (t.commission or Decimal("0")) - (t.swap or Decimal("0"))),
+            "close_reason": t.close_reason or "manual",
             "trade_type": trade_type,
             "opened_at": t.opened_at.isoformat() if t.opened_at else None,
             "close_time": t.closed_at.isoformat() if t.closed_at else None,
