@@ -1,8 +1,9 @@
 import uuid
 
-from fastapi import APIRouter, Depends, Query, Request
+from fastapi import APIRouter, Depends, Query, Request, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.exc import IntegrityError, DBAPIError
 
 from packages.common.src.database import get_db
 from dependencies import require_permission
@@ -328,7 +329,25 @@ async def delete_user(
     trading accounts, copy-trade allocations, copy trades, deposits, withdrawals,
     transactions, referrals, IB profile, and finally the user row. Cannot be
     undone."""
-    return await user_service.delete_user(
-        user_id=user_id, admin_id=admin.id,
-        ip_address=request.client.host if request.client else None, db=db,
-    )
+    # Safety net: a complex user (master trader / IB with many relationships)
+    # can hit a FK on a child table the service doesn't yet clean up. That used
+    # to surface as a raw 500 ("Internal server error"). Catch any DB error,
+    # roll back, and return a clear 409 naming the blocking constraint so the
+    # admin (and we) know exactly which table to handle next.
+    try:
+        return await user_service.delete_user(
+            user_id=user_id, admin_id=admin.id,
+            ip_address=request.client.host if request.client else None, db=db,
+        )
+    except HTTPException:
+        raise  # clean 404 / 409 the service already raised — pass through
+    except (IntegrityError, DBAPIError) as e:
+        await db.rollback()
+        orig = getattr(e, "orig", e)
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                f"Cannot permanently delete this user — a record still references them ({orig}). "
+                "Use Soft Delete to disable the account while keeping records."
+            ),
+        )
