@@ -4,7 +4,6 @@ import { useState, useEffect, useCallback } from 'react';
 import { clsx } from 'clsx';
 import toast from 'react-hot-toast';
 import DashboardShell from '@/components/layout/DashboardShell';
-import CameraCapture from '@/components/kyc/CameraCapture';
 import { QRCodeCanvas } from 'qrcode.react';
 import api from '@/lib/api/client';
 import {
@@ -506,9 +505,6 @@ export default function KycPage() {
                     </div>
                   )}
                 </label>
-                <div className="flex items-center justify-center pt-1">
-                  <CameraCapture onCapture={setFile} facingMode="environment" label="Or open camera" />
-                </div>
               </div>
 
               <div className="space-y-2">
@@ -552,9 +548,6 @@ export default function KycPage() {
                     <span className="text-xs text-text-secondary">Upload proof of address (utility bill / bank statement)</span>
                   )}
                 </label>
-                <div className="flex items-center justify-center pt-1">
-                  <CameraCapture onCapture={setFile2} facingMode="environment" label="Or open camera" />
-                </div>
               </div>
 
               <div className="space-y-2">
@@ -587,9 +580,6 @@ export default function KycPage() {
                     </div>
                   )}
                 </label>
-                <div className="flex items-center justify-center pt-1">
-                  <CameraCapture onCapture={setFile3} facingMode="user" label="Or open camera (selfie)" />
-                </div>
               </div>
 
               <ContinueOnPhone />
