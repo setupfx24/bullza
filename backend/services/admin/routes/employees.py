@@ -31,6 +31,7 @@ PERMISSION_CATALOG = {
     "Analytics":   ["analytics.view", "exposure.view"],
     "Audit":       ["audit_logs.view"],
     "RM":          ["rm.view", "rm.request", "rm.manage", "rm.assign"],
+    "Fixed Return": ["fixed_return.view", "fixed_return.manage"],
     # Task assignment + daily reports (client 2026-06-16). tasks.assign lets an
     # employee assign work + see all reports; every employee sees/updates their
     # OWN tasks without any permission.

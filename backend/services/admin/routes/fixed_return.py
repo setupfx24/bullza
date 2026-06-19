@@ -38,7 +38,7 @@ class RejectRequest(BaseModel):
 
 @router.get("/pending")
 async def list_pending(
-    _admin: dict = Depends(get_current_admin),
+    _admin: dict = Depends(require_permission("fixed_return.view")),
     db: AsyncSession = Depends(get_db),
 ) -> list[dict[str, Any]]:
     """Locks currently parked in ``early_pending`` — admin queue."""

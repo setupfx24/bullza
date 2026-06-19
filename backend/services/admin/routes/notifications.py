@@ -21,7 +21,7 @@ from packages.common.src.database import get_db
 from packages.common.src.models import (
     Deposit, SupportTicket, User, Withdrawal,
 )
-from dependencies import get_current_admin
+from dependencies import get_current_admin, resolve_employee_permissions
 
 router = APIRouter(prefix="/notifications", tags=["Admin Notifications"])
 
@@ -125,25 +125,38 @@ async def notifications_summary(
     # /deposits page (tab=withdrawals); approvals get their own page; the
     # rest map 1:1 to existing routes.
     items = [
-        {"kind": "withdrawals", "count": pending_withdrawals,
+        {"kind": "withdrawals", "count": pending_withdrawals, "perm": "withdrawals.view",
          "label": "Pending withdrawals", "link": "/deposits?tab=withdrawals", "severity": "critical"},
-        {"kind": "approvals",   "count": pending_approvals,
+        {"kind": "approvals",   "count": pending_approvals, "perm": "funds.approve",
          "label": "Approval requests", "link": "/approvals", "severity": "critical"},
-        {"kind": "rm_funding",  "count": rm_pending,
+        {"kind": "rm_funding",  "count": rm_pending, "perm": "rm.manage",
          "label": "RM funding requests", "link": "/rm-requests", "severity": "critical"},
-        {"kind": "fixed_return_withdrawals", "count": fr_withdrawals,
+        {"kind": "fixed_return_withdrawals", "count": fr_withdrawals, "perm": "fixed_return.view",
          "label": "Fixed-Return withdrawal requests", "link": "/config/fixed-return", "severity": "critical"},
-        {"kind": "deposits",    "count": pending_deposits,
+        {"kind": "deposits",    "count": pending_deposits, "perm": "deposits.view",
          "label": "Pending deposits", "link": "/deposits", "severity": "normal"},
-        {"kind": "fixed_return_new", "count": fr_new_locks,
+        {"kind": "fixed_return_new", "count": fr_new_locks, "perm": "fixed_return.view",
          "label": "New Fixed-Return deposits (24h)", "link": "/config/fixed-return", "severity": "normal"},
-        {"kind": "kyc",         "count": pending_kyc,
+        {"kind": "kyc",         "count": pending_kyc, "perm": "kyc.view",
          "label": "KYC submissions", "link": "/kyc", "severity": "normal"},
-        {"kind": "tickets",     "count": open_tickets,
+        {"kind": "tickets",     "count": open_tickets, "perm": "tickets.view",
          "label": "Open support tickets", "link": "/support", "severity": "normal"},
-        {"kind": "new_users",   "count": new_users_24h,
+        {"kind": "new_users",   "count": new_users_24h, "perm": "users.view",
          "label": "New users (24h)", "link": "/users", "severity": "info"},
     ]
+
+    # Scope the bell to what THIS admin can actually act on. An employee
+    # should only be pinged about their own area — a withdrawal_manager sees
+    # withdrawals, a support agent sees tickets, etc. — not every queue in the
+    # platform. super_admin ("*") keeps the full board.
+    perms = await resolve_employee_permissions(admin, db)
+    if "*" not in perms:
+        items = [i for i in items if i["perm"] in perms]
+
+    # Strip the internal `perm` key from the response (frontend doesn't need it).
+    for i in items:
+        i.pop("perm", None)
+
     # The badge counts only critical + normal; "info" items (new sign-ups)
     # don't pulse the bell — they're context, not a queue.
     total = sum(i["count"] for i in items if i["severity"] in ("critical", "normal"))

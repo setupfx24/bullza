@@ -175,12 +175,14 @@ function MyTasks() {
   );
 }
 
+interface TaskRow { title: string; description: string; dueDate: string }
+
 function AssignTask() {
   const [emps, setEmps] = useState<Emp[]>([]);
-  const [assignedTo, setAssignedTo] = useState('');
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
-  const [dueDate, setDueDate] = useState('');
+  // Multiple employees + multiple tasks can be assigned in one go (client
+  // 2026-06-19: "ek baar me ek hi task assign ho raha tha").
+  const [selectedEmps, setSelectedEmps] = useState<string[]>([]);
+  const [rows, setRows] = useState<TaskRow[]>([{ title: '', description: '', dueDate: '' }]);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -189,47 +191,106 @@ function AssignTask() {
       .catch((e: any) => toast.error(e?.message || 'Failed to load employees'));
   }, []);
 
+  const toggleEmp = (id: string) =>
+    setSelectedEmps((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
+  const addRow = () => setRows((r) => [...r, { title: '', description: '', dueDate: '' }]);
+  const removeRow = (i: number) => setRows((r) => (r.length === 1 ? r : r.filter((_, idx) => idx !== i)));
+  const updateRow = (i: number, key: keyof TaskRow, val: string) =>
+    setRows((r) => r.map((row, idx) => (idx === i ? { ...row, [key]: val } : row)));
+
   const submit = async () => {
-    if (!assignedTo) { toast.error('Choose an employee'); return; }
-    if (!title.trim()) { toast.error('Enter a task title'); return; }
+    const tasks = rows.filter((r) => r.title.trim());
+    if (!selectedEmps.length) { toast.error('Choose at least one employee'); return; }
+    if (!tasks.length) { toast.error('Add at least one task'); return; }
     setBusy(true);
-    try {
-      await adminApi.post('/tasks', {
-        assigned_to: assignedTo,
-        title: title.trim(),
-        description: description.trim() || undefined,
-        due_date: dueDate || undefined,
-      });
-      toast.success('Task assigned');
-      setTitle(''); setDescription(''); setDueDate('');
-    } catch (e: any) {
-      toast.error(e?.message || 'Failed to assign');
-    } finally { setBusy(false); }
+    let ok = 0, fail = 0;
+    for (const empId of selectedEmps) {
+      for (const t of tasks) {
+        try {
+          await adminApi.post('/tasks', {
+            assigned_to: empId,
+            title: t.title.trim(),
+            description: t.description.trim() || undefined,
+            due_date: t.dueDate || undefined,
+          });
+          ok++;
+        } catch { fail++; }
+      }
+    }
+    setBusy(false);
+    if (ok) {
+      toast.success(`${ok} task${ok > 1 ? 's' : ''} assigned${fail ? ` · ${fail} failed` : ''}`);
+      setRows([{ title: '', description: '', dueDate: '' }]);
+    } else {
+      toast.error('Failed to assign');
+    }
   };
 
   return (
-    <div className="rounded-lg border border-border-primary bg-bg-secondary p-4 space-y-3 max-w-lg">
+    <div className="rounded-lg border border-border-primary bg-bg-secondary p-4 space-y-4 max-w-2xl">
+      {/* Employees — multi-select */}
       <div>
-        <label className="block text-xxs text-text-tertiary mb-1">Assign to</label>
-        <select value={assignedTo} onChange={(e) => setAssignedTo(e.target.value)} className="w-full text-xs py-2 px-2 bg-bg-input border border-border-primary rounded-md text-text-primary">
-          <option value="">— Select employee —</option>
-          {emps.map((e) => <option key={e.user_id} value={e.user_id}>{e.name} ({e.role}) — {e.email}</option>)}
-        </select>
+        <label className="block text-xxs text-text-tertiary mb-1.5">Assign to ({selectedEmps.length} selected)</label>
+        <div className="flex flex-wrap gap-1.5 max-h-40 overflow-y-auto">
+          {emps.map((e) => {
+            const on = selectedEmps.includes(e.user_id);
+            return (
+              <button
+                key={e.user_id}
+                type="button"
+                onClick={() => toggleEmp(e.user_id)}
+                className={cn(
+                  'px-2.5 py-1.5 rounded-md text-xxs font-medium border transition-fast',
+                  on ? 'bg-buy/20 text-buy border-buy/40' : 'bg-bg-input text-text-secondary border-border-primary hover:bg-bg-hover',
+                )}
+                title={e.email}
+              >
+                {e.name} <span className="opacity-60">({e.role})</span>
+              </button>
+            );
+          })}
+          {!emps.length && <span className="text-xxs text-text-tertiary">No employees.</span>}
+        </div>
       </div>
-      <div>
-        <label className="block text-xxs text-text-tertiary mb-1">Task title</label>
-        <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Review pending KYC docs" className="w-full text-xs py-2 px-2 bg-bg-input border border-border-primary rounded-md text-text-primary" />
+
+      {/* Tasks — multiple rows */}
+      <div className="space-y-2.5">
+        <label className="block text-xxs text-text-tertiary">Tasks</label>
+        {rows.map((row, i) => (
+          <div key={i} className="rounded-md border border-border-primary/70 bg-bg-input/40 p-2.5 space-y-2">
+            <div className="flex items-center gap-2">
+              <input
+                value={row.title}
+                onChange={(e) => updateRow(i, 'title', e.target.value)}
+                placeholder={`Task ${i + 1} title — e.g. Review pending KYC docs`}
+                className="flex-1 text-xs py-2 px-2 bg-bg-input border border-border-primary rounded-md text-text-primary"
+              />
+              {rows.length > 1 && (
+                <button type="button" onClick={() => removeRow(i)} className="p-1.5 rounded-md text-danger border border-danger/30 hover:bg-danger/15" title="Remove task">
+                  <XCircle size={14} />
+                </button>
+              )}
+            </div>
+            <textarea
+              value={row.description}
+              onChange={(e) => updateRow(i, 'description', e.target.value)}
+              rows={2}
+              placeholder="Details (optional)"
+              className="w-full text-xs py-2 px-2 bg-bg-input border border-border-primary rounded-md text-text-primary resize-none"
+            />
+            <div>
+              <span className="block text-[10px] text-text-tertiary mb-1">Due date (optional)</span>
+              <DateField value={row.dueDate} onChange={(v) => updateRow(i, 'dueDate', v)} />
+            </div>
+          </div>
+        ))}
+        <button type="button" onClick={addRow} className="inline-flex items-center gap-1 text-xxs font-medium text-buy hover:underline">
+          <Plus size={12} /> Add another task
+        </button>
       </div>
-      <div>
-        <label className="block text-xxs text-text-tertiary mb-1">Details (optional)</label>
-        <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} className="w-full text-xs py-2 px-2 bg-bg-input border border-border-primary rounded-md text-text-primary resize-none" />
-      </div>
-      <div>
-        <label className="block text-xxs text-text-tertiary mb-1">Due date (optional)</label>
-        <DateField value={dueDate} onChange={setDueDate} />
-      </div>
+
       <button onClick={submit} disabled={busy} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-md text-xs font-medium bg-buy text-white hover:bg-buy-light disabled:opacity-50">
-        {busy ? <Loader2 size={13} className="animate-spin" /> : <Plus size={13} />} Assign task
+        {busy ? <Loader2 size={13} className="animate-spin" /> : <Plus size={13} />} Assign {rows.filter(r => r.title.trim()).length || ''} task{rows.filter(r => r.title.trim()).length === 1 ? '' : 's'}
       </button>
     </div>
   );

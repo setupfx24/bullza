@@ -71,6 +71,10 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Analytics', href: '/analytics', icon: BarChart3, perm: 'analytics.view' },
   { label: 'Audit logs', href: '/audit-logs', icon: ScrollText, perm: 'audit_logs.view' },
   { label: 'Bonus', href: '/bonus', icon: Gift, perm: 'bonus.view' },
+  // Top-level entry so a Fixed-Return manager role (fixed_return.view) can
+  // reach the page without needing config.view (it also lives under Config
+  // for super-admins). Same page either way.
+  { label: 'Fixed Return', href: '/config/fixed-return', icon: Wallet, perm: 'fixed_return.view' },
   { label: 'Trade Insurance', href: '/insurance', icon: ShieldCheck, perm: '*' },
   // Play Zone + Lifestyle Fulfillment (gamification/rewards) are not used on
   // this platform — hidden from the sidebar. The pages + APIs still exist, so
