@@ -27,9 +27,9 @@ function Avatar({ name, src }: { name: string; src?: string }) {
     <div
       className="size-12 rounded-full overflow-hidden shrink-0 flex items-center justify-center font-display font-semibold text-sm"
       style={{
-        background: showImg ? 'transparent' : 'hsl(99 55% 42% / 0.22)',
+        background: showImg ? 'transparent' : 'hsl(8 87% 54% / 0.22)',
         color: 'hsl(99 60% 78%)',
-        border: '1px solid hsl(99 55% 42% / 0.35)',
+        border: '1px solid hsl(8 87% 54% / 0.35)',
       }}
       aria-hidden
     >

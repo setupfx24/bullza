@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { Users, Globe, Award, TrendingUp, Wallet, Zap, Handshake, FlaskConical } from 'lucide-react'
+import { Users, Globe, Award, TrendingUp, Wallet, Zap, Handshake, Moon } from 'lucide-react'
 import Button from '../components/Button'
 import Card from '../components/Card'
 import StatBox from '../components/StatBox'
@@ -29,11 +29,11 @@ const ACCOUNT_TYPES = [
     points: ['Lifetime per-lot commissions', 'Multi-tier earnings', 'Marketing kit and dashboard', 'Dedicated partner manager'],
   },
   {
-    icon: FlaskConical,
-    name: 'Demo',
-    min: '$100,000 virtual',
-    tagline: 'Practise risk-free, live conditions',
-    points: ['Identical execution to live', 'Real market spreads', 'No KYC required', 'Switch to live in one click'],
+    icon: Moon,
+    name: 'Swap',
+    min: '$200',
+    tagline: 'Sharia-compliant · Swap-free',
+    points: ['Zero overnight swap charges', 'Sharia-compliant trading', 'Full platform & instrument access', 'Hold positions indefinitely'],
   },
 ]
 
@@ -124,7 +124,7 @@ const AboutUs = () => {
               <StatBox value="15+" label="Years in Business" />
             </ScrollRevealItem>
             <ScrollRevealItem>
-              <StatBox value="50K+" label="Active Traders" />
+              <StatBox value="50,000+" label="Active Traders" />
             </ScrollRevealItem>
             <ScrollRevealItem>
               <StatBox value="150+" label="Countries Served" />
@@ -204,7 +204,7 @@ const AboutUs = () => {
               Account Types for Every Trader
             </h2>
             <p className="text-text-secondary text-center max-w-2xl mx-auto mb-12">
-              Start small with a Standard account, scale up to ECN raw spreads, partner with us through the IB program, or practise risk-free on Demo — same platform, same execution, different conditions.
+              Start small with a Standard account, scale up to ECN raw spreads, partner with us through the IB program, or hold positions overnight on the swap-free Swap account — same platform, same execution, different conditions.
             </p>
           </ScrollReveal>
 
@@ -251,7 +251,7 @@ const AboutUs = () => {
             <p className="text-xl text-text-secondary mb-8 max-w-2xl mx-auto">
               Experience the difference of trading with a broker that puts your success first.
             </p>
-            <Link to="/accounts/demo">
+            <Link to="/auth/register">
               <Button variant="primary">Open Account Now</Button>
             </Link>
           </ScrollReveal>

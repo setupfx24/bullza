@@ -223,10 +223,10 @@ export default function ReferralPage() {
                 </tr>
               </thead>
               <tbody>
-                {/* Commission row */}
+                {/* Reward row */}
                 <tr className="border-t border-foreground/10">
                   <td className="px-5 py-4 text-sm text-foreground/75 bg-foreground/[0.04] border-r border-foreground/15">
-                    Commission
+                    Reward
                   </td>
                   {tiers.map((t, i) => {
                     const isMid = tiers.length >= 3 && i === Math.floor(tiers.length / 2);
@@ -248,7 +248,7 @@ export default function ReferralPage() {
         </div>
 
         <p className="mt-5 text-center text-xs text-foreground/45 max-w-2xl mx-auto leading-relaxed">
-          You earn the commission of the highest tier you reach. A tier unlocks once your activations
+          You earn the reward of the highest tier you reach. A tier unlocks once your activations
           cross its threshold. An activation = a referred client who completes KYC and at least 3 trades.
           Top partners can be set a custom rate.
         </p>

@@ -96,7 +96,7 @@ const Home = () => {
           </h2>
           
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
-            <StatBox value="50K+" label="Active Traders" />
+            <StatBox value="50,000+" label="Active Traders" />
             <StatBox value="2.3B+" label="Daily Trading Volume" />
             <StatBox value="1000+" label="Tradable Instruments" />
             <StatBox value="15+" label="Years Market Experience" />

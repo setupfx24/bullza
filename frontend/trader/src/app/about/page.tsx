@@ -79,7 +79,7 @@ export default function AboutPage() {
           <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
             {[
               { value: '150+', label: 'Countries Served' },
-              { value: '50K+', label: 'Active Traders' },
+              { value: '50,000+', label: 'Active Traders' },
               { value: '$500M+', label: 'Daily Volume' },
               { value: '99.9%', label: 'Uptime' },
             ].map(({ value, label }) => (

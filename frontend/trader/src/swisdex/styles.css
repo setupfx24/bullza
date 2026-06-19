@@ -15,25 +15,33 @@
   /* Belt-and-braces: never let any descendant cause horizontal page scroll on mobile. */
   overflow-x: hidden;
 
-  /* ── Raw palette (HSL triplets, no hsl() so Tailwind alpha works) ── */
+  /* ── Raw palette (HSL triplets, no hsl() so Tailwind alpha works) ──
+     2026-06 rebrand: monochrome coral palette built around #F04024.
+     The legacy `--brand-green` and `--brand-red` aliases still resolve
+     so any component reaching for them stays in-palette. */
   --ink:           0 0% 6%;
   --cream:         0 0% 96%;
-  --brand-green:  99 55% 42%;       /* #55a630 — primary */
-  --brand-red:     0 100% 41%;      /* #d00000 — destructive */
+  --brand-coral:        8 87% 54%;  /* #F04024 — primary (Coral 500) */
+  --brand-coral-deep:   8 75% 38%;  /* #AB2415 — secondary / shadow */
+  --brand-coral-soft:  14 95% 75%;  /* #FCAE8B — soft peach for gradients */
+
+  /* Legacy aliases — kept so the rest of the codebase still resolves. */
+  --brand-green: var(--brand-coral);
+  --brand-red:   var(--brand-coral-deep);
 
   --background:               var(--ink);
   --foreground:               var(--cream);
   --card:                     var(--ink);
   --card-foreground:          var(--cream);
-  --primary:                  var(--brand-green);
+  --primary:                  var(--brand-coral);
   --primary-foreground:       0 0% 100%;
-  --secondary:                var(--brand-red);
+  --secondary:                var(--brand-coral-deep);
   --secondary-foreground:     0 0% 100%;
   --muted:                    0 0% 14%;
   --muted-foreground:         0 0% 70%;
-  --accent:                   var(--brand-green);
+  --accent:                   var(--brand-coral);
   --accent-foreground:        0 0% 100%;
-  --destructive:              var(--brand-red);
+  --destructive:              var(--brand-coral-deep);
   --destructive-foreground:   0 0% 100%;
   --border:                   0 0% 90%;
   --input:                    0 0% 90%;
@@ -139,13 +147,13 @@
   position: absolute;
   inset: 0;
   border-radius: inherit;
-  padding: 1.4px;
+  padding: 1px;
   background: linear-gradient(135deg,
-    rgba(85, 166, 48, 0.85) 0%,
-    rgba(255, 255, 255, 0.25) 35%,
-    rgba(255, 255, 255, 0)   55%,
-    rgba(255, 255, 255, 0.25) 70%,
-    rgba(208, 0, 0, 0.85) 100%);
+    rgba(240, 64, 36, 0.55) 0%,
+    rgba(255, 255, 255, 0.10) 40%,
+    rgba(255, 255, 255, 0)    60%,
+    rgba(255, 255, 255, 0.10) 80%,
+    rgba(252, 174, 139, 0.45) 100%);
   -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
           mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
   -webkit-mask-composite: xor;
@@ -169,13 +177,13 @@
   position: absolute;
   inset: 0;
   border-radius: inherit;
-  padding: 1.6px;
+  padding: 1.2px;
   background: linear-gradient(135deg,
-    rgba(85, 166, 48, 1) 0%,
-    rgba(255, 255, 255, 0.35) 30%,
+    rgba(240, 64, 36, 0.85) 0%,
+    rgba(255, 255, 255, 0.25) 30%,
     rgba(255, 255, 255, 0.05) 55%,
-    rgba(255, 255, 255, 0.35) 75%,
-    rgba(208, 0, 0, 1) 100%);
+    rgba(255, 255, 255, 0.25) 75%,
+    rgba(252, 174, 139, 0.85) 100%);
   -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
           mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
   -webkit-mask-composite: xor;
