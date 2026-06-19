@@ -1033,7 +1033,47 @@ async def close_position(position_id: UUID, req, user_id: UUID, db: AsyncSession
 
     tick = json.loads(tick_data)
     sv = side_val(pos.side)
-    close_price = Decimal(str(tick["bid"])) if sv == "buy" else Decimal(str(tick["ask"]))
+
+    # Re-derive the close bid/ask from the tick MID using the SAME per-scope
+    # spread the OPEN path used (master-pool override → resolve_spread_config
+    # for user / account-type / instrument / segment). Previously close used
+    # the raw broadcast tick, whose spread can differ from what was charged at
+    # open — that asymmetry is what made the spread look like it was taken
+    # twice. With open and close symmetric, the admin-configured spread is
+    # crossed exactly ONCE per round-trip (and it already shows in unrealised
+    # P&L the instant the trade opens), so nothing extra is taken at close.
+    # Client 2026-06-19. The mid still moves with the live market, so the
+    # spread sits around a fluctuating price as intended.
+    _raw_bid = Decimal(str(tick["bid"]))
+    _raw_ask = Decimal(str(tick["ask"]))
+    _mid_c = (_raw_bid + _raw_ask) / Decimal("2")
+    _pip_c = Decimal(str(pos.instrument.pip_size or "0.0001"))
+    _digits_c = int(pos.instrument.digits or 5)
+    c_bid, c_ask = _raw_bid, _raw_ask
+    try:
+        _master_c = (await db.execute(
+            select(MasterAccount).where(MasterAccount.account_id == account.id)
+        )).scalar_one_or_none()
+        if _master_c and _master_c.spread_markup_pips:
+            c_bid, c_ask = symmetric_quote_from_mid(
+                _mid_c, Decimal(str(_master_c.spread_markup_pips)), "pips",
+                _pip_c, _digits_c, Decimal("0"),
+            )
+        else:
+            _sv_c, _st_c, _ = await resolve_spread_config(
+                db, pos.instrument, user_id=user_id,
+                account_group_id=account.account_group_id,
+            )
+            if _sv_c and _sv_c > 0:
+                c_bid, c_ask = symmetric_quote_from_mid(
+                    _mid_c, _sv_c, _st_c, _pip_c, _digits_c, Decimal("0"),
+                )
+    except Exception as _se:
+        logger.warning(
+            "Close-side spread resolution failed for %s (user=%s): %s",
+            pos.instrument.symbol, user_id, _se,
+        )
+    close_price = c_bid if sv == "buy" else c_ask
     contract_size = pos.instrument.contract_size if pos.instrument else Decimal("100000")
 
     # Use the SAME effective leverage formula as the open path so margin
