@@ -22,7 +22,11 @@ import PositionsPanel from '@/components/trading/PositionsPanel';
 import { ActiveAccountBadge } from '@/components/trading/ActiveAccountBadge';
 import TerminalLeftRail, { type TerminalSpaceId } from '@/components/trading/TerminalLeftRail';
 
-const AdvancedChart = dynamic(() => import('@/components/charts/AdvancedChart'), { ssr: false });
+// Broker-fed native chart (client 2026-06-19): candles come from the gateway
+// /bars feed — the SAME source as the order-panel bid/ask — instead of
+// TradingView's external widget, so prices match and there's no slow
+// per-symbol script re-injection.
+const LiveChart = dynamic(() => import('@/components/charts/Chart'), { ssr: false });
 const TradingViewNewsTimeline = dynamic(() => import('@/components/charts/TradingViewNewsTimeline'), {
   ssr: false,
 });
@@ -517,7 +521,7 @@ export default function TradingTerminalPage() {
                   </div>
                 ) : null}
                 <div className="flex-1 min-h-0 min-w-0 overflow-hidden relative">
-                  <AdvancedChart />
+                  <LiveChart />
                 </div>
               </div>
 
@@ -643,7 +647,7 @@ export default function TradingTerminalPage() {
               </div>
             ) : null}
             <div className="flex-1 min-w-0 min-h-0 overflow-hidden relative">
-              <AdvancedChart />
+              <LiveChart />
             </div>
           </div>
 
