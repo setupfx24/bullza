@@ -730,7 +730,12 @@ function WalletPageContent() {
       toast.error('Enter your payment reference');
       return;
     }
-    // Screenshot is OPTIONAL now (XM-style) — finance matches the reference.
+    // Payment screenshot is REQUIRED for manual/bank deposits (client
+    // 2026-06-19) — finance needs proof of the transfer to credit it.
+    if (!depositProofFile) {
+      toast.error('Please attach your payment screenshot');
+      return;
+    }
     setDepositSubmitting(true);
     try {
       const fd = new FormData();
@@ -1406,7 +1411,7 @@ function WalletPageContent() {
                       </div>
                       <div className="space-y-1 min-w-0">
                         <label className="text-xs text-text-secondary">
-                          Payment screenshot <span className="text-text-tertiary font-normal">(optional)</span>
+                          Payment screenshot <span className="text-danger">*</span>
                         </label>
                         <label
                           className={clsx(
