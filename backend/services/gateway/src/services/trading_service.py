@@ -1177,6 +1177,16 @@ async def close_position(position_id: UUID, req, user_id: UUID, db: AsyncSession
         result_msg = "Position closed"
         result_profit = full_profit
 
+    # Negative Balance Protection — a trader can never owe money. If a close
+    # (esp. a gapping/illiquid market) drops the balance below zero, the broker
+    # absorbs the residual and the balance resets to 0 (client 2026-06-19).
+    if account.balance < Decimal("0"):
+        logger.warning(
+            "NBP: absorbing %.2f negative balance on account %s after close",
+            float(-account.balance), getattr(account, "account_number", account.id),
+        )
+        account.balance = Decimal("0")
+
     account.equity = account.balance + (account.credit or Decimal("0"))
     account.free_margin = account.equity - (account.margin_used or Decimal("0"))
 

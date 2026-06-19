@@ -301,6 +301,20 @@ class RiskEngine:
             if margin_level > Decimal(str(_so)):
                 break
 
+        # ── Negative Balance Protection ──────────────────────────────────
+        # After liquidating, the broker absorbs any residual loss — a trader can
+        # NEVER owe money / go below zero (client 2026-06-19; standard at
+        # regulated brokers). A fast/gapping market can close the last position
+        # below break-even, so clamp a negative balance back to 0.
+        if account.balance < Decimal("0"):
+            logger.warning(
+                "NBP: absorbing %.2f negative balance on account %s after stop-out",
+                float(-account.balance), account.account_number,
+            )
+            account.balance = Decimal("0")
+        account.equity = account.balance + (account.credit or Decimal("0"))
+        account.free_margin = account.equity - (account.margin_used or Decimal("0"))
+
         # After the stop-out loop ends — email the user a summary. Skipped on
         # demo accounts, and on the no-op case where nothing was actually
         # closed (defensive — shouldn't happen but cheap to guard).
