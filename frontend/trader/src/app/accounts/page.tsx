@@ -460,6 +460,15 @@ export default function AccountsPage() {
    *  actually selects Real. (Was: hard-blocked the picker if KYC wasn't
    *  approved, which made demo accounts unreachable for new users.) */
   const handleOpenNewAccount = () => {
+    // Unverified real users get a clear KYC prompt popup before the picker
+    // (client 2026-06-19: "kyc popup nahi aa raha"). Demo users skip it — they
+    // can only open demo accounts anyway, so go straight to the picker.
+    const kyc = (user?.kyc_status || 'pending').toLowerCase();
+    const approved = kyc === 'approved' || kyc === 'verified';
+    if (!user?.is_demo && !approved) {
+      setKycGateOpen(true);
+      return;
+    }
     setAccountPickerOpen(true);
   };
 
@@ -510,6 +519,14 @@ export default function AccountsPage() {
               className="px-5 py-2.5 rounded-lg border border-border-primary bg-bg-card text-sm font-semibold text-text-primary hover:bg-bg-hover transition-colors"
             >
               Close
+            </button>
+            {/* Demo doesn't need KYC — let the user practise right away. */}
+            <button
+              type="button"
+              onClick={() => { setKycGateOpen(false); setAccountPickerOpen(true); }}
+              className="px-5 py-2.5 rounded-lg border border-border-primary bg-bg-card text-sm font-semibold text-text-primary hover:bg-bg-hover transition-colors"
+            >
+              Open Demo instead
             </button>
             <Link
               href="/kyc"
