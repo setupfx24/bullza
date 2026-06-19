@@ -597,6 +597,8 @@ function SecurityCard({
   const [resetting, setResetting] = useState(false);
   const [revoking, setRevoking] = useState<string | null>(null);
   const [revokingAll, setRevokingAll] = useState(false);
+  const [settingPwd, setSettingPwd] = useState(false);
+  const [pwdResult, setPwdResult] = useState<string | null>(null);
 
   const loadSessions = useCallback(async () => {
     setLoading(true);
@@ -628,6 +630,27 @@ function SecurityCard({
       toast.error(e?.message || 'Failed to trigger reset');
     } finally {
       setResetting(false);
+    }
+  };
+
+  const setUserPassword = async () => {
+    const custom = window.prompt(
+      `Set a NEW password for ${user.email}.\n\nLeave blank to auto-generate a strong one. You'll SEE the password once so you can share it with the user. (The old password can't be shown — it's encrypted.)`,
+      '',
+    );
+    if (custom === null) return; // cancelled
+    setSettingPwd(true);
+    setPwdResult(null);
+    try {
+      const res = await adminApi.post<{ message: string; password: string }>(
+        `/users/${userId}/set-password`, { password: custom.trim() || undefined },
+      );
+      setPwdResult(res.password);
+      toast.success('Password set — copy it below');
+    } catch (e: any) {
+      toast.error(e?.message || 'Failed to set password');
+    } finally {
+      setSettingPwd(false);
     }
   };
 
@@ -670,16 +693,43 @@ function SecurityCard({
             below to help users regain access or to lock out suspicious sessions.
           </p>
         </div>
-        <button
-          type="button"
-          onClick={triggerReset}
-          disabled={resetting}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-buy rounded-md hover:bg-buy-light disabled:opacity-50 shrink-0"
-        >
-          {resetting ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
-          Send Password Reset Email
-        </button>
+        <div className="flex items-center gap-2 shrink-0 flex-wrap">
+          <button
+            type="button"
+            onClick={setUserPassword}
+            disabled={settingPwd}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-primary bg-primary/15 border border-primary/30 rounded-md hover:bg-primary/25 disabled:opacity-50"
+          >
+            {settingPwd ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
+            Set Password
+          </button>
+          <button
+            type="button"
+            onClick={triggerReset}
+            disabled={resetting}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-buy rounded-md hover:bg-buy-light disabled:opacity-50"
+          >
+            {resetting ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
+            Send Reset Email
+          </button>
+        </div>
       </div>
+
+      {pwdResult && (
+        <div className="rounded-lg border border-primary/30 bg-primary/10 px-4 py-3 flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-[10px] uppercase tracking-wide text-text-tertiary">New password (share with the user — shown once)</p>
+            <p className="font-mono font-bold text-sm text-text-primary select-all break-all">{pwdResult}</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => { navigator.clipboard?.writeText(pwdResult); toast.success('Copied'); }}
+            className="text-xs text-primary hover:underline shrink-0"
+          >
+            Copy
+          </button>
+        </div>
+      )}
 
       {/* Flags row — email verified, 2FA */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-1">

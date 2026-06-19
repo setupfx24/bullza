@@ -245,6 +245,18 @@ class SLTPEngine:
         )
         db.add(tx)
 
+        # Settle any trade-insurance policy on this position — same as the
+        # manual close path (trading_service.close_position). Without this,
+        # SL/TP auto-closed positions left the policy stuck 'active' forever
+        # (client 2026-06-19: insurance showed active after the trade closed).
+        # Best-effort; maybe_pay swallows its own errors but guard anyway so a
+        # settlement hiccup never blocks the auto-close.
+        try:
+            from packages.common.src.insurance.claims import maybe_pay as _insurance_maybe_pay
+            await _insurance_maybe_pay(db=db, position=pos, history=history)
+        except Exception as _ie:
+            logger.warning("SL/TP insurance settle failed pos=%s: %s", pos.id, _ie)
+
         try:
             await redis_client.publish(f"account:{pos.account_id}", json.dumps({
                 "type": "position_closed",

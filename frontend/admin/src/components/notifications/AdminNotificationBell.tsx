@@ -58,6 +58,8 @@ function iconFor(kind: string) {
     case 'tickets':     return MessageCircle;
     case 'approvals':   return ShieldCheck;
     case 'new_users':   return UserPlus;
+    case 'fixed_return_withdrawals': return ArrowUpFromLine;
+    case 'fixed_return_new':         return ArrowDownToLine;
     default:            return AlertTriangle;
   }
 }

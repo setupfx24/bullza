@@ -75,6 +75,13 @@ function formatWhen(iso: string | null | undefined): string {
 export type TradeStatementMeta = {
   /** Shown under title, e.g. account or user hint */
   subtitle?: string;
+  /** Account holder — rendered in the statement header (client 2026-06-19). */
+  userName?: string;
+  userEmail?: string;
+  /** Account number/label the trades belong to (or "All accounts"). */
+  accountLabel?: string;
+  /** Optional date range covered by the statement. */
+  periodLabel?: string;
 };
 
 export async function downloadTradeStatementPdf(
@@ -111,6 +118,28 @@ export async function downloadTradeStatementPdf(
   doc.setFontSize(8);
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(80, 80, 80);
+
+  // Account holder details (client 2026-06-19: the statement must show who it
+  // belongs to and which account the trades were taken from).
+  if (meta?.userName || meta?.userEmail) {
+    const who = [meta?.userName, meta?.userEmail ? `<${meta.userEmail}>` : '']
+      .filter(Boolean)
+      .join('  ');
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(30, 30, 30);
+    doc.text(`Account holder: ${who}`, margin, y);
+    y += 5;
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(80, 80, 80);
+  }
+  if (meta?.accountLabel) {
+    doc.text(`Account: ${meta.accountLabel}`, margin, y);
+    y += 4;
+  }
+  if (meta?.periodLabel) {
+    doc.text(`Period: ${meta.periodLabel}`, margin, y);
+    y += 4;
+  }
   doc.text(`Generated: ${formatWhen(new Date().toISOString())} (local time)`, margin, y);
   y += 5;
   doc.text(`Closed trades listed: ${trades.length}`, margin, y);

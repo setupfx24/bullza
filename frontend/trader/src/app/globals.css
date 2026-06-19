@@ -98,8 +98,8 @@
   --border-glass-bright: rgba(255, 255, 255, 0.08);
 
   --text-primary: #ffffff;
-  --text-secondary: #888888;
-  --text-tertiary: #555555;
+  --text-secondary: #b0b0b0;
+  --text-tertiary: #8a8a8a;
   --text-inverse: #000000;
 
   --scrollbar-track: #0a0a0a;
@@ -206,8 +206,8 @@
   --border-glass: rgba(255, 255, 255, 0.06);
   --border-glass-bright: rgba(255, 255, 255, 0.08);
   --text-primary: #ffffff;
-  --text-secondary: #888888;
-  --text-tertiary: #555555;
+  --text-secondary: #b0b0b0;
+  --text-tertiary: #8a8a8a;
   --text-inverse: #000000;
   --scrollbar-track: #0a0a0a;
   --scrollbar-thumb: #2a2a2a;
@@ -780,7 +780,12 @@ html {
   from { opacity: 0; transform: translateY(6px); }
   to   { opacity: 1; transform: translateY(0); }
 }
-.page-fade-in { animation: pageFadeIn 0.18s ease-out both; }
+/* `backwards` not `both`: the retained transform: translateY(0) on this
+   persistent content wrapper made it the containing block for every fixed
+   modal inside, so modals (KYC details, etc.) positioned to the wrapper and
+   jumped to the top of the page instead of centering in the viewport. Revert
+   the transform to none once the page-in finishes. */
+.page-fade-in { animation: pageFadeIn 0.18s ease-out backwards; }
 
 /* Sidebar icon glow pulse */
 @keyframes iconGlowPulse {

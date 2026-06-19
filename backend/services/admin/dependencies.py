@@ -168,9 +168,19 @@ def require_permission(permission: str):
         )
         employee = result.scalar_one_or_none()
         if employee:
-            role_perms = EMPLOYEE_ROLE_PERMISSIONS.get(employee.role, set())
+            role_perms = EMPLOYEE_ROLE_PERMISSIONS.get(employee.role)
+            if role_perms is None:
+                # Super-admin-defined custom role (client 2026-06-16) — its
+                # permission set lives in employee_custom_roles, resolved here
+                # so custom roles behave exactly like the hardcoded ones.
+                from sqlalchemy import text as _sql_text
+                cr = (await db.execute(
+                    _sql_text("SELECT permissions FROM employee_custom_roles WHERE name = :n"),
+                    {"n": employee.role},
+                )).first()
+                role_perms = set(cr[0]) if cr and cr[0] else set()
             extra = set(employee.extra_permissions or [])
-            effective = role_perms | extra
+            effective = set(role_perms) | extra
             if "*" in effective or permission in effective:
                 return admin
 
@@ -179,6 +189,33 @@ def require_permission(permission: str):
             detail=f"Permission '{permission}' required",
         )
     return _check
+
+
+async def resolve_employee_permissions(admin: User, db: AsyncSession) -> set:
+    """Effective permission set for an admin/employee.
+
+    Single source of truth mirrored by require_permission() and /auth/me:
+    super_admin → {"*"}; otherwise the role's defaults (built-in OR custom
+    role from employee_custom_roles) unioned with extra_permissions. Used to
+    scope what an employee SEES (e.g. the notification bell) to exactly what
+    they're allowed to act on.
+    """
+    if admin.role == "super_admin":
+        return {"*"}
+    emp = (await db.execute(
+        select(Employee).where(Employee.user_id == admin.id, Employee.is_active == True)
+    )).scalar_one_or_none()
+    if not emp:
+        return set()
+    role_perms = EMPLOYEE_ROLE_PERMISSIONS.get(emp.role)
+    if role_perms is None:
+        from sqlalchemy import text as _sql_text
+        cr = (await db.execute(
+            _sql_text("SELECT permissions FROM employee_custom_roles WHERE name = :n"),
+            {"n": emp.role},
+        )).first()
+        role_perms = set(cr[0]) if cr and cr[0] else set()
+    return set(role_perms) | set(emp.extra_permissions or [])
 
 
 async def write_audit_log(

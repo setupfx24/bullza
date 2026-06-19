@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
@@ -204,6 +204,23 @@ export default function UsersPage() {
   const [sortDir, setSortDir] = useState<SortDir>('asc');
   const [openActionsId, setOpenActionsId] = useState<string | null>(null);
   const [menuPos, setMenuPos] = useState<{ top: number; left: number } | null>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  // After the actions menu mounts, measure its REAL height and nudge it up if
+  // it overflows the viewport bottom — otherwise the long menu's last items
+  // (Soft Delete / Delete Permanently) get pushed off-screen. The estimate in
+  // toggleActions can't know the exact height (it varies: reactivate vs
+  // suspend+terminate), so we correct it here. Guard prevents a re-render loop.
+  useLayoutEffect(() => {
+    if (!openActionsId || !menuPos || !menuRef.current) return;
+    const margin = 8;
+    const h = menuRef.current.offsetHeight;
+    const maxTop = window.innerHeight - h - margin;
+    const clamped = Math.max(margin, Math.min(menuPos.top, maxTop));
+    if (Math.abs(clamped - menuPos.top) > 1) {
+      setMenuPos((p) => (p ? { ...p, top: clamped } : p));
+    }
+  }, [openActionsId, menuPos]);
 
   const [modalType, setModalType] = useState<ModalType>(null);
   const [modalUser, setModalUser] = useState<User | null>(null);
@@ -283,7 +300,10 @@ export default function UsersPage() {
       const btn = e.currentTarget;
       const rect = btn.getBoundingClientRect();
       const menuW = 190;
-      const menuH = 340;
+      // Generous estimate for the full menu (~12 items + dividers). The exact
+      // height is corrected after mount by the useLayoutEffect above; this just
+      // gets the initial placement close so there's no visible jump.
+      const menuH = 470;
       const margin = 8;
 
       // Anchor horizontally to the STATUS cell (the td immediately before the
@@ -755,6 +775,7 @@ export default function UsersPage() {
           <>
             <div className="fixed inset-0 z-40" onMouseDown={closeMenu} />
             <div
+              ref={menuRef}
               data-actions-menu
               className="fixed z-50 w-[190px] py-1 rounded-lg border border-border-primary bg-bg-secondary shadow-dropdown text-left animate-slide-down overflow-y-auto overscroll-contain"
               style={{ top: menuPos.top, left: menuPos.left, maxHeight: `calc(100vh - ${menuPos.top}px - 8px)` }}

@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { clsx } from 'clsx';
 import toast from 'react-hot-toast';
-import { User, Shield, Bell, Monitor, ChevronRight, Sun, Moon, Palette, Copy } from 'lucide-react';
+import { User, Shield, Bell, Monitor, Sun, Moon, Palette, Copy } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { useUIStore } from '@/stores/uiStore';
 import { useTradingStore } from '@/stores/tradingStore';
@@ -25,16 +25,8 @@ interface Profile {
   postal_code?: string | null;
   kyc_status: string;
   two_factor_enabled: boolean;
-}
-
-interface TradingAccount {
-  id: string;
-  account_number: string;
-  account_type: string;
-  balance: number;
-  is_demo: boolean;
-  status?: string;
-  leverage?: number;
+  /** Registration date — shown as "Member since" (B2-6). */
+  created_at?: string;
 }
 
 interface Session {
@@ -62,7 +54,6 @@ function fmt(n: number) {
 export default function ProfilePage() {
   const [tab, setTab] = useState<TabId>('profile');
   const [profile, setProfile] = useState<Profile | null>(null);
-  const [accounts, setAccounts] = useState<TradingAccount[]>([]);
   const [sessions, setSessions] = useState<Session[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -167,13 +158,6 @@ export default function ProfilePage() {
     } finally { setLoading(false); }
   }, []);
 
-  const fetchAccounts = useCallback(async () => {
-    try {
-      const res = await api.get<{ accounts?: TradingAccount[]; items?: TradingAccount[] }>('/accounts');
-      setAccounts(res.accounts ?? res.items ?? []);
-    } catch { /* non-critical */ }
-  }, []);
-
   const fetchSessions = useCallback(async () => {
     try {
       const res = await api.get<{ sessions: Session[] }>('/profile/sessions');
@@ -181,7 +165,7 @@ export default function ProfilePage() {
     } catch { /* non-critical */ }
   }, []);
 
-  useEffect(() => { fetchProfile(); fetchAccounts(); }, [fetchProfile, fetchAccounts]);
+  useEffect(() => { fetchProfile(); }, [fetchProfile]);
   useEffect(() => { if (tab === 'sessions') fetchSessions(); }, [tab, fetchSessions]);
 
   const handleSaveProfile = async () => {
@@ -414,11 +398,32 @@ export default function ProfilePage() {
                     </div>
                   </div>
 
-                  {/* Postal */}
-                  <div>
-                    <label className={labelCls}>Postal / Zip Code</label>
-                    <input type="text" value={postal} onChange={(e) => setPostal(e.target.value)} className={inputCls} placeholder="" />
+                  {/* Postal + Country */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className={labelCls}>Postal / Zip Code</label>
+                      <input type="text" value={postal} onChange={(e) => setPostal(e.target.value)} className={inputCls} placeholder="" />
+                    </div>
+                    <div>
+                      <label className={labelCls}>Country</label>
+                      <input type="text" value={country} onChange={(e) => setCountry(e.target.value)} className={inputCls} placeholder="e.g. India" />
+                    </div>
                   </div>
+
+                  {/* Registration date — read-only (client 2026-06-19: user
+                      should see when they joined). Per-account creation dates
+                      live on the Accounts page. */}
+                  {profile?.created_at && (
+                    <div>
+                      <label className={labelCls}>Member since</label>
+                      <input
+                        type="text"
+                        value={new Date(profile.created_at).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })}
+                        disabled
+                        className={`${inputCls} opacity-60 cursor-not-allowed`}
+                      />
+                    </div>
+                  )}
 
                   <div className="flex justify-end pt-1">
                     <Button variant="primary" onClick={handleSaveProfile} loading={savingProfile}>
@@ -429,45 +434,6 @@ export default function ProfilePage() {
               )}
             </div>
 
-            {/* Trading Accounts section */}
-            {accounts.length > 0 && (
-              <div className="rounded-xl border border-border-primary bg-card overflow-hidden noise-texture">
-                <div className="px-5 py-3.5 border-b border-border-primary">
-                  <h3 className="text-sm font-semibold text-text-primary">Trading Accounts</h3>
-                </div>
-                <ul className="divide-y divide-border-primary">
-                  {accounts.map((acc) => (
-                    <li key={acc.id} className="px-5 py-3.5 flex items-center justify-between gap-3">
-                      <div className="flex items-center gap-3 min-w-0">
-                        <div className="w-8 h-8 rounded-lg bg-bg-secondary border border-border-primary flex items-center justify-center text-xs font-bold text-text-tertiary shrink-0">
-                          {acc.is_demo ? 'D' : 'L'}
-                        </div>
-                        <div className="min-w-0">
-                          <p className="text-sm font-medium text-text-primary truncate">{acc.account_number}</p>
-                          <p className="text-xs text-text-tertiary">
-                            {acc.is_demo ? 'Demo Account' : 'Live Account'}
-                            {acc.leverage ? ` • 1:${acc.leverage}` : ''}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-3 shrink-0">
-                        <div className="text-right">
-                          <p className="text-sm font-semibold text-text-primary">{fmt(acc.balance)}</p>
-                          <p className="text-[10px] text-text-tertiary">Balance</p>
-                        </div>
-                        <span className={clsx(
-                          'px-2 py-0.5 rounded-full text-[10px] font-semibold',
-                          acc.status === 'active' ? 'bg-accent/15 text-accent' : 'bg-bg-secondary text-text-tertiary',
-                        )}>
-                          {acc.status ?? 'active'}
-                        </span>
-                        <ChevronRight size={14} className="text-text-tertiary" />
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
           </div>
         )}
 

@@ -111,11 +111,13 @@ async def quote_all_tiers(
     if is_copy_trade:
         surcharge += cfg.copy_trade_surcharge
 
-    # Frequent-claim coverage reduction (anti-farming). 1.0 if caller
-    # didn't pass db + user_id, or user is below the threshold.
+    # Frequent-claim coverage reduction DISABLED (client 2026-06-19): the
+    # advertised tier coverage (50% / 70%) must be exactly what the trader
+    # sees in the picker/chart AND what they're paid on a claim. Silently
+    # shrinking it to 38% / 53% for frequent claimers contradicted the
+    # marketing and confused users. Multiplier pinned to 1.0; the reduction
+    # helper is kept for reference but no longer applied.
     coverage_multiplier = 1.0
-    if db is not None and user_id is not None:
-        coverage_multiplier = await _frequent_claim_reduction(db, user_id, cfg)
 
     quotes: list[TierQuote] = []
     for tier_row in cfg.simple_tiers or []:

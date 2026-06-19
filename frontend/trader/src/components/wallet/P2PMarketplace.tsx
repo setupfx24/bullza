@@ -22,6 +22,16 @@ import { useAuthStore } from '@/stores/authStore';
 
 type Side = 'buy' | 'sell';
 
+// Payment methods the trader can request for an RM-coordinated deposit
+// (client 2026-06-16). The RM shares the matching payment detail.
+const RM_METHODS: { key: string; label: string; hint: string }[] = [
+  { key: 'Cryptocurrency', label: 'Cryptocurrency', hint: 'Your RM will share a crypto wallet address to send to.' },
+  { key: 'BinancePay', label: 'BinancePay', hint: 'Your RM will share their BinancePay ID / QR.' },
+  { key: 'UPI', label: 'UPI', hint: 'Your RM will share a UPI ID to pay to.' },
+  { key: 'USDT', label: 'USDT', hint: 'Your RM will share a USDT (TRC20/ERC20) address.' },
+  { key: 'Local Bank Transfer', label: 'Local Bank Transfer', hint: 'Your RM will share bank account / IFSC details.' },
+];
+
 interface UserProfile {
   first_name?: string | null;
   last_name?: string | null;
@@ -36,6 +46,7 @@ export default function P2PMarketplace({ mode }: { mode: Side }) {
   const authUser = useAuthStore((s) => s.user) as UserProfile | null;
 
   const [amount, setAmount] = useState<string>('');
+  const [method, setMethod] = useState<string>(''); // chosen payment method (deposit only)
   const [phone, setPhone] = useState<string>(authUser?.phone || '');
   const [payoutDetails, setPayoutDetails] = useState<string>('');
   const [note, setNote] = useState<string>('');
@@ -59,6 +70,10 @@ export default function P2PMarketplace({ mode }: { mode: Side }) {
       toast.error('Enter a valid amount');
       return;
     }
+    if (side === 'deposit' && !method) {
+      toast.error('Choose a payment method');
+      return;
+    }
     if (!phone || phone.trim().length < 7) {
       toast.error('Enter a valid phone number');
       return;
@@ -75,6 +90,7 @@ export default function P2PMarketplace({ mode }: { mode: Side }) {
           amount: amt,
           phone: phone.trim(),
           side,
+          method: side === 'deposit' ? method : undefined,
           payout_details: side === 'withdraw' ? payoutDetails.trim() : undefined,
           note: note.trim() || undefined,
         },
@@ -107,7 +123,7 @@ export default function P2PMarketplace({ mode }: { mode: Side }) {
         </p>
         <button
           type="button"
-          onClick={() => { setDone(false); setAmount(''); setNote(''); }}
+          onClick={() => { setDone(false); setAmount(''); setNote(''); setMethod(''); }}
           className="mt-2 text-xs text-accent hover:underline"
         >
           Submit another request
@@ -133,6 +149,32 @@ export default function P2PMarketplace({ mode }: { mode: Side }) {
 
       {/* Form */}
       <div className="space-y-3">
+        {side === 'deposit' && (
+          <Field label="Payment method">
+            <div className="grid grid-cols-2 gap-2">
+              {RM_METHODS.map((m) => (
+                <button
+                  key={m.key}
+                  type="button"
+                  onClick={() => setMethod(m.key)}
+                  className={`px-3 py-2.5 rounded-xl border text-xs font-semibold transition-colors text-left ${
+                    method === m.key
+                      ? 'border-accent bg-accent/10 text-text-primary'
+                      : 'border-border-primary bg-bg-secondary text-text-secondary hover:border-accent/40'
+                  }`}
+                >
+                  {m.label}
+                </button>
+              ))}
+            </div>
+            {method ? (
+              <p className="mt-1.5 text-[11px] text-text-tertiary leading-relaxed">
+                {RM_METHODS.find((m) => m.key === method)?.hint}
+              </p>
+            ) : null}
+          </Field>
+        )}
+
         <Field label="Name">
           <input
             type="text"
@@ -196,7 +238,7 @@ export default function P2PMarketplace({ mode }: { mode: Side }) {
         <button
           type="button"
           onClick={() => void submit()}
-          disabled={submitting || !amount || !phone}
+          disabled={submitting || !amount || !phone || (side === 'deposit' && !method)}
           className="w-full mt-2 py-3 rounded-xl font-bold text-sm uppercase tracking-wider bg-accent text-white disabled:bg-bg-hover disabled:text-text-tertiary disabled:cursor-not-allowed flex items-center justify-center gap-2"
         >
           {submitting && <Loader2 className="w-4 h-4 animate-spin" />}

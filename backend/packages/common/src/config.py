@@ -79,13 +79,15 @@ class Settings(BaseSettings):
     # EMAIL_LOGO_URL must be an absolute https URL because email clients
     # cannot resolve relative paths or render images from blob/data URIs.
     # If empty, the layout falls back to the styled "SwisDex" wordmark text.
-    # The email layout (email_templates/base.py) now renders on a LIGHT/white
-    # background (client request 2026-06-15), so the logo must be the
-    # dark-lettered asset (swisdex_png.png) — it is clearly visible on white,
-    # whereas the white-lettered swisdex_png5.png would disappear. Override in
-    # .env if a tenant ships a custom logo. Must be an absolute https URL
-    # because email clients can't resolve relative paths.
-    EMAIL_LOGO_URL: str = "https://swisdex.com/images/swisdex_png.png"
+    # The email header renders on a DARK band (email_templates/base.py), so the
+    # logo must be the WHITE-lettered asset (swisdex_png5.png). A dark header is
+    # the only reliable choice across clients: Gmail's dark mode forcibly
+    # darkens light backgrounds (which made the old dark-lettered logo on a
+    # white header vanish), but it never lightens an already-dark background —
+    # so a white logo on a dark header stays visible in both light and dark
+    # mode. Override in .env if a tenant ships a custom logo. Must be an
+    # absolute https URL because email clients can't resolve relative paths.
+    EMAIL_LOGO_URL: str = "https://swisdex.com/images/swisdex_png5.png"
 
     # Mobile app store links — when set, the email footer renders the
     # "Get the app" section with App Store + Google Play badges. Leave

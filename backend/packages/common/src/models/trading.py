@@ -107,6 +107,11 @@ class Order(Base):
     filled_at = Column(DateTime(timezone=True))
     commission = Column(Numeric(18, 8), default=0)
     swap = Column(Numeric(18, 8), default=0)
+    # Broker's gross spread revenue on this trade, in account currency (USD):
+    # (ask − bid) × effective_lots × contract_size, captured at fill. Shown as
+    # its OWN line (separate from commission) in the admin Finance Overview
+    # (client 2026-06-16).
+    spread_revenue = Column(Numeric(18, 8), default=0)
     comment = Column(Text)
     is_admin_created = Column(Boolean, default=False)
     admin_created_by = Column(UUID(as_uuid=True), ForeignKey("users.id"))

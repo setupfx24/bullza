@@ -82,6 +82,54 @@ async def _resolve_ib_type(db: AsyncSession, profile: IBProfile) -> str:
     return "ib" if profile.parent_ib_id is None else "sub_ib"
 
 
+async def _can_self_apply_ib(db: AsyncSession, user_id: UUID) -> bool:
+    """Per client 2026-06-19: only a user introduced by the Super IB (SDA05)
+    — or one who signed up with NO referral at all (they attach under the
+    Super IB) — may self-apply to become a full IB. A user introduced by any
+    other IB/affiliate is shown only a "Contact SwisDex to become an IB"
+    prompt instead of the self-apply flow."""
+    u = (await db.execute(select(User).where(User.id == user_id))).scalar_one_or_none()
+    if u is None:
+        return False
+    ref_id = getattr(u, "referred_by_user_id", None)
+    if ref_id is None:
+        return True  # no referral → sits under the Super IB → can apply
+    super_id = await _get_super_ib_profile_id(db)
+    if super_id is None:
+        return True  # no Super IB configured yet → don't block applications
+    super_prof = (await db.execute(
+        select(IBProfile).where(IBProfile.id == super_id)
+    )).scalar_one_or_none()
+    return super_prof is not None and super_prof.user_id == ref_id
+
+
+async def _ib_pool_and_active(db: AsyncSession, ib_user_id: UUID) -> tuple[float, int, int]:
+    """Returns (deposit_pool_usd, active_users, total_referred) for an IB's
+    direct downline (client 2026-06-19: the IB should see how much its users
+    have collectively deposited and how many are active, which drives the
+    per-lot commission tier). 'Active' = a referred user with >=1 approved
+    deposit (funded)."""
+    referred = (await db.execute(
+        select(Referral.referred_id).where(Referral.referrer_id == ib_user_id)
+    )).scalars().all()
+    total_referred = len(referred)
+    if not referred:
+        return 0.0, 0, 0
+    pool = (await db.execute(
+        select(func.coalesce(func.sum(Deposit.amount), 0)).where(
+            Deposit.user_id.in_(referred),
+            Deposit.status.in_(["approved", "auto_approved"]),
+        )
+    )).scalar() or 0
+    active = (await db.execute(
+        select(func.count(func.distinct(Deposit.user_id))).where(
+            Deposit.user_id.in_(referred),
+            Deposit.status.in_(["approved", "auto_approved"]),
+        )
+    )).scalar() or 0
+    return float(pool), int(active), total_referred
+
+
 async def ib_status(user_id: UUID, db: AsyncSession) -> dict:
     profile_result = await db.execute(
         select(IBProfile).where(IBProfile.user_id == user_id)
@@ -96,6 +144,7 @@ async def ib_status(user_id: UUID, db: AsyncSession) -> dict:
 
     if profile:
         ib_type = await _resolve_ib_type(db, profile)
+        deposit_pool, active_users, total_referred = await _ib_pool_and_active(db, user_id)
         return {
             "is_ib": True,
             "ib_type": ib_type,             # 'super_ib' | 'ib' | 'sub_ib'
@@ -105,6 +154,12 @@ async def ib_status(user_id: UUID, db: AsyncSession) -> dict:
             "total_earned": float(profile.total_earned),
             "pending_payout": float(profile.pending_payout),
             "is_active": profile.is_active,
+            # Downline economics (client 2026-06-19): collective deposit pool +
+            # active/total user counts so the IB sees what tier its per-lot
+            # commission ($5/$7/$10/$12) is driven by.
+            "deposit_pool_usd": deposit_pool,
+            "active_users": active_users,
+            "total_referred": total_referred,
             "created_at": profile.created_at.isoformat() if profile.created_at else None,
         }
 
@@ -118,6 +173,9 @@ async def ib_status(user_id: UUID, db: AsyncSession) -> dict:
         "total_deposits_usd": total_deposits,
         "is_eligible": total_deposits >= min_deposit,
     }
+    # Whether this user may use the self-apply flow at all, or only see the
+    # "Contact SwisDex to become an IB" prompt (client 2026-06-19).
+    can_become_ib = await _can_self_apply_ib(db, user_id)
 
     if application:
         return {
@@ -125,12 +183,14 @@ async def ib_status(user_id: UUID, db: AsyncSession) -> dict:
             "application_status": application.status,
             "applied_at": application.created_at.isoformat() if application.created_at else None,
             "eligibility": eligibility,
+            "can_become_ib": can_become_ib,
         }
 
     return {
         "is_ib": False,
         "application_status": None,
         "eligibility": eligibility,
+        "can_become_ib": can_become_ib,
     }
 
 
@@ -149,6 +209,15 @@ async def apply_ib(user_id: UUID, application_data: dict | None, db: AsyncSessio
     )
     if existing_app.scalar_one_or_none():
         raise HTTPException(status_code=400, detail="You already have a pending application")
+
+    # Only Super-IB-introduced (or no-referral) users may self-apply
+    # (client 2026-06-19). Everyone else must contact SwisDex.
+    if not await _can_self_apply_ib(db, user_id):
+        raise HTTPException(
+            status_code=403,
+            detail="Direct IB applications are open only to users introduced by SwisDex. "
+                   "Please contact SwisDex to become an IB.",
+        )
 
     # Minimum-deposit gate. Admin sets the threshold via system_settings →
     # ib_min_deposit_usd. We compare against lifetime approved deposits so

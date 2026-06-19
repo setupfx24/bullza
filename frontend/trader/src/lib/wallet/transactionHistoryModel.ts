@@ -135,10 +135,19 @@ export function mergeWalletHistory(
     };
   };
 
+  const ledgerTx = ledger
+    .map(mapLedgerToTransaction)
+    // Realized trade P&L (profit/loss) belongs in the dedicated "Trades" tab,
+    // NOT the money-movement history — showing it here made the deposit/
+    // withdrawal history look like it contained trade history (client
+    // 2026-06-19). Keep deposits, withdrawals, transfers, bonuses, credits,
+    // fixed-return and fees; drop the per-trade P&L rows.
+    .filter((t) => t.type !== 'profit' && t.type !== 'loss');
+
   const merged = [
     ...deposits.map((d) => mapRow(d, 'deposit')),
     ...withdrawals.map((w) => mapRow(w, 'withdrawal')),
-    ...ledger.map(mapLedgerToTransaction),
+    ...ledgerTx,
   ];
   merged.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
   return merged;

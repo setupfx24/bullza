@@ -7,7 +7,7 @@ from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from packages.common.src.auth import hash_password
-from packages.common.src.models import User, Employee, AuditLog
+from packages.common.src.models import User, Employee, AuditLog, EmployeeCustomRole
 from packages.common.src.admin_schemas import (
     EmployeeIn, EmployeeUpdate, AuditLogOut, PaginatedResponse,
 )
@@ -17,6 +17,17 @@ VALID_EMPLOYEE_ROLES = [
     "super_admin", "trade_manager", "support", "finance", "risk_manager", "marketing", "rm",
     "deposit_manager", "withdrawal_manager",
 ]
+
+
+async def _is_valid_role(role: str, db: AsyncSession) -> bool:
+    """A role is valid if it's a built-in role OR a super-admin-defined custom
+    role (client 2026-06-16)."""
+    if role in VALID_EMPLOYEE_ROLES:
+        return True
+    found = (await db.execute(
+        select(EmployeeCustomRole.id).where(EmployeeCustomRole.name == role)
+    )).first()
+    return found is not None
 
 
 async def list_employees(db: AsyncSession) -> dict:
@@ -53,8 +64,8 @@ async def create_employee(
     if admin.role != "super_admin":
         raise HTTPException(status_code=403, detail="Only super admins can create employees")
 
-    if body.role not in VALID_EMPLOYEE_ROLES:
-        raise HTTPException(status_code=400, detail=f"Invalid role. Must be one of: {VALID_EMPLOYEE_ROLES}")
+    if not await _is_valid_role(body.role, db):
+        raise HTTPException(status_code=400, detail=f"Invalid role. Built-in: {VALID_EMPLOYEE_ROLES}, or a custom role.")
 
     existing_q = await db.execute(select(User).where(User.email == body.email))
     if existing_q.scalar_one_or_none():
@@ -119,8 +130,8 @@ async def update_employee(
     old_values = {"role": employee.role, "is_active": employee.is_active}
 
     if body.role is not None:
-        if body.role not in VALID_EMPLOYEE_ROLES:
-            raise HTTPException(status_code=400, detail=f"Invalid role. Must be one of: {VALID_EMPLOYEE_ROLES}")
+        if not await _is_valid_role(body.role, db):
+            raise HTTPException(status_code=400, detail=f"Invalid role. Built-in: {VALID_EMPLOYEE_ROLES}, or a custom role.")
         employee.role = body.role
 
     if body.is_active is not None:
@@ -129,6 +140,12 @@ async def update_employee(
     user_q = await db.execute(select(User).where(User.id == employee.user_id))
     user = user_q.scalar_one_or_none()
     if user:
+        # The admin UI sends a single full_name — split it into first/last so
+        # the name actually updates (it was being ignored before).
+        if body.full_name is not None and body.full_name.strip():
+            parts = body.full_name.strip().split(" ", 1)
+            user.first_name = parts[0]
+            user.last_name = parts[1] if len(parts) > 1 else ""
         if body.first_name is not None:
             user.first_name = body.first_name
         if body.last_name is not None:
@@ -150,6 +167,15 @@ async def delete_employee(
     ip_address: str | None,
     db: AsyncSession,
 ) -> dict:
+    """Permanently remove an employee from the roster.
+
+    We hard-delete the Employee row (so it disappears from the list) and demote
+    the linked user out of admin (role=user, status=terminated, sessions revoked)
+    — we do NOT delete the users row, because audit_logs / support_tickets / etc.
+    FK-reference users.id and deleting it would break history. (Previously this
+    only set is_active=False, so the row stayed in the list — the "delete nahi ho
+    raha" complaint.)
+    """
     if admin.role != "super_admin":
         raise HTTPException(status_code=403, detail="Only super admins can delete employees")
 
@@ -158,20 +184,29 @@ async def delete_employee(
     if not employee:
         raise HTTPException(status_code=404, detail="Employee not found")
 
-    employee.is_active = False
+    # Guard: deleting your own employee record would lock you out.
+    if employee.user_id == admin.id:
+        raise HTTPException(status_code=400, detail="You cannot delete your own account")
 
     user_q = await db.execute(select(User).where(User.id == employee.user_id))
     user = user_q.scalar_one_or_none()
+    user_email = user.email if user else None
+
+    await db.delete(employee)
     if user:
-        user.status = "suspended"
+        user.role = "user"
+        user.status = "terminated"
+        # Revoke any live admin sessions for this account.
+        if hasattr(user, "password_epoch"):
+            user.password_epoch = (user.password_epoch or 0) + 1
 
     await write_audit_log(
         db, admin.id, "delete_employee", "employee", employee_id,
-        new_values={"is_active": False, "user_status": "suspended"},
+        new_values={"deleted": True, "email": user_email, "demoted_to": "user", "status": "terminated"},
         ip_address=ip_address,
     )
     await db.commit()
-    return {"message": "Employee deactivated"}
+    return {"message": "Employee deleted"}
 
 
 async def get_employee_activity(

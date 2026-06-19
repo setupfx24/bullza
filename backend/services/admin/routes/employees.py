@@ -1,11 +1,14 @@
 import uuid
 
-from fastapi import APIRouter, Body, Depends, Query, Request, Response
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request, Response
+from pydantic import BaseModel
+from sqlalchemy import select, func
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from packages.common.src.database import get_db
 from dependencies import get_current_admin, EMPLOYEE_ROLE_PERMISSIONS
-from packages.common.src.models import User
+from packages.common.src.models import User, EmployeeCustomRole, Employee
 from packages.common.src.admin_schemas import EmployeeIn, EmployeeUpdate
 from services import employee_service
 
@@ -15,7 +18,7 @@ router = APIRouter(prefix="/employees", tags=["Employees"])
 # Static catalog of permissions the admin UI renders as checkboxes. Keep in sync
 # with require_permission() call sites across the admin backend.
 PERMISSION_CATALOG = {
-    "Users":       ["users.view", "users.add_fund", "users.deduct_fund", "users.ban", "users.block_trading", "users.kill_switch"],
+    "Users":       ["users.view", "users.add_fund", "users.deduct_fund", "users.ban", "users.block_trading", "users.kill_switch", "users.set_password"],
     "KYC":         ["kyc.view", "kyc.manage"],
     "Deposits":    ["deposits.view", "deposits.approve", "deposits.reject"],
     "Withdrawals": ["withdrawals.view", "withdrawals.approve", "withdrawals.reject"],
@@ -28,6 +31,11 @@ PERMISSION_CATALOG = {
     "Analytics":   ["analytics.view", "exposure.view"],
     "Audit":       ["audit_logs.view"],
     "RM":          ["rm.view", "rm.request", "rm.manage", "rm.assign"],
+    "Fixed Return": ["fixed_return.view", "fixed_return.manage"],
+    # Task assignment + daily reports (client 2026-06-16). tasks.assign lets an
+    # employee assign work + see all reports; every employee sees/updates their
+    # OWN tasks without any permission.
+    "Tasks":       ["tasks.assign", "tasks.view_all"],
 }
 
 
@@ -99,6 +107,91 @@ async def list_permission_catalog(admin: User = Depends(get_current_admin)):
         "catalog": PERMISSION_CATALOG,
         "role_defaults": {role: sorted(perms) for role, perms in EMPLOYEE_ROLE_PERMISSIONS.items()},
     }
+
+
+# ─── Custom employee roles (super-admin defined, reusable) ───────────────
+class CustomRoleIn(BaseModel):
+    name: str
+    permissions: list[str] = []
+
+
+@router.get("/roles")
+async def list_custom_roles(
+    admin: User = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    rows = (await db.execute(
+        select(EmployeeCustomRole).order_by(EmployeeCustomRole.name)
+    )).scalars().all()
+    return {"items": [
+        {"id": str(r.id), "name": r.name, "permissions": list(r.permissions or [])}
+        for r in rows
+    ]}
+
+
+@router.post("/roles")
+async def create_custom_role(
+    body: CustomRoleIn,
+    admin: User = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    if admin.role != "super_admin":
+        raise HTTPException(status_code=403, detail="Only super admins can manage roles")
+    name = (body.name or "").strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="Role name is required")
+    if name in EMPLOYEE_ROLE_PERMISSIONS:
+        raise HTTPException(status_code=400, detail="That name is a built-in role — choose another")
+    role = EmployeeCustomRole(name=name, permissions=list(body.permissions or []), created_by=admin.id)
+    db.add(role)
+    try:
+        await db.commit()
+    except IntegrityError:
+        await db.rollback()
+        raise HTTPException(status_code=409, detail="A role with that name already exists")
+    return {"id": str(role.id), "name": role.name}
+
+
+@router.put("/roles/{role_id}")
+async def update_custom_role(
+    role_id: uuid.UUID,
+    body: CustomRoleIn,
+    admin: User = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    if admin.role != "super_admin":
+        raise HTTPException(status_code=403, detail="Only super admins can manage roles")
+    role = (await db.execute(
+        select(EmployeeCustomRole).where(EmployeeCustomRole.id == role_id)
+    )).scalar_one_or_none()
+    if not role:
+        raise HTTPException(status_code=404, detail="Role not found")
+    role.permissions = list(body.permissions or [])
+    await db.commit()
+    return {"message": "Role updated"}
+
+
+@router.delete("/roles/{role_id}")
+async def delete_custom_role(
+    role_id: uuid.UUID,
+    admin: User = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    if admin.role != "super_admin":
+        raise HTTPException(status_code=403, detail="Only super admins can manage roles")
+    role = (await db.execute(
+        select(EmployeeCustomRole).where(EmployeeCustomRole.id == role_id)
+    )).scalar_one_or_none()
+    if not role:
+        raise HTTPException(status_code=404, detail="Role not found")
+    in_use = (await db.execute(
+        select(func.count()).select_from(Employee).where(Employee.role == role.name)
+    )).scalar() or 0
+    if in_use:
+        raise HTTPException(status_code=409, detail=f"{in_use} employee(s) still use this role — reassign them first")
+    await db.delete(role)
+    await db.commit()
+    return {"message": "Role deleted"}
 
 
 @router.get("/{employee_id}/permissions")

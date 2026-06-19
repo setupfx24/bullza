@@ -18,7 +18,7 @@ from routes import (
     support, employees, settings, transactions, kyc, account_types, user_audit_logs,
     insurance as insurance_admin, play_zone as play_zone_admin,
     lifestyle as lifestyle_admin, approvals, notifications, broadcast,
-    fixed_return as fixed_return_admin, rm as rm_admin,
+    fixed_return as fixed_return_admin, rm as rm_admin, tasks as tasks_admin,
 )
 
 app_settings = get_settings()
@@ -118,6 +118,39 @@ async def _apply_startup_ddl():
             await conn.execute(text(
                 "ALTER TABLE employees DROP CONSTRAINT IF EXISTS employees_role_check"
             ))
+            # Employee tasks + custom roles (migration 0077, client 2026-06-16).
+            await conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS employee_custom_roles (
+                    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                    name VARCHAR(40) UNIQUE NOT NULL,
+                    permissions JSONB NOT NULL DEFAULT '[]'::jsonb,
+                    created_by UUID REFERENCES users(id),
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+                )
+            """))
+            await conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS employee_tasks (
+                    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                    assigned_by UUID REFERENCES users(id),
+                    assigned_to UUID NOT NULL REFERENCES users(id),
+                    title VARCHAR(200) NOT NULL,
+                    description TEXT,
+                    due_date DATE,
+                    status VARCHAR(20) NOT NULL DEFAULT 'pending',
+                    undone_reason TEXT,
+                    completed_at TIMESTAMPTZ,
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+                    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+                )
+            """))
+            await conn.execute(text(
+                "CREATE INDEX IF NOT EXISTS ix_employee_tasks_assigned_to ON employee_tasks(assigned_to)"
+            ))
+            # Broker spread revenue per trade (migration 0078) — its own Finance
+            # Overview line, separate from commission.
+            await conn.execute(text(
+                "ALTER TABLE orders ADD COLUMN IF NOT EXISTS spread_revenue NUMERIC(18,8) DEFAULT 0"
+            ))
     except Exception as e:
         logger.warning("startup DDL skipped: %s", e)
 
@@ -177,6 +210,7 @@ app.include_router(bonus.router, prefix=prefix)
 app.include_router(banners.router, prefix=prefix)
 app.include_router(support.router, prefix=prefix)
 app.include_router(employees.router, prefix=prefix)
+app.include_router(tasks_admin.router, prefix=f"{prefix}/tasks")
 app.include_router(settings.router, prefix=prefix)
 app.include_router(transactions.router, prefix=prefix)
 app.include_router(kyc.router, prefix=prefix)

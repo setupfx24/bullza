@@ -308,20 +308,27 @@ def _build_verify_url(user: User) -> str:
     return f"{base}/auth/verify-email?token={token}"
 
 
-def _send_verify_email(user: User, request: Request | None = None) -> None:
+def _send_verify_email(user: User, request: Request | None = None) -> bool:
     """Schedule the focused verify-your-email message. Fire-and-forget.
 
+    Returns True only if the email was actually built and handed to the
+    SMTP sender — so the API can report `verification_sent` honestly instead
+    of always claiming success (which masked "SMTP not configured" and render
+    failures, making "email not arriving" impossible to diagnose).
+
     Template is intentionally minimal: greeting + verify CTA + expiry +
-    "ignore if you didn't sign up" reassurance. Onboarding / welcome
-    content lives elsewhere (or not at all) — the client flagged that
-    bundling it here buried the verification action.
+    "ignore if you didn't sign up" reassurance.
     """
     try:
         from packages.common.src.smtp_mail import (
             send_email, smtp_configured, fire_and_forget,
         )
         if not smtp_configured():
-            return
+            logger.warning(
+                "verify-email NOT sent for %s: SMTP is not configured "
+                "(SMTP_HOST is empty in this service's environment)", user.email,
+            )
+            return False
         from packages.common.src.email_templates.verify_email import render_verify_email
         verify_url = _build_verify_url(user)
         subject, html, text = render_verify_email(
@@ -330,8 +337,11 @@ def _send_verify_email(user: User, request: Request | None = None) -> None:
             expires_hours=EMAIL_VERIFY_EXPIRES_HOURS,
         )
         fire_and_forget(send_email(user.email, subject, html, text=text, category="support"))
+        logger.info("verify-email queued for %s", user.email)
+        return True
     except Exception as e:
         logger.warning("verify-email scheduling failed for %s: %s", user.email, e)
+        return False
 
 
 async def confirm_email_verification(
@@ -485,31 +495,42 @@ async def _attach_to_company_ib(db: AsyncSession, user_id: UUID) -> None:
     from packages.common.src.settings_store import (
         get_bool_setting, get_system_setting,
     )
+    from sqlalchemy import func as _func
 
-    if not await get_bool_setting("company_ib_attach_unreferred", False):
-        return
-    raw_uid = await get_system_setting("company_ib_user_id", None)
-    if not raw_uid or not isinstance(raw_uid, str) or not raw_uid.strip():
-        return
-    try:
-        company_user_id = UUID(raw_uid.strip())
-    except (ValueError, AttributeError):
-        return
-    if company_user_id == user_id:
-        return  # self-attribution guard
+    company_ib = None
 
-    ib_q = await db.execute(
-        select(IBProfile).where(
-            IBProfile.user_id == company_user_id,
-            IBProfile.is_active == True,
-        )
-    )
-    company_ib = ib_q.scalar_one_or_none()
-    if not company_ib:
-        # Admin pointed at a user that has no active IB profile — silent
-        # no-op rather than block signup. They'll see the warning on the
-        # admin Company-IB panel.
-        return
+    # 1. Admin-configured company IB (only when the auto-attach toggle is on).
+    if await get_bool_setting("company_ib_attach_unreferred", False):
+        raw_uid = await get_system_setting("company_ib_user_id", None)
+        if raw_uid and isinstance(raw_uid, str) and raw_uid.strip():
+            try:
+                company_user_id = UUID(raw_uid.strip())
+                if company_user_id != user_id:
+                    company_ib = (await db.execute(
+                        select(IBProfile).where(
+                            IBProfile.user_id == company_user_id,
+                            IBProfile.is_active == True,
+                        )
+                    )).scalar_one_or_none()
+            except (ValueError, AttributeError):
+                company_ib = None
+
+    # 2. Fall back to the Super IB (SDA05 root). Client 2026-06-19: every
+    #    no-code / unreferred signup must land UNDER the Super IB — previously
+    #    this only happened if an admin toggled company_ib_attach_unreferred,
+    #    so organic signups were orphaned (never under the Super IB).
+    if company_ib is None:
+        code = str(await get_system_setting("super_ib_code", None) or "SDA05").strip()
+        if code:
+            company_ib = (await db.execute(
+                select(IBProfile).where(
+                    _func.lower(IBProfile.referral_code) == code.lower(),
+                    IBProfile.is_active == True,
+                )
+            )).scalar_one_or_none()
+
+    if company_ib is None or company_ib.user_id == user_id:
+        return  # no default IB sink exists yet (or self-attribution)
 
     db.add(Referral(
         referrer_id=company_ib.user_id,
@@ -676,11 +697,12 @@ async def register_user(
         role="user",
         status="active",
         kyc_status="pending",
-        # New email-password sign-ups must verify before they can log in.
-        # Google / wallet sign-ups stay verified=True (third-party already
-        # confirmed ownership). Migration 0038 backfills True for existing
-        # users so this gate doesn't lock anyone out on deploy.
-        email_verified=False,
+        # Client 2026-06-16: AUTO-VERIFY on register so users can sign in
+        # immediately (no more 403 "email_unverified"). The verification email
+        # is still sent below (welcome + confirm link) but it no longer BLOCKS
+        # sign-in. Clicking the link later is idempotent (already verified).
+        email_verified=True,
+        email_verified_at=datetime.now(timezone.utc),
     )
     db.add(user)
     await db.flush()
@@ -726,16 +748,14 @@ async def register_user(
 
     await db.commit()
 
-    # Email/password signups do NOT receive a session cookie here — the user
-    # must click the verify link in their inbox, which is the ONLY path that
-    # issues cookies + lets them into the app. This is the email-verification
-    # gate the platform relies on; previously the cookies-on-register flow
-    # let traders skip verification entirely (regression closed 2026-05-12).
-    _send_verify_email(user, request)
+    # Still send the verification/welcome email (client 2026-06-16 wants the
+    # email to go out), but the account is already verified so it does NOT
+    # block sign-in — the user can log in right away.
+    verification_sent = _send_verify_email(user, request)
     return {
         "email": user.email,
-        "verification_sent": True,
-        "message": "Account created. Check your email to verify and sign in.",
+        "verification_sent": verification_sent,
+        "message": "Account created. You can sign in now.",
     }
 
 

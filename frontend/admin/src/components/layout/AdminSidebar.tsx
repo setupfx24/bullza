@@ -11,7 +11,7 @@ import {
   UserCog, ChevronDown, ChevronRight, Network, Share2,
   DollarSign, Percent, ArrowLeftRight, PanelLeftClose, PanelLeft,
   Receipt, Layers, ShieldCheck, ScrollText, BookOpen, Sparkles, Package, Megaphone,
-  UserCheck, HandCoins,
+  UserCheck, HandCoins, ClipboardList, KeyRound,
 } from 'lucide-react';
 
 interface NavItem {
@@ -71,6 +71,10 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Analytics', href: '/analytics', icon: BarChart3, perm: 'analytics.view' },
   { label: 'Audit logs', href: '/audit-logs', icon: ScrollText, perm: 'audit_logs.view' },
   { label: 'Bonus', href: '/bonus', icon: Gift, perm: 'bonus.view' },
+  // Top-level entry so a Fixed-Return manager role (fixed_return.view) can
+  // reach the page without needing config.view (it also lives under Config
+  // for super-admins). Same page either way.
+  { label: 'Fixed Return', href: '/config/fixed-return', icon: Wallet, perm: 'fixed_return.view' },
   { label: 'Trade Insurance', href: '/insurance', icon: ShieldCheck, perm: '*' },
   // Play Zone + Lifestyle Fulfillment (gamification/rewards) are not used on
   // this platform — hidden from the sidebar. The pages + APIs still exist, so
@@ -79,8 +83,12 @@ const NAV_ITEMS: NavItem[] = [
   // { label: 'Lifestyle Queue', href: '/lifestyle', icon: Package, perm: '*' },
   { label: 'Banners', href: '/banners', icon: Image, perm: 'banners.view' },
   { label: 'Support', href: '/support', icon: HeadphonesIcon, perm: 'tickets.view' },
+  // Tasks: visible to EVERY employee (My Tasks). Assign/Reports tabs inside
+  // are gated by tasks.assign / tasks.view_all. No `perm` = always shown.
+  { label: 'Tasks', href: '/tasks', icon: ClipboardList },
   { label: 'Broadcast', href: '/broadcast', icon: Megaphone, perm: '_super_admin' },
   { label: 'Employees', href: '/employees', icon: UserCog, perm: '_super_admin' },
+  { label: 'Roles', href: '/roles', icon: KeyRound, perm: '_super_admin' },
   { label: 'Settings', href: '/settings', icon: Settings, perm: '_super_admin' },
 ];
 

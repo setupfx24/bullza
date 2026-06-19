@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { clsx } from 'clsx';
 import toast from 'react-hot-toast';
 import DashboardShell from '@/components/layout/DashboardShell';
+import { QRCodeCanvas } from 'qrcode.react';
 import api from '@/lib/api/client';
 import {
   ShieldCheck,
@@ -581,6 +582,8 @@ export default function KycPage() {
                 </label>
               </div>
 
+              <ContinueOnPhone />
+
               <button
                 type="button"
                 onClick={() => void handleSubmit()}
@@ -604,5 +607,38 @@ export default function KycPage() {
         </div>
       )}
     </DashboardShell>
+  );
+}
+
+/**
+ * "Continue on phone" — shows a QR of the current KYC URL so the user can
+ * finish KYC on their phone (better camera). They sign in on the phone and
+ * land on the same page (client 2026-06-16, "click with other device").
+ */
+function ContinueOnPhone() {
+  const [show, setShow] = useState(false);
+  const url = typeof window !== 'undefined' ? window.location.href : '';
+  return (
+    <div className="pt-1">
+      <button
+        type="button"
+        onClick={() => setShow((s) => !s)}
+        className="text-xs font-medium text-accent hover:underline"
+      >
+        {show ? 'Hide' : 'Continue on another device (phone)'}
+      </button>
+      {show && (
+        <div className="mt-2 flex flex-col items-center gap-2 rounded-xl border border-border-primary bg-card-nested p-4">
+          <p className="text-[11px] text-text-tertiary text-center max-w-xs">
+            Scan with your phone camera, sign in, and finish KYC there using the phone camera.
+          </p>
+          {url ? (
+            <div className="bg-white p-2 rounded-lg">
+              <QRCodeCanvas value={url} size={140} />
+            </div>
+          ) : null}
+        </div>
+      )}
+    </div>
   );
 }
