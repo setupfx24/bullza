@@ -15,7 +15,9 @@ import {
   History,
   Loader2,
   X,
+  Download,
 } from 'lucide-react';
+import { downloadAdminReportPdf } from '@/lib/pdf/adminReportPdf';
 
 type TabId = 'deposits' | 'withdrawals' | 'history';
 type StatusFilter = 'pending' | 'approved' | 'rejected' | 'all';
@@ -414,14 +416,64 @@ export default function DepositsPage() {
   const currentTotal = activeTab === 'deposits' ? depositsTotal : activeTab === 'withdrawals' ? withdrawalsTotal : transactionsTotal;
   const totalPages = Math.max(1, Math.ceil(currentTotal / PAGE_SIZE));
 
+  // Export the CURRENT tab's list (deposits or withdrawals) to PDF, honouring
+  // the status + date-range filters above, with totals (client 2026-06-19).
+  const downloadReport = () => {
+    const isWd = activeTab === 'withdrawals';
+    const list: Array<Deposit | Withdrawal> = isWd ? withdrawals : deposits;
+    if (!list.length) { toast.error('Nothing to export for the current filters'); return; }
+    const total = list.reduce((s, r) => s + (Number(r.amount) || 0), 0);
+    const period = (dateFrom || dateTo) ? `${dateFrom || 'start'} → ${dateTo || 'today'}` : 'All time';
+    void downloadAdminReportPdf(
+      isWd ? 'Withdrawals report' : 'Deposits report',
+      [
+        { header: 'Date', width: 34 },
+        { header: 'User', width: 44 },
+        { header: 'Email', width: 56 },
+        { header: 'Method', width: 28 },
+        { header: 'Amount (USD)', width: 28, align: 'right', mono: true },
+        { header: 'Status', width: 24 },
+      ],
+      list.map((r) => [
+        formatDate(r.created_at),
+        r.user_name || '—',
+        r.user_email || '—',
+        r.method || '—',
+        `$${(Number(r.amount) || 0).toFixed(2)}`,
+        r.status,
+      ]),
+      {
+        subtitle: `${isWd ? 'Withdrawals' : 'Deposits'} · status: ${statusFilter}`,
+        periodLabel: period,
+        summaryLines: [
+          `Total ${isWd ? 'withdrawals' : 'deposits'} shown: $${total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+          `Count: ${list.length}`,
+        ],
+        filename: isWd ? 'withdrawals-report' : 'deposits-report',
+      },
+    );
+  };
+
   return (
     <>
       <div className="p-6 space-y-4">
-        <div>
-          <h1 className="text-lg font-semibold text-text-primary">Deposits & Withdrawals</h1>
-          <p className="text-xxs text-text-tertiary mt-0.5">
-            Review and manage funding requests
-          </p>
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h1 className="text-lg font-semibold text-text-primary">Deposits & Withdrawals</h1>
+            <p className="text-xxs text-text-tertiary mt-0.5">
+              Review and manage funding requests
+            </p>
+          </div>
+          {activeTab !== 'history' && (
+            <button
+              type="button"
+              onClick={downloadReport}
+              className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium border border-border-primary bg-bg-secondary text-text-primary hover:bg-bg-hover transition-fast"
+              title="Download the current list (filters + dates applied) as PDF"
+            >
+              <Download size={14} className="text-buy" /> Download PDF
+            </button>
+          )}
         </div>
 
         <div className="bg-bg-secondary border border-border-primary rounded-md">
