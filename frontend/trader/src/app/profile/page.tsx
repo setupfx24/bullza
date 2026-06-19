@@ -25,6 +25,8 @@ interface Profile {
   postal_code?: string | null;
   kyc_status: string;
   two_factor_enabled: boolean;
+  /** Registration date — shown as "Member since" (B2-6). */
+  created_at?: string;
 }
 
 interface Session {
