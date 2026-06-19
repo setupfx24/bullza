@@ -6,7 +6,7 @@ from decimal import Decimal
 import jwt
 from fastapi import HTTPException
 from sqlalchemy import select, func, or_
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import IntegrityError, DBAPIError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from packages.common.src.config import get_settings
@@ -948,27 +948,48 @@ async def delete_user(
     # master/IB user (they referred others).
     from sqlalchemy import text
     p = {"uid": str(user_id)}
-    await db.execute(text("UPDATE users SET referred_by_user_id = NULL WHERE referred_by_user_id = :uid"), p)
-    await db.execute(text("UPDATE users SET assigned_rm_id = NULL WHERE assigned_rm_id = :uid"), p)
-    await db.execute(text("DELETE FROM insurance_claims WHERE user_id = :uid"), p)
-    await db.execute(text("DELETE FROM insurance_policies WHERE user_id = :uid"), p)
-    await db.execute(text("DELETE FROM rm_funding_requests WHERE rm_id = :uid OR user_id = :uid"), p)
-    await db.execute(text("UPDATE rm_funding_requests SET approved_by = NULL WHERE approved_by = :uid"), p)
-    await db.execute(text("UPDATE rm_funding_requests SET credited_by = NULL WHERE credited_by = :uid"), p)
-    await db.execute(text("UPDATE rm_funding_requests SET rejected_by = NULL WHERE rejected_by = :uid"), p)
-    await db.execute(text("UPDATE lifestyle_fulfillments SET handled_by = NULL WHERE handled_by = :uid"), p)
+    # Each of these touches a table that may NOT exist on every deployment
+    # (lifestyle, rm_funding, insurance, and the newer employee_* tables).
+    # Run each in its own SAVEPOINT so a missing table raises a swallowed
+    # ProgrammingError instead of 500-ing (and aborting) the whole delete —
+    # which was the "internal server error" the admin saw.
+    _optional = [
+        "UPDATE users SET referred_by_user_id = NULL WHERE referred_by_user_id = :uid",
+        "UPDATE users SET assigned_rm_id = NULL WHERE assigned_rm_id = :uid",
+        "DELETE FROM insurance_claims WHERE user_id = :uid",
+        "DELETE FROM insurance_policies WHERE user_id = :uid",
+        "DELETE FROM rm_funding_requests WHERE rm_id = :uid OR user_id = :uid",
+        "UPDATE rm_funding_requests SET approved_by = NULL WHERE approved_by = :uid",
+        "UPDATE rm_funding_requests SET credited_by = NULL WHERE credited_by = :uid",
+        "UPDATE rm_funding_requests SET rejected_by = NULL WHERE rejected_by = :uid",
+        "UPDATE lifestyle_fulfillments SET handled_by = NULL WHERE handled_by = :uid",
+        # Newer tables that FK users.id — harmless no-ops if the user never
+        # touched them, skipped entirely if the table isn't present.
+        "DELETE FROM employee_tasks WHERE assigned_to = :uid OR assigned_by = :uid",
+        "UPDATE employee_custom_roles SET created_by = NULL WHERE created_by = :uid",
+        "UPDATE admin_notifications SET read_by = NULL WHERE read_by = :uid",
+    ]
+    for _sql in _optional:
+        try:
+            async with db.begin_nested():
+                await db.execute(text(_sql), p)
+        except Exception:
+            pass  # table absent on this deployment — skip it
 
-    # ── 10. Finally the user row ──
-    await db.execute(sql_delete(User).where(User.id == user_id))
-
-    await write_audit_log(
-        db, admin_id, "delete_user", "user", user_id,
-        new_values={"email": user_email},
-        ip_address=ip_address,
-    )
+    # ── 10. Finally the user row + commit, guarded together ──
+    # The FK-violation that blocks deletion raises on the DELETE statement
+    # itself (Postgres constraints are IMMEDIATE), not at commit — so the guard
+    # must wrap the delete too, otherwise an unhandled FK surfaces as a 500
+    # instead of the intended clear 409.
     try:
+        await db.execute(sql_delete(User).where(User.id == user_id))
+        await write_audit_log(
+            db, admin_id, "delete_user", "user", user_id,
+            new_values={"email": user_email},
+            ip_address=ip_address,
+        )
         await db.commit()
-    except IntegrityError as e:
+    except (IntegrityError, DBAPIError) as e:
         # A table we don't yet clean up still references this user. Surface
         # WHICH constraint so it's a clear, fixable message in the admin UI
         # instead of a silent "Internal server error".
