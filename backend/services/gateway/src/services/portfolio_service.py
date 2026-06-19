@@ -131,7 +131,16 @@ async def portfolio_summary(user_id: UUID, account_id: UUID | None, db: AsyncSes
     month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
 
     async def _closed_pnl(since: datetime | None) -> float:
-        query = select(func.coalesce(func.sum(TradeHistory.profit), 0)).where(
+        # NET realized P&L = price P&L minus the costs charged on the trade
+        # (commission + swap). The closed-position card in the terminal shows
+        # this net figure, so the dashboard must too — otherwise a trade that
+        # was +$0.17 gross but -$0.02 after costs showed here as a profit/win
+        # while the terminal showed a loss (client 2026-06-19).
+        query = select(func.coalesce(func.sum(
+            TradeHistory.profit
+            - func.coalesce(TradeHistory.commission, 0)
+            - func.coalesce(TradeHistory.swap, 0)
+        ), 0)).where(
             TradeHistory.account_id.in_(account_ids),
         )
         if since:
@@ -219,38 +228,44 @@ async def portfolio_performance(
     symbol_profits = {}
 
     for trade in trades:
-        running_equity += trade.profit
-        total_profit += trade.profit
+        # NET P&L per trade = price P&L minus commission + swap, matching the
+        # terminal's closed-position figure. Win/loss is decided on NET too, so
+        # a trade that was positive gross but negative after costs counts as a
+        # loss here (client 2026-06-19 — it was being counted as a win).
+        net = (trade.profit or Decimal("0")) - (trade.commission or Decimal("0")) - (trade.swap or Decimal("0"))
+        running_equity += net
+        total_profit += net
         if running_equity > max_equity:
             max_equity = running_equity
         dd = max_equity - running_equity
         if dd > max_drawdown:
             max_drawdown = dd
-        if trade.profit > 0:
+        if net > 0:
             total_wins += 1
-        elif trade.profit < 0:
+        elif net < 0:
             total_losses += 1
         # Frontend (portfolio Equity Growth chart) reads `date`. The
         # previous payload used `time` and the chart's filter silently
         # dropped every row, which produced the "empty equity graph"
         # report. Emit both keys so historical clients still resolve.
+        net_f = float(net)
         ts_iso = trade.closed_at.isoformat() if trade.closed_at else None
         equity_curve.append({
             "date": ts_iso,
             "time": ts_iso,
             "equity": float(running_equity),
-            "profit": float(trade.profit),
+            "profit": net_f,
         })
         if trade.closed_at:
-            daily_returns.append(float(trade.profit))
+            daily_returns.append(net_f)
             month_key = trade.closed_at.strftime("%Y-%m")
-            monthly_profits[month_key] = monthly_profits.get(month_key, 0) + float(trade.profit)
+            monthly_profits[month_key] = monthly_profits.get(month_key, 0) + net_f
         symbol = trade.instrument.symbol if trade.instrument else "unknown"
         if symbol not in symbol_profits:
             symbol_profits[symbol] = {"symbol": symbol, "profit": 0.0, "trades": 0, "wins": 0}
-        symbol_profits[symbol]["profit"] += float(trade.profit)
+        symbol_profits[symbol]["profit"] += net_f
         symbol_profits[symbol]["trades"] += 1
-        if trade.profit > 0:
+        if net > 0:
             symbol_profits[symbol]["wins"] += 1
 
     total_trades = total_wins + total_losses
