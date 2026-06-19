@@ -308,20 +308,27 @@ def _build_verify_url(user: User) -> str:
     return f"{base}/auth/verify-email?token={token}"
 
 
-def _send_verify_email(user: User, request: Request | None = None) -> None:
+def _send_verify_email(user: User, request: Request | None = None) -> bool:
     """Schedule the focused verify-your-email message. Fire-and-forget.
 
+    Returns True only if the email was actually built and handed to the
+    SMTP sender — so the API can report `verification_sent` honestly instead
+    of always claiming success (which masked "SMTP not configured" and render
+    failures, making "email not arriving" impossible to diagnose).
+
     Template is intentionally minimal: greeting + verify CTA + expiry +
-    "ignore if you didn't sign up" reassurance. Onboarding / welcome
-    content lives elsewhere (or not at all) — the client flagged that
-    bundling it here buried the verification action.
+    "ignore if you didn't sign up" reassurance.
     """
     try:
         from packages.common.src.smtp_mail import (
             send_email, smtp_configured, fire_and_forget,
         )
         if not smtp_configured():
-            return
+            logger.warning(
+                "verify-email NOT sent for %s: SMTP is not configured "
+                "(SMTP_HOST is empty in this service's environment)", user.email,
+            )
+            return False
         from packages.common.src.email_templates.verify_email import render_verify_email
         verify_url = _build_verify_url(user)
         subject, html, text = render_verify_email(
@@ -330,8 +337,11 @@ def _send_verify_email(user: User, request: Request | None = None) -> None:
             expires_hours=EMAIL_VERIFY_EXPIRES_HOURS,
         )
         fire_and_forget(send_email(user.email, subject, html, text=text, category="support"))
+        logger.info("verify-email queued for %s", user.email)
+        return True
     except Exception as e:
         logger.warning("verify-email scheduling failed for %s: %s", user.email, e)
+        return False
 
 
 async def confirm_email_verification(
@@ -730,10 +740,10 @@ async def register_user(
     # Still send the verification/welcome email (client 2026-06-16 wants the
     # email to go out), but the account is already verified so it does NOT
     # block sign-in — the user can log in right away.
-    _send_verify_email(user, request)
+    verification_sent = _send_verify_email(user, request)
     return {
         "email": user.email,
-        "verification_sent": True,
+        "verification_sent": verification_sent,
         "message": "Account created. You can sign in now.",
     }
 
