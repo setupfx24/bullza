@@ -168,7 +168,22 @@ async def get_admin_me(admin: User, db: AsyncSession) -> dict:
         emp = emp_q.scalar_one_or_none()
         if emp:
             employee_role = emp.role
-            permissions = EMPLOYEE_ROLE_PERMISSIONS.get(emp.role, set())
+            # Resolve the SAME way require_permission() does, so the UI the
+            # frontend builds from these permissions matches what the backend
+            # actually enforces. A custom (super-admin-defined) role isn't in
+            # EMPLOYEE_ROLE_PERMISSIONS — its permission set lives in
+            # employee_custom_roles. Without this, a custom-role employee got
+            # permissions=[] from /auth/me and the sidebar hid every page even
+            # though the backend would have allowed the actions.
+            role_perms = EMPLOYEE_ROLE_PERMISSIONS.get(emp.role)
+            if role_perms is None:
+                from sqlalchemy import text as _sql_text
+                cr = (await db.execute(
+                    _sql_text("SELECT permissions FROM employee_custom_roles WHERE name = :n"),
+                    {"n": emp.role},
+                )).first()
+                role_perms = set(cr[0]) if cr and cr[0] else set()
+            permissions = set(role_perms) | set(emp.extra_permissions or [])
 
     return {
         "id": str(admin.id),
