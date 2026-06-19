@@ -55,6 +55,20 @@ async def _revenue_stats(db: AsyncSession, since=None, until=None):
     )
     total_swap = abs(float(swap_q.scalar() or 0))
 
+    # Spread revenue is its OWN line — separate from commission/charges (client:
+    # "spread apne jagah dikhna chahiye"). Captured per order at fill time on
+    # Order.spread_revenue (mig 0078); summed over the same window here. It was
+    # previously hard-coded to 0 so spread never showed as a distinct figure.
+    spread_filter = [Order.spread_revenue != 0]
+    if since:
+        spread_filter.append(Order.created_at >= since)
+    if until:
+        spread_filter.append(Order.created_at < until)
+    spread_q = await db.execute(
+        select(func.coalesce(func.sum(Order.spread_revenue), 0)).where(*spread_filter)
+    )
+    total_spread = abs(float(spread_q.scalar() or 0))
+
     pnl_q = await db.execute(
         select(func.coalesce(func.sum(TradeHistory.profit), 0)).where(*pnl_filter) if pnl_filter
         else select(func.coalesce(func.sum(TradeHistory.profit), 0))
@@ -62,10 +76,10 @@ async def _revenue_stats(db: AsyncSession, since=None, until=None):
     user_pnl = float(pnl_q.scalar() or 0)
 
     return {
-        "total_revenue": total_commission + total_swap,
+        "total_revenue": total_commission + total_swap + total_spread,
         "commission_revenue": total_commission,
         "swap_revenue": total_swap,
-        "spread_revenue": 0,
+        "spread_revenue": total_spread,
         "net_pnl": -user_pnl,
     }
 
