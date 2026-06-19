@@ -968,6 +968,15 @@ async def delete_user(
         "DELETE FROM employee_tasks WHERE assigned_to = :uid OR assigned_by = :uid",
         "UPDATE employee_custom_roles SET created_by = NULL WHERE created_by = :uid",
         "UPDATE admin_notifications SET read_by = NULL WHERE read_by = :uid",
+        # Per-user pricing overrides (admin sets these on master traders / VIPs).
+        # spread_configs.user_id / swap_configs.user_id are RESTRICT FKs, so an
+        # uncleaned row blocks the final user delete → the 500 on master users.
+        "DELETE FROM spread_configs WHERE user_id = :uid",
+        "DELETE FROM swap_configs WHERE user_id = :uid",
+        # Social / sharing + rewards rows that FK users.id without CASCADE.
+        "DELETE FROM shared_trades WHERE user_id = :uid",
+        "DELETE FROM social_follows WHERE follower_id = :uid OR following_id = :uid",
+        "DELETE FROM master_followers WHERE follower_user_id = :uid",
     ]
     for _sql in _optional:
         try:
