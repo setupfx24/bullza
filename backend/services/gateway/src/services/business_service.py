@@ -82,25 +82,49 @@ async def _resolve_ib_type(db: AsyncSession, profile: IBProfile) -> str:
     return "ib" if profile.parent_ib_id is None else "sub_ib"
 
 
+async def _get_introducer_user_id(db: AsyncSession, user_id: UUID) -> UUID | None:
+    """Who introduced this user, across ALL signup paths (client 2026-06-19).
+
+    There are two code namespaces and three ways a signup gets attributed:
+      1. a personal `User.referral_code` → sets `User.referred_by_user_id`;
+      2. an `IBProfile.referral_code` (e.g. the Super IB 'SDA05') → writes a
+         `Referral` row but leaves `referred_by_user_id` NULL;
+      3. a no-code signup → auto-attached under the Super IB via a `Referral` row.
+
+    The old gating only looked at `referred_by_user_id`, so anyone who joined
+    through an IB *code* (cases 2 & 3) looked un-introduced and could wrongly
+    self-apply. Derive the introducer from `referred_by_user_id` first, then
+    fall back to the `Referral` row written at signup."""
+    ref = (await db.execute(
+        select(User.referred_by_user_id).where(User.id == user_id)
+    )).first()
+    if ref and ref[0] is not None:
+        return ref[0]
+    row = (await db.execute(
+        select(Referral.referrer_id)
+        .where(Referral.referred_id == user_id)
+        .order_by(Referral.created_at.asc())
+        .limit(1)
+    )).first()
+    return row[0] if row else None
+
+
 async def _can_self_apply_ib(db: AsyncSession, user_id: UUID) -> bool:
     """Per client 2026-06-19: only a user introduced by the Super IB (SDA05)
     — or one who signed up with NO referral at all (they attach under the
     Super IB) — may self-apply to become a full IB. A user introduced by any
     other IB/affiliate is shown only a "Contact SwisDex to become an IB"
     prompt instead of the self-apply flow."""
-    u = (await db.execute(select(User).where(User.id == user_id))).scalar_one_or_none()
-    if u is None:
-        return False
-    ref_id = getattr(u, "referred_by_user_id", None)
-    if ref_id is None:
-        return True  # no referral → sits under the Super IB → can apply
+    introducer_id = await _get_introducer_user_id(db, user_id)
+    if introducer_id is None:
+        return True  # no introducer → sits under the Super IB → can apply
     super_id = await _get_super_ib_profile_id(db)
     if super_id is None:
         return True  # no Super IB configured yet → don't block applications
     super_prof = (await db.execute(
         select(IBProfile).where(IBProfile.id == super_id)
     )).scalar_one_or_none()
-    return super_prof is not None and super_prof.user_id == ref_id
+    return super_prof is not None and super_prof.user_id == introducer_id
 
 
 async def _ib_pool_and_active(db: AsyncSession, ib_user_id: UUID) -> tuple[float, int, int]:
