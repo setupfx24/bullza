@@ -210,7 +210,14 @@ p, label, span { font-weight: inherit; }
   100% { background-position: 200% 0; }
 }
 
-.animate-page-in { animation: pageFadeIn 0.25s ease-out both; }
+/* `backwards` (not `both`): keep the intro fade/slide, but DON'T retain the
+   final transform after it finishes. A lingering transform: translateY(0) on
+   this persistent layout wrapper made it the containing block for every
+   position:fixed modal inside it, so modals positioned relative to the wrapper
+   instead of the viewport and appeared pinned to the top of the page (client:
+   "details modal goes to top, not visible — happens in many places"). With
+   `backwards` the transform reverts to none once the page-in animation ends. */
+.animate-page-in { animation: pageFadeIn 0.25s ease-out backwards; }
 .animate-slide-up { animation: slideUp 0.3s cubic-bezier(0.22,1,0.36,1) both; }
 .animate-glow { animation: glowPulse 2s ease-in-out infinite; }
 .animate-shimmer {
