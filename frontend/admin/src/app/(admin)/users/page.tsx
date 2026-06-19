@@ -206,6 +206,18 @@ export default function UsersPage() {
   const [menuPos, setMenuPos] = useState<{ top: number; left: number } | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
+  // Effective permissions of the logged-in admin/employee — drives which
+  // actions appear in the 3-dot menu. A limited employee must NOT see (or be
+  // tempted to click) Ban / Kill-switch / Terminate / Delete etc. they have no
+  // permission for (client 2026-06-19). super_admin gets "*" = everything.
+  const [perms, setPerms] = useState<string[]>([]);
+  useEffect(() => {
+    adminApi.get<{ permissions?: string[] }>('/auth/me')
+      .then((m) => setPerms(m?.permissions || []))
+      .catch(() => setPerms([]));
+  }, []);
+  const can = (perm?: string) => !perm || perms.includes('*') || perms.includes(perm);
+
   // After the actions menu mounts, measure its REAL height and nudge it up if
   // it overflows the viewport bottom — otherwise the long menu's last items
   // (Soft Delete / Delete Permanently) get pushed off-screen. The estimate in
@@ -742,30 +754,44 @@ export default function UsersPage() {
         const u = sorted.find(x => x.id === openActionsId);
         if (!u) return null;
         const closeMenu = () => { setOpenActionsId(null); setMenuPos(null); };
-        const menuItems = [
-          { label: 'View Profile', icon: Eye, action: () => { closeMenu(); router.push(`/users/${u.id}`); } },
-          { label: 'Add Fund', icon: Plus, action: () => openModal('add-fund', u) },
-          { label: 'Deduct Fund', icon: Minus, action: () => openModal('deduct-fund', u) },
-          { label: 'Give Credit', icon: CreditCard, action: () => openModal('give-credit', u) },
-          { label: 'Take Credit', icon: DollarSign, action: () => openModal('take-credit', u) },
+        // Each entry carries the permission the BACKEND enforces for it, so
+        // the menu only shows what this admin can actually do. Backend gating:
+        // ban/unban/suspend/terminate/soft-delete → users.ban,
+        // kill-switch → users.kill_switch, login-as → users.impersonate,
+        // permanent delete → users.delete, funds → users.add_fund/deduct_fund.
+        const rawItems = [
+          { label: 'View Profile', icon: Eye, perm: 'users.view', action: () => { closeMenu(); router.push(`/users/${u.id}`); } },
+          { label: 'Add Fund', icon: Plus, perm: 'users.add_fund', action: () => openModal('add-fund', u) },
+          { label: 'Deduct Fund', icon: Minus, perm: 'users.deduct_fund', action: () => openModal('deduct-fund', u) },
+          { label: 'Give Credit', icon: CreditCard, perm: 'users.add_fund', action: () => openModal('give-credit', u) },
+          { label: 'Take Credit', icon: DollarSign, perm: 'users.deduct_fund', action: () => openModal('take-credit', u) },
           { divider: true } as any,
-          { label: u.status?.toLowerCase() === 'banned' ? 'Unban User' : 'Ban User', icon: Ban, action: () => openModal(u.status?.toLowerCase() === 'banned' ? 'unban' : 'ban', u), danger: true },
-          { label: 'Kill Switch', icon: Power, action: () => openModal('kill-switch', u), danger: true },
+          { label: u.status?.toLowerCase() === 'banned' ? 'Unban User' : 'Ban User', icon: Ban, perm: 'users.ban', action: () => openModal(u.status?.toLowerCase() === 'banned' ? 'unban' : 'ban', u), danger: true },
+          { label: 'Kill Switch', icon: Power, perm: 'users.kill_switch', action: () => openModal('kill-switch', u), danger: true },
           { divider: true } as any,
           // Lifecycle: reactivate is offered when the account is in any
           // login-blocked state; otherwise suspend / terminate / soft-delete.
           ...(['suspended', 'terminated', 'deleted'].includes((u.status || '').toLowerCase())
-            ? [{ label: 'Reactivate User', icon: UserCheck, action: () => quickStatusAction(u, 'reactivate', `Reactivate ${u.name}? They will be able to log in again.`, 'User reactivated') }]
+            ? [{ label: 'Reactivate User', icon: UserCheck, perm: 'users.ban', action: () => quickStatusAction(u, 'reactivate', `Reactivate ${u.name}? They will be able to log in again.`, 'User reactivated') }]
             : [
-                { label: 'Suspend (temporary)', icon: PauseCircle, action: () => quickStatusAction(u, 'suspend', `Suspend ${u.name}? They can't log in until reactivated. Data is kept.`, 'User suspended'), danger: true },
-                { label: 'Terminate Account', icon: XCircle, action: () => quickStatusAction(u, 'terminate', `Terminate ${u.name}? Account closes but all history stays.`, 'User terminated'), danger: true },
+                { label: 'Suspend (temporary)', icon: PauseCircle, perm: 'users.ban', action: () => quickStatusAction(u, 'suspend', `Suspend ${u.name}? They can't log in until reactivated. Data is kept.`, 'User suspended'), danger: true },
+                { label: 'Terminate Account', icon: XCircle, perm: 'users.ban', action: () => quickStatusAction(u, 'terminate', `Terminate ${u.name}? Account closes but all history stays.`, 'User terminated'), danger: true },
               ]),
           { divider: true } as any,
-          { label: 'Login As User', icon: LogIn, action: () => handleLoginAs(u) },
+          { label: 'Login As User', icon: LogIn, perm: 'users.impersonate', action: () => handleLoginAs(u) },
           { divider: true } as any,
-          { label: 'Soft Delete (keep records)', icon: Archive, action: () => quickStatusAction(u, 'soft-delete', `Soft-delete ${u.name}? They can never log in, but ALL records stay with the broker. Reversible.`, 'User soft-deleted'), danger: true },
-          { label: 'Delete Permanently', icon: Trash2, action: () => openModal('delete', u), danger: true },
+          { label: 'Soft Delete (keep records)', icon: Archive, perm: 'users.ban', action: () => quickStatusAction(u, 'soft-delete', `Soft-delete ${u.name}? They can never log in, but ALL records stay with the broker. Reversible.`, 'User soft-deleted'), danger: true },
+          { label: 'Delete Permanently', icon: Trash2, perm: 'users.delete', action: () => openModal('delete', u), danger: true },
         ];
+        // Hide actions this admin lacks permission for, then drop any divider
+        // that became leading / trailing / doubled-up after the filtering.
+        const permitted = rawItems.filter((it: any) => it.divider || can(it.perm));
+        const menuItems = permitted.filter((it: any, i: number) => {
+          if (!it.divider) return true;
+          const prev = permitted.slice(0, i).reverse().find((x: any) => !x.divider);
+          const next = permitted.slice(i + 1).find((x: any) => !x.divider);
+          return prev && next; // keep a divider only if real items sit on both sides
+        });
         // Portal the dropdown to document.body so `position: fixed` stays
         // viewport-relative even when an ancestor has a CSS `transform`
         // (e.g. the `animate-page-in` wrapper) which would otherwise become
