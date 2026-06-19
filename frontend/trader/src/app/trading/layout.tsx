@@ -3,7 +3,7 @@
 import { Suspense, useEffect } from 'react';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { clsx } from 'clsx';
-import { useTradingStore, type TradingAccount } from '@/stores/tradingStore';
+import { useTradingStore, defaultContractSize, type TradingAccount } from '@/stores/tradingStore';
 import { wsManager } from '@/lib/ws/wsManager';
 import { extractTicksFromPayload } from '@/lib/ws/normalizePricePayload';
 import api from '@/lib/api/client';
@@ -98,7 +98,10 @@ function TradingSession({ children }: { children: React.ReactNode }) {
               min_lot: Number(i.min_lot ?? 0.01),
               max_lot: Number(i.max_lot ?? 100),
               lot_step: Number(i.lot_step ?? 0.01),
-              contract_size: Number(i.contract_size ?? 100000),
+              // Fall back to a symbol-aware default (metals 100, crypto 1) when
+              // the feed omits contract_size — a flat 100000 made metals/crypto
+              // live P&L 1000x off vs the close (client 2026-06-19).
+              contract_size: Number(i.contract_size) || defaultContractSize(String(i.symbol || '')),
               base_currency: i.base_currency ? String(i.base_currency) : null,
               quote_currency: i.quote_currency ? String(i.quote_currency) : null,
             })),

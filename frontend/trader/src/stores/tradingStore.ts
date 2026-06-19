@@ -2,6 +2,18 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import api from '@/lib/api/client';
 
+/** Per-instrument contract size used ONLY as a fallback when the instrument
+ *  feed didn't carry one. A flat 100000 (forex standard lot) is wrong for
+ *  metals/crypto and made live P&L wildly off (e.g. XAUUSD 0.01 lot showed a
+ *  1000× P&L vs the backend, so the running value never matched the close —
+ *  client 2026-06-19). Metals = 100 oz/lot, crypto = 1 coin/lot. */
+export function defaultContractSize(symbol: string): number {
+  const s = (symbol || '').trim().toUpperCase();
+  if (s.startsWith('XAU') || s.startsWith('XAG') || s.startsWith('XPT') || s.startsWith('XPD')) return 100;
+  if (s.startsWith('BTC') || s.startsWith('ETH') || s.startsWith('XRP') || s.startsWith('LTC') || s.startsWith('SOL') || s.includes('USDT')) return 1;
+  return 100000;
+}
+
 export interface TickData {
   symbol: string;
   bid: number;
@@ -312,7 +324,7 @@ export const useTradingStore = create<TradingState>()((set, get) => ({
         const inst =
           state.instruments.find((i) => i.symbol === sym) ||
           state.instruments.find((i) => String(i.symbol).toUpperCase() === sym);
-        const cs = inst?.contract_size || 100000;
+        const cs = inst?.contract_size || defaultContractSize(sym);
         // Use ENGINE lots (effective_lots), not the display lots, so a
         // cent position's live P&L matches the backend instead of
         // jumping 100× on every tick. Falls back to display lots for
