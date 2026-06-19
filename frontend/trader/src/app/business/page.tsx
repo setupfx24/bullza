@@ -312,6 +312,28 @@ function IBTab() {
 
   if (!status?.is_ib) {
 
+    // Client 2026-06-19: only Super-IB-introduced (or no-referral) users may
+    // self-apply. A user introduced by another IB/affiliate sees ONLY a
+    // "Contact SwisDex to become an IB" prompt — no self-apply / eligibility.
+    if (status?.can_become_ib === false) {
+      return (
+        <div className="rounded-xl border border-border-primary bg-card p-6 sm:p-10 noise-texture text-center space-y-4 max-w-lg mx-auto">
+          <div className="text-3xl">🤝</div>
+          <h3 className="text-lg sm:text-xl font-bold text-text-primary">Become an Introducing Broker</h3>
+          <p className="text-sm text-text-secondary leading-relaxed">
+            The IB program is by introduction. To become an IB and earn per-lot commissions on
+            your referrals, please get in touch with the SwisDex team.
+          </p>
+          <a
+            href="/support?topic=become-ib"
+            className="inline-block px-6 py-3 rounded-xl text-sm font-bold bg-accent text-black hover:brightness-110 shadow-[0_0_24px_rgba(85,166,48,0.35)]"
+          >
+            Contact SwisDex to become an IB
+          </a>
+        </div>
+      );
+    }
+
     const eligibility = status?.eligibility as
       | { min_deposit_required_usd: number; total_deposits_usd: number; is_eligible: boolean }
       | undefined;
@@ -449,7 +471,13 @@ function IBTab() {
 
           { label: 'Pending Payout', value: `$${fmt(dashboard?.pending_payout || 0)}`, color: 'text-warning' },
 
-          { label: 'Referrals', value: String(dashboard?.total_referrals || 0), color: 'text-accent' },
+          // Downline economics (client 2026-06-19): collective deposit pool +
+          // active user count drive which per-lot tier the IB earns.
+          { label: 'Users Deposit Pool', value: `$${fmt(status?.deposit_pool_usd || 0)}`, color: 'text-accent' },
+
+          { label: 'Active Users', value: `${status?.active_users || 0}${status?.total_referred ? ` / ${status.total_referred}` : ''}`, color: 'text-success' },
+
+          { label: 'Referrals', value: String(dashboard?.total_referrals ?? status?.total_referred ?? 0), color: 'text-accent' },
 
           { label: 'Level', value: `L${dashboard?.level || 1}`, color: 'text-text-primary' },
 
