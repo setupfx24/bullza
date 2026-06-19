@@ -408,40 +408,41 @@ function PortfolioPageContent() {
 
       }
 
+      // Pull the account holder's name/email for the statement header
+      // (client 2026-06-19). Best-effort — the PDF still renders if it fails.
+      let prof: { first_name?: string; last_name?: string; email?: string } = {};
+      try {
+        prof = await api.get<{ first_name?: string; last_name?: string; email?: string }>('/profile');
+      } catch { /* header just omits the holder line */ }
+
       await downloadTradeStatementPdf(
-
         all.map((t) => ({
-
           close_time: t.close_time,
-
           open_time: t.open_time ?? t.opened_at,
-
           opened_at: t.opened_at,
-
           symbol: t.symbol,
-
           side: t.side,
-
           lots: t.lots,
-
           open_price: t.open_price ?? t.entry_price,
-
           close_price: t.close_price ?? t.exit_price,
-
           entry_price: t.entry_price,
-
           exit_price: t.exit_price,
-
           pnl: t.pnl,
-
           close_reason: t.close_reason,
-
           commission: t.commission,
-
           swap: t.swap,
-
         })),
-
+        {
+          userName: [prof.first_name, prof.last_name].filter(Boolean).join(' ') || undefined,
+          userEmail: prof.email,
+          accountLabel: validAccountId
+            ? (accountNoLabel ? `#${accountNoLabel}` : validAccountId)
+            : 'All accounts',
+          periodLabel:
+            TF_TO_PERIOD[tf] === 'custom' && (customFrom || customTo)
+              ? `${customFrom || '…'} → ${customTo || '…'}`
+              : undefined,
+        },
       );
 
       toast.success('Statement PDF downloaded');
