@@ -146,7 +146,7 @@ const INSTRUMENTS = ['Forex', 'Metal', 'Crypto', 'Energies', 'Stocks', 'Indices'
 
 const FEATURE_ROWS: Array<{ label: string; values: React.ReactNode[] }> = [
   { label: 'Minimum Deposit',  values: ['$50', '$200', '$50', '$200'] },
-  { label: 'Spread',           values: ['From 0.6 pips', 'From 0.4 pips', 'From 0.8 pips', 'From 0.8 pips'] },
+  { label: 'Spread',           values: ['From 1.1 pips', 'From 0.0 pips', 'From 0.8 pips', 'From 0.8 pips'] },
   { label: 'Commission',       values: ['No Commission', 'Ultra-low per lot', 'Lifetime per-lot earnings', 'No swap charges'] },
   { label: 'Maximum Leverage', values: ['1:1000', '1:1000', '1:1000', '1:1000'] },
   {
@@ -169,6 +169,7 @@ const FEATURE_ROWS: Array<{ label: string; values: React.ReactNode[] }> = [
   { label: 'Order execution',            values: ['Instant', 'Instant', 'Instant', 'Instant'] },
   // Swap is the dedicated swap-free / Sharia-compliant account.
   { label: 'Swap-Free',                  values: ['Optional', 'Optional', 'Optional', 'Always-on'] },
+  { label: 'Customer Support',           values: ['24/7', '24/7', '24/7', '24/7'] },
 ];
 
 function FeatureComparison() {

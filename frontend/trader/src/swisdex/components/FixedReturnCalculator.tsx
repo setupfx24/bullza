@@ -240,8 +240,12 @@ export function FixedReturnCalculator() {
 
           <dl className="mt-6 grid grid-cols-2 gap-4 text-sm">
             <div>
-              <dt className="text-xs uppercase tracking-wider text-foreground/55">Total at maturity</dt>
-              <dd className="mt-1 text-base font-semibold tabular-nums">{fmtUSD(projected.payout)}</dd>
+              <dt className="text-xs uppercase tracking-wider text-foreground/55">Principal</dt>
+              <dd className="mt-1 text-base tabular-nums">{fmtUSD(principal)}</dd>
+            </div>
+            <div>
+              <dt className="text-xs uppercase tracking-wider text-foreground/55">Monthly interest</dt>
+              <dd className="mt-1 text-base tabular-nums">{fmtUSD(projected.monthly)}</dd>
             </div>
             <div>
               <dt className="text-xs uppercase tracking-wider text-foreground/55">Per payout</dt>
@@ -251,12 +255,8 @@ export function FixedReturnCalculator() {
               </dd>
             </div>
             <div>
-              <dt className="text-xs uppercase tracking-wider text-foreground/55">Monthly interest</dt>
-              <dd className="mt-1 text-base tabular-nums">{fmtUSD(projected.monthly)}</dd>
-            </div>
-            <div>
-              <dt className="text-xs uppercase tracking-wider text-foreground/55">Principal</dt>
-              <dd className="mt-1 text-base tabular-nums">{fmtUSD(principal)}</dd>
+              <dt className="text-xs uppercase tracking-wider text-foreground/55">Total at maturity</dt>
+              <dd className="mt-1 text-base font-semibold tabular-nums">{fmtUSD(projected.payout)}</dd>
             </div>
           </dl>
 

@@ -118,7 +118,7 @@ export const HOW_IT_WORKS = [
 
 export const STATS = [
   { value: '90%',     label: 'Profitable Trades' },
-  { value: '50K+',    label: 'Active Investors Worldwide' },
+  { value: '50,000+', label: 'Active Traders Worldwide' },
   { value: 'Upto 7%', label: 'Monthly Return' },
   { value: '24/7',    label: 'Automated Trading, Always On' },
 ] as const;
