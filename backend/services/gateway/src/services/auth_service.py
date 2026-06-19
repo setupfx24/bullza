@@ -495,31 +495,42 @@ async def _attach_to_company_ib(db: AsyncSession, user_id: UUID) -> None:
     from packages.common.src.settings_store import (
         get_bool_setting, get_system_setting,
     )
+    from sqlalchemy import func as _func
 
-    if not await get_bool_setting("company_ib_attach_unreferred", False):
-        return
-    raw_uid = await get_system_setting("company_ib_user_id", None)
-    if not raw_uid or not isinstance(raw_uid, str) or not raw_uid.strip():
-        return
-    try:
-        company_user_id = UUID(raw_uid.strip())
-    except (ValueError, AttributeError):
-        return
-    if company_user_id == user_id:
-        return  # self-attribution guard
+    company_ib = None
 
-    ib_q = await db.execute(
-        select(IBProfile).where(
-            IBProfile.user_id == company_user_id,
-            IBProfile.is_active == True,
-        )
-    )
-    company_ib = ib_q.scalar_one_or_none()
-    if not company_ib:
-        # Admin pointed at a user that has no active IB profile — silent
-        # no-op rather than block signup. They'll see the warning on the
-        # admin Company-IB panel.
-        return
+    # 1. Admin-configured company IB (only when the auto-attach toggle is on).
+    if await get_bool_setting("company_ib_attach_unreferred", False):
+        raw_uid = await get_system_setting("company_ib_user_id", None)
+        if raw_uid and isinstance(raw_uid, str) and raw_uid.strip():
+            try:
+                company_user_id = UUID(raw_uid.strip())
+                if company_user_id != user_id:
+                    company_ib = (await db.execute(
+                        select(IBProfile).where(
+                            IBProfile.user_id == company_user_id,
+                            IBProfile.is_active == True,
+                        )
+                    )).scalar_one_or_none()
+            except (ValueError, AttributeError):
+                company_ib = None
+
+    # 2. Fall back to the Super IB (SDA05 root). Client 2026-06-19: every
+    #    no-code / unreferred signup must land UNDER the Super IB — previously
+    #    this only happened if an admin toggled company_ib_attach_unreferred,
+    #    so organic signups were orphaned (never under the Super IB).
+    if company_ib is None:
+        code = str(await get_system_setting("super_ib_code", None) or "SDA05").strip()
+        if code:
+            company_ib = (await db.execute(
+                select(IBProfile).where(
+                    _func.lower(IBProfile.referral_code) == code.lower(),
+                    IBProfile.is_active == True,
+                )
+            )).scalar_one_or_none()
+
+    if company_ib is None or company_ib.user_id == user_id:
+        return  # no default IB sink exists yet (or self-attribution)
 
     db.add(Referral(
         referrer_id=company_ib.user_id,
