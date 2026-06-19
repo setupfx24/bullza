@@ -385,6 +385,23 @@ async def claim_payout(
 async def _list_policies(
     db: AsyncSession, user_id: UUID, *, statuses: tuple[str, ...] | None = None, limit: int = 50,
 ) -> list[InsurancePolicyOut]:
+    # Self-heal catch-all (client 2026-06-19: insurance showed "active" after the
+    # trade closed). Any policy still 'active' whose position is already closed
+    # is stale — a close path forgot to settle it. Mark it expired so the
+    # dashboard never shows live insurance on a closed trade. Best-effort.
+    try:
+        from sqlalchemy import text as _sql_text
+        await db.execute(_sql_text(
+            "UPDATE insurance_policies SET status = 'expired', "
+            "settled_at = COALESCE(settled_at, now()), "
+            "settled_reason = COALESCE(settled_reason, 'position_closed') "
+            "WHERE user_id = :uid AND status = 'active' AND position_id IN "
+            "(SELECT id FROM positions WHERE status = 'closed')"
+        ), {"uid": str(user_id)})
+        await db.commit()
+    except Exception:
+        await db.rollback()
+
     stmt = (
         select(InsurancePolicy, Instrument.symbol)
         .join(Instrument, Instrument.id == InsurancePolicy.instrument_id)
