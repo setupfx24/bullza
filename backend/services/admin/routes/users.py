@@ -341,8 +341,16 @@ async def delete_user(
         )
     except HTTPException:
         raise  # clean 404 / 409 the service already raised — pass through
-    except (IntegrityError, DBAPIError) as e:
-        await db.rollback()
+    except Exception as e:
+        # Broadened from (IntegrityError, DBAPIError): once a delete in the
+        # service fails, the transaction is aborted and the NEXT statement can
+        # raise a SQLAlchemy PendingRollbackError / InvalidRequestError — NOT a
+        # DBAPIError — which escaped as a raw 500. Catch everything, roll back,
+        # and return a clear 409 (client 2026-06-20).
+        try:
+            await db.rollback()
+        except Exception:
+            pass
         orig = getattr(e, "orig", e)
         raise HTTPException(
             status_code=409,

@@ -977,6 +977,12 @@ async def delete_user(
         "DELETE FROM shared_trades WHERE user_id = :uid",
         "DELETE FROM social_follows WHERE follower_id = :uid OR following_id = :uid",
         "DELETE FROM master_followers WHERE follower_user_id = :uid",
+        # Bonuses / pool memberships an "old" (active) user accumulated that
+        # also FK users.id without CASCADE (client 2026-06-20: long-standing
+        # users still failed to delete). Each is a no-op if absent.
+        "DELETE FROM user_bonuses WHERE user_id = :uid",
+        "DELETE FROM master_accounts WHERE user_id = :uid",
+        "DELETE FROM ticket_messages WHERE sender_id = :uid",
     ]
     for _sql in _optional:
         try:
@@ -998,10 +1004,15 @@ async def delete_user(
             ip_address=ip_address,
         )
         await db.commit()
-    except (IntegrityError, DBAPIError) as e:
-        # A table we don't yet clean up still references this user. Surface
-        # WHICH constraint so it's a clear, fixable message in the admin UI
-        # instead of a silent "Internal server error".
+    except HTTPException:
+        raise
+    except Exception as e:
+        # A table we don't yet clean up still references this user (or any
+        # other DB error). Surface WHAT blocked it so it's a clear, fixable
+        # message in the admin UI instead of a silent "Internal server error"
+        # — client 2026-06-20: never 500 the delete. Broadened from the
+        # IntegrityError/DBAPIError-only catch so an asyncpg/ProgrammingError
+        # from an old user's extra rows can't escape as a 500.
         await db.rollback()
         orig = getattr(e, "orig", e)
         raise HTTPException(
