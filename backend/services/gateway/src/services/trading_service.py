@@ -41,6 +41,21 @@ async def get_current_price(symbol: str) -> tuple[Decimal, Decimal]:
     return Decimal(str(tick["bid"])), Decimal(str(tick["ask"]))
 
 
+async def _live_spread_mult(symbol: str) -> Decimal:
+    """The live volatility multiplier market-data published with the tick.
+    Lets per-user execution apply the SAME market-driven widening that the
+    broadcast quote already shows. 1.0 when variable spread is off/calm."""
+    try:
+        raw = await redis_client.get(PriceChannel.tick_key(symbol))
+        if raw:
+            m = Decimal(str(json.loads(raw).get("spread_mult", 1) or 1))
+            if m > 0:
+                return m
+    except Exception:
+        pass
+    return Decimal("1")
+
+
 async def validate_account(account_id: UUID, user_id: UUID, db: AsyncSession) -> TradingAccount:
     result = await db.execute(
         select(TradingAccount)
@@ -253,12 +268,17 @@ async def place_order(
                 ),
             )
 
+    # Live volatility multiplier (variable spread) — the same factor the
+    # broadcast quote already shows, so the per-scope spread we apply below
+    # widens with the market in lock-step with the displayed bid/ask.
+    _mult = await _live_spread_mult(instrument.symbol)
+
     if master_override and master_override.spread_markup_pips:
         # MAM/PAMM pool — master spread is the WHOLE spread, no
         # additive layering. Whatever account_group the pool account
         # was opened under is ignored on purpose.
         try:
-            sv_master = Decimal(str(master_override.spread_markup_pips))
+            sv_master = Decimal(str(master_override.spread_markup_pips)) * _mult
             new_bid, new_ask = symmetric_quote_from_mid(
                 mid, sv_master, "pips", pip, digits, Decimal("0"),
             )
@@ -278,7 +298,7 @@ async def place_order(
             )
             if sv and sv > 0:
                 new_bid, new_ask = symmetric_quote_from_mid(
-                    mid, sv, st, pip, digits, Decimal("0"),
+                    mid, sv * _mult, st, pip, digits, Decimal("0"),
                 )
                 bid, ask = new_bid, new_ask
         except Exception as _e:
@@ -1050,13 +1070,14 @@ async def close_position(position_id: UUID, req, user_id: UUID, db: AsyncSession
     _pip_c = Decimal(str(pos.instrument.pip_size or "0.0001"))
     _digits_c = int(pos.instrument.digits or 5)
     c_bid, c_ask = _raw_bid, _raw_ask
+    _mult_c = await _live_spread_mult(pos.instrument.symbol)
     try:
         _master_c = (await db.execute(
             select(MasterAccount).where(MasterAccount.account_id == account.id)
         )).scalar_one_or_none()
         if _master_c and _master_c.spread_markup_pips:
             c_bid, c_ask = symmetric_quote_from_mid(
-                _mid_c, Decimal(str(_master_c.spread_markup_pips)), "pips",
+                _mid_c, Decimal(str(_master_c.spread_markup_pips)) * _mult_c, "pips",
                 _pip_c, _digits_c, Decimal("0"),
             )
         else:
@@ -1066,7 +1087,7 @@ async def close_position(position_id: UUID, req, user_id: UUID, db: AsyncSession
             )
             if _sv_c and _sv_c > 0:
                 c_bid, c_ask = symmetric_quote_from_mid(
-                    _mid_c, _sv_c, _st_c, _pip_c, _digits_c, Decimal("0"),
+                    _mid_c, _sv_c * _mult_c, _st_c, _pip_c, _digits_c, Decimal("0"),
                 )
     except Exception as _se:
         logger.warning(

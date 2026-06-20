@@ -198,7 +198,7 @@ class MarketDataService:
                     continue
                 try:
                     bid, ask = self.spread_cache.widen(symbol, mid)
-                    await publish_price(symbol, bid, ask, ts)
+                    await publish_price(symbol, bid, ask, ts, self.spread_cache.mult_for(symbol))
                 except Exception as exc:
                     logger.debug("Stale quote refresh failed for %s: %s", symbol, exc)
 
@@ -220,9 +220,10 @@ class MarketDataService:
             mid = (bid + ask) / 2.0
             self._last_mid[symbol] = mid
             self._last_live_mono[symbol] = time.monotonic()
+            spread_mult = self.spread_cache.note_mid(symbol, mid)
             bid, ask = self.spread_cache.widen(symbol, mid)
 
-            await publish_price(symbol, bid, ask, ts)
+            await publish_price(symbol, bid, ask, ts, spread_mult)
 
             await self.store.insert_tick(symbol, bid, ask, ts)
 
@@ -312,8 +313,9 @@ class MarketDataService:
                         mid = price
                         self._last_mid[symbol] = mid
                         self._last_live_mono[symbol] = time.monotonic()
+                        spread_mult = self.spread_cache.note_mid(symbol, mid)
                         bid, ask = self.spread_cache.widen(symbol, mid)
-                        await publish_price(symbol, bid, ask, timestamp)
+                        await publish_price(symbol, bid, ask, timestamp, spread_mult)
                         await self.store.insert_tick(symbol, bid, ask, timestamp)
                         self.aggregator.update(symbol, bid, ask, timestamp)
                         await self._publish_current_bars(symbol)

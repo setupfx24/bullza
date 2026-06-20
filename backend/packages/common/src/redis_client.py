@@ -71,7 +71,9 @@ async def acquire_leader_lock(key: str, ttl_seconds: int) -> bool:
         return True
 
 
-async def publish_price(symbol: str, bid: float, ask: float, timestamp: str):
+async def publish_price(
+    symbol: str, bid: float, ask: float, timestamp: str, spread_mult: float = 1.0
+):
     import json
     data = json.dumps({
         "symbol": symbol,
@@ -79,6 +81,11 @@ async def publish_price(symbol: str, bid: float, ask: float, timestamp: str):
         "ask": ask,
         "timestamp": timestamp,
         "spread": round(ask - bid, 8),
+        # Live volatility multiplier already applied to the broadcast bid/ask.
+        # Rides in the tick so per-user execution (which re-widens from mid with
+        # the user's own base spread) can apply the SAME market widening and
+        # stay consistent with the displayed quote. 1.0 = no widening.
+        "spread_mult": round(spread_mult, 4),
     })
     # TTL on tick keys (audit C4/C6 + C1-infra): a dead feed must NOT
     # leave a stale price in Redis forever — consumers (risk engine,
