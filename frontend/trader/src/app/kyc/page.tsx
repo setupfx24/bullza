@@ -94,6 +94,41 @@ function StatusBadge({ status, kind = 'user' }: { status: string; kind?: 'user' 
   );
 }
 
+/**
+ * Phone KYC kept failing (client 2026-06-20): mobile camera photos are often
+ * 5–12 MB and tripped the 10 MB cap / magic-byte check on the server. Re-encode
+ * any picked image to a resized JPEG client-side so it's a clean, small,
+ * server-accepted file. PDFs and undecodable files pass through unchanged.
+ */
+async function prepareKycFile(file: File | null): Promise<File | null> {
+  if (!file) return null;
+  if (!file.type.startsWith('image/')) return file; // PDF etc. — leave as-is
+  try {
+    const bitmap = await createImageBitmap(file);
+    const maxDim = 2000;
+    let { width, height } = bitmap;
+    if (Math.max(width, height) > maxDim) {
+      const scale = maxDim / Math.max(width, height);
+      width = Math.round(width * scale);
+      height = Math.round(height * scale);
+    }
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return file;
+    ctx.drawImage(bitmap, 0, 0, width, height);
+    const blob: Blob | null = await new Promise((res) =>
+      canvas.toBlob((b) => res(b), 'image/jpeg', 0.85),
+    );
+    if (!blob || blob.size === 0) return file;
+    const base = (file.name.replace(/\.[^.]+$/, '') || 'kyc').slice(0, 60);
+    return new File([blob], `${base}.jpg`, { type: 'image/jpeg' });
+  } catch {
+    return file; // browser couldn't decode (rare) — send the original
+  }
+}
+
 export default function KycPage() {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
@@ -492,7 +527,7 @@ export default function KycPage() {
                     type="file"
                     accept="image/*,application/pdf"
                     className="hidden"
-                    onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+                    onChange={async (e) => { const f = e.target.files?.[0] ?? null; setFile(await prepareKycFile(f)); }}
                   />
                   {file ? (
                     <span className="text-sm text-accent font-medium break-all text-center">{file.name}</span>
@@ -540,7 +575,7 @@ export default function KycPage() {
                     type="file"
                     accept="image/*,application/pdf"
                     className="hidden"
-                    onChange={(e) => setFile2(e.target.files?.[0] ?? null)}
+                    onChange={async (e) => { const f = e.target.files?.[0] ?? null; setFile2(await prepareKycFile(f)); }}
                   />
                   {file2 ? (
                     <span className="text-xs text-accent font-medium px-2 break-all text-center">{file2.name}</span>
@@ -567,7 +602,7 @@ export default function KycPage() {
                     accept="image/*"
                     capture="user"
                     className="hidden"
-                    onChange={(e) => setFile3(e.target.files?.[0] ?? null)}
+                    onChange={async (e) => { const f = e.target.files?.[0] ?? null; setFile3(await prepareKycFile(f)); }}
                   />
                   {file3 ? (
                     <span className="text-xs text-accent font-medium px-2 break-all text-center">{file3.name}</span>
