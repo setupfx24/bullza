@@ -274,7 +274,7 @@ function InstrumentDirectory({
                 </span>
                 <ChevronDown
                   className={`size-4 shrink-0 transition-transform ${isOpen ? 'rotate-180' : ''}`}
-                  style={{ color: isOpen ? '#F04024' : 'rgba(255,255,255,0.85)' }}
+                  style={{ color: isOpen ? '#55a630' : 'rgba(255,255,255,0.85)' }}
                   aria-hidden
                 />
               </button>
@@ -286,7 +286,7 @@ function InstrumentDirectory({
               {isOpen && (
                 <div
                   className="mt-2 liquid-glass-strong rounded-2xl p-3 [backdrop-filter:blur(28px)]"
-                  style={{ border: '1px solid hsl(8 87% 54% / 0.35)' }}
+                  style={{ border: '1px solid hsl(99 55% 42% / 0.35)' }}
                   role="menu"
                 >
                   <ul className="flex flex-col gap-1 max-h-[320px] overflow-y-auto">
@@ -306,7 +306,7 @@ function InstrumentDirectory({
                                 ? 'bg-primary/25 font-semibold'
                                 : 'hover:bg-foreground/[0.08]'
                             }`}
-                            style={{ color: isActive ? '#F04024' : '#ffffff' }}
+                            style={{ color: isActive ? '#55a630' : '#ffffff' }}
                             aria-pressed={isActive}
                             aria-label={`Load ${item} live chart`}
                           >

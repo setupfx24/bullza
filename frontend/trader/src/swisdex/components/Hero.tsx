@@ -23,19 +23,19 @@ export function Hero() {
           aria-hidden
         >
           <LineWaves
-            speed={0.18}
-            innerLineCount={28}
-            outerLineCount={32}
-            warpIntensity={0.7}
+            speed={0.3}
+            innerLineCount={32}
+            outerLineCount={36}
+            warpIntensity={1}
             rotation={-45}
             edgeFadeWidth={0}
-            colorCycleSpeed={0.9}
-            brightness={0.14}
-            color1="#AB2415"
-            color2="#F04024"
+            colorCycleSpeed={1.4}
+            brightness={0.22}
+            color1="#d00000"
+            color2="#55a630"
             color3="#ffffff"
             enableMouseInteraction
-            mouseInfluence={1.4}
+            mouseInfluence={2}
           />
         </div>
 
@@ -102,8 +102,8 @@ export function Hero() {
             transition={{ delay: 1.6, duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
             className="mt-8 inline-flex items-center gap-2.5 rounded-full px-3 py-1.5 pointer-events-auto"
             style={{
-              background: 'rgba(240, 64, 36,0.18)',
-              border: '1px solid rgba(240, 64, 36,0.45)',
+              background: 'rgba(85,166,48,0.18)',
+              border: '1px solid rgba(85,166,48,0.45)',
               backdropFilter: 'blur(8px)',
             }}
           >
