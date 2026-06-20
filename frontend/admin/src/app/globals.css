@@ -37,6 +37,14 @@
 }
 
 /* —— Light theme —— */
+/* The sidebar wordmark asset is white lettering — invisible on the light
+   theme's white header. Darken it to a black wordmark so it stays readable
+   (client 2026-06-20: "white theme me logo theek nahi hai"). */
+html.light .swisdex-wordmark,
+[data-theme='light'] .swisdex-wordmark {
+  filter: brightness(0);
+}
+
 html.light, [data-theme='light'] {
   color-scheme: light;
   --c-bg-page: 242 239 233;

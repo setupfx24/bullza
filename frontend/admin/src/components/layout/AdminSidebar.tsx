@@ -137,7 +137,7 @@ export default function AdminSidebar() {
           <img src="/images/feb.png" alt="SwisDex" className="w-7 h-7 object-contain mx-auto" />
         ) : (
           <Link href="/" className="flex items-center min-w-0">
-            <img src="/images/swisdex_png5.png" alt="SwisDex" className="h-8 w-auto object-contain shrink-0" />
+            <img src="/images/swisdex_png5.png" alt="SwisDex" className="swisdex-wordmark h-8 w-auto object-contain shrink-0" />
           </Link>
         )}
         <button
