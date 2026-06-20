@@ -18,6 +18,7 @@ import {
   Download,
 } from 'lucide-react';
 import { downloadAdminReportPdf } from '@/lib/pdf/adminReportPdf';
+import { usePermissions } from '@/lib/usePermissions';
 
 type TabId = 'deposits' | 'withdrawals' | 'history';
 type StatusFilter = 'pending' | 'approved' | 'rejected' | 'all';
@@ -223,6 +224,7 @@ export default function DepositsPage() {
     return t === 'withdrawals' || t === 'history' ? (t as TabId) : 'deposits';
   })();
   const [activeTab, setActiveTab] = useState<TabId>(initialTab);
+  const { can } = usePermissions();
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('pending');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
@@ -667,8 +669,9 @@ export default function DepositsPage() {
                               {formatDate(d.created_at)}
                             </td>
                             <td className="px-4 py-2.5 text-right">
-                              {d.status === 'pending' && (
+                              {d.status === 'pending' && (can('deposits.approve') || can('deposits.reject')) && (
                                 <div className="flex items-center justify-end gap-1.5">
+                                  {can('deposits.approve') && (
                                   <button
                                     type="button"
                                     onClick={() => {
@@ -685,6 +688,8 @@ export default function DepositsPage() {
                                   >
                                     Approve
                                   </button>
+                                  )}
+                                  {can('deposits.reject') && (
                                   <button
                                     type="button"
                                     onClick={() =>
@@ -700,6 +705,7 @@ export default function DepositsPage() {
                                   >
                                     Reject
                                   </button>
+                                  )}
                                 </div>
                               )}
                             </td>
@@ -778,8 +784,9 @@ export default function DepositsPage() {
                               {formatDate(w.created_at)}
                             </td>
                             <td className="px-4 py-2.5 text-right">
-                              {w.status === 'pending' && (
+                              {w.status === 'pending' && (can('withdrawals.approve') || can('withdrawals.reject')) && (
                                 <div className="flex items-center justify-end gap-1.5">
+                                  {can('withdrawals.approve') && (
                                   <button
                                     type="button"
                                     onClick={() =>
@@ -795,6 +802,8 @@ export default function DepositsPage() {
                                   >
                                     Approve
                                   </button>
+                                  )}
+                                  {can('withdrawals.reject') && (
                                   <button
                                     type="button"
                                     onClick={() =>
@@ -810,6 +819,7 @@ export default function DepositsPage() {
                                   >
                                     Reject
                                   </button>
+                                  )}
                                 </div>
                               )}
                             </td>

@@ -23,6 +23,7 @@ import {
   Download,
 } from 'lucide-react';
 import { downloadAdminReportPdf } from '@/lib/pdf/adminReportPdf';
+import { usePermissions } from '@/lib/usePermissions';
 
 interface UserDetail {
   user: {
@@ -143,6 +144,7 @@ export default function UserDetailPage() {
   const params = useParams();
   const router = useRouter();
   const userId = params.id as string;
+  const { can } = usePermissions();
 
   const [data, setData] = useState<UserDetail | null>(null);
   const [deposits, setDeposits] = useState<Array<{ id: string; amount: number; method: string; status: string; created_at: string | null; approved_at: string | null; approved_by: string | null; reference: string | null }>>([]);
@@ -340,14 +342,15 @@ export default function UserDetailPage() {
         {/* Account security & sessions — Reset Password, Revoke, list */}
         <SecurityCard userId={userId} user={user} />
 
-        {/* Fixed Return per-user rate override */}
-        <FixedReturnOverrideCard userId={userId} />
-
-        {/* Fixed Return — admin grants a lock to this user with custom terms */}
-        <FixedReturnGrantCard userId={userId} />
-
-        {/* Fixed Return — special bonus (% of principal or flat amount) */}
-        <FixedReturnBonusCard userId={userId} />
+        {/* Fixed Return — managing these requires fixed_return.manage (client
+            2026-06-20: a normal employee was still able to grant fixed return). */}
+        {can('fixed_return.manage') && (
+          <>
+            <FixedReturnOverrideCard userId={userId} />
+            <FixedReturnGrantCard userId={userId} />
+            <FixedReturnBonusCard userId={userId} />
+          </>
+        )}
 
         {/* Trading Accounts */}
         <div className="bg-bg-secondary border border-border-primary rounded-lg p-5">
