@@ -22,11 +22,11 @@ import PositionsPanel from '@/components/trading/PositionsPanel';
 import { ActiveAccountBadge } from '@/components/trading/ActiveAccountBadge';
 import TerminalLeftRail, { type TerminalSpaceId } from '@/components/trading/TerminalLeftRail';
 
-// Broker-fed native chart (client 2026-06-19): candles come from the gateway
-// /bars feed — the SAME source as the order-panel bid/ask — instead of
-// TradingView's external widget, so prices match and there's no slow
-// per-symbol script re-injection.
-const LiveChart = dynamic(() => import('@/components/charts/Chart'), { ssr: false });
+// Client 2026-06-19 chose TradingView's polished Advanced Chart over the
+// broker-fed native chart, accepting that its prices are TradingView's own
+// feed (not the order-panel bid/ask). The native broker chart lives in
+// components/charts/Chart.tsx if we want to switch back.
+const LiveChart = dynamic(() => import('@/components/charts/AdvancedChart'), { ssr: false });
 const TradingViewNewsTimeline = dynamic(() => import('@/components/charts/TradingViewNewsTimeline'), {
   ssr: false,
 });
