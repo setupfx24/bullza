@@ -1025,7 +1025,21 @@ function SubBrokerTab() {
 
   }
 
-
+  // A full IB does NOT apply to be a sub-broker (client 2026-06-20): they
+  // already have a higher tier. Show their network pointer instead of the
+  // apply form.
+  if (status?.is_ib) {
+    return (
+      <div className="rounded-xl border border-border-primary bg-card p-6 sm:p-8 noise-texture text-center max-w-lg mx-auto space-y-2">
+        <div className="text-2xl">✅</div>
+        <h3 className="text-sm font-semibold text-text-primary">You're already an IB</h3>
+        <p className="text-xxs text-text-tertiary">
+          As an IB you don&apos;t need to apply as a sub-broker. See your sub-IBs and downline in the
+          <span className="text-accent font-medium"> My Network</span> tab.
+        </p>
+      </div>
+    );
+  }
 
   return (
 
