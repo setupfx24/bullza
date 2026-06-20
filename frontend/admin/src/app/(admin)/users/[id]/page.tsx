@@ -20,7 +20,9 @@ import {
   UserRound,
   Wallet,
   X,
+  Download,
 } from 'lucide-react';
+import { downloadAdminReportPdf } from '@/lib/pdf/adminReportPdf';
 
 interface UserDetail {
   user: {
@@ -192,6 +194,37 @@ export default function UserDetailPage() {
   const { user, accounts, total_deposit, total_withdrawal, total_trades, open_positions } = data;
   const name = [user.first_name, user.last_name].filter(Boolean).join(' ') || user.email.split('@')[0];
 
+  // Full per-user detail report (client 2026-06-20 "user ki poori detail ki
+  // PDF"): profile + totals as headline lines, trading accounts as the table.
+  const exportUserPdf = () => {
+    void downloadAdminReportPdf(
+      `User report — ${name}`,
+      [
+        { header: 'Account', width: 38 },
+        { header: 'Balance', width: 26, align: 'right', mono: true },
+        { header: 'Credit', width: 24, align: 'right', mono: true },
+        { header: 'Equity', width: 26, align: 'right', mono: true },
+        { header: 'Margin used', width: 26, align: 'right', mono: true },
+        { header: 'Leverage', width: 20, align: 'right' },
+        { header: 'Currency', width: 20 },
+      ],
+      accounts.map(a => [
+        a.account_number, `$${fmt(a.balance)}`, `$${fmt(a.credit)}`, `$${fmt(a.equity)}`,
+        `$${fmt(a.margin_used)}`, `1:${a.leverage}`, a.currency,
+      ]),
+      {
+        subtitle: `User: ${name} <${user.email}>`,
+        summaryLines: [
+          `Email: ${user.email}    Phone: ${user.phone || '—'}    Country: ${user.country || '—'}`,
+          `Status: ${user.status}    KYC: ${user.kyc_status}    Joined: ${(user.created_at || '').slice(0, 10) || '—'}`,
+          `Total deposits: $${fmt(total_deposit)}    Total withdrawals: $${fmt(total_withdrawal)}`,
+          `Total trades: ${total_trades}    Open positions: ${open_positions}    Accounts: ${accounts.length}`,
+        ],
+        filename: `user-${name.replace(/\s+/g, '-').toLowerCase()}`,
+      },
+    );
+  };
+
   return (
     <>
       <div className="p-6 space-y-6">
@@ -211,6 +244,10 @@ export default function UserDetailPage() {
               </div>
             </div>
             <div className="flex items-center gap-2">
+              <button type="button" onClick={exportUserPdf} title="Download this user's full detail as PDF"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border border-border-primary bg-bg-secondary text-text-primary hover:bg-bg-hover transition-fast">
+                <Download size={14} className="text-buy" /> PDF
+              </button>
               <span className={cn('px-3 py-1.5 rounded-lg text-xs font-semibold', statusColor(user.status))}>{user.status}</span>
               <span className={cn('px-3 py-1.5 rounded-lg text-xs font-semibold', kycColor(user.kyc_status))}>KYC: {user.kyc_status}</span>
             </div>
