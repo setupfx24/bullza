@@ -2,13 +2,19 @@
 import json as _json
 import logging
 import time as _time
+from decimal import Decimal
+from uuid import UUID
 from fastapi import APIRouter, Depends, Query
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from packages.common.src.alltick_rest import fetch_klines as alltick_fetch_klines
+from packages.common.src.auth import get_current_user
 from packages.common.src.config import get_settings
 from packages.common.src.database import get_db
-from packages.common.src.redis_client import redis_client
+from packages.common.src.instrument_pricing import resolve_spread_config
+from packages.common.src.models import Instrument, TradingAccount
+from packages.common.src.redis_client import redis_client, PriceChannel
 from packages.common.src.schemas import InstrumentResponse, TickData
 from packages.common.src.instrumentation import get_rate_limiter
 from ..services import instrument_service
@@ -220,6 +226,73 @@ async def _backfill_alltick_bars(
         _logger.warning("alltick cache writeback failed for %s %s: %s", sym, tf, exc)
 
     return merged
+
+
+@router.get("/{symbol}/my-spread")
+async def get_my_spread(
+    symbol: str,
+    account_id: str | None = Query(default=None),
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """The signed-in user's EFFECTIVE spread for a symbol: their per-scope base
+    (resolve_spread_config: user / account-type / instrument / segment / default)
+    × the live volatility multiplier. The shared price broadcast can only carry
+    the default spread, so the order panel calls this to show the spread the
+    user will actually trade at when admin set it per account-type or per user.
+    """
+    sym = (symbol or "").upper()
+    fallback = {
+        "symbol": sym, "value": 0.0, "spread_type": "pips",
+        "pip_size": 0.0001, "digits": 5, "spread_mult": 1.0, "effective_value": 0.0,
+    }
+    inst = (await db.execute(
+        select(Instrument).where(func.upper(Instrument.symbol) == sym)
+    )).scalar_one_or_none()
+    if inst is None:
+        return fallback
+
+    account_group_id = None
+    if account_id:
+        try:
+            acct = (await db.execute(
+                select(TradingAccount).where(
+                    TradingAccount.id == UUID(account_id),
+                    TradingAccount.user_id == UUID(str(current_user["user_id"])),
+                )
+            )).scalar_one_or_none()
+            if acct:
+                account_group_id = acct.account_group_id
+        except (ValueError, KeyError, TypeError):
+            account_group_id = None
+
+    try:
+        sv, st, _pimp = await resolve_spread_config(
+            db, inst,
+            user_id=UUID(str(current_user["user_id"])),
+            account_group_id=account_group_id,
+        )
+    except Exception:
+        sv, st = Decimal("0"), "pips"
+
+    mult = 1.0
+    try:
+        raw = await redis_client.get(PriceChannel.tick_key(sym))
+        if raw:
+            mult = float(_json.loads(raw).get("spread_mult", 1.0) or 1.0)
+    except Exception:
+        mult = 1.0
+
+    base = float(sv or 0)
+    return {
+        "symbol": sym,
+        "value": base,
+        "spread_type": st,
+        "pip_size": float(inst.pip_size or 0.0001),
+        "digits": int(inst.digits or 5),
+        "spread_mult": round(mult, 4),
+        "effective_value": round(base * mult, 6),
+    }
 
 
 @router.get("/{symbol}/bars")

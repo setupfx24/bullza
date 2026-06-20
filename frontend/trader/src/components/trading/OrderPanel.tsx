@@ -63,6 +63,13 @@ export default function OrderPanel() {
   const [symbolPickerOpen, setSymbolPickerOpen] = useState(false);
   const [insuranceSelection, setInsuranceSelection] = useState<{ tier: InsuranceTier; fee: number } | null>(null);
   const [wsStatus, setWsStatus] = useState<'connected' | 'connecting' | 'disconnected'>('disconnected');
+  // The user's OWN effective spread for this symbol/account. The shared price
+  // broadcast can only carry the default spread, so per-account-type / per-user
+  // spreads would otherwise show as 0 here. Fetched from /my-spread so the
+  // panel shows the spread (and bid/ask) the user will actually trade at.
+  const [mySpread, setMySpread] = useState<
+    { value: number; spread_type: string; pip_size: number; effective_value: number } | null
+  >(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   const tick = prices[selectedSymbol];
@@ -71,12 +78,41 @@ export default function OrderPanel() {
   const digits = getDigits(selectedSymbol);
   const contractSize = instrumentInfo?.contract_size || 100000;
 
+  // Pull the user's effective spread whenever the symbol or account changes.
+  useEffect(() => {
+    let cancelled = false;
+    setMySpread(null);
+    if (!selectedSymbol) return;
+    const acct = activeAccount?.id ? `?account_id=${encodeURIComponent(activeAccount.id)}` : '';
+    api
+      .get<{ value: number; spread_type: string; pip_size: number; effective_value: number }>(
+        `/instruments/${encodeURIComponent(selectedSymbol)}/my-spread${acct}`,
+      )
+      .then((r) => { if (!cancelled) setMySpread(r); })
+      .catch(() => { if (!cancelled) setMySpread(null); });
+    return () => { cancelled = true; };
+  }, [selectedSymbol, activeAccount?.id]);
+
+  // Effective bid/ask/spread around the broadcast mid using the user's own
+  // spread (falls back to the broadcast quote until /my-spread resolves).
+  const _mid = tick ? (tick.bid + tick.ask) / 2 : 0;
+  const _pipSize = mySpread?.pip_size || instrumentInfo?.pip_size || 0.0001;
+  const _userSpreadPrice =
+    mySpread && _mid
+      ? (mySpread.spread_type === 'percentage'
+          ? _mid * (mySpread.effective_value / 100)
+          : mySpread.effective_value * _pipSize)
+      : (tick?.spread ?? 0);
+  const userBid = _mid ? _mid - _userSpreadPrice / 2 : (tick?.bid ?? 0);
+  const userAsk = _mid ? _mid + _userSpreadPrice / 2 : (tick?.ask ?? 0);
+  const userSpreadPips = _pipSize ? _userSpreadPrice / _pipSize : 0;
+
   const marketStatus = useMemo(
     () => getMarketStatus(selectedSymbol, segment),
     [selectedSymbol, segment, Math.floor(Date.now() / 60_000)],
   );
 
-  const execPrice = tick ? (side === 'buy' ? tick.ask : tick.bid) : 0;
+  const execPrice = tick ? (side === 'buy' ? userAsk : userBid) : 0;
   const lotsNum = parseFloat(lots) || 0;
 
   // Cent-account lot scaling (Mig 0069). The backend persists the
@@ -181,7 +217,7 @@ export default function OrderPanel() {
       // Sell Limit ABOVE, Buy Stop ABOVE, Sell Stop BELOW. We don't
       // hard-reject (the matching engine handles it) but we surface
       // a clear warning before sending.
-      const ref = side === 'buy' ? (tick?.ask ?? 0) : (tick?.bid ?? 0);
+      const ref = side === 'buy' ? userAsk : userBid;
       if (ref > 0) {
         const aboveMarket = pendingPriceNum > ref;
         const belowMarket = pendingPriceNum < ref;
@@ -430,7 +466,7 @@ export default function OrderPanel() {
                 }}
              >
                 <div className={clsx('font-bold uppercase tracking-wider', isTradingTerminal ? 'text-[10px] mb-0' : 'text-sm mb-0.5')}>Sell</div>
-                <div className={clsx('font-mono font-bold', isTradingTerminal ? 'text-[13px]' : 'text-[15px]', side === 'sell' && 'text-red-400')}>{tick ? tick.bid.toFixed(digits) : '---'}</div>
+                <div className={clsx('font-mono font-bold', isTradingTerminal ? 'text-[13px]' : 'text-[15px]', side === 'sell' && 'text-red-400')}>{tick ? userBid.toFixed(digits) : '---'}</div>
                 <div className={clsx('text-text-tertiary', isTradingTerminal ? 'text-[8px] mt-0.5' : 'text-[9px] mt-1')}>Bid</div>
              </button>
              <button
@@ -444,7 +480,7 @@ export default function OrderPanel() {
                 }}
              >
                 <div className={clsx('font-bold uppercase tracking-wider', isTradingTerminal ? 'text-[10px] mb-0' : 'text-sm mb-0.5')}>Buy</div>
-                <div className={clsx('font-mono font-bold', isTradingTerminal ? 'text-[13px]' : 'text-[15px]', side === 'buy' && 'text-[#55a630]')}>{tick ? tick.ask.toFixed(digits) : '---'}</div>
+                <div className={clsx('font-mono font-bold', isTradingTerminal ? 'text-[13px]' : 'text-[15px]', side === 'buy' && 'text-[#55a630]')}>{tick ? userAsk.toFixed(digits) : '---'}</div>
                 <div className={clsx('text-text-tertiary', isTradingTerminal ? 'text-[8px] mt-0.5' : 'text-[9px] mt-1')}>Ask</div>
              </button>
           </div>
@@ -488,7 +524,7 @@ export default function OrderPanel() {
                   min={0}
                   value={pendingPrice}
                   onChange={(e) => setPendingPrice(e.target.value)}
-                  placeholder={tick ? (side === 'buy' ? tick.ask : tick.bid).toFixed(digits) : '0.00'}
+                  placeholder={tick ? (side === 'buy' ? userAsk : userBid).toFixed(digits) : '0.00'}
                   className={clsx(
                     'w-full mt-1 px-2.5 py-1.5 rounded-md font-mono text-sm bg-bg-input border text-text-primary',
                     pendingPrice && !pendingPriceValid
@@ -513,7 +549,7 @@ export default function OrderPanel() {
           {tick && (
              <div className={clsx('flex items-center justify-center', isTradingTerminal ? '-mt-1' : '-mt-2')}>
                 <span className={clsx('font-mono px-2 py-0.5 rounded-full bg-bg-secondary text-text-tertiary border border-border-primary', isTradingTerminal ? 'text-[9px]' : 'text-[10px]')}>
-                  Spread: {(tick.spread / (instrumentInfo?.pip_size || 0.0001)).toFixed(1)}
+                  Spread: {userSpreadPips.toFixed(1)}
                 </span>
              </div>
           )}
