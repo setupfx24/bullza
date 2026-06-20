@@ -38,6 +38,20 @@ function formatWhen(d: Date): string {
   });
 }
 
+// jsPDF's built-in Helvetica is Latin-1 only, so characters like the arrow
+// (→), bullet (·•) and em-dash (—) render in a different/odd glyph — which is
+// the "font doesn't match" the client saw on the custom-period line. Map the
+// common offenders to ASCII so every line uses the same font (client 2026-06-20).
+function s(v: unknown): string {
+  return String(v == null ? '' : v)
+    .replace(/[→]/g, 'to')
+    .replace(/[·•]/g, '-')
+    .replace(/[—–]/g, '-')
+    .replace(/[“”]/g, '"')
+    .replace(/[‘’]/g, "'")
+    .replace(/[^\x00-\xFF]/g, '');
+}
+
 export async function downloadAdminReportPdf(
   title: string,
   columns: AdminReportColumn[],
@@ -68,25 +82,25 @@ export async function downloadAdminReportPdf(
 
   doc.setTextColor(30, 30, 30);
   doc.setFontSize(16);
-  doc.text(title, margin, y);
+  doc.text(s(title), margin, y);
   y += 8;
 
   doc.setFontSize(8);
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(80, 80, 80);
 
-  if (meta?.subtitle) { doc.text(meta.subtitle, margin, y); y += 4; }
-  if (meta?.periodLabel) { doc.text(`Period: ${meta.periodLabel}`, margin, y); y += 4; }
+  if (meta?.subtitle) { doc.text(s(meta.subtitle), margin, y); y += 4; }
+  if (meta?.periodLabel) { doc.text(`Period: ${s(meta.periodLabel)}`, margin, y); y += 4; }
   doc.text(`Generated: ${formatWhen(new Date())} (local time)`, margin, y);
   y += 4;
-  if (meta?.generatedBy) { doc.text(`By: ${meta.generatedBy}`, margin, y); y += 4; }
+  if (meta?.generatedBy) { doc.text(`By: ${s(meta.generatedBy)}`, margin, y); y += 4; }
   doc.text(`Rows: ${rows.length}`, margin, y);
   y += 5;
 
   if (meta?.summaryLines?.length) {
     doc.setTextColor(30, 30, 30);
     doc.setFont('helvetica', 'bold');
-    for (const line of meta.summaryLines) { doc.text(line, margin, y); y += 4.5; }
+    for (const line of meta.summaryLines) { doc.text(s(line), margin, y); y += 4.5; }
     doc.setFont('helvetica', 'normal');
     y += 1;
   }
@@ -102,8 +116,8 @@ export async function downloadAdminReportPdf(
 
   autoTable(doc, {
     startY: y,
-    head: [columns.map((c) => c.header)],
-    body: rows.map((r) => r.map((v) => (v == null ? '' : String(v)))),
+    head: [columns.map((c) => s(c.header))],
+    body: rows.map((r) => r.map((v) => s(v))),
     theme: 'striped',
     headStyles: { fillColor: [85, 166, 48], textColor: 255, fontStyle: 'bold', fontSize: 8, cellPadding: 2 },
     bodyStyles: { fontSize: 7, cellPadding: 1.5, textColor: [40, 40, 40] },

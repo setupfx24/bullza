@@ -217,8 +217,9 @@ export default function UserDetailPage() {
       {
         subtitle: `User: ${name} <${user.email}>`,
         summaryLines: [
-          `Email: ${user.email}    Phone: ${user.phone || '—'}    Country: ${user.country || '—'}`,
-          `Status: ${user.status}    KYC: ${user.kyc_status}    Joined: ${(user.created_at || '').slice(0, 10) || '—'}`,
+          `Email: ${user.email}    Phone: ${user.phone || '-'}`,
+          `Country: ${user.country || '-'}    Address: ${user.address || '-'}`,
+          `Status: ${user.status}    KYC: ${user.kyc_status}    Joined: ${(user.created_at || '').slice(0, 10) || '-'}`,
           `Total deposits: $${fmt(total_deposit)}    Total withdrawals: $${fmt(total_withdrawal)}`,
           `Total trades: ${total_trades}    Open positions: ${open_positions}    Accounts: ${accounts.length}`,
         ],
