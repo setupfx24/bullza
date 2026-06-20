@@ -75,6 +75,36 @@ def render_welcome(
         + '</ul>'
     )
 
+    # Product & rewards highlights (client 2026-06-20: the welcome mail should
+    # introduce referral, insurance, bonus, fixed-return and PAMM/MAM).
+    products_html = (
+        '<p style="margin:24px 0 12px;color:#1a1a1a;font-size:14px;font-weight:700;">'
+        "Ways to earn more and protect your capital:"
+        '</p>'
+        '<ul style="margin:0 0 24px;padding:0 0 0 18px;color:#1a1a1a;">'
+        + _bullet(
+            "Referral Rewards",
+            "Share your referral link — earn rewards when the people you invite join and start trading.",
+        )
+        + _bullet(
+            "Trade Insurance",
+            "Optionally insure a position so a covered loss is partly refunded. Trade with a built-in safety net.",
+        )
+        + _bullet(
+            "Deposit Bonus",
+            "Qualifying deposits can earn a bonus credited straight to your wallet, so you can size up from day one.",
+        )
+        + _bullet(
+            "Fixed Return",
+            "Park capital in the Fixed Return product for steady, capital-protected returns over a chosen term.",
+        )
+        + _bullet(
+            "PAMM & MAM Investing",
+            "Invest alongside expert money managers — or run a pool yourself — with profits shared automatically.",
+        )
+        + '</ul>'
+    )
+
     credentials_html = ""
     if username or trading_id:
         credentials_html = (
@@ -140,7 +170,7 @@ def render_welcome(
         '</p>'
     )
 
-    body_html = experience_html + credentials_html + why_html + closing
+    body_html = experience_html + products_html + credentials_html + why_html + closing
 
     subject = "Welcome to SwisDex"
     html = render_layout(
