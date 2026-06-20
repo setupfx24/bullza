@@ -6,7 +6,9 @@ import { cn } from '@/lib/utils';
 import {
   Users, TrendingUp, Wallet, ArrowDownToLine,
   DollarSign, HeadphonesIcon, Loader2, RefreshCw,
+  Download as DownloadIcon,
 } from 'lucide-react';
+import { downloadAdminReportPdf } from '@/lib/pdf/adminReportPdf';
 import toast from 'react-hot-toast';
 import { formatDistanceToNow } from 'date-fns';
 
@@ -241,21 +243,59 @@ export default function DashboardPage() {
     return () => window.clearInterval(id);
   }, [fetchLivePositions]);
 
+  // Today's snapshot as a PDF (client 2026-06-20 admin #2): deposits,
+  // withdrawals, P&L, users and pending counts as of now.
+  const downloadSummaryPdf = () => {
+    if (!stats) return;
+    const m = (n: number) => `$${(Number(n) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    void downloadAdminReportPdf(
+      "Today's summary",
+      [{ header: 'Metric', width: 70 }, { header: 'Value', width: 50, align: 'right', mono: true }],
+      [
+        ['Deposits today', m(stats.deposits_today)],
+        ['Withdrawals today', m(stats.withdrawals_today)],
+        ['Platform P&L', m(stats.platform_pnl)],
+        ['Commission paid', m(stats.commission_paid)],
+        ['Total users', String(stats.total_users)],
+        ['Active traders', String(stats.active_traders)],
+        ['Pending deposits', String(stats.pending_deposits_count)],
+        ['Open tickets', String(stats.open_tickets_count)],
+      ],
+      {
+        subtitle: 'Platform snapshot',
+        periodLabel: 'Today',
+        landscape: false,
+        filename: 'today-summary',
+      },
+    );
+  };
+
   return (
     <>
       <div className="p-4 sm:p-6 space-y-6 max-w-[1600px] mx-auto w-full">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <h2 className="text-lg font-semibold text-text-primary">Dashboard</h2>
-          <button
-            type="button"
-            onClick={fetchData}
-            disabled={loading}
-            className="flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs text-text-secondary hover:text-text-primary bg-bg-secondary border border-border-primary rounded-md hover:bg-bg-hover transition-fast disabled:opacity-50 w-full sm:w-auto"
-          >
-            <RefreshCw size={12} className={cn(loading && 'animate-spin')} />
-            Refresh
-          </button>
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            <button
+              type="button"
+              onClick={downloadSummaryPdf}
+              disabled={!stats}
+              className="flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs text-text-primary bg-bg-secondary border border-border-primary rounded-md hover:bg-bg-hover transition-fast disabled:opacity-50 w-full sm:w-auto"
+            >
+              <DownloadIcon size={12} className="text-buy" />
+              Today's summary PDF
+            </button>
+            <button
+              type="button"
+              onClick={fetchData}
+              disabled={loading}
+              className="flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs text-text-secondary hover:text-text-primary bg-bg-secondary border border-border-primary rounded-md hover:bg-bg-hover transition-fast disabled:opacity-50 w-full sm:w-auto"
+            >
+              <RefreshCw size={12} className={cn(loading && 'animate-spin')} />
+              Refresh
+            </button>
+          </div>
         </div>
 
         {/* Stats Grid */}
