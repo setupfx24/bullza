@@ -670,6 +670,22 @@ function WalletPageContent() {
     }
   };
 
+  // XM-style pre-deposit confirmation (client 2026-06-20): before a manual /
+  // UPI deposit is submitted, show the "make sure you pay the exact amount and
+  // submit the correct UTR" warning. Confirm then runs the real submit.
+  const [showDepositConfirm, setShowDepositConfirm] = useState(false);
+  const requestDepositConfirm = () => {
+    if (demoFundingBlocked) { toast.error(DEMO_FUNDING_MSG); return; }
+    const amt = parseFloat(depositAmount);
+    if (!amt || amt <= 0) { toast.error('Enter a valid amount'); return; }
+    if (minDeposit > 0 && amt < minDeposit) {
+      toast.error(`Minimum deposit is $${minDeposit.toLocaleString()}.`); return;
+    }
+    if (!depositTxId.trim()) { toast.error('Enter your 12-digit UTR / payment reference'); return; }
+    if (!depositProofFile) { toast.error('Please attach your payment screenshot'); return; }
+    setShowDepositConfirm(true);
+  };
+
   const submitDeposit = async () => {
     if (demoFundingBlocked) {
       toast.error(DEMO_FUNDING_MSG);
@@ -1369,9 +1385,22 @@ function WalletPageContent() {
                                   {manualBankInfo.ifsc_code}
                                 </p>
                               ) : null}
-                              {/* Backend may still surface a `upi_id` field on
-                                  ManualBankDetailsResponse — block its render so
-                                  the visible bank details panel never shows UPI. */}
+                              {manualBankInfo.upi_id ? (
+                                <p className="break-all sm:col-span-2">
+                                  <span className="text-text-tertiary font-sans text-[10px] uppercase tracking-wide">UPI ID — pay here</span>
+                                  <br />
+                                  <span className="inline-flex items-center gap-2">
+                                    <span className="font-bold text-text-primary select-all">{manualBankInfo.upi_id}</span>
+                                    <button
+                                      type="button"
+                                      onClick={() => { navigator.clipboard?.writeText(manualBankInfo.upi_id || ''); toast.success('UPI ID copied'); }}
+                                      className="text-[10px] font-sans font-semibold text-[#55a630] hover:underline"
+                                    >
+                                      Copy
+                                    </button>
+                                  </span>
+                                </p>
+                              ) : null}
                             </div>
                             {manualBankInfo.qr_code_url ? (
                               <div className="pt-1 flex justify-center">
@@ -1452,7 +1481,7 @@ function WalletPageContent() {
                       </div>
                       <button
                         type="button"
-                        onClick={() => void submitDeposit()}
+                        onClick={requestDepositConfirm}
                         disabled={
                           demoFundingBlocked ||
                           depositSubmitting ||
@@ -2052,6 +2081,46 @@ function WalletPageContent() {
           void fetchData(true);
         }}
       />
+
+      {/* XM-style pre-deposit confirmation (client 2026-06-20). */}
+      {showDepositConfirm && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={() => setShowDepositConfirm(false)} />
+          <div className="relative w-full max-w-md rounded-2xl border border-border-primary bg-bg-base shadow-2xl p-5 sm:p-6 space-y-4 animate-in fade-in zoom-in-95">
+            <div className="flex items-start justify-between gap-3">
+              <h3 className="text-base font-bold text-text-primary">Before your deposit is processed</h3>
+              <button type="button" onClick={() => setShowDepositConfirm(false)} className="text-text-tertiary hover:text-text-primary">✕</button>
+            </div>
+            <p className="text-xs text-text-secondary">Please make sure the points below are met so your deposit is credited successfully:</p>
+            <ul className="space-y-2.5 text-xs text-text-secondary">
+              <li className="flex gap-2"><span className="text-[#55a630] font-bold">•</span><span>Pay the <strong className="text-text-primary">exact amount</strong> requested — a different amount may delay or block crediting.</span></li>
+              <li className="flex gap-2"><span className="text-amber-500 font-bold">•</span><span><strong className="text-amber-500">Enter the correct 12-digit UTR / UPI reference</strong> after paying. If this is missed, the funds will not be credited.</span></li>
+              <li className="flex gap-2"><span className="text-[#55a630] font-bold">•</span><span>UPI deposits may take up to <strong className="text-text-primary">20 minutes</strong> to credit. If it takes longer, contact live support.</span></li>
+            </ul>
+            <div className="rounded-lg bg-bg-secondary border border-border-primary px-3 py-2.5 text-xs text-text-secondary">
+              Depositing <strong className="text-text-primary">${parseFloat(depositAmount || '0').toLocaleString()}</strong> · UTR/Ref:{' '}
+              <span className="font-mono text-text-primary break-all">{depositTxId.trim()}</span>
+            </div>
+            <div className="flex gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => setShowDepositConfirm(false)}
+                className="flex-1 py-2.5 rounded-xl border border-border-primary bg-bg-secondary text-sm font-semibold text-text-secondary hover:bg-bg-hover transition-fast"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={depositSubmitting}
+                onClick={() => { setShowDepositConfirm(false); void submitDeposit(); }}
+                className="flex-1 py-2.5 rounded-xl bg-[#55a630] text-sm font-bold text-white hover:bg-[#4a9329] transition-fast disabled:opacity-50"
+              >
+                Confirm &amp; Submit
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </DashboardShell>
   );
