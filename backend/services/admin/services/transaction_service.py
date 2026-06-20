@@ -40,11 +40,19 @@ async def list_transactions(
     db: AsyncSession,
     start_date=None,
     end_date=None,
+    exclude_types: list[str] | None = None,
 ) -> PaginatedResponse:
     query = select(Transaction)
 
     if type_filter and type_filter != "all":
         query = query.where(Transaction.type == type_filter)
+
+    # Client 2026-06-20: the Deposits & Withdrawals "History" tab is for money
+    # movements only, but it was also listing trade P&L rows. Callers pass
+    # exclude_types=["trading", "trade"] to keep trades out (they have their
+    # own Trades page).
+    if exclude_types:
+        query = query.where(Transaction.type.notin_(exclude_types))
 
     if start_date is not None:
         query = query.where(Transaction.created_at >= start_date)

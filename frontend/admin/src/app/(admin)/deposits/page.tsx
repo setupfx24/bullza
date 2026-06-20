@@ -320,6 +320,9 @@ export default function DepositsPage() {
       const params: Record<string, string> = {
         page: String(page),
         per_page: String(PAGE_SIZE),
+        // This is the funding History tab — keep trade P&L rows out (trades
+        // have their own page). Client 2026-06-20.
+        exclude: 'trading,trade',
       };
       if (dateFrom) params.start_date = dateFrom;
       if (dateTo) params.end_date = dateTo;
