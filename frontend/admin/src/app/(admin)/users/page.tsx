@@ -37,6 +37,7 @@ import {
   Archive,
   X,
 } from 'lucide-react';
+import { downloadAdminReportPdf } from '@/lib/pdf/adminReportPdf';
 
 /** YYYY-MM-DD in local time (avoids the UTC-shift `toISOString()` pitfall). */
 function ymd(d: Date): string {
@@ -537,6 +538,39 @@ export default function UsersPage() {
     URL.revokeObjectURL(url);
   };
 
+  const exportPdf = () => {
+    if (!sorted.length) return;
+    const period = (dateFrom || dateTo) ? `${dateFrom || 'start'} → ${dateTo || 'today'}` : 'All time';
+    const totalBal = sorted.reduce((s, u) => s + (Number(u.balance) || 0), 0);
+    void downloadAdminReportPdf(
+      'Users report',
+      [
+        { header: 'Name', width: 40 },
+        { header: 'Email', width: 58 },
+        { header: 'Balance (USD)', width: 28, align: 'right', mono: true },
+        { header: 'Equity (USD)', width: 28, align: 'right', mono: true },
+        { header: 'Group', width: 24 },
+        { header: 'KYC', width: 20 },
+        { header: 'Status', width: 20 },
+      ],
+      sorted.map(u => [
+        u.name || '—', u.email || '—',
+        `$${(Number(u.balance) || 0).toFixed(2)}`,
+        `$${(Number(u.equity) || 0).toFixed(2)}`,
+        u.group || '—', u.kyc_status || '—', u.status || '—',
+      ]),
+      {
+        subtitle: `Users${statusFilter ? ` · status: ${statusFilter}` : ''}${debouncedSearch ? ` · search: "${debouncedSearch}"` : ''}`,
+        periodLabel: period,
+        summaryLines: [
+          `Users listed: ${sorted.length}`,
+          `Total balance (listed): $${totalBal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+        ],
+        filename: 'users-report',
+      },
+    );
+  };
+
   const SortIcon = ({ col }: { col: SortKey }) => {
     if (sortKey !== col) return <ArrowUpDown size={10} className="text-text-tertiary opacity-0 group-hover:opacity-100 transition-fast" />;
     return sortDir === 'asc' ? <ArrowUp size={10} className="text-buy" /> : <ArrowDown size={10} className="text-buy" />;
@@ -555,13 +589,22 @@ export default function UsersPage() {
               {loading ? 'Loading...' : `${total} total users`}
             </p>
           </div>
-          <button type="button" onClick={exportCsv} className={cn(
-            'inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg border border-border-primary',
-            'bg-bg-secondary text-sm text-text-primary font-medium transition-fast hover:bg-bg-hover',
-          )}>
-            <Download size={16} className="text-text-secondary" />
-            Export CSV
-          </button>
+          <div className="flex items-center gap-2">
+            <button type="button" onClick={exportPdf} className={cn(
+              'inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg border border-border-primary',
+              'bg-bg-secondary text-sm text-text-primary font-medium transition-fast hover:bg-bg-hover',
+            )}>
+              <Download size={16} className="text-buy" />
+              Download PDF
+            </button>
+            <button type="button" onClick={exportCsv} className={cn(
+              'inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg border border-border-primary',
+              'bg-bg-secondary text-sm text-text-primary font-medium transition-fast hover:bg-bg-hover',
+            )}>
+              <Download size={16} className="text-text-secondary" />
+              Export CSV
+            </button>
+          </div>
         </div>
 
         {/* Filters */}
