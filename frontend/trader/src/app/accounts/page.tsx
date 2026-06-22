@@ -128,6 +128,7 @@ export default function AccountsPage() {
   const [transferSubmitting, setTransferSubmitting] = useState(false);
   const [accountPickerOpen, setAccountPickerOpen] = useState(false);
   const [kycGateOpen, setKycGateOpen] = useState(false);
+  const kycAutoShown = useRef(false);
   const [demoUpgradeOpen, setDemoUpgradeOpen] = useState(false);
   /** After creating an account, open-account sets sessionStorage; expand that card on Accounts. */
   const [expandAccountId, setExpandAccountId] = useState<string | null>(null);
@@ -237,6 +238,19 @@ export default function AccountsPage() {
       setToKind('trading');
     }
   }, [liveAccounts.length, fromKind, toKind]);
+
+  // Proactively show the KYC prompt once for an unverified LIVE user who has no
+  // live account yet — so the popup actually appears without them having to
+  // click "New Account" (client 2026-06-20: "KYC popup nahi aa raha").
+  useEffect(() => {
+    if (kycAutoShown.current || loading || !user) return;
+    const kyc = (user.kyc_status || 'pending').toLowerCase();
+    const approved = kyc === 'approved' || kyc === 'verified';
+    if (!user.is_demo && !approved && liveAccounts.length === 0) {
+      kycAutoShown.current = true;
+      setKycGateOpen(true);
+    }
+  }, [loading, user, liveAccounts.length]);
 
   /* Show all active accounts. CF/IF (follower copy-trade / managed sub-accounts)
      render with "View Trades" instead of Trade — the copy engine places trades
