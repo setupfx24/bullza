@@ -849,12 +849,18 @@ export default function DepositsPage() {
                       <tbody className="divide-y divide-border-primary">
                         {(transactions as TransactionRecord[]).map((t) => {
                           const isPositive = t.amount >= 0;
+                          // Generic "adjustment" rows carry the real reason in
+                          // `description` (e.g. "Manual credit", "Insurance payout").
+                          // Show that name instead of the bare type (client 2026-06-20).
+                          const _desc = (t.description || '').trim();
                           const typeLabel = t.type === 'admin_commission' ? 'Admin Commission'
                             : t.type === 'ib_commission' ? 'Master Fee'
                             : t.type === 'commission' ? 'Performance Fee'
                             : t.type === 'deposit' ? 'Deposit'
                             : t.type === 'withdrawal' ? 'Withdrawal'
-                            : t.type;
+                            : t.type === 'adjustment'
+                              ? (_desc && _desc.toLowerCase() !== 'adjustment' ? _desc : 'Adjustment')
+                              : (_desc && _desc.toLowerCase() !== t.type.toLowerCase() ? _desc : t.type.replace(/_/g, ' '));
                           const typeBadge = t.type === 'admin_commission' ? 'bg-purple-500/15 text-purple-600'
                             : t.type === 'ib_commission' ? 'bg-blue-500/15 text-blue-600'
                             : t.type === 'deposit' ? 'bg-success/15 text-success'
