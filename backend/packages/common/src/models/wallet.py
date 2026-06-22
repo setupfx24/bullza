@@ -84,6 +84,9 @@ class Withdrawal(Base):
     bank_details = Column(JSONB)
     crypto_address = Column(String(200))
     crypto_tx_hash = Column(String(200))
+    # NOWPayments payout/batch id for automatic crypto withdrawals — lets the
+    # payout IPN correlate back to this withdrawal.
+    payout_batch_id = Column(String(100))
     rejection_reason = Column(Text)
     approved_by = Column(UUID(as_uuid=True), ForeignKey("users.id"))
     approved_at = Column(DateTime(timezone=True))

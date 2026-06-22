@@ -224,6 +224,12 @@ class Settings(BaseSettings):
     NOWPAYMENTS_IPN_SECRET: str = ""    # IPN HMAC secret from dashboard
     NOWPAYMENTS_SANDBOX: bool = False
     NOWPAYMENTS_CALLBACK_BASE_URL: str = ""  # e.g. "https://api.swisdex.com"
+    # Automatic crypto WITHDRAWALS (payouts) use the /v1/payout API, which needs
+    # a JWT obtained from the account login (separate from the x-api-key used for
+    # deposits). Disable whitelisting + 2FA on the NOWPayments dashboard for
+    # unattended payouts. Leave blank to keep withdrawals fully manual.
+    NOWPAYMENTS_EMAIL: str = ""
+    NOWPAYMENTS_PASSWORD: str = ""
 
     # Absolute path recommended in production (writable volume). Relative paths are resolved from gateway CWD.
     KYC_UPLOAD_ROOT: str = "uploads/kyc"

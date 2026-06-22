@@ -1157,6 +1157,135 @@ async def handle_nowpayments_webhook(
 
 # ─── Withdrawals ──────────────────────────────────────────────────────────
 
+def _parse_crypto_payout(withdrawal: Withdrawal) -> tuple[str | None, str | None]:
+    """Extract (asset_id, address) from a crypto withdrawal's stored details.
+    The trader form stores '[ASSET] address' in bank_details.oxapay_payout."""
+    raw = ""
+    bd = withdrawal.bank_details
+    if isinstance(bd, dict):
+        raw = str(bd.get("oxapay_payout") or bd.get("nowpayments_payout") or "").strip()
+    if not raw and withdrawal.crypto_address:
+        raw = str(withdrawal.crypto_address).strip()
+    if not raw:
+        return None, None
+    if raw.startswith("[") and "]" in raw:
+        asset = raw[1:raw.index("]")].strip()
+        address = raw[raw.index("]") + 1:].strip()
+        return (asset or None), (address or None)
+    return None, raw
+
+
+async def _send_nowpayments_payout(
+    withdrawal: Withdrawal, user_row: User, db: AsyncSession
+) -> bool:
+    """Send the NOWPayments crypto payout for an ALREADY-DEBITED withdrawal.
+
+    On success → status 'processing' (+ payout_batch_id). On ANY failure →
+    re-credit the wallet (reversal Transaction) + status 'failed' + notify, so
+    the user never loses money. Never raises — returns True/False; caller commits.
+    """
+    from . import nowpayments_service
+    asset, address = _parse_crypto_payout(withdrawal)
+    np_currency = nowpayments_service.resolve_currency(asset) if asset else None
+
+    async def _refund(reason: str) -> None:
+        user_row.main_wallet_balance = (user_row.main_wallet_balance or Decimal("0")) + withdrawal.amount
+        db.add(Transaction(
+            user_id=withdrawal.user_id, account_id=None, type="withdrawal",
+            amount=withdrawal.amount, balance_after=user_row.main_wallet_balance,
+            reference_id=withdrawal.id, description="Auto-withdrawal failed — refunded to wallet",
+        ))
+        withdrawal.status = "failed"
+        withdrawal.rejection_reason = reason[:500]
+        try:
+            await create_notification(
+                db, withdrawal.user_id, title="Withdrawal Refunded",
+                message=f"Your ${float(withdrawal.amount):,.2f} crypto withdrawal could not be sent and was refunded to your wallet.",
+                notif_type="withdrawal", action_url="/wallet",
+            )
+        except Exception:
+            pass
+
+    if not address or not np_currency:
+        await _refund("Auto-payout unavailable: missing or unrecognised crypto address/asset")
+        return False
+    try:
+        crypto_amt = await nowpayments_service.estimate_crypto_amount(withdrawal.amount, np_currency)
+        result = await nowpayments_service.create_payout(
+            address=address, np_currency=np_currency, crypto_amount=crypto_amt,
+            order_id=str(withdrawal.id),
+        )
+        withdrawal.payout_batch_id = result.get("batch_id")
+        withdrawal.status = "processing"
+        withdrawal.approved_at = datetime.utcnow()
+        return True
+    except Exception as e:
+        logger.error("NOWPayments auto-payout failed for withdrawal %s: %s", withdrawal.id, e)
+        await _refund(f"Payout error: {e}")
+        return False
+
+
+async def handle_nowpayments_payout_webhook(
+    *, batch_id: str, status: str, payload: dict, db: AsyncSession
+) -> None:
+    """Update an auto crypto withdrawal from its NOWPayments payout IPN.
+
+    finished → 'completed' (+ tx hash). failed/rejected/expired → 'failed' and
+    refund the wallet ONCE. Other states (waiting/sending) leave it 'processing'.
+    Idempotent: terminal withdrawals are skipped.
+    """
+    w = (await db.execute(
+        select(Withdrawal).where(Withdrawal.payout_batch_id == batch_id)
+    )).scalars().first()
+    if not w:
+        logger.info("Payout IPN for unknown batch %s — ignoring", batch_id)
+        return
+    cur = (w.status or "").lower()
+    if cur in ("completed", "failed", "rejected"):
+        return  # already terminal
+
+    s = (status or "").lower()
+    if s == "finished":
+        w.status = "completed"
+        w.completed_at = datetime.utcnow()
+        h = payload.get("hash") or payload.get("transaction_hash")
+        if h:
+            w.crypto_tx_hash = str(h)[:200]
+        try:
+            await create_notification(
+                db, w.user_id, title="Withdrawal Completed",
+                message=f"Your ${float(w.amount):,.2f} crypto withdrawal has been sent.",
+                notif_type="withdrawal", action_url="/wallet",
+            )
+        except Exception:
+            pass
+        await db.commit()
+    elif s in ("failed", "rejected", "expired"):
+        # Refund the wallet once (the amount was debited when the payout was sent).
+        user_row = (await db.execute(
+            select(User).where(User.id == w.user_id).with_for_update()
+        )).scalar_one_or_none()
+        if user_row:
+            user_row.main_wallet_balance = (user_row.main_wallet_balance or Decimal("0")) + w.amount
+            db.add(Transaction(
+                user_id=w.user_id, account_id=None, type="withdrawal",
+                amount=w.amount, balance_after=user_row.main_wallet_balance,
+                reference_id=w.id, description="Crypto payout failed — refunded to wallet",
+            ))
+        w.status = "failed"
+        w.rejection_reason = f"Payout {s}"[:500]
+        try:
+            await create_notification(
+                db, w.user_id, title="Withdrawal Failed",
+                message=f"Your ${float(w.amount):,.2f} crypto withdrawal could not be sent and was refunded to your wallet.",
+                notif_type="withdrawal", action_url="/wallet",
+            )
+        except Exception:
+            pass
+        await db.commit()
+    # else: in-flight (waiting/processing/sending) → keep 'processing'
+
+
 async def create_withdrawal(req, user_id: UUID, db: AsyncSession) -> dict:
     from packages.common.src.settings_store import get_bool_setting, get_float_setting
     if await get_bool_setting("maintenance_mode", False):
@@ -1188,11 +1317,12 @@ async def create_withdrawal(req, user_id: UUID, db: AsyncSession) -> dict:
             ),
         )
 
+    method_norm = METHOD_MAP.get(req.method, "bank_transfer")
     withdrawal = Withdrawal(
         user_id=user_id,
         account_id=None,
         amount=req.amount,
-        method=METHOD_MAP.get(req.method, "bank_transfer"),
+        method=method_norm,
         bank_details=getattr(req, "bank_details", None),
         crypto_address=getattr(req, "crypto_address", None),
         status="pending",
@@ -1200,6 +1330,48 @@ async def create_withdrawal(req, user_id: UUID, db: AsyncSession) -> dict:
     db.add(withdrawal)
     await db.commit()
     await db.refresh(withdrawal)
+
+    # ── Auto crypto withdrawal (client 2026-06-22): crypto withdrawals at or
+    # below crypto_auto_withdrawal_max_usd are paid out automatically via
+    # NOWPayments; larger ones stay 'pending' for admin approval. ──
+    from . import nowpayments_service as _np
+    is_crypto = method_norm in ("oxapay", "nowpayments", "crypto_btc", "crypto_eth", "crypto_usdt", "metamask")
+    auto_max = float(await get_float_setting("crypto_auto_withdrawal_max_usd", 0.0))
+    auto_eligible = (
+        is_crypto
+        and await get_bool_setting("crypto_auto_withdrawal_enabled", False)
+        and auto_max > 0
+        and float(req.amount) <= auto_max
+        and _np.payouts_configured()
+    )
+    if auto_eligible:
+        locked = (await db.execute(
+            select(User).where(User.id == user_id).with_for_update()
+        )).scalar_one_or_none()
+        bal = (locked.main_wallet_balance or Decimal("0")) if locked else Decimal("0")
+        if locked and bal >= withdrawal.amount:
+            # Debit now (no admin step), then send the payout.
+            locked.main_wallet_balance = bal - withdrawal.amount
+            db.add(Transaction(
+                user_id=user_id, account_id=None, type="withdrawal",
+                amount=-withdrawal.amount, balance_after=locked.main_wallet_balance,
+                reference_id=withdrawal.id, description=f"Auto crypto withdrawal - {req.method}",
+            ))
+            ok = await _send_nowpayments_payout(withdrawal, locked, db)
+            await db.commit()
+            await db.refresh(withdrawal)
+            if ok:
+                try:
+                    await create_notification(
+                        db, user_id, title="Withdrawal Processing",
+                        message=f"${float(withdrawal.amount):,.2f} crypto withdrawal is being sent automatically.",
+                        notif_type="withdrawal", action_url="/wallet",
+                    )
+                    await db.commit()
+                except Exception:
+                    pass
+            return {"id": str(withdrawal.id), "status": withdrawal.status, "amount": float(withdrawal.amount)}
+        # balance changed under us → fall through to the manual pending flow
 
     await create_notification(
         db, user_id,
