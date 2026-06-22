@@ -149,6 +149,12 @@ class Settings(BaseSettings):
     # not licensed on the symbol. Heartbeat 10010 every ~30s.
     INFOWAY_TOKEN: str = ""
     INFOWAY_WS_URL: str = "wss://data.infoway.io/ws"
+    # Client 2026-06-20: NEVER show simulated/mock prices. When the real feed
+    # (InfoWay/AllTick) sends nothing — closed market, weekend, token/plan
+    # issue — quotes must FREEZE on the last real price, not switch to the GBM
+    # simulator (which invented e.g. XAUUSD ~2000). Set to true ONLY for local
+    # dev without a feed token.
+    ALLOW_SIMULATED_FEED: bool = False
     # Business segment for the WS URL (?business=common). InfoWay routes
     # forex / crypto / commodities under "common"; equities have separate
     # business codes per their docs. Override only if the account requires it.

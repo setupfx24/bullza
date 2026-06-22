@@ -50,6 +50,9 @@ class MarketDataService:
         self._tick_count = 0
         self._alltick_watchdog_armed = False
         self._infoway_watchdog_armed = False
+        # When true, the feed object exists but is never started → no prices are
+        # published (mock disabled + no real token). Quotes freeze instead.
+        self._feed_disabled = False
         # Provider priority: Corecen LP → InfoWay → AllTick → Simulator.
         # Whichever is set first wins; setting INFOWAY_TOKEN takes over
         # from AllTick without needing to clear ALLTICK_TOKEN.
@@ -78,6 +81,17 @@ class MarketDataService:
             self.feed = AllTickFeed(raw_alltick, INSTRUMENTS)
             self._alltick_watchdog_armed = True
             logger.info("Price feed: AllTick WebSocket (orderbook depth)")
+        elif not getattr(settings, "ALLOW_SIMULATED_FEED", False):
+            # Mock disabled (client 2026-06-20) + no usable real token → publish
+            # NO prices rather than invented ones. The feed exists but is never
+            # started; quotes simply don't update.
+            self.feed = FeedSimulator(tick_rate_multiplier=1.0)
+            self._feed_disabled = True
+            logger.critical(
+                "No usable market-data token AND simulated feed is disabled "
+                "(ALLOW_SIMULATED_FEED=false) — NO prices will be published. Set a real "
+                "INFOWAY_TOKEN/ALLTICK_TOKEN, or ALLOW_SIMULATED_FEED=true for local dev."
+            )
         else:
             self.feed = FeedSimulator(tick_rate_multiplier=1.0)
             if raw_alltick or raw_infoway:
@@ -106,8 +120,10 @@ class MarketDataService:
         await self.spread_cache.reload_if_stale(force=True)
         await self._seed_last_mid_from_redis()
 
-        tasks = [
-            asyncio.create_task(self.feed.start()),
+        tasks = []
+        if not self._feed_disabled:
+            tasks.append(asyncio.create_task(self.feed.start()))
+        tasks += [
             asyncio.create_task(self._process_ticks()),
             asyncio.create_task(self._spread_reload_loop()),
             asyncio.create_task(self._spread_config_subscriber()),
@@ -336,10 +352,19 @@ class MarketDataService:
             return
         if not isinstance(self.feed, AllTickFeed):
             return
+        if not getattr(settings, "ALLOW_SIMULATED_FEED", False):
+            # Client 2026-06-20: do NOT switch to the GBM simulator. Leave the
+            # real feed connected so quotes freeze on the last real price and
+            # resume when AllTick streams again (e.g. Monday open).
+            logger.warning(
+                "AllTick: no ticks in 55s (closed market / token / plan / network). "
+                "Simulated feed disabled (ALLOW_SIMULATED_FEED=false) — keeping the real "
+                "feed connected; quotes stay frozen, NOT switching to mock prices."
+            )
+            return
         logger.error(
-            "AllTick: no ticks in 55s — check ALLTICK_TOKEN, outbound WSS to "
-            "quote.alltick.co, plan symbol limits, and weekend/closed-market state. "
-            "Falling back to simulated feed so quotes appear."
+            "AllTick: no ticks in 55s — falling back to simulated feed "
+            "(ALLOW_SIMULATED_FEED=true)."
         )
         try:
             await self.feed.stop()
@@ -361,10 +386,19 @@ class MarketDataService:
             return
         if not isinstance(self.feed, InfoWayFeed):
             return
+        if not getattr(settings, "ALLOW_SIMULATED_FEED", False):
+            # Client 2026-06-20: do NOT switch to the GBM simulator (it invented
+            # e.g. XAUUSD ~2000). Leave InfoWay connected so quotes freeze on the
+            # last real price and resume when InfoWay streams again.
+            logger.warning(
+                "InfoWay: no ticks in 55s (closed market / token / plan / network). "
+                "Simulated feed disabled (ALLOW_SIMULATED_FEED=false) — keeping InfoWay "
+                "connected; quotes stay frozen, NOT switching to mock prices."
+            )
+            return
         logger.error(
-            "InfoWay: no ticks in 55s — check INFOWAY_TOKEN, outbound WSS to "
-            "data.infoway.io, plan symbol limits, and weekend/closed-market state. "
-            "Falling back to simulated feed so quotes appear."
+            "InfoWay: no ticks in 55s — falling back to simulated feed "
+            "(ALLOW_SIMULATED_FEED=true)."
         )
         try:
             await self.feed.stop()
