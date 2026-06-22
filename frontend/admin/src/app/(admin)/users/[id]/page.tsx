@@ -228,6 +228,48 @@ export default function UserDetailPage() {
     );
   };
 
+  // #12 (client 2026-06-20): download THIS user's deposit/withdrawal history.
+  // Pulls their money transactions (trades excluded) and renders a PDF.
+  const exportFundingPdf = async () => {
+    try {
+      const res = await adminApi.get<{ items: Array<{ type: string; amount: number; status: string; created_at: string | null; method?: string | null; description?: string | null }> }>(
+        '/transactions', { search: user.email, exclude: 'trading,trade', per_page: '500' },
+      );
+      const items = res?.items || [];
+      if (!items.length) { toast.error('No deposit/withdrawal history for this user'); return; }
+      const completed = items.filter((i) => (i.status || '').toLowerCase() === 'completed');
+      const totIn = completed.filter((i) => /deposit|bonus|commission|credit|fixed_return|transfer_in/i.test(i.type || '')).reduce((s, i) => s + (Number(i.amount) || 0), 0);
+      const totOut = completed.filter((i) => /withdraw|transfer_out|debit/i.test(i.type || '')).reduce((s, i) => s + Math.abs(Number(i.amount) || 0), 0);
+      void downloadAdminReportPdf(
+        `Deposit & withdrawal history - ${name}`,
+        [
+          { header: 'Date', width: 36 },
+          { header: 'Type', width: 30 },
+          { header: 'Method', width: 38 },
+          { header: 'Amount (USD)', width: 28, align: 'right', mono: true },
+          { header: 'Status', width: 24 },
+        ],
+        items.map((i) => [
+          (i.created_at || '').replace('T', ' ').slice(0, 16) || '-',
+          (i.type || '-').replace(/_/g, ' '),
+          i.method || i.description || '-',
+          `$${fmt(Number(i.amount) || 0)}`,
+          i.status || '-',
+        ]),
+        {
+          subtitle: `User: ${name} <${user.email}>`,
+          summaryLines: [
+            `Rows: ${items.length}`,
+            `Total in (completed): $${fmt(totIn)}    Total out (completed): $${fmt(totOut)}`,
+          ],
+          filename: `user-${name.replace(/\s+/g, '-').toLowerCase()}-funding`,
+        },
+      );
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : 'Could not load history');
+    }
+  };
+
   return (
     <>
       <div className="p-6 space-y-6">
@@ -285,7 +327,17 @@ export default function UserDetailPage() {
 
         {/* Deposit history — how each deposit was made + which admin approved */}
         <div className="bg-bg-secondary border border-border-primary rounded-lg p-5">
-          <h2 className="text-base font-bold text-text-primary mb-4">Deposit history</h2>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-base font-bold text-text-primary">Deposit history</h2>
+            <button
+              type="button"
+              onClick={exportFundingPdf}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium border border-border-primary bg-bg-base text-text-primary hover:bg-bg-hover transition-fast"
+              title="Download this user's deposit & withdrawal history as PDF"
+            >
+              <Download size={14} className="text-buy" /> Deposit/Withdrawal PDF
+            </button>
+          </div>
           {deposits.length === 0 ? (
             <p className="text-xs text-text-tertiary">No deposits.</p>
           ) : (
