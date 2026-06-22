@@ -49,9 +49,9 @@ const tierShort = (min: number) => `$${min >= 1000 ? `${min / 1000}K` : min}`;
 const HEADER_BG = [
   'linear-gradient(180deg, #1f2937 0%, #0a0a0a 100%)',
   'linear-gradient(180deg, #2c3e50 0%, #0e1418 100%)',
-  'linear-gradient(180deg, #F04024 0%, #1a3210 100%)',
+  'linear-gradient(180deg, #55a630 0%, #1a3210 100%)',
   'linear-gradient(180deg, #2f7d18 0%, #0a1f08 100%)',
-  'linear-gradient(180deg, #AB2415 0%, #3d0000 100%)',
+  'linear-gradient(180deg, #d00000 0%, #3d0000 100%)',
 ];
 
 export function FixedReturnRateTable({ heading = true }: { heading?: boolean }) {
