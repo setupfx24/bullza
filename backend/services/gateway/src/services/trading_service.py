@@ -502,7 +502,8 @@ async def place_order(
         db.add(position)
 
         account.margin_used = (account.margin_used or Decimal("0")) + required_margin
-        account.balance -= commission
+        # NBP: opening commission must not push the balance negative.
+        account.balance = max(Decimal("0"), (account.balance or Decimal("0")) - commission)
         account.equity = (account.balance or Decimal("0")) + (account.credit or Decimal("0")) + unrealized_pnl
         account.free_margin = account.equity - account.margin_used
 

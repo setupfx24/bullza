@@ -143,6 +143,12 @@ class RiskEngine:
                             )
                             unrealized_pnl += pnl
 
+                        # Negative Balance Protection (client 2026-06-20): a
+                        # trading account's realized balance must never be
+                        # negative. Clamp here so any account that drifted below
+                        # zero (e.g. old swap charges) self-heals every tick.
+                        if account.balance is not None and account.balance < 0:
+                            account.balance = Decimal("0")
                         equity = account.balance + account.credit + unrealized_pnl
                         margin_level = (equity / account.margin_used * 100) if account.margin_used > 0 else Decimal("9999")
 
