@@ -175,11 +175,11 @@ function tradeExitLabel(
 
 
 
-const TIMEFRAMES = ['1M', '3M', '6M', '1Y', 'All', 'Custom'] as const;
+const TIMEFRAMES = ['1D', '1W', '1M', '3M', '6M', '1Y', 'All', 'Custom'] as const;
 
 const TF_TO_PERIOD: Record<string, string> = {
 
-  '1M': '1m', '3M': '3m', '6M': '6m', '1Y': '1y', 'All': 'all', 'Custom': 'custom',
+  '1D': '1d', '1W': '1w', '1M': '1m', '3M': '3m', '6M': '6m', '1Y': '1y', 'All': 'all', 'Custom': 'custom',
 
 };
 
@@ -507,10 +507,16 @@ function PortfolioPageContent() {
     const marginLevel =
       approxUsedMargin > 0 ? `${((equity / approxUsedMargin) * 100).toFixed(1)}%` : null;
     const periodKey = TF_TO_PERIOD[tf] || 'all';
+    // The selected-period P&L must come from the PERIOD-FILTERED performance
+    // endpoint (stats.total_return), not the fixed monthly summary — otherwise
+    // 1M/3M/6M/1Y/Custom all showed the same "this month" figure and the value
+    // never changed when switching timeframe (client 2026-06-22).
     const periodPnl =
-      periodKey === '1m' ? summary.pnl_breakdown?.this_month ?? 0 :
-      periodKey === 'all' ? summary.pnl_breakdown?.all_time ?? 0 :
-      summary.pnl_breakdown?.this_month ?? 0;
+      typeof performance?.stats?.total_return === 'number'
+        ? performance.stats.total_return
+        : periodKey === 'all'
+          ? summary.pnl_breakdown?.all_time ?? 0
+          : summary.pnl_breakdown?.this_month ?? 0;
     return buildDashboardFromPortfolio({
       balance,
       equity,

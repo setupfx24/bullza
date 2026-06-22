@@ -191,7 +191,7 @@ async def portfolio_performance(
         account_ids = [account_id]
 
     now = datetime.now(timezone.utc)
-    period_map = {"1m": timedelta(days=30), "3m": timedelta(days=90), "6m": timedelta(days=180), "1y": timedelta(days=365), "all": None}
+    period_map = {"1d": timedelta(days=1), "1w": timedelta(days=7), "1m": timedelta(days=30), "3m": timedelta(days=90), "6m": timedelta(days=180), "1y": timedelta(days=365), "all": None}
 
     # Custom-range mode: caller passed period='custom' with explicit dates.
     # Falls back to preset behaviour when period is one of the preset codes
