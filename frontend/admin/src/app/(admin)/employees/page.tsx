@@ -14,6 +14,7 @@ interface Employee {
   role: string;
   phone?: string;
   is_active: boolean;
+  deleted?: boolean;
   last_active?: string;
   created_at: string;
   extra_permissions?: string[];
@@ -295,9 +296,15 @@ export default function EmployeesPage() {
                         <span className={cn('inline-flex px-1.5 py-0.5 rounded-sm text-xxs font-medium', roleBadgeClass(emp.role))}>{emp.role}</span>
                       </td>
                       <td className="px-4 py-2.5">
-                        <button onClick={() => toggleActive(emp)} className={cn('inline-flex px-1.5 py-0.5 rounded-sm text-xxs font-medium cursor-pointer transition-fast', emp.is_active ? 'bg-success/15 text-success hover:bg-success/25' : 'bg-text-tertiary/15 text-text-tertiary hover:bg-text-tertiary/25')}>
-                          {emp.is_active ? 'Active' : 'Inactive'}
-                        </button>
+                        {emp.deleted ? (
+                          <span className="inline-flex px-1.5 py-0.5 rounded-sm text-xxs font-medium bg-danger/15 text-danger" title="This employee was deleted; their record is kept for history.">
+                            Deleted
+                          </span>
+                        ) : (
+                          <button onClick={() => toggleActive(emp)} className={cn('inline-flex px-1.5 py-0.5 rounded-sm text-xxs font-medium cursor-pointer transition-fast', emp.is_active ? 'bg-success/15 text-success hover:bg-success/25' : 'bg-text-tertiary/15 text-text-tertiary hover:bg-text-tertiary/25')}>
+                            {emp.is_active ? 'Active' : 'Inactive'}
+                          </button>
+                        )}
                       </td>
                       <td className="px-4 py-2.5 text-xs text-text-tertiary font-mono tabular-nums">{emp.last_active || '—'}</td>
                       <td className="px-4 py-2.5 text-right">
