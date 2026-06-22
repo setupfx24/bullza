@@ -243,14 +243,20 @@ function WalletPageContent() {
   // client-side before the request even leaves the page.
   const [minDeposit, setMinDeposit] = useState(50);
   const [minWithdraw, setMinWithdraw] = useState(70);
+  // Auto crypto withdrawal threshold (0 = off) so the form can tell the user
+  // which withdrawals go out instantly vs need review.
+  const [cryptoAutoMax, setCryptoAutoMax] = useState(0);
   useEffect(() => {
     void (async () => {
       try {
-        const s = await api.get<{ min_deposit_amount_usd?: number; min_withdrawal_amount_usd?: number }>(
+        const s = await api.get<{ min_deposit_amount_usd?: number; min_withdrawal_amount_usd?: number; crypto_auto_withdrawal_enabled?: boolean; crypto_auto_withdrawal_max_usd?: number }>(
           '/auth/platform-status',
         );
         if (typeof s.min_deposit_amount_usd === 'number') setMinDeposit(s.min_deposit_amount_usd);
         if (typeof s.min_withdrawal_amount_usd === 'number') setMinWithdraw(s.min_withdrawal_amount_usd);
+        if (s.crypto_auto_withdrawal_enabled && typeof s.crypto_auto_withdrawal_max_usd === 'number') {
+          setCryptoAutoMax(s.crypto_auto_withdrawal_max_usd);
+        }
       } catch { /* keep defaults */ }
     })();
   }, []);
@@ -1659,6 +1665,11 @@ function WalletPageContent() {
                         />
                       </div>
                       <p className="text-[11px] text-text-tertiary">Processing time: up to 24 hours.</p>
+                      {cryptoAutoMax > 0 && (
+                        <p className="text-[11px] text-[#55a630]">
+                          Crypto withdrawals up to ${cryptoAutoMax.toLocaleString()} are processed automatically; larger amounts are reviewed first.
+                        </p>
+                      )}
 
                       <button
                         type="button"

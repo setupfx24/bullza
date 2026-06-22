@@ -56,6 +56,10 @@ async def platform_status():
         # up-front instead of only rejecting on submit.
         "min_deposit_amount_usd": float(await get_float_setting("min_deposit_amount_usd", 50.0)),
         "min_withdrawal_amount_usd": float(await get_float_setting("min_withdrawal_amount_usd", 70.0)),
+        # Auto crypto withdrawal threshold — crypto withdrawals at/below this are
+        # paid out automatically; larger ones need admin approval. 0 = off.
+        "crypto_auto_withdrawal_enabled": await get_bool_setting("crypto_auto_withdrawal_enabled", False),
+        "crypto_auto_withdrawal_max_usd": float(await get_float_setting("crypto_auto_withdrawal_max_usd", 0.0)),
     }
 
 

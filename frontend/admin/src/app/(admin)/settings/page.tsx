@@ -19,6 +19,10 @@ interface Settings {
   // withdrawal submission. 0 = no minimum.
   min_deposit_amount_usd: number;
   min_withdrawal_amount_usd: number;
+  // Auto crypto withdrawal (NOWPayments payout). Crypto withdrawals at/below
+  // the max are paid out automatically; larger ones need admin approval.
+  crypto_auto_withdrawal_enabled: boolean;
+  crypto_auto_withdrawal_max_usd: number;
   referral_commission_amount_usd: number;
   referral_qualifying_trades: number;
   // IB commission gates (mirror of the referral gates above).
@@ -61,6 +65,8 @@ const DEFAULT_SETTINGS: Settings = {
   ib_min_deposit_usd: 100,
   min_deposit_amount_usd: 50,
   min_withdrawal_amount_usd: 70,
+  crypto_auto_withdrawal_enabled: false,
+  crypto_auto_withdrawal_max_usd: 0,
   referral_commission_amount_usd: 5,
   referral_qualifying_trades: 3,
   ib_commission_requires_kyc: true,
@@ -104,6 +110,8 @@ function rowsToSettings(rows: SystemSettingRow[]): Settings {
     ib_min_deposit_usd: num('ib_min_deposit_usd', DEFAULT_SETTINGS.ib_min_deposit_usd),
     min_deposit_amount_usd: num('min_deposit_amount_usd', DEFAULT_SETTINGS.min_deposit_amount_usd),
     min_withdrawal_amount_usd: num('min_withdrawal_amount_usd', DEFAULT_SETTINGS.min_withdrawal_amount_usd),
+    crypto_auto_withdrawal_enabled: bool('crypto_auto_withdrawal_enabled', DEFAULT_SETTINGS.crypto_auto_withdrawal_enabled),
+    crypto_auto_withdrawal_max_usd: num('crypto_auto_withdrawal_max_usd', DEFAULT_SETTINGS.crypto_auto_withdrawal_max_usd),
     referral_commission_amount_usd: num(
       'referral_commission_amount_usd',
       DEFAULT_SETTINGS.referral_commission_amount_usd as number,
@@ -147,6 +155,8 @@ function settingsToPayload(s: Settings): Record<string, unknown> {
     ib_min_deposit_usd: s.ib_min_deposit_usd,
     min_deposit_amount_usd: s.min_deposit_amount_usd,
     min_withdrawal_amount_usd: s.min_withdrawal_amount_usd,
+    crypto_auto_withdrawal_enabled: s.crypto_auto_withdrawal_enabled,
+    crypto_auto_withdrawal_max_usd: s.crypto_auto_withdrawal_max_usd,
     // Fallback flat USD bounty — used only when referral_tiers
     // (the by-active-referral-count ladder, editable at /config/referral-tiers,
     // independent of IB) has no matching tier for the referrer's position.
@@ -438,6 +448,38 @@ export default function SettingsPage() {
                       min="0"
                       value={settings.min_withdrawal_amount_usd}
                       onChange={(e) => updateNum('min_withdrawal_amount_usd', e.target.value)}
+                      className="w-28 text-xs py-1.5 px-2 bg-bg-input border border-border-primary rounded-md font-mono tabular-nums text-right"
+                    />
+                    <span className="text-xxs text-text-tertiary w-8">USD</span>
+                  </div>
+                </div>
+
+                {/* Auto crypto withdrawal (NOWPayments payout) */}
+                <div className="flex items-center justify-between gap-4 p-3 rounded-md border border-border-primary">
+                  <div>
+                    <p className="text-xs font-medium text-text-primary">Auto Crypto Withdrawal (NOWPayments)</p>
+                    <p className="text-xxs text-text-tertiary mt-0.5">Send crypto withdrawals automatically via NOWPayments. Needs NOWPayments payout credentials + whitelisting/2FA disabled on their dashboard.</p>
+                  </div>
+                  <button
+                    onClick={() => updateBool('crypto_auto_withdrawal_enabled', !settings.crypto_auto_withdrawal_enabled)}
+                    className={cn('relative w-9 h-5 rounded-full transition-fast shrink-0', settings.crypto_auto_withdrawal_enabled ? 'bg-success' : 'bg-bg-tertiary border border-border-primary')}
+                  >
+                    <span className={cn('absolute top-0.5 w-4 h-4 rounded-full bg-white transition-fast shadow-sm', settings.crypto_auto_withdrawal_enabled ? 'left-[18px]' : 'left-0.5')} />
+                  </button>
+                </div>
+                <div className="flex flex-wrap items-center justify-between gap-4">
+                  <div className="min-w-0 flex-1">
+                    <label className="text-xs text-text-secondary block">Auto-Withdrawal Max (USD)</label>
+                    <p className="text-xxs text-text-tertiary mt-0.5">Crypto withdrawals at or below this amount are paid out automatically; larger ones need admin approval. 0 = nothing auto.</p>
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <span className="text-xxs text-text-tertiary">$</span>
+                    <input
+                      type="number"
+                      step="1"
+                      min="0"
+                      value={settings.crypto_auto_withdrawal_max_usd}
+                      onChange={(e) => updateNum('crypto_auto_withdrawal_max_usd', e.target.value)}
                       className="w-28 text-xs py-1.5 px-2 bg-bg-input border border-border-primary rounded-md font-mono tabular-nums text-right"
                     />
                     <span className="text-xxs text-text-tertiary w-8">USD</span>
