@@ -64,6 +64,9 @@ class UserOut(BaseModel):
     trading_blocked_until: Optional[datetime] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
+    email_verified: Optional[bool] = None
+    two_factor_enabled: Optional[bool] = None
+    bank_deposit_enabled: Optional[bool] = None
 
     class Config:
         from_attributes = True

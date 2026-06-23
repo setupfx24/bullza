@@ -2,6 +2,7 @@ import uuid
 
 from fastapi import APIRouter, Depends, Query, Request, HTTPException
 from pydantic import BaseModel
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import IntegrityError, DBAPIError
 
@@ -207,6 +208,28 @@ async def block_trading(
         user_id=user_id, admin_id=admin.id,
         ip_address=request.client.host if request.client else None, db=db,
     )
+
+
+class BankDepositBody(BaseModel):
+    enabled: bool
+
+
+@router.post("/{user_id}/bank-deposit")
+async def set_bank_deposit(
+    user_id: uuid.UUID,
+    body: BankDepositBody,
+    admin: User = Depends(require_permission("users.add_fund")),
+    db: AsyncSession = Depends(get_db),
+):
+    """Show/hide the bank (manual) deposit option for THIS user specifically
+    (client 2026-06-23). Overrides the global wallet.manual_enabled toggle."""
+    from packages.common.src.models import User as _U
+    u = (await db.execute(select(_U).where(_U.id == user_id))).scalar_one_or_none()
+    if not u:
+        raise HTTPException(status_code=404, detail="User not found")
+    u.bank_deposit_enabled = bool(body.enabled)
+    await db.commit()
+    return {"message": "Bank deposit visibility updated", "bank_deposit_enabled": bool(body.enabled)}
 
 
 @router.post("/{user_id}/kill-switch")

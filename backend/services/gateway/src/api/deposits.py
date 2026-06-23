@@ -450,7 +450,10 @@ async def create_rm_request(
 
 
 @router.get("/payment-methods")
-async def get_payment_methods():
+async def get_payment_methods(
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
     # Public flags driving which tabs the trader UI shows. Crypto
     # (NOWPayments) is always enabled — it's the primary funding rail
     # and shouldn't be admin-toggleable. Manual (bank/UPI) and P2P are
@@ -463,9 +466,20 @@ async def get_payment_methods():
     # Defaults: manual = True (preserves existing behaviour), p2p = False
     # (P2P marketplace is still being onboarded — admin opts in when ready).
     from packages.common.src.settings_store import get_bool_setting
+    from packages.common.src.models import User
+    from sqlalchemy import select
+    manual = await get_bool_setting("wallet.manual_enabled", True)
+    # Per-user override (client 2026-06-23): admin can show the bank deposit
+    # option to a SPECIFIC client even when the global manual rail is off (or
+    # hide it for a specific client when it's globally on).
+    row = (await db.execute(
+        select(User.bank_deposit_enabled).where(User.id == current_user["user_id"])
+    )).first()
+    if row and row[0] is not None:
+        manual = bool(row[0])
     return {
         "crypto": True,
-        "manual": await get_bool_setting("wallet.manual_enabled", True),
+        "manual": manual,
         "p2p": await get_bool_setting("wallet.p2p_enabled", False),
     }
 

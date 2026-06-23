@@ -42,6 +42,7 @@ interface UserDetail {
     // uses these to decide whether to trigger a reset / revoke sessions.
     email_verified?: boolean;
     two_factor_enabled?: boolean;
+    bank_deposit_enabled?: boolean | null;
     created_at: string | null;
   };
   accounts: {
@@ -150,6 +151,7 @@ export default function UserDetailPage() {
   const [deposits, setDeposits] = useState<Array<{ id: string; amount: number; method: string; status: string; created_at: string | null; approved_at: string | null; approved_by: string | null; reference: string | null }>>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [bankBusy, setBankBusy] = useState(false);
 
   const fetchUser = useCallback(async () => {
     setLoading(true);
@@ -403,6 +405,40 @@ export default function UserDetailPage() {
             <FixedReturnGrantCard userId={userId} />
             <FixedReturnBonusCard userId={userId} />
           </>
+        )}
+
+        {/* Per-user bank deposit visibility (client 2026-06-23) */}
+        {can('users.add_fund') && (
+          <div className="bg-bg-secondary border border-border-primary rounded-lg p-5 flex items-center justify-between gap-4">
+            <div className="min-w-0">
+              <h3 className="text-sm font-bold text-text-primary">Bank deposit option</h3>
+              <p className="text-xxs text-text-tertiary mt-0.5">
+                Show the bank/manual deposit option to THIS client. {data.user.bank_deposit_enabled == null
+                  ? 'Currently following the global setting.'
+                  : data.user.bank_deposit_enabled ? 'Enabled for this client.' : 'Hidden for this client.'}
+              </p>
+            </div>
+            <button
+              type="button"
+              disabled={bankBusy}
+              onClick={async () => {
+                setBankBusy(true);
+                try {
+                  const next = !(data.user.bank_deposit_enabled ?? false);
+                  await adminApi.post(`/users/${userId}/bank-deposit`, { enabled: next });
+                  toast.success(`Bank deposit ${next ? 'enabled' : 'disabled'} for this client`);
+                  void fetchUser();
+                } catch (e: unknown) {
+                  toast.error(e instanceof Error ? e.message : 'Failed');
+                } finally {
+                  setBankBusy(false);
+                }
+              }}
+              className={cn('relative w-10 h-5 rounded-full transition-fast shrink-0', data.user.bank_deposit_enabled ? 'bg-success' : 'bg-bg-tertiary border border-border-primary', bankBusy && 'opacity-50')}
+            >
+              <span className={cn('absolute top-0.5 w-4 h-4 rounded-full bg-white transition-fast shadow-sm', data.user.bank_deposit_enabled ? 'left-[22px]' : 'left-0.5')} />
+            </button>
+          </div>
         )}
 
         {/* Trading Accounts */}

@@ -41,6 +41,10 @@ class User(Base):
     # for fast lookup at reward-application time). Gated by
     # system_settings.vip_pass_enabled until token economics land.
     is_vip = Column(Boolean, default=False, server_default="false")
+    # Per-user bank/manual deposit visibility (client 2026-06-23): admin can
+    # show the bank deposit option to specific clients only. NULL = follow the
+    # global wallet.manual_enabled toggle; True/False = explicit per-user override.
+    bank_deposit_enabled = Column(Boolean, nullable=True)
     two_factor_enabled = Column(Boolean, default=False)
     two_factor_secret = Column(String(255))
     # Bcrypt-hashed single-use recovery codes shown to the user once at

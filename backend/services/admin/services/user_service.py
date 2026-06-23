@@ -57,6 +57,8 @@ def _user_to_out(u: User) -> dict:
         # so they can decide whether to reset / revoke sessions.
         "email_verified": bool(getattr(u, "email_verified", False)),
         "two_factor_enabled": bool(getattr(u, "two_factor_enabled", False)),
+        # Per-user bank deposit visibility (None = follow global toggle).
+        "bank_deposit_enabled": getattr(u, "bank_deposit_enabled", None),
     }
 
 
