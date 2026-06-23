@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from packages.common.src.models import (
     BankAccount, BonusOffer, Deposit, Transaction, TradingAccount, User, UserBonus, Withdrawal,
+    AccountGroup,
 )
 from packages.common.src.notify import create_notification
 from packages.common.src.config import get_settings
@@ -1907,6 +1908,15 @@ async def wallet_summary(user_id: UUID, account_id: UUID | None, db: AsyncSessio
     )
     live_list = list(acct_q.scalars().all())
 
+    # Cent-account flag per account so the wallet UI can render ¢ balances and
+    # convert ¢→USD on transfer (client 2026-06-23).
+    cent_rows = (await db.execute(
+        select(TradingAccount.id, AccountGroup.is_cent_account)
+        .join(AccountGroup, AccountGroup.id == TradingAccount.account_group_id, isouter=True)
+        .where(TradingAccount.id.in_([a.id for a in live_list]))
+    )).all() if live_list else []
+    cent_map = {str(aid): bool(ic) for aid, ic in cent_rows}
+
     live_accounts_payload = [
         {
             "id": str(a.id),
@@ -1916,6 +1926,7 @@ async def wallet_summary(user_id: UUID, account_id: UUID | None, db: AsyncSessio
             "margin_used": float(a.margin_used or 0),
             "currency": a.currency or "USD",
             "free_margin": float((a.balance or Decimal("0")) - (a.margin_used or Decimal("0"))),
+            "is_cent_account": cent_map.get(str(a.id), False),
         }
         for a in live_list
     ]

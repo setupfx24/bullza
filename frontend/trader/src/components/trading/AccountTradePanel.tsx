@@ -476,8 +476,8 @@ export default function AccountTradePanel({ account, onClose }: AccountTradePane
             <div className="rounded-xl p-2.5 space-y-1.5 bg-bg-secondary" style={{ border: `1px solid ${!hasEnoughMargin ? 'rgba(239,83,80,0.3)' : 'var(--border-primary)'}` }}>
               {[
                 { label: 'Exec. Price', value: execPrice > 0 ? execPrice.toFixed(digits) : '—', color: 'var(--text-primary)' },
-                { label: 'Margin Required', value: `$${marginRequired.toFixed(2)}`, color: !hasEnoughMargin ? '#ef5350' : 'var(--text-primary)' },
-                { label: 'Free Margin', value: `$${freeMargin.toFixed(2)}`, color: !hasEnoughMargin ? '#ef5350' : '#55a630' },
+                { label: 'Margin Required', value: fmtAccountMoney(marginRequired, isCentAccount(account)), color: !hasEnoughMargin ? '#ef5350' : 'var(--text-primary)' },
+                { label: 'Free Margin', value: fmtAccountMoney(freeMargin, isCentAccount(account)), color: !hasEnoughMargin ? '#ef5350' : '#55a630' },
                 { label: 'Feed', value: isConnected ? '● Connected' : '○ Disconnected', color: isConnected ? '#55a630' : '#f57c00' },
               ].map((row) => (
                 <div key={row.label} className="flex items-center justify-between">
@@ -589,10 +589,10 @@ export default function AccountTradePanel({ account, onClose }: AccountTradePane
           {/* Account summary footer */}
           <div className="px-3 py-2 space-y-1 border-t border-border-primary bg-bg-secondary">
             {[
-              { label: 'Balance', value: `$${account.balance.toFixed(2)}` },
-              { label: 'Equity', value: `$${account.equity.toFixed(2)}` },
-              { label: 'Margin Used', value: `$${account.margin_used.toFixed(2)}` },
-              { label: 'Free Margin', value: `$${account.free_margin.toFixed(2)}`, color: '#55a630' },
+              { label: 'Balance', value: fmtAccountMoney(account.balance, isCentAccount(account)) },
+              { label: 'Equity', value: fmtAccountMoney(account.equity, isCentAccount(account)) },
+              { label: 'Margin Used', value: fmtAccountMoney(account.margin_used, isCentAccount(account)) },
+              { label: 'Free Margin', value: fmtAccountMoney(account.free_margin, isCentAccount(account)), color: '#55a630' },
             ].map((r) => (
               <div key={r.label} className="flex items-center justify-between">
                 <span className="text-[9px] text-text-tertiary">{r.label}</span>

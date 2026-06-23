@@ -10,6 +10,7 @@ import DashboardShell from '@/components/layout/DashboardShell';
 import DemoLockGate from '@/components/demo/DemoLockGate';
 import { useAuthStore } from '@/stores/authStore';
 import api from '@/lib/api/client';
+import { fmtAccountMoney, isCentAccount, CENT_PER_USD, CENT_SYMBOL } from '@/lib/wallet/centDisplay';
 import WalletDepositModal from '@/components/wallet/WalletDepositModal';
 import P2PMarketplace from '@/components/wallet/P2PMarketplace';
 import {
@@ -40,6 +41,7 @@ interface LiveAccountRow {
   margin_used?: number;
   currency?: string;
   free_margin?: number;
+  is_cent_account?: boolean;
 }
 
 interface WalletData {
@@ -859,21 +861,32 @@ function WalletPageContent() {
       toast.error('Enter a valid amount');
       return;
     }
+    // Cent accounts display + accept ¢; the backend works in USD. Convert the
+    // entered ¢ amount to USD (÷100) so e.g. ¢500 from a cent account lands as
+    // $5.00 in the main wallet (client 2026-06-23).
+    const txAccount = liveAccounts.find((a) => a.id === tradingId);
+    const txIsCent = isCentAccount(txAccount);
+    const usdAmt = txIsCent ? amt / CENT_PER_USD : amt;
+    const enteredLabel = txIsCent ? `${CENT_SYMBOL}${amt.toLocaleString()}` : `$${amt.toLocaleString()}`;
     setBalanceTransferBusy(true);
     try {
       if (balanceTransfer.mode === 'to_main') {
         await api.post('/wallet/transfer-trading-to-main', {
           from_account_id: tradingId,
-          amount: amt,
+          amount: usdAmt,
         });
-        toast.success(`$${amt.toLocaleString()} moved to main wallet`);
+        toast.success(
+          txIsCent
+            ? `${enteredLabel} moved to main wallet ($${usdAmt.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })})`
+            : `${enteredLabel} moved to main wallet`,
+        );
       } else {
         await api.post('/wallet/transfer-main-to-trading', {
           to_account_id: tradingId,
-          amount: amt,
+          amount: usdAmt,
         });
         const num = liveAccounts.find((a) => a.id === tradingId)?.account_number ?? '';
-        toast.success(`$${amt.toLocaleString()} sent to ${num || 'trading account'}`);
+        toast.success(`${enteredLabel} sent to ${num || 'trading account'}`);
       }
       closeBalanceTransfer();
       void fetchData(true);
@@ -882,6 +895,12 @@ function WalletPageContent() {
       setBalanceTransferBusy(false);
     }
   };
+
+  // Selected account for the transfer modal — drives ¢ vs $ rendering.
+  const transferAccount = balanceTransfer
+    ? liveAccounts.find((a) => a.id === (balanceTransfer.tradingAccountId ?? balanceTransferPickId))
+    : undefined;
+  const transferIsCent = isCentAccount(transferAccount);
 
   if (loading) {
     return (
@@ -1020,7 +1039,9 @@ function WalletPageContent() {
               {liveAccounts.map((a) => {
                 const cur = a.currency || wallet?.currency || 'USD';
                 const bal = Number(a.balance) || 0;
-                const line = new Intl.NumberFormat('en-US', { style: 'currency', currency: cur }).format(bal);
+                const line = isCentAccount(a)
+                  ? fmtAccountMoney(bal, true)
+                  : new Intl.NumberFormat('en-US', { style: 'currency', currency: cur }).format(bal);
                 const isSel = a.id === selectedAccountId;
                 const num = a.account_number || '';
                 const isManaged = num.startsWith('IF') || num.startsWith('CF');
@@ -2043,11 +2064,16 @@ function WalletPageContent() {
             ) : null}
             <div className="mb-3 space-y-1">
               <label className="text-[10px] font-semibold uppercase tracking-wider text-text-tertiary">
-                Amount ({wallet?.currency || 'USD'})
+                Amount ({transferIsCent ? CENT_SYMBOL : (wallet?.currency || 'USD')})
               </label>
+              {transferIsCent && transferAccount && balanceTransfer.mode === 'to_main' ? (
+                <p className="text-[10px] text-text-tertiary">
+                  Available: {fmtAccountMoney(transferAccount.balance, true)} · credited to main wallet in USD
+                </p>
+              ) : null}
               <div className="relative">
                 <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs font-bold text-text-tertiary">
-                  $
+                  {transferIsCent ? CENT_SYMBOL : '$'}
                 </span>
                 <input
                   type="number"
