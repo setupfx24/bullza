@@ -36,12 +36,16 @@ async def list_tickets(
     status_filter: str | None,
     priority_filter: str | None,
     db: AsyncSession,
+    assigned_to: uuid.UUID | None = None,
 ) -> PaginatedResponse:
     query = select(SupportTicket)
     if status_filter:
         query = query.where(SupportTicket.status == status_filter)
     if priority_filter:
         query = query.where(SupportTicket.priority == priority_filter)
+    # Reply-only employees only see tickets assigned to them (client 2026-06-23).
+    if assigned_to is not None:
+        query = query.where(SupportTicket.assigned_to == assigned_to)
 
     count_q = select(func.count()).select_from(query.subquery())
     total = (await db.execute(count_q)).scalar() or 0
