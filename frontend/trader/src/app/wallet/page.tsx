@@ -1220,7 +1220,12 @@ function WalletPageContent() {
                         <button
                           key={method}
                           type="button"
-                          onClick={() => setDepositUiSection(method)}
+                          onClick={() => {
+                            // Bank deposit opens its own dedicated page (client
+                            // 2026-06-23: "naya page khulna chahiye XM ki tarah").
+                            if (method === 'manual') { router.push('/wallet/deposit/bank'); return; }
+                            setDepositUiSection(method);
+                          }}
                           className={clsx(
                             'px-4 py-2.5 text-sm font-semibold transition-all border-b-2 whitespace-nowrap',
                             active
@@ -1231,7 +1236,7 @@ function WalletPageContent() {
                           {method === 'crypto'
                             ? 'Crypto (NOWPayments)'
                             : method === 'manual'
-                            ? 'Manual (Bank)'
+                            ? 'Bank Deposit'
                             : 'Request to RM'}
                         </button>
                       );
