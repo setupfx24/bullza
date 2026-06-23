@@ -796,6 +796,19 @@ async def login_user(
     if not user or not verify_password(password, user.password_hash):
         raise AuthServiceError("Invalid credentials", 401)
 
+    # Staff accounts (admins / employees) are User rows with an elevated role.
+    # They MUST sign in through the admin panel — entering staff credentials on
+    # the trader login is rejected so the admin surface never leaks into the
+    # trader app (client 2026-06-23: "superadmin credentials se user login nahi
+    # hona chahiye"). Impersonation ("Login As") is unaffected: login_as_user /
+    # login_as_employee mint a token for the TARGET user directly and never
+    # pass through this credential check.
+    if user.role in ("admin", "super_admin", "employee", "manager", "support"):
+        raise AuthServiceError(
+            "This is a staff account. Please sign in through the admin panel.",
+            403,
+        )
+
     # Gate sign-in until the user has confirmed ownership of the email.
     # Existing users (registered before migration 0038) were backfilled
     # with email_verified=True so this only blocks new sign-ups that
