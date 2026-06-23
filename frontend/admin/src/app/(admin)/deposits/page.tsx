@@ -321,8 +321,10 @@ export default function DepositsPage() {
         page: String(page),
         per_page: String(PAGE_SIZE),
         // This is the funding History tab — keep trade P&L rows out (trades
-        // have their own page). Client 2026-06-20.
-        exclude: 'trading,trade',
+        // have their own page). trading_service books trade outcomes as
+        // type "profit"/"loss" (NOT "trade"), so those must be excluded too
+        // or they leak back into the funding history (client 2026-06-23).
+        exclude: 'trading,trade,profit,loss,commission,swap',
       };
       if (dateFrom) params.start_date = dateFrom;
       if (dateTo) params.end_date = dateTo;

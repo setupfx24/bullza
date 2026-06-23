@@ -1235,8 +1235,8 @@ export default function PositionsPanel({ variant = 'default' }: PositionsPanelPr
                             <td className={clsx(td, 'font-mono font-bold tabular-nums')} style={{ color: pnl >= 0 ? '#2962FF' : '#FF2440' }}>
                               {pnl >= 0 ? '+' : ''}{fmtAccountMoney(pnl, isCentAccount(activeAccount))}
                             </td>
-                            <td className={clsx(td, 'font-mono tabular-nums', charges < 0 ? 'text-sell' : 'text-text-secondary')}>
-                              {charges === 0 ? fmtAccountMoney(0, isCentAccount(activeAccount)) : (charges > 0 ? '+' : '-') + fmtAccountMoney(Math.abs(charges), isCentAccount(activeAccount)).replace('-', '')}
+                            <td className={clsx(td, 'font-mono tabular-nums', charges > 0 ? 'text-sell' : charges < 0 ? 'text-buy' : 'text-text-secondary')}>
+                              {charges === 0 ? fmtAccountMoney(0, isCentAccount(activeAccount)) : (charges > 0 ? '-' : '+') + fmtAccountMoney(Math.abs(charges), isCentAccount(activeAccount)).replace('-', '')}
                             </td>
                             <td className={clsx(td, 'text-[10px]')}>
                               {sltpEdit && sltpEdit.positionId === pos.id ? (
