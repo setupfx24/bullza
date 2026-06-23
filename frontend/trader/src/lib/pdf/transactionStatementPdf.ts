@@ -21,6 +21,7 @@ export type TransactionStatementRow = {
 export type TransactionStatementMeta = {
   userName?: string;
   userEmail?: string;
+  userId?: string;
   accountLabel?: string;
   periodLabel?: string;
   /** "All transactions" | "Deposits" | "Withdrawals" — shown in the header. */
@@ -96,6 +97,7 @@ export async function downloadTransactionStatementPdf(
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(80, 80, 80);
   }
+  if (meta?.userId) { doc.text(`User ID: ${meta.userId}`, margin, y); y += 4; }
   if (meta?.accountLabel) { doc.text(`Account: ${meta.accountLabel}`, margin, y); y += 4; }
   if (meta?.periodLabel) { doc.text(`Period: ${meta.periodLabel}`, margin, y); y += 4; }
   doc.text(`Generated: ${formatWhen(new Date().toISOString())} (local time)`, margin, y);

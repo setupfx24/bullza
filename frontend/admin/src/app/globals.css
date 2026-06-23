@@ -38,11 +38,14 @@
 
 /* —— Light theme —— */
 /* The sidebar wordmark asset is white lettering — invisible on the light
-   theme's white header. Darken it to a black wordmark so it stays readable
-   (client 2026-06-20: "white theme me logo theek nahi hai"). */
-html.light .swisdex-wordmark,
-[data-theme='light'] .swisdex-wordmark {
-  filter: brightness(0);
+   theme's white header. Put it on a dark chip in light mode so the real
+   (white) logo stays visible and on-brand (client 2026-06-23: brightness()
+   turned it into an ugly black blob). */
+html.light .swisdex-logo-wrap,
+[data-theme='light'] .swisdex-logo-wrap {
+  background: #0a0a0a;
+  border-radius: 8px;
+  padding: 4px 10px;
 }
 
 html.light, [data-theme='light'] {

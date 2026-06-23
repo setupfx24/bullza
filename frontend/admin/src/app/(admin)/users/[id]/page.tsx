@@ -217,7 +217,7 @@ export default function UserDetailPage() {
         `$${fmt(a.margin_used)}`, `1:${a.leverage}`, a.currency,
       ]),
       {
-        subtitle: `User: ${name} <${user.email}>`,
+        subtitle: `User: ${name} <${user.email}> | ID: ${user.id}`,
         summaryLines: [
           `Email: ${user.email}    Phone: ${user.phone || '-'}`,
           `Country: ${user.country || '-'}    Address: ${user.address || '-'}`,
@@ -259,7 +259,7 @@ export default function UserDetailPage() {
           i.status || '-',
         ]),
         {
-          subtitle: `User: ${name} <${user.email}>`,
+          subtitle: `User: ${name} <${user.email}> | ID: ${user.id}`,
           summaryLines: [
             `Rows: ${items.length}`,
             `Total in (completed): $${fmt(totIn)}    Total out (completed): $${fmt(totOut)}`,

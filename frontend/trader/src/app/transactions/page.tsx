@@ -176,6 +176,7 @@ export default function TransactionsPage() {
       void downloadTransactionStatementPdf(filteredTx, {
         userName: fullName || undefined,
         userEmail: user?.email || undefined,
+        userId: user?.id || undefined,
         kindLabel,
         periodLabel,
       });
