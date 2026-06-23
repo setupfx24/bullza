@@ -476,6 +476,17 @@ async def _consume_referral(db: AsyncSession, user_id: UUID, referral_code: str)
     ib_profile = ib_q.scalar_one_or_none()
     if ib_profile:
         db.add(Referral(referrer_id=ib_profile.user_id, referred_id=user_id, ib_profile_id=ib_profile.id))
+        # Also set referred_by_user_id so the IB earns the PERSONAL referral
+        # reward too (client 2026-06-23): the referral amount goes to EVERYONE
+        # who refers — including IBs — while per-lot commission stays IB-only.
+        # Without this an IB-code signup left referred_by_user_id NULL, so the
+        # IB got no referral payout on the referee's first deposit / trades.
+        new_user = (await db.execute(
+            select(User).where(User.id == user_id)
+        )).scalar_one_or_none()
+        if (new_user is not None and new_user.referred_by_user_id is None
+                and ib_profile.user_id != user_id):
+            new_user.referred_by_user_id = ib_profile.user_id
         # Best-effort: a rewards-side failure must not block the signup itself.
         try:
             from . import rewards_service
