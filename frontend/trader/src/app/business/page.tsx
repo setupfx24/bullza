@@ -430,6 +430,27 @@ function IBTab() {
 
 
 
+  // A Sub-IB (anyone not introduced directly by the Super IB) does NOT get the
+  // IB program section — only a prompt to apply to SwisDex (client 2026-06-23:
+  // "sub-sub wale ko IB section show ho raha hai").
+  if (dashboard?.is_sub_ib) {
+    return (
+      <div className="rounded-xl border border-border-primary bg-card p-6 sm:p-8 noise-texture text-center max-w-lg mx-auto space-y-3">
+        <div className="text-2xl">🤝</div>
+        <h3 className="text-sm font-semibold text-text-primary">You&apos;re a Sub-IB</h3>
+        <p className="text-xxs text-text-tertiary">
+          The IB program is available to full IBs. To become a full IB, apply to SwisDex.
+        </p>
+        <a
+          href="/support?topic=ib-upgrade"
+          className="inline-block text-xs font-medium px-4 py-2 rounded-md bg-accent/15 text-accent border border-accent/30 hover:bg-accent/25"
+        >
+          Apply to SwisDex to become an IB
+        </a>
+      </div>
+    );
+  }
+
   return (
 
     <div className="space-y-4">
