@@ -1204,6 +1204,7 @@ async def close_position(position_id: UUID, req, user_id: UUID, db: AsyncSession
 
         result_msg = f"Partial close: {close_lots} lots"
         result_profit = partial_profit
+        result_charges = partial_commission + partial_swap
     else:
         pos.status = "closed"
         pos.close_price = close_price
@@ -1238,6 +1239,14 @@ async def close_position(position_id: UUID, req, user_id: UUID, db: AsyncSession
 
         result_msg = "Position closed"
         result_profit = full_profit
+        result_charges = (pos.commission or Decimal("0")) + (pos.swap or Decimal("0"))
+
+    # NET P&L for what the trader SEES (close toast, notification, realtime
+    # push). The closed-positions list + portfolio already show
+    # profit - commission - swap, so the close screen must match (client
+    # 2026-06-23). The ledger Transaction below keeps the gross close amount —
+    # commission was charged at open and swap overnight as separate rows.
+    result_net = result_profit - result_charges
 
     # Negative Balance Protection — a trader can never owe money. If a close
     # (esp. a gapping/illiquid market) drops the balance below zero, the broker
@@ -1321,8 +1330,8 @@ async def close_position(position_id: UUID, req, user_id: UUID, db: AsyncSession
     _pos_symbol = pos.instrument.symbol if pos.instrument else ""
     _pos_id = str(pos.id)
     _acct_id = str(account.id)
-    _profit_str = str(result_profit)
-    pnl_str = f"+${float(result_profit):.2f}" if result_profit >= 0 else f"-${abs(float(result_profit)):.2f}"
+    _profit_str = str(result_net)
+    pnl_str = f"+${float(result_net):.2f}" if result_net >= 0 else f"-${abs(float(result_net)):.2f}"
 
     async def _post_close_tasks():
         async with AsyncSessionLocal() as bg_db:
@@ -1372,7 +1381,11 @@ async def close_position(position_id: UUID, req, user_id: UUID, db: AsyncSession
     return {
         "message": result_msg,
         "close_price": float(close_price),
-        "profit": float(result_profit),
+        # NET P&L (profit - commission - swap) so the close screen matches the
+        # closed-positions list + portfolio. `gross_profit` kept for callers
+        # that need the raw price P&L.
+        "profit": float(result_net),
+        "gross_profit": float(result_profit),
         "lots_closed": float(close_lots),
         "remaining_lots": float(pos.lots) if is_partial else 0,
         "balance": float(account.balance),

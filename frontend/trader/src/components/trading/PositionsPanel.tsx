@@ -1110,11 +1110,14 @@ export default function PositionsPanel({ variant = 'default' }: PositionsPanelPr
                             <div><span className="text-text-tertiary">Acct</span> <span className="text-text-secondary">{accountLabel(pos.account_id)}</span></div>
                             {(() => {
                               const charges = (pos.commission || 0) + (pos.swap || 0);
+                              // Charges (commission + swap) are a COST that reduces
+                              // P&L, so a positive total must show as a deduction
+                              // (-$x, red) — not a gain (+$x). Client 2026-06-23.
                               return (
                                 <div>
                                   <span className="text-text-tertiary">Charges</span>{' '}
-                                  <span className={clsx('font-mono', charges < 0 ? 'text-sell' : 'text-text-secondary')}>
-                                    {charges === 0 ? '$0.00' : (charges > 0 ? '+' : '-') + '$' + Math.abs(charges).toFixed(2)}
+                                  <span className={clsx('font-mono', charges > 0 ? 'text-sell' : charges < 0 ? 'text-buy' : 'text-text-secondary')}>
+                                    {charges === 0 ? '$0.00' : (charges > 0 ? '-' : '+') + '$' + Math.abs(charges).toFixed(2)}
                                   </span>
                                 </div>
                               );
