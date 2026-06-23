@@ -444,16 +444,18 @@ export default function PositionsPanel({ variant = 'default' }: PositionsPanelPr
           { timeoutMs: 8_000 },
         );
         const pnl = res.profit ?? 0;
-        const sign = pnl >= 0 ? '+' : '';
+        // Cent accounts must show ¢ (×100), not $ (client 2026-06-23: close
+        // toast was converting cent P&L to $).
+        const pnlStr = fmtAccountMoney(pnl, isCentAccount(activeAccount), { signDisplay: 'always' });
         pnl >= 0 ? sounds.profit() : sounds.loss();
 
         if (res.remaining_lots && res.remaining_lots > 0) {
           toast.success(
-            `Partial close @ ${res.close_price}\nBooked: ${sign}$${pnl.toFixed(2)}  •  ${res.remaining_lots} lots remain`,
+            `Partial close @ ${res.close_price}\nBooked: ${pnlStr}  •  ${res.remaining_lots} lots remain`,
             { duration: 5000 },
           );
         } else {
-          toast.success(`Closed @ ${res.close_price} | P&L: ${sign}$${pnl.toFixed(2)}`);
+          toast.success(`Closed @ ${res.close_price} | P&L: ${pnlStr}`);
         }
         Promise.all([refreshPositions(), refreshAccount(), loadHistory()]).catch(() => {});
       } catch (e) {
@@ -518,9 +520,9 @@ export default function PositionsPanel({ variant = 'default' }: PositionsPanelPr
       }
 
       if (res.closed_count > 0) {
-        const sign = res.total_profit >= 0 ? '+' : '';
+        const totalStr = fmtAccountMoney(res.total_profit, isCentAccount(activeAccount), { signDisplay: 'always' });
         toast.success(
-          `${res.closed_count} position${res.closed_count > 1 ? 's' : ''} closed — booked ${sign}$${res.total_profit.toFixed(2)}`,
+          `${res.closed_count} position${res.closed_count > 1 ? 's' : ''} closed — booked ${totalStr}`,
         );
       }
       if (res.failed_count > 0) {

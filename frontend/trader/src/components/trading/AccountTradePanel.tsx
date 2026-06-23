@@ -534,9 +534,14 @@ export default function AccountTradePanel({ account, onClose }: AccountTradePane
                 const cp = liveTick ? (pos.side === 'buy' ? liveTick.bid : liveTick.ask) : 0;
                 const inst = instruments.find((i) => i.symbol === pos.symbol);
                 const cs = inst?.contract_size || 100000;
-                // Engine lots, not display lots — else a cent position's
-                // live P&L shows 100× too large.
-                const pnlLots = pos.effective_lots ?? pos.lots;
+                // Engine lots, not display lots — else a cent position's live
+                // P&L shows 100× too large (client 2026-06-23: "¢4 then suddenly
+                // ¢45000 loss" = a tick update arrived without effective_lots and
+                // fell back to display lots). When effective_lots is missing,
+                // derive it from display lots × the account multiplier instead of
+                // trusting the raw display lots.
+                const _lotMult = Number((account as { account_group?: { lot_size_multiplier?: number } }).account_group?.lot_size_multiplier) || 1;
+                const pnlLots = pos.effective_lots ?? (pos.lots * _lotMult);
                 const livePnl = cp > 0
                   ? pos.side === 'buy'
                     ? (cp - pos.open_price) * pnlLots * cs

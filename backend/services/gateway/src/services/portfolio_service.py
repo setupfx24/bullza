@@ -14,7 +14,7 @@ from sqlalchemy.orm import selectinload
 
 from packages.common.src.models import (
     TradingAccount, Position, PositionStatus, OrderSide,
-    TradeHistory, Instrument, CopyTrade, Transaction,
+    TradeHistory, Instrument, CopyTrade, Transaction, AccountGroup,
 )
 from packages.common.src.redis_client import redis_client, PriceChannel
 
@@ -364,8 +364,26 @@ async def trade_history(
     )
     trades = result.scalars().all()
 
+    # Cent accounts store ENGINE (scaled) lots in TradeHistory — e.g. a 0.05
+    # cent-lot trade is held as 0.005. The open-positions list multiplies back
+    # by 1/lot_size_multiplier for display; the history list did NOT, so it
+    # showed the scaled-down 0.005 while the running trade showed 0.05 (client
+    # 2026-06-23). Build a per-account unscale factor and apply it below.
+    unscale_by_account: dict[str, Decimal] = {}
+    if account_ids:
+        mult_rows = (await db.execute(
+            select(TradingAccount.id, AccountGroup.lot_size_multiplier)
+            .join(AccountGroup, AccountGroup.id == TradingAccount.account_group_id, isouter=True)
+            .where(TradingAccount.id.in_(account_ids))
+        )).all()
+        for aid, mult in mult_rows:
+            m = Decimal(str(mult)) if mult is not None else Decimal("1")
+            unscale_by_account[str(aid)] = (Decimal("1") / m) if m > 0 else Decimal("1")
+
     items = []
     for t in trades:
+        _uns = unscale_by_account.get(str(t.account_id), Decimal("1"))
+        _disp_lots = float(Decimal(str(t.lots)) * _uns)
         side_val = t.side.value if hasattr(t.side, 'value') else str(t.side)
         copy_trade_q = await db.execute(
             select(CopyTrade).where(CopyTrade.investor_position_id == t.position_id)
@@ -374,7 +392,7 @@ async def trade_history(
         trade_type = "copy_trade" if copy_trade else "self_trade"
         items.append({
             "id": str(t.id), "symbol": t.instrument.symbol if t.instrument else None,
-            "side": side_val, "lots": float(t.lots),
+            "side": side_val, "lots": _disp_lots,
             "open_price": float(t.open_price), "close_price": float(t.close_price),
             "swap": float(t.swap), "commission": float(t.commission),
             # NET P&L (price P&L minus commission + swap) so the Trade History
