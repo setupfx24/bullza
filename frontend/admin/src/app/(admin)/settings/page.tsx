@@ -23,6 +23,7 @@ interface Settings {
   // the max are paid out automatically; larger ones need admin approval.
   crypto_auto_withdrawal_enabled: boolean;
   crypto_auto_withdrawal_max_usd: number;
+  dual_approval_threshold_usd: number;
   referral_commission_amount_usd: number;
   referral_qualifying_trades: number;
   // IB commission gates (mirror of the referral gates above).
@@ -67,6 +68,7 @@ const DEFAULT_SETTINGS: Settings = {
   min_withdrawal_amount_usd: 70,
   crypto_auto_withdrawal_enabled: false,
   crypto_auto_withdrawal_max_usd: 0,
+  dual_approval_threshold_usd: 1000,
   referral_commission_amount_usd: 5,
   referral_qualifying_trades: 3,
   ib_commission_requires_kyc: true,
@@ -112,6 +114,7 @@ function rowsToSettings(rows: SystemSettingRow[]): Settings {
     min_withdrawal_amount_usd: num('min_withdrawal_amount_usd', DEFAULT_SETTINGS.min_withdrawal_amount_usd),
     crypto_auto_withdrawal_enabled: bool('crypto_auto_withdrawal_enabled', DEFAULT_SETTINGS.crypto_auto_withdrawal_enabled),
     crypto_auto_withdrawal_max_usd: num('crypto_auto_withdrawal_max_usd', DEFAULT_SETTINGS.crypto_auto_withdrawal_max_usd),
+    dual_approval_threshold_usd: num('dual_approval_threshold_usd', DEFAULT_SETTINGS.dual_approval_threshold_usd),
     referral_commission_amount_usd: num(
       'referral_commission_amount_usd',
       DEFAULT_SETTINGS.referral_commission_amount_usd as number,
@@ -157,6 +160,7 @@ function settingsToPayload(s: Settings): Record<string, unknown> {
     min_withdrawal_amount_usd: s.min_withdrawal_amount_usd,
     crypto_auto_withdrawal_enabled: s.crypto_auto_withdrawal_enabled,
     crypto_auto_withdrawal_max_usd: s.crypto_auto_withdrawal_max_usd,
+    dual_approval_threshold_usd: s.dual_approval_threshold_usd,
     // Fallback flat USD bounty — used only when referral_tiers
     // (the by-active-referral-count ladder, editable at /config/referral-tiers,
     // independent of IB) has no matching tier for the referrer's position.
@@ -480,6 +484,27 @@ export default function SettingsPage() {
                       min="0"
                       value={settings.crypto_auto_withdrawal_max_usd}
                       onChange={(e) => updateNum('crypto_auto_withdrawal_max_usd', e.target.value)}
+                      className="w-28 text-xs py-1.5 px-2 bg-bg-input border border-border-primary rounded-md font-mono tabular-nums text-right"
+                    />
+                    <span className="text-xxs text-text-tertiary w-8">USD</span>
+                  </div>
+                </div>
+
+                {/* Dual-approval threshold (client 2026-06-23: make the $1000
+                    second-sign-off limit editable). */}
+                <div className="flex flex-wrap items-center justify-between gap-4">
+                  <div className="min-w-0 flex-1">
+                    <label className="text-xs text-text-secondary block">Dual-Approval Threshold</label>
+                    <p className="text-xxs text-text-tertiary mt-0.5">Admin fund add/deduct at or above this amount needs a second admin sign-off. (A repeat fund-add to the same user within 24h always needs approval, regardless of this limit.)</p>
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <span className="text-xxs text-text-tertiary">$</span>
+                    <input
+                      type="number"
+                      step="1"
+                      min="0"
+                      value={settings.dual_approval_threshold_usd}
+                      onChange={(e) => updateNum('dual_approval_threshold_usd', e.target.value)}
                       className="w-28 text-xs py-1.5 px-2 bg-bg-input border border-border-primary rounded-md font-mono tabular-nums text-right"
                     />
                     <span className="text-xxs text-text-tertiary w-8">USD</span>

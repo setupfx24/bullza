@@ -300,8 +300,26 @@ async def add_fund(
     amt = Decimal(str(body.amount))
 
     if approval_request_id is None:
-        # First-pass: gate on amount thresholds. Either short-circuits with a
-        # 202 (approval required) or returns None to proceed.
+        # Anti-split guard (client 2026-06-23): if this user already received an
+        # admin fund-add in the last 24h, force dual approval on the NEXT one —
+        # even below the threshold — so an employee can't bypass the second
+        # sign-off by splitting one large credit into several small top-ups.
+        from datetime import datetime, timedelta, timezone
+        cutoff = datetime.now(timezone.utc) - timedelta(hours=24)
+        recent = await db.execute(
+            select(Transaction.id).where(
+                Transaction.user_id == user_id,
+                Transaction.type == "adjustment",
+                Transaction.amount > 0,
+                Transaction.created_by.isnot(None),
+                Transaction.created_at >= cutoff,
+            ).limit(1)
+        )
+        force_dual = recent.first() is not None
+
+        # First-pass: gate on amount thresholds (or force dual approval if the
+        # 24h guard above tripped). Either short-circuits with a 202 (approval
+        # required) or returns None to proceed.
         await request_or_execute(
             db,
             action="add_fund",
@@ -310,6 +328,7 @@ async def add_fund(
             amount=amt,
             payload={"description": body.description, "source": "main_wallet"},
             requested_by=admin_id,
+            always=force_dual,
         )
     else:
         # Second-pass: confirm the approval row matches what we're about to do.
