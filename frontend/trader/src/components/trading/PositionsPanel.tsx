@@ -1102,7 +1102,7 @@ export default function PositionsPanel({ variant = 'default' }: PositionsPanelPr
                               })()}
                             </div>
                             <span className="font-mono text-sm font-bold tabular-nums" style={{ color: pnl >= 0 ? '#2962FF' : '#FF2440' }}>
-                              {pnl >= 0 ? '+' : ''}${pnl.toFixed(2)}
+                              {fmtAccountMoney(pnl, isCentAccount(activeAccount), { signDisplay: 'always' })}
                             </span>
                           </div>
                           <div className="grid grid-cols-3 gap-x-3 gap-y-1 text-[11px]">
@@ -1516,7 +1516,7 @@ export default function PositionsPanel({ variant = 'default' }: PositionsPanelPr
                                 })()}
                               </div>
                               <span className="font-mono text-sm font-bold tabular-nums" style={{ color: net >= 0 ? '#2962FF' : '#FF2440' }}>
-                                {net >= 0 ? '+' : ''}${net.toFixed(2)}
+                                {fmtAccountMoney(net, isCentAccount(activeAccount), { signDisplay: 'always' })}
                               </span>
                             </div>
                             <div className="grid grid-cols-3 gap-x-3 gap-y-1 text-[11px]">
@@ -1592,7 +1592,7 @@ export default function PositionsPanel({ variant = 'default' }: PositionsPanelPr
                             <td className={clsx(td, 'font-mono')}>{trade.open_price.toFixed(d)}</td>
                             <td className={clsx(td, 'font-mono')}>{trade.close_price.toFixed(d)}</td>
                             <td className={clsx(td, 'font-mono font-bold tabular-nums')} style={{ color: net >= 0 ? '#2962FF' : '#FF2440' }}>
-                              {net >= 0 ? '+' : ''}${net.toFixed(2)}
+                              {fmtAccountMoney(net, isCentAccount(activeAccount), { signDisplay: 'always' })}
                             </td>
                             <td className={td}>
                               <span

@@ -8,6 +8,7 @@ import { useTradingStore, type TradingAccount, type TickData } from '@/stores/tr
 import api from '@/lib/api/client';
 import { sounds, unlockAudio } from '@/lib/sounds';
 import { getDigits } from '@/lib/utils';
+import { fmtAccountMoney, isCentAccount } from '@/lib/wallet/centDisplay';
 import { getMarketStatus } from '@/lib/marketHours';
 import { wsManager, type ConnectionStatus } from '@/lib/ws/wsManager';
 import { extractTicksFromPayload } from '@/lib/ws/normalizePricePayload';
@@ -576,7 +577,7 @@ export default function AccountTradePanel({ account, onClose }: AccountTradePane
                     </div>
                     <div className="text-right shrink-0">
                       <div className="text-[11px] font-mono font-bold tabular-nums" style={{ color: pnlColor }}>
-                        {livePnl >= 0 ? '+' : ''}{livePnl.toFixed(2)}
+                        {fmtAccountMoney(livePnl, isCentAccount(account), { signDisplay: 'always' })}
                       </div>
                     </div>
                   </div>
