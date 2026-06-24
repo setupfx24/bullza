@@ -1495,9 +1495,12 @@ export default function PositionsPanel({ variant = 'default' }: PositionsPanelPr
                     ) : (
                       historyTrades.map((trade) => {
                         const d = getDigits(trade.symbol);
-                        const pnl = trade.pnl || 0;
-                        const charges = trade.commission || 0;
-                        const net = pnl - charges;
+                        // trade.pnl from /portfolio/trades is ALREADY net (price
+                        // P&L − commission − swap). Use it directly — subtracting
+                        // charges again double-counted commission and showed
+                        // -$0.74 vs the -$0.67 on the close popup + trade history
+                        // (client 2026-06-24).
+                        const net = trade.pnl || 0;
                         const exitBadge = closeReasonBadge(trade.close_reason, trade.close_price, d);
                         return (
                           <div key={trade.id} className="rounded-xl border border-border-glass bg-bg-secondary/40 p-3 space-y-2">
@@ -1561,9 +1564,12 @@ export default function PositionsPanel({ variant = 'default' }: PositionsPanelPr
                     <tbody>
                       {historyTrades.map((trade) => {
                         const d = getDigits(trade.symbol);
-                        const pnl = trade.pnl || 0;
-                        const charges = trade.commission || 0;
-                        const net = pnl - charges;
+                        // trade.pnl from /portfolio/trades is ALREADY net (price
+                        // P&L − commission − swap). Use it directly — subtracting
+                        // charges again double-counted commission and showed
+                        // -$0.74 vs the -$0.67 on the close popup + trade history
+                        // (client 2026-06-24).
+                        const net = trade.pnl || 0;
                         const exitBadge = closeReasonBadge(trade.close_reason, trade.close_price, d);
                         return (
                           <tr key={trade.id} className={tbodyRowClass}>
