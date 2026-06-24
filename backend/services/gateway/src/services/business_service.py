@@ -625,11 +625,16 @@ async def ib_tree(user_id: UUID, max_depth: int, db: AsyncSession) -> dict:
     # not. Sub-IB profile info is LEFT-joined so the existing UI
     # (referral_code, sub-IB level, total_earned per node) keeps
     # rendering when the downline node IS an IB.
+    # Direct children come from EITHER referred_by_user_id (personal code) OR a
+    # Referral row pointing at this IB's profile (IB code/link signups, which
+    # leave referred_by_user_id NULL — they showed in the Sub-Broker clients
+    # list but were missing from My Network; client 2026-06-24). For the latter
+    # we coalesce their parent to this IB so they attach under the root.
     cte_query = text("""
         WITH RECURSIVE network AS (
             SELECT
                 u.id AS user_id,
-                u.referred_by_user_id AS parent_user_id,
+                COALESCE(u.referred_by_user_id, :root_user_id) AS parent_user_id,
                 u.email, u.first_name, u.last_name,
                 ip.id AS ib_profile_id,
                 ip.referral_code, ip.level AS ib_level,
@@ -639,6 +644,10 @@ async def ib_tree(user_id: UUID, max_depth: int, db: AsyncSession) -> dict:
             FROM users u
             LEFT JOIN ib_profiles ip ON ip.user_id = u.id
             WHERE u.referred_by_user_id = :root_user_id
+               OR u.id IN (
+                    SELECT r.referred_id FROM referrals r
+                    WHERE r.ib_profile_id = :root_ib_profile_id
+               )
 
             UNION ALL
 
@@ -660,7 +669,11 @@ async def ib_tree(user_id: UUID, max_depth: int, db: AsyncSession) -> dict:
 
     result = await db.execute(
         cte_query,
-        {"root_user_id": str(user_id), "max_depth": max_depth},
+        {
+            "root_user_id": str(user_id),
+            "root_ib_profile_id": str(profile.id),
+            "max_depth": max_depth,
+        },
     )
     rows = result.fetchall()
 
