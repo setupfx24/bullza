@@ -207,6 +207,20 @@ export default function UsersPage() {
   const [menuPos, setMenuPos] = useState<{ top: number; left: number } | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
+  // Dual-approval threshold — admin-editable in Settings. Used to show the
+  // real limit in the Add/Deduct Fund modal instead of a hard-coded $1,000
+  // (client 2026-06-24). Falls back to 1000 if Settings aren't readable.
+  const [dualThreshold, setDualThreshold] = useState(1000);
+  useEffect(() => {
+    adminApi.get<{ key: string; value: unknown }[]>('/settings')
+      .then((rows) => {
+        const row = Array.isArray(rows) ? rows.find((r) => r.key === 'dual_approval_threshold_usd') : undefined;
+        const n = row ? Number(row.value) : NaN;
+        if (Number.isFinite(n) && n >= 0) setDualThreshold(n);
+      })
+      .catch(() => { /* no settings access → keep default */ });
+  }, []);
+
   // Effective permissions of the logged-in admin/employee — drives which
   // actions appear in the 3-dot menu. A limited employee must NOT see (or be
   // tempted to click) Ban / Kill-switch / Terminate / Delete etc. they have no
@@ -423,7 +437,7 @@ export default function UsersPage() {
       );
       if (resp?.detail?.code === 'approval_required') {
         toast(
-          `Pending — amount ≥ $${resp.detail.threshold_usd?.toLocaleString() ?? '1,000'}. ` +
+          `Pending — amount ≥ $${resp.detail.threshold_usd?.toLocaleString() ?? dualThreshold.toLocaleString()}. ` +
           `A second admin must approve this in /approvals.`,
           { icon: '⏳', duration: 6000 },
         );
@@ -893,7 +907,7 @@ export default function UsersPage() {
                   The amount will be credited to the user&apos;s <strong>main wallet</strong>. The user must then transfer funds to their trading account from the Wallet page.
                 </p>
                 <p className="text-[11px] text-text-tertiary mt-1.5 leading-snug">
-                  Amounts of <strong>$1,000 or more</strong> require a second admin to approve in <strong>/approvals</strong> before the wallet is credited.
+                  Amounts of <strong>${dualThreshold.toLocaleString()} or more</strong> require a second admin to approve in <strong>/approvals</strong> before the wallet is credited. A repeat fund-add to the same user within 24h also needs approval, even below this limit.
                 </p>
               </div>
             </div>
