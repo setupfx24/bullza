@@ -1650,6 +1650,35 @@ async def transfer_trading_to_main(req, user_id: UUID, db: AsyncSession) -> dict
         raise HTTPException(status_code=404, detail="User not found")
 
     account.balance = (account.balance or Decimal("0")) - amt
+
+    # Credit rule (client 2026-06-24): bonus / admin credit is tradable but must
+    # stay "backed" by real balance — the user must keep at least `credit` worth
+    # of balance in the account. If THIS transfer drops the balance below the
+    # credit, they've pulled their real money out from under the bonus, so the
+    # bonus credit is forfeited in full. Insurance-claim credit is EARNED money
+    # (the user paid the insurance fee) and survives — same protection as the
+    # first-withdrawal forfeiture.
+    cur_credit = account.credit or Decimal("0")
+    if cur_credit > 0 and account.balance < cur_credit:
+        insurance_credit = Decimal(str((await db.execute(
+            select(func.coalesce(func.sum(Transaction.amount), 0)).where(
+                Transaction.account_id == account.id,
+                Transaction.type == "insurance_payout",
+            )
+        )).scalar() or 0))
+        protected = min(cur_credit, max(Decimal("0"), insurance_credit))
+        forfeited = cur_credit - protected
+        if forfeited > 0:
+            account.credit = protected
+            db.add(Transaction(
+                user_id=user_id, account_id=account.id, type="bonus_forfeited",
+                amount=-forfeited, balance_after=account.balance,
+                description=(
+                    f"Bonus credit forfeited — balance dropped below credit on "
+                    f"transfer to main wallet (${float(forfeited):.2f})"
+                ),
+            ))
+
     account.equity = account.balance + (account.credit or Decimal("0"))
     account.free_margin = account.equity - (account.margin_used or Decimal("0"))
 

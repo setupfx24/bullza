@@ -278,6 +278,9 @@ function WalletPageContent() {
   } | null>(null);
   const [balanceTransferPickId, setBalanceTransferPickId] = useState('');
   const [balanceTransferAmount, setBalanceTransferAmount] = useState('');
+  // Agreement to the credit-forfeit rule when a to-main transfer would drop the
+  // trading balance below its bonus credit (client 2026-06-24).
+  const [transferAgree, setTransferAgree] = useState(false);
   const [balanceTransferBusy, setBalanceTransferBusy] = useState(false);
 
   const fetchData = useCallback(
@@ -840,6 +843,7 @@ function WalletPageContent() {
     setBalanceTransfer(null);
     setBalanceTransferAmount('');
     setBalanceTransferBusy(false);
+    setTransferAgree(false);
   };
 
   const submitBalanceTransfer = async () => {
@@ -901,6 +905,22 @@ function WalletPageContent() {
     ? liveAccounts.find((a) => a.id === (balanceTransfer.tradingAccountId ?? balanceTransferPickId))
     : undefined;
   const transferIsCent = isCentAccount(transferAccount);
+
+  // Credit-forfeit rule (to-main transfers only): the bonus credit must stay
+  // backed by real balance. Work out whether the typed amount would drop the
+  // balance below the credit — if so we warn + require agreement.
+  const transferCreditUsd = Number(transferAccount?.credit) || 0;
+  const transferBalanceUsd = Number(transferAccount?.balance) || 0;
+  const transferAmtUsd = (() => {
+    const v = parseFloat(balanceTransferAmount);
+    if (Number.isNaN(v) || v <= 0) return 0;
+    return transferIsCent ? v / CENT_PER_USD : v;
+  })();
+  const transferWouldForfeit =
+    !!balanceTransfer &&
+    balanceTransfer.mode === 'to_main' &&
+    transferCreditUsd > 0 &&
+    (transferBalanceUsd - transferAmtUsd) < transferCreditUsd;
 
   if (loading) {
     return (
@@ -2082,12 +2102,45 @@ function WalletPageContent() {
                   min="0.01"
                   step="0.01"
                   value={balanceTransferAmount}
-                  onChange={(e) => setBalanceTransferAmount(e.target.value)}
+                  onChange={(e) => { setBalanceTransferAmount(e.target.value); setTransferAgree(false); }}
                   placeholder="0.00"
                   className="w-full rounded-lg border border-border-primary bg-bg-primary py-2 pl-7 pr-3 text-sm font-mono font-bold text-text-primary outline-none focus:border-accent/40"
                 />
               </div>
             </div>
+
+            {/* Credit-forfeit rule for to-main transfers (client 2026-06-24). */}
+            {balanceTransfer.mode === 'to_main' && transferCreditUsd > 0 ? (
+              <div className={clsx(
+                'mb-3 rounded-lg border px-3 py-2.5 text-[11px] leading-relaxed',
+                transferWouldForfeit ? 'border-red-500/40 bg-red-500/10 text-red-300' : 'border-amber-500/30 bg-amber-500/10 text-amber-200',
+              )}>
+                <p>
+                  This account has <strong>{fmtAccountMoney(transferCreditUsd, transferIsCent)}</strong> bonus credit.
+                  You must keep at least <strong>{fmtAccountMoney(transferCreditUsd, transferIsCent)}</strong> balance in it.
+                </p>
+                {transferWouldForfeit ? (
+                  <p className="mt-1 font-semibold">
+                    ⚠️ This transfer drops your balance below the credit — your entire{' '}
+                    {fmtAccountMoney(transferCreditUsd, transferIsCent)} credit will be forfeited (insurance payouts are kept).
+                  </p>
+                ) : (
+                  <p className="mt-1 text-text-tertiary">Withdraw more than that and the entire credit is forfeited (insurance payouts are kept).</p>
+                )}
+                {transferWouldForfeit ? (
+                  <label className="mt-2 flex items-start gap-2 cursor-pointer text-text-secondary">
+                    <input
+                      type="checkbox"
+                      checked={transferAgree}
+                      onChange={(e) => setTransferAgree(e.target.checked)}
+                      className="mt-0.5 accent-red-500"
+                    />
+                    <span>I understand my {fmtAccountMoney(transferCreditUsd, transferIsCent)} credit will be forfeited.</span>
+                  </label>
+                ) : null}
+              </div>
+            ) : null}
+
             <div className="flex gap-2">
               <button
                 type="button"
@@ -2099,10 +2152,10 @@ function WalletPageContent() {
               <button
                 type="button"
                 onClick={() => void submitBalanceTransfer()}
-                disabled={balanceTransferBusy}
+                disabled={balanceTransferBusy || (transferWouldForfeit && !transferAgree)}
                 className={clsx(
                   'flex-1 rounded-lg py-2 text-xs font-bold transition-colors',
-                  balanceTransferBusy
+                  (balanceTransferBusy || (transferWouldForfeit && !transferAgree))
                     ? 'cursor-not-allowed bg-border-primary text-text-tertiary opacity-60'
                     : 'bg-accent text-black hover:bg-accent/90',
                 )}
