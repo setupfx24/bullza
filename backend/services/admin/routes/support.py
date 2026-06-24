@@ -21,14 +21,13 @@ async def list_tickets(
     admin: User = Depends(get_current_admin),
     db: AsyncSession = Depends(get_db),
 ):
-    # Client 2026-06-23: an employee with a ticket ASSIGNED to them must see it
-    # even if they don't have the broad tickets.view. Managers (tickets.view)
-    # see everything; reply-capable employees see only their assigned tickets.
+    # An employee with a ticket ASSIGNED to them must see it even if they don't
+    # have the broad tickets.view (client 2026-06-23/24: assigned ticket wasn't
+    # showing on the assignee's dashboard). Managers (tickets.view / *) see
+    # everything; everyone else is scoped to their OWN assigned tickets — no
+    # hard 403, so an assignee never gets locked out of their own queue.
     perms = await resolve_employee_permissions(admin, db)
     can_view_all = "*" in perms or "tickets.view" in perms
-    can_reply = "tickets.reply" in perms or "tickets.assign" in perms
-    if not (can_view_all or can_reply):
-        raise HTTPException(status_code=403, detail="Permission 'tickets.view' required")
     return await support_service.list_tickets(
         page=page, per_page=per_page,
         status_filter=status_filter, priority_filter=priority_filter,
@@ -46,8 +45,10 @@ async def get_ticket_detail(
     can_view_all = "*" in perms or "tickets.view" in perms
     detail = await support_service.get_ticket_detail(ticket_id=ticket_id, db=db)
     if not can_view_all:
-        can_reply = "tickets.reply" in perms or "tickets.assign" in perms
-        if not (can_reply and str(detail.get("assigned_to") or "") == str(admin.id)):
+        # An assignee can always OPEN their own assigned ticket to read it.
+        # Posting a reply still requires tickets.reply (enforced on /reply),
+        # so this only gates VIEW access (client 2026-06-24).
+        if str(detail.get("assigned_to") or "") != str(admin.id):
             raise HTTPException(status_code=403, detail="You can only open tickets assigned to you")
     return detail
 
