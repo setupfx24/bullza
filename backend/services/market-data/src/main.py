@@ -42,6 +42,14 @@ settings = get_settings()
 STALE_TICK_AFTER_SEC = 90.0
 STALE_REFRESH_INTERVAL_SEC = 30.0
 
+# Bad-tick guard: a single tick that moves the mid more than this fraction off
+# the last good price is treated as a garbage quote and dropped. Real single
+# ticks almost never move >10% even in volatile crypto; bad quotes are usually
+# 0, crossed, or off by 50%+. After this many consecutive drops we accept the
+# next tick anyway, so a genuine market gap is never frozen out permanently.
+MAX_TICK_JUMP_PCT = 0.10
+MAX_CONSECUTIVE_BAD_TICKS = 5
+
 
 class MarketDataService:
     def __init__(self):
@@ -108,6 +116,9 @@ class MarketDataService:
         self.running = True
         self._last_mid: dict[str, float] = {}
         self._last_live_mono: dict[str, float] = {}
+        # Bad-tick guard: count consecutive outlier ticks dropped per symbol so a
+        # genuine market gap eventually gets through (see tick processor).
+        self._bad_tick_streak: dict[str, int] = {}
 
     async def start(self):
         logger.info("Starting Market Data Service...")
@@ -234,6 +245,32 @@ class MarketDataService:
             ts = tick.get("timestamp", datetime.now(timezone.utc).isoformat())
 
             mid = (bid + ask) / 2.0
+
+            # ── Bad-tick guard (client 2026-06-24) ───────────────────────────
+            # The feed occasionally delivers a garbage quote (zero, crossed, or
+            # a price off by a huge margin). Computing P&L on it spikes the
+            # trader's running P&L for one frame, then it snaps back — so the
+            # number jumps around (e.g. 1 → -55 → 200) instead of moving
+            # smoothly. Drop these and freeze on the last good price, like pro
+            # terminals. A genuine market gap still gets through after a few
+            # consecutive rejects so we never freeze permanently.
+            prev_mid = self._last_mid.get(symbol)
+            if bid <= 0 or ask <= 0 or bid > ask:
+                self._bad_tick_streak[symbol] = self._bad_tick_streak.get(symbol, 0) + 1
+                continue
+            if prev_mid is not None and prev_mid > 0:
+                jump = abs(mid - prev_mid) / prev_mid
+                streak = self._bad_tick_streak.get(symbol, 0)
+                if jump > MAX_TICK_JUMP_PCT and streak < MAX_CONSECUTIVE_BAD_TICKS:
+                    self._bad_tick_streak[symbol] = streak + 1
+                    if streak == 0:
+                        logger.warning(
+                            "Dropped outlier tick %s: mid %.6f vs prev %.6f (%.1f%% jump)",
+                            symbol, mid, prev_mid, jump * 100.0,
+                        )
+                    continue
+            self._bad_tick_streak[symbol] = 0
+
             self._last_mid[symbol] = mid
             self._last_live_mono[symbol] = time.monotonic()
             spread_mult = self.spread_cache.note_mid(symbol, mid)
