@@ -282,6 +282,97 @@ async def get_user_deposits(user_id: uuid.UUID, db: AsyncSession) -> list[dict]:
     return out
 
 
+async def _apply_first_funding_bonus(user_row, amount: Decimal, db) -> Decimal:
+    """Welcome bonus for a user's FIRST funding done via admin add-fund —
+    mirrors the first-deposit bonus so an admin-credited first deposit earns the
+    same welcome bonus a real deposit would (client 2026-06-24). One-time: skips
+    if the user already has any bonus, any approved deposit, or has forfeited.
+    Bracket-walk kept in lockstep with wallet_service.compute_welcome_bonus.
+    Returns the bonus credited (0 if none)."""
+    from packages.common.src.settings_store import (
+        get_bool_setting, get_float_setting, get_system_setting,
+    )
+    from packages.common.src.models import Deposit as _Dep
+    if getattr(user_row, "bonus_forfeited_at", None) is not None:
+        return Decimal("0")
+    if not await get_bool_setting("welcome_bonus_enabled", False):
+        return Decimal("0")
+    prior_bonus = (await db.execute(
+        select(func.count()).select_from(Transaction).where(
+            Transaction.user_id == user_row.id, Transaction.type == "bonus",
+        )
+    )).scalar() or 0
+    if prior_bonus > 0:
+        return Decimal("0")
+    prior_dep = (await db.execute(
+        select(func.count()).select_from(_Dep).where(
+            _Dep.user_id == user_row.id,
+            _Dep.status.in_(["approved", "auto_approved"]),
+        )
+    )).scalar() or 0
+    if prior_dep > 0:
+        return Decimal("0")
+
+    raw = await get_system_setting("welcome_bonus_brackets", None)
+    brackets = raw if isinstance(raw, list) else []
+    if not brackets:
+        legacy = float(await get_float_setting("welcome_bonus_value", 0.0))
+        if legacy > 0:
+            brackets = [{
+                "min_deposit": 0, "max_deposit": None,
+                "type": (str(await get_system_setting("welcome_bonus_type", "percentage") or "percentage")).strip().lower(),
+                "value": legacy,
+                "cap_usd": float(await get_float_setting("welcome_bonus_cap_usd", 0.0)),
+            }]
+
+    bonus = Decimal("0")
+    label = ""
+    for row in brackets:
+        try:
+            min_d = Decimal(str(row.get("min_deposit") or 0))
+        except (TypeError, ValueError):
+            continue
+        mr = row.get("max_deposit")
+        try:
+            max_d = None if mr in (None, "") else Decimal(str(mr))
+        except (TypeError, ValueError):
+            max_d = None
+        if amount < min_d:
+            continue
+        if max_d is not None and amount > max_d:
+            continue
+        try:
+            value = Decimal(str(row.get("value") or 0))
+        except (TypeError, ValueError):
+            continue
+        if value <= 0:
+            continue
+        btype = (str(row.get("type") or "percentage")).strip().lower()
+        try:
+            cap = Decimal(str(row.get("cap_usd") or 0))
+        except (TypeError, ValueError):
+            cap = Decimal("0")
+        if btype == "percentage":
+            bonus = (amount * value / Decimal("100")).quantize(Decimal("0.01"))
+            label = f"Welcome bonus ({value}% of first fund-add)"
+        else:
+            bonus = value.quantize(Decimal("0.01"))
+            label = f"Welcome bonus (flat ${value})"
+        if cap > 0 and bonus > cap:
+            bonus = cap
+            label += f" — capped at ${cap}"
+        break
+
+    if bonus <= 0:
+        return Decimal("0")
+    user_row.main_wallet_bonus = (getattr(user_row, "main_wallet_bonus", None) or Decimal("0")) + bonus
+    db.add(Transaction(
+        user_id=user_row.id, account_id=None, type="bonus",
+        amount=bonus, balance_after=user_row.main_wallet_bonus, description=label,
+    ))
+    return bonus
+
+
 async def add_fund(
     user_id: uuid.UUID, body: FundRequest,
     admin_id: uuid.UUID, ip_address: str | None, db: AsyncSession,
@@ -372,6 +463,11 @@ async def add_fund(
     )
     db.add(txn)
 
+    # First-funding welcome bonus (client 2026-06-24): an admin-credited FIRST
+    # deposit earns the same welcome bonus a real first deposit would. No-op
+    # unless welcome_bonus_enabled is on AND this is the user's first funding.
+    bonus_credited = await _apply_first_funding_bonus(user_row, amt, db)
+
     await write_audit_log(
         db, admin_id, "add_fund", "user", user_id,
         # Money columns stored as strings to preserve full Decimal precision
@@ -385,8 +481,9 @@ async def add_fund(
         user_id,
         title="Funds Added",
         message=(
-            f"${float(body.amount):,.2f} has been added to your main wallet. "
-            "You can now transfer it to your trading account from the Wallet page."
+            f"${float(body.amount):,.2f} has been added to your main wallet."
+            + (f" Plus a ${float(bonus_credited):,.2f} welcome bonus!" if bonus_credited > 0 else "")
+            + " You can now transfer it to your trading account from the Wallet page."
         ),
         notif_type="deposit",
         action_url="/wallet",
