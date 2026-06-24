@@ -736,7 +736,7 @@ function WalletPageContent() {
           },
         );
         if (resp.payment_url) {
-          toast.success('Redirecting to NOWPayments…');
+          toast.success('Opening secure crypto checkout…');
           window.location.href = resp.payment_url;
           return;
         }
@@ -1244,6 +1244,8 @@ function WalletPageContent() {
                           onClick={() => {
                             // Bank deposit opens its own dedicated page (client
                             // 2026-06-23: "naya page khulna chahiye XM ki tarah").
+                            // Crypto stays inline (client 2026-06-24: "crypto
+                            // jaisa hai waisa hi rahega").
                             if (method === 'manual') { router.push('/wallet/deposit/bank'); return; }
                             setDepositUiSection(method);
                           }}
@@ -1255,7 +1257,7 @@ function WalletPageContent() {
                           )}
                         >
                           {method === 'crypto'
-                            ? 'Crypto (NOWPayments)'
+                            ? 'Crypto'
                             : method === 'manual'
                             ? 'Bank Deposit'
                             : 'Request to RM'}
@@ -1292,7 +1294,7 @@ function WalletPageContent() {
 
                       <div className="rounded-xl border border-accent/20 bg-accent/5 px-4 py-3">
                         <p className="text-xs text-text-secondary leading-relaxed">
-                          You&apos;ll be redirected to NOWPayments. Choose the coin and network you want to pay with there (USDT on BSC / TRC-20, USDC, BNB, etc.), then send the amount from your wallet (MetaMask, Trust, Binance, etc.). Once the transaction confirms on-chain, your wallet balance is credited automatically.
+                          You&apos;ll be taken to a secure crypto checkout. Choose the coin and network you want to pay with there (USDT on BSC / TRC-20, USDC, BNB, etc.), then send the amount from your wallet (MetaMask, Trust, Binance, etc.). Once the transaction confirms on-chain, your wallet balance is credited automatically.
                         </p>
                       </div>
 
@@ -1328,7 +1330,7 @@ function WalletPageContent() {
                             : 'bg-accent text-white hover:bg-[#5cffb8] shadow-neon-green-lg'
                         )}
                       >
-                        {depositSubmitting ? 'Opening NOWPayments…' : 'Pay with Crypto'}
+                        {depositSubmitting ? 'Opening checkout…' : 'Pay with Crypto'}
                       </button>
                     </>
                   ) : (
