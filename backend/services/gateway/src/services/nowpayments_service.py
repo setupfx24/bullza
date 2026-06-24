@@ -248,6 +248,33 @@ async def get_payment_status(payment_id: str) -> dict:
     return data
 
 
+async def list_invoice_payments(invoice_id: str) -> list[dict]:
+    """List the payment attempts made against a NOWPayments invoice.
+
+    Used by the reconciliation poller to settle deposits whose IPN webhook
+    never arrived (Cloudflare/dashboard issues). Returns the raw `data` list
+    (each entry has `payment_id`, `payment_status`, `order_id`, …) or [] on any
+    error — the caller treats an empty list as 'nothing to settle yet', so a
+    wrong endpoint can never mis-credit, it just won't reconcile."""
+    settings = get_settings()
+    if not settings.NOWPAYMENTS_API_KEY or not invoice_id:
+        return []
+    headers = {"x-api-key": settings.NOWPAYMENTS_API_KEY}
+    try:
+        async with httpx.AsyncClient(timeout=30) as client:
+            resp = await client.get(
+                f"{_api_base()}/payment/",
+                params={"invoiceId": str(invoice_id), "limit": 20, "page": 0},
+                headers=headers,
+            )
+            if resp.status_code >= 400:
+                return []
+            data = resp.json()
+    except Exception:
+        return []
+    return data.get("data") or [] if isinstance(data, dict) else []
+
+
 def verify_webhook_signature(raw_body: bytes, received_hmac: str) -> bool:
     """Verify the IPN HMAC-SHA512 signature.
 
