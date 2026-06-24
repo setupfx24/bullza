@@ -307,9 +307,29 @@ async def _get_bank_for_tier(amount: Decimal, db: AsyncSession) -> BankAccount |
     return bank
 
 
+# ─── KYC gate ─────────────────────────────────────────────────────────────
+
+async def _require_kyc_approved(user_id: UUID, db: AsyncSession) -> None:
+    """Block deposits AND withdrawals until the user's KYC is approved
+    (client 2026-06-24: "no deposit and withdrawal without KYC verification").
+    Raises 403 otherwise. Demo flows never call money endpoints, so this only
+    affects real funding."""
+    from packages.common.src.models import User as _KycUser
+    row = (await db.execute(
+        select(_KycUser.kyc_status).where(_KycUser.id == user_id)
+    )).first()
+    status = ((row[0] if row else "") or "").lower()
+    if status not in ("approved", "verified"):
+        raise HTTPException(
+            status_code=403,
+            detail="Complete your KYC verification before you can deposit or withdraw.",
+        )
+
+
 # ─── Deposits ─────────────────────────────────────────────────────────────
 
 async def create_deposit(req, user_id: UUID, db: AsyncSession) -> dict:
+    await _require_kyc_approved(user_id, db)
     from packages.common.src.settings_store import get_bool_setting, get_float_setting
     if await get_bool_setting("maintenance_mode", False):
         raise HTTPException(status_code=503, detail="Platform is under maintenance. Deposits are temporarily disabled.")
@@ -453,6 +473,7 @@ async def create_manual_deposit(
     db: AsyncSession,
     bonus_code: str | None = None,
 ) -> dict:
+    await _require_kyc_approved(user_id, db)
     from packages.common.src.settings_store import get_bool_setting, get_float_setting
     if not await get_bool_setting("allow_deposits", True):
         raise HTTPException(status_code=403, detail="Deposits are currently disabled")
@@ -790,6 +811,7 @@ async def create_wallet_deposit(
     wallet-connect flow. Returns the address + exact crypto amount the
     frontend renders. No payment_url — user pays from their connected
     wallet directly. Settlement still gates on the IPN webhook."""
+    await _require_kyc_approved(user_id, db)
     from packages.common.src.settings_store import get_bool_setting
     if await get_bool_setting("maintenance_mode", False):
         raise HTTPException(status_code=503, detail="Platform is under maintenance.")
@@ -1288,6 +1310,7 @@ async def handle_nowpayments_payout_webhook(
 
 
 async def create_withdrawal(req, user_id: UUID, db: AsyncSession) -> dict:
+    await _require_kyc_approved(user_id, db)
     from packages.common.src.settings_store import get_bool_setting, get_float_setting
     if await get_bool_setting("maintenance_mode", False):
         raise HTTPException(status_code=503, detail="Platform is under maintenance. Withdrawals are temporarily disabled.")
@@ -1423,6 +1446,7 @@ async def create_manual_withdrawal(
     file: UploadFile | None,
     db: AsyncSession,
 ) -> dict:
+    await _require_kyc_approved(user_id, db)
     from packages.common.src.settings_store import get_bool_setting, get_float_setting
     if not await get_bool_setting("allow_withdrawals", True):
         raise HTTPException(status_code=403, detail="Withdrawals are currently disabled")
