@@ -16,6 +16,12 @@ export default function KycLoginPrompt() {
 
   useEffect(() => {
     if (!user || user.is_demo) return;
+    // Sequence the onboarding: while the profile is incomplete the
+    // ProfileCompleteGate (a blocking modal) owns the screen — don't stack the
+    // KYC popup on top of it. Once the user finishes the profile,
+    // profile_complete flips true, this effect re-runs and the KYC popup shows
+    // (client 2026-06-24: "pehle profile completion, fir KYC popup").
+    if (user.profile_complete === false) return;
     const kyc = (user.kyc_status || 'pending').toLowerCase();
     // Already done or in review → no prompt. Only nudge pending/rejected.
     if (['approved', 'verified', 'submitted', 'under_review'].includes(kyc)) return;
