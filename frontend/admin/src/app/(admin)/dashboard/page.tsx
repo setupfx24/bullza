@@ -197,7 +197,10 @@ export default function DashboardPage() {
       } else {
         setStats(null);
         const msg = statsRes.reason instanceof Error ? statsRes.reason.message : 'Failed to load stats';
-        toast.error(msg);
+        // A limited employee (e.g. one a super-admin impersonated) may lack
+        // analytics.view — the stat cards just render "—", so don't spam a
+        // permission toast. Only surface genuine failures (client 2026-06-24).
+        if (!/permission|required|forbidden|unauthor|403/i.test(msg)) toast.error(msg);
       }
 
       if (depositsRes.status === 'fulfilled') {
