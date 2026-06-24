@@ -319,10 +319,12 @@ function IBTab() {
       return (
         <div className="rounded-xl border border-border-primary bg-card p-6 sm:p-10 noise-texture text-center space-y-4 max-w-lg mx-auto">
           <div className="text-3xl">🤝</div>
-          <h3 className="text-lg sm:text-xl font-bold text-text-primary">Become an Introducing Broker</h3>
+          <span className="inline-block text-xs font-semibold px-2.5 py-0.5 rounded-md bg-warning/15 text-warning">You&apos;re a Sub-IB</span>
+          <h3 className="text-lg sm:text-xl font-bold text-text-primary">Sub-IB Account</h3>
           <p className="text-sm text-text-secondary leading-relaxed">
-            The IB program is by introduction. To become an IB and earn per-lot commissions on
-            your referrals, please get in touch with the SwisDex team.
+            You joined through an Introducing Broker, so you&apos;re a Sub-IB. The full IB
+            program isn&apos;t available to apply for here — to become a full IB and earn
+            per-lot commissions, you need to contact the company.
           </p>
           <a
             href="/support?topic=become-ib"
