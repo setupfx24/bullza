@@ -99,6 +99,10 @@ def render_welcome(
             "Park capital in the Fixed Return product for steady, capital-protected returns over a chosen term.",
         )
         + _bullet(
+            "Introducing Broker (IB)",
+            "Become an Introducing Broker and earn per-lot commissions on the clients you bring to SwisDex.",
+        )
+        + _bullet(
             "PAMM & MAM Investing",
             "Invest alongside expert money managers — or run a pool yourself — with profits shared automatically.",
         )
@@ -199,6 +203,7 @@ def render_welcome(
         "  • Trade Insurance — insure a position so a covered loss is partly refunded.\n"
         "  • Deposit Bonus — qualifying deposits earn a bonus credited to your wallet.\n"
         "  • Fixed Return — steady, capital-protected returns over a chosen term.\n"
+        "  • Introducing Broker (IB) — earn per-lot commissions on the clients you bring in.\n"
         "  • PAMM & MAM Investing — invest alongside expert money managers, or run a pool yourself.\n\n"
     )
     if username:
