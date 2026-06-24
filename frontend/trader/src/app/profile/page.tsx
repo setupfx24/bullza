@@ -10,6 +10,7 @@ import { useTradingStore } from '@/stores/tradingStore';
 import { Button } from '@/components/ui/Button';
 import DashboardShell from '@/components/layout/DashboardShell';
 import LinkedWalletCard from '@/components/profile/LinkedWalletCard';
+import DOBPicker from '@/components/forms/DOBPicker';
 import api from '@/lib/api/client';
 
 interface Profile {
@@ -375,10 +376,13 @@ export default function ProfilePage() {
                     </div>
                   </div>
 
-                  {/* Date of Birth — editable until KYC approval (client 2026-06-23) */}
+                  {/* Date of Birth — editable until KYC approval (client 2026-06-23).
+                      Custom DOBPicker (not native <input type=date>) so the
+                      calendar starts each month at the 1st with no trailing
+                      prev/next-month days (client 2026-06-24). */}
                   <div>
                     <label className={labelCls}>Date of Birth</label>
-                    <input type="date" value={dob} onChange={(e) => setDob(e.target.value)} disabled={kycLocked} className={inputCls} />
+                    <DOBPicker value={dob} onChange={setDob} disabled={kycLocked} />
                   </div>
 
                   {/* Email + Phone */}
