@@ -10,8 +10,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
 import { clsx } from 'clsx';
-import { ArrowLeft } from 'lucide-react';
-import DashboardShell from '@/components/layout/DashboardShell';
+import { ArrowLeft, X } from 'lucide-react';
 import api from '@/lib/api/client';
 
 interface BankDetails {
@@ -120,8 +119,22 @@ export default function BankDepositPage() {
     ) : null;
 
   return (
-    <DashboardShell>
-      <div className="max-w-xl mx-auto w-full px-3 sm:px-0 py-2 space-y-5">
+    <div className="min-h-[100dvh] w-full overflow-y-auto bg-bg-base text-text-primary">
+      {/* Branded checkout header — focused full-screen payment page, no app
+          chrome (client 2026-06-24: render like the NOWPayments checkout). */}
+      <div className="sticky top-0 z-10 flex items-center justify-between border-b border-border-glass/60 bg-bg-base/95 backdrop-blur px-4 py-3">
+        <div className="flex items-center gap-2 min-w-0">
+          {/* Two logo variants, swapped by theme (same as AppSidebar). */}
+          <img src="/images/swisdex_png5.png" alt="SwisDex" className="h-7 w-auto object-contain shrink-0 hidden dark:block" />
+          <img src="/images/swisdex_png.png" alt="SwisDex" className="h-7 w-auto object-contain shrink-0 dark:hidden" />
+          <span className="text-[11px] font-semibold text-text-secondary border-l border-border-primary pl-2 ml-1 hidden sm:inline">Secure Bank Deposit</span>
+        </div>
+        <button type="button" onClick={() => router.push('/wallet')} aria-label="Close" className="p-1.5 rounded-lg text-text-secondary hover:bg-bg-hover hover:text-text-primary transition-fast">
+          <X size={18} />
+        </button>
+      </div>
+
+      <div className="max-w-xl mx-auto w-full px-4 py-6 space-y-5">
         <button type="button" onClick={() => router.push('/wallet')} className="inline-flex items-center gap-1.5 text-sm text-text-secondary hover:text-text-primary">
           <ArrowLeft size={16} /> Back to Wallet
         </button>
@@ -218,6 +231,6 @@ export default function BankDepositPage() {
           </div>
         </div>
       )}
-    </DashboardShell>
+    </div>
   );
 }
