@@ -244,6 +244,12 @@ export default function AccountsPage() {
   // click "New Account" (client 2026-06-20: "KYC popup nahi aa raha").
   useEffect(() => {
     if (kycAutoShown.current || loading || !user) return;
+    // Sequence onboarding: while the profile is incomplete the
+    // ProfileCompleteGate (blocking modal) owns the screen — don't auto-pop
+    // the "Complete KYC to open a live account" gate on top of it. Once the
+    // profile is done this effect re-runs and the KYC gate can show (client
+    // 2026-06-24: "pehle profile form, fir KYC").
+    if (user.profile_complete === false) return;
     const kyc = (user.kyc_status || 'pending').toLowerCase();
     const approved = kyc === 'approved' || kyc === 'verified';
     if (!user.is_demo && !approved && liveAccounts.length === 0) {
