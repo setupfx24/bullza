@@ -76,7 +76,12 @@ async def _resolve_ib_type(db: AsyncSession, profile: IBProfile) -> str:
     if super_id is not None:
         if profile.id == super_id:
             return "super_ib"
-        if profile.parent_ib_id == super_id:
+        # A NULL parent means there's no introducing IB above this profile —
+        # i.e. a full IB that sits directly under the Super IB (e.g. a
+        # no-referral user who self-applied). Only a profile whose parent is
+        # ANOTHER (non-super) IB is a Sub-IB. Treating NULL as sub_ib wrongly
+        # hid the IB dashboard from real IBs (client 2026-06-24).
+        if profile.parent_ib_id is None or profile.parent_ib_id == super_id:
             return "ib"
         return "sub_ib"
     return "ib" if profile.parent_ib_id is None else "sub_ib"
