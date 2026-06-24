@@ -136,8 +136,11 @@ export default function AdminSidebar() {
         {collapsed ? (
           <img src="/images/feb.png" alt="SwisDex" className="w-7 h-7 object-contain mx-auto" />
         ) : (
-          <Link href="/" className="flex items-center min-w-0 swisdex-logo-wrap">
-            <img src="/images/swisdex_png5.png" alt="SwisDex" className="h-8 w-auto object-contain shrink-0" />
+          <Link href="/" className="flex items-center min-w-0">
+            {/* Two logo variants, swapped by theme (same as the trader app):
+                white wordmark on dark, dark/colour wordmark on light. */}
+            <img src="/images/swisdex_png5.png" alt="SwisDex" className="swisdex-logo-dark h-8 w-auto object-contain shrink-0" />
+            <img src="/images/swisdex_png.png" alt="SwisDex" className="swisdex-logo-light h-8 w-auto object-contain shrink-0" />
           </Link>
         )}
         <button
