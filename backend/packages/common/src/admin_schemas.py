@@ -90,6 +90,10 @@ class AccountTypeIn(BaseModel):
     # Per-account-type Trade Insurance gate (Mig 0070). True = type may
     # use insurance; False = insurance hidden + blocked for this type.
     insurance_enabled: bool = True
+    # Cent account: balances shown in ¢ (×100) and lots scaled by
+    # lot_size_multiplier (client 2026-06-25: admin can create cent types).
+    is_cent_account: bool = False
+    lot_size_multiplier: float = 1.0
 
 
 class AccountTypeOut(BaseModel):
@@ -105,6 +109,8 @@ class AccountTypeOut(BaseModel):
     is_demo: bool
     is_active: bool
     insurance_enabled: bool = True
+    is_cent_account: bool = False
+    lot_size_multiplier: float = 1.0
     created_at: Optional[datetime] = None
 
     class Config:
