@@ -821,6 +821,9 @@ function WalletPageContent() {
     }
     setBalanceTransfer({ mode: 'to_main', tradingAccountId });
     setBalanceTransferAmount('');
+    // Refresh the account list so a just-created account is selectable without
+    // a manual page refresh (client 2026-06-25).
+    void fetchData(true);
   };
 
   const openTransferFromMain = (tradingAccountId: string | null) => {
@@ -830,6 +833,7 @@ function WalletPageContent() {
     }
     setBalanceTransfer({ mode: 'to_trading', tradingAccountId });
     setBalanceTransferAmount('');
+    void fetchData(true);
     const pick =
       tradingAccountId ??
       (selectedAccountId && liveAccounts.some((a) => a.id === selectedAccountId)
