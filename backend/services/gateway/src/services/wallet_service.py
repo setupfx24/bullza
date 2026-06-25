@@ -1886,7 +1886,21 @@ async def list_transactions(user_id: UUID, account_id: UUID | None, db: AsyncSes
             raise HTTPException(status_code=404, detail="Account not found")
         query = select(Transaction).where(Transaction.account_id == account_id)
     else:
-        query = select(Transaction).where(Transaction.user_id == user_id)
+        # Aggregate ("all") view must NOT mix in demo-account activity — demo
+        # trades (P&L / commission / swap ledger rows) were leaking into the
+        # real transaction history. Keep main-wallet rows (NULL account_id) and
+        # real-account rows; drop anything tied to a demo account (2026-06-25).
+        demo_acct_ids = select(TradingAccount.id).where(
+            TradingAccount.user_id == user_id,
+            TradingAccount.is_demo == True,  # noqa: E712
+        )
+        query = select(Transaction).where(
+            Transaction.user_id == user_id,
+            or_(
+                Transaction.account_id.is_(None),
+                Transaction.account_id.notin_(demo_acct_ids),
+            ),
+        )
 
     query = query.order_by(Transaction.created_at.desc()).limit(500)
     result = await db.execute(query)
