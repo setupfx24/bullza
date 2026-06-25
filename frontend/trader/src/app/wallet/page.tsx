@@ -1713,11 +1713,6 @@ function WalletPageContent() {
                         />
                       </div>
                       <p className="text-[11px] text-text-tertiary">Processing time: up to 24 hours.</p>
-                      {cryptoAutoMax > 0 && (
-                        <p className="text-[11px] text-[#55a630]">
-                          Crypto withdrawals up to ${cryptoAutoMax.toLocaleString()} are processed automatically; larger amounts are reviewed first.
-                        </p>
-                      )}
 
                       <button
                         type="button"

@@ -22,13 +22,15 @@ def render_kyc_approved(
     name = (first_name or "trader").strip() or "trader"
     body = """
     <p style="margin:0 0 12px;color:#1a1a1a;font-size:14px;line-height:1.6;">
-      Now unlocked on your account:
+      Your account is fully unlocked. You can now avail all SwisDex features:
     </p>
     <ul style="margin:0;padding-left:20px;color:#1a1a1a;font-size:14px;line-height:1.7;">
-      <li>Higher leverage tiers</li>
-      <li>Larger withdrawal limits</li>
-      <li>Faster deposit settlement</li>
-      <li>Premium rewards eligibility</li>
+      <li><strong>Trade Insurance</strong> — protect a position so a covered loss is partly refunded</li>
+      <li><strong>Deposit Bonus</strong> — qualifying deposits earn a bonus to your wallet</li>
+      <li><strong>Referral Rewards</strong> — earn when people you invite join and trade</li>
+      <li><strong>Fixed Return</strong> — steady, capital-protected returns over a chosen term</li>
+      <li><strong>PAMM &amp; MAM</strong> — invest alongside expert managers, or run a pool yourself</li>
+      <li>Higher leverage tiers, larger withdrawal limits, and faster deposit settlement</li>
     </ul>
     """
     subject = "KYC verified — your account is fully unlocked"
@@ -41,11 +43,13 @@ def render_kyc_approved(
     )
     text = (
         f"Hi {name},\n\n"
-        "Your KYC has been approved. Now unlocked:\n"
-        "  - Higher leverage tiers\n"
-        "  - Larger withdrawal limits\n"
-        "  - Faster deposit settlement\n"
-        "  - Premium rewards eligibility\n\n"
+        "Your KYC has been approved. You can now avail all SwisDex features:\n"
+        "  - Trade Insurance — protect a position against a covered loss\n"
+        "  - Deposit Bonus — qualifying deposits earn a bonus\n"
+        "  - Referral Rewards — earn when people you invite join and trade\n"
+        "  - Fixed Return — steady, capital-protected returns\n"
+        "  - PAMM & MAM — invest alongside expert managers or run a pool\n"
+        "  - Higher leverage, larger withdrawals, faster deposits\n\n"
         f"Open your dashboard: {trader_app_url.rstrip('/')}/dashboard\n"
     )
     return subject, html, text
