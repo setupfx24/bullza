@@ -205,6 +205,21 @@ export default function SupportPage() {
                       {msg.is_internal_note && <span className="text-xxs text-warning">(Internal)</span>}
                     </div>
                     <p className="text-xs text-text-secondary whitespace-pre-wrap">{msg.message}</p>
+                    {Array.isArray((msg as { attachments?: { name?: string; type?: string; data?: string }[] }).attachments) && (
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {((msg as { attachments?: { name?: string; type?: string; data?: string }[] }).attachments || []).map((a, i) => (
+                          a?.data ? (
+                            (a.type || '').startsWith('image/') ? (
+                              <a key={i} href={a.data} target="_blank" rel="noreferrer" title={a.name}>
+                                <img src={a.data} alt={a.name || 'attachment'} className="max-h-32 rounded border border-border-primary" />
+                              </a>
+                            ) : (
+                              <a key={i} href={a.data} download={a.name || 'attachment'} className="text-xxs text-buy underline">{a.name || 'Download attachment'}</a>
+                            )
+                          ) : null
+                        ))}
+                      </div>
+                    )}
                   </div>
                 ))
               )}
