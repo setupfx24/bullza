@@ -38,6 +38,8 @@ interface Settings {
   // Show/hide the PAMM and MAM (copy-trading) products in the trader app.
   pamm_enabled: boolean;
   mam_enabled: boolean;
+  // Allow Trade Insurance on PAMM/MAM pool + managed accounts.
+  pamm_mam_insurance_enabled: boolean;
   // Admin-controlled payment-method tabs in the trader wallet.
   // Crypto (NOWPayments) is always on; these two toggle the
   // remaining tabs in real time via /wallet/payment-methods.
@@ -78,6 +80,7 @@ const DEFAULT_SETTINGS: Settings = {
   allow_deposits: true,
   allow_withdrawals: true,
   pamm_enabled: true,
+  pamm_mam_insurance_enabled: false,
   mam_enabled: true,
   'wallet.manual_enabled': true,
   'wallet.p2p_enabled': false,
@@ -137,6 +140,7 @@ function rowsToSettings(rows: SystemSettingRow[]): Settings {
     allow_withdrawals: bool('allow_withdrawals', DEFAULT_SETTINGS.allow_withdrawals),
     pamm_enabled: bool('pamm_enabled', DEFAULT_SETTINGS.pamm_enabled),
     mam_enabled: bool('mam_enabled', DEFAULT_SETTINGS.mam_enabled),
+    pamm_mam_insurance_enabled: bool('pamm_mam_insurance_enabled', DEFAULT_SETTINGS.pamm_mam_insurance_enabled),
     'wallet.manual_enabled': bool('wallet.manual_enabled', DEFAULT_SETTINGS['wallet.manual_enabled']),
     'wallet.p2p_enabled': bool('wallet.p2p_enabled', DEFAULT_SETTINGS['wallet.p2p_enabled']),
     'wallet.rm_email': (() => {
@@ -173,6 +177,7 @@ function settingsToPayload(s: Settings): Record<string, unknown> {
     allow_deposits: s.allow_deposits,
     allow_withdrawals: s.allow_withdrawals,
     pamm_enabled: s.pamm_enabled,
+    pamm_mam_insurance_enabled: s.pamm_mam_insurance_enabled,
     mam_enabled: s.mam_enabled,
     'wallet.manual_enabled': s['wallet.manual_enabled'],
     'wallet.p2p_enabled': s['wallet.p2p_enabled'],
@@ -364,6 +369,7 @@ export default function SettingsPage() {
                     { key: 'allow_withdrawals', label: 'Allow Withdrawals', desc: 'Enable or disable withdrawal requests' },
                     { key: 'pamm_enabled', label: 'Show PAMM to customers', desc: 'Off = hide the PAMM product from the trader app' },
                     { key: 'mam_enabled', label: 'Show MAM / Copy Trading to customers', desc: 'Off = hide MAM / copy-trading from the trader app' },
+                    { key: 'pamm_mam_insurance_enabled', label: 'Trade Insurance on PAMM / MAM accounts', desc: 'Off = PAMM/MAM pool + managed accounts cannot buy Trade Insurance' },
                     // Per-method tabs in the trader wallet. Crypto (NOWPayments)
                     // is always on; these two toggle the Manual + P2P tabs in
                     // real time. Gateway also hard-rejects API calls on the
