@@ -4,6 +4,7 @@ import json
 import logging
 import signal
 import time
+from collections import deque
 from datetime import datetime, timezone
 
 from packages.common.src.config import get_settings
@@ -49,6 +50,13 @@ STALE_REFRESH_INTERVAL_SEC = 30.0
 # next tick anyway, so a genuine market gap is never frozen out permanently.
 MAX_TICK_JUMP_PCT = 0.10
 MAX_CONSECUTIVE_BAD_TICKS = 5
+
+# De-spike filter: publish the MEDIAN of the last N raw mids instead of the raw
+# value. This removes feed noise — single-tick spikes AND tick-to-tick
+# oscillation (e.g. silver bouncing 58.9 <-> 59.3) that whipped the running P&L
+# around — while still tracking a genuine trend. Odd window so the median is a
+# real sample. 3 = minimal (~1 tick) latency (client 2026-06-25).
+MID_MEDIAN_WINDOW = 3
 
 
 class MarketDataService:
@@ -119,6 +127,8 @@ class MarketDataService:
         # Bad-tick guard: count consecutive outlier ticks dropped per symbol so a
         # genuine market gap eventually gets through (see tick processor).
         self._bad_tick_streak: dict[str, int] = {}
+        # Rolling window of recent raw mids per symbol for the median de-spike.
+        self._mid_window: dict[str, deque] = {}
 
     async def start(self):
         logger.info("Starting Market Data Service...")
@@ -270,6 +280,17 @@ class MarketDataService:
                         )
                     continue
             self._bad_tick_streak[symbol] = 0
+
+            # De-spike: replace the raw mid with the median of the last few mids
+            # so feed noise/oscillation can't whip the P&L around. Tracks real
+            # trends; ignores single-tick spikes (client 2026-06-25).
+            win = self._mid_window.get(symbol)
+            if win is None:
+                win = deque(maxlen=MID_MEDIAN_WINDOW)
+                self._mid_window[symbol] = win
+            win.append(mid)
+            if len(win) >= 3:
+                mid = sorted(win)[len(win) // 2]
 
             self._last_mid[symbol] = mid
             self._last_live_mono[symbol] = time.monotonic()
