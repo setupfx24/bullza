@@ -67,6 +67,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               position="top-center"
               containerClassName="swisdex-toaster"
               gutter={10}
+              // Drop the stack below the sticky app header (~64px) so toasts
+              // don't overlap the Bonus / Affiliates / wallet pills up top.
+              containerStyle={{ top: 76, zIndex: 99999 }}
               toastOptions={{
                 duration: 2500,
                 className: 'swisdex-hot-toast',

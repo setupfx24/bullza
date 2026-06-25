@@ -614,12 +614,19 @@ function WalletPageContent() {
       const payout = [`[${selectedCryptoWithdraw}]`, detail].join(' ').trim();
       setWithdrawSubmitting(true);
       try {
-        await api.post('/wallet/withdraw', {
+        const res = await api.post<{ status?: string }>('/wallet/withdraw', {
           amount: amt,
           method: CRYPTO_WITHDRAW_METHOD,
           bank_details: { oxapay_payout: payout },
         });
-        toast.success(`Withdrawal of $${amt.toLocaleString()} submitted — pending approval`);
+        // Auto-withdrawals come back "processing" (sent to the payout provider);
+        // manual ones come back "pending" (need admin approval).
+        const isAuto = res?.status === 'processing';
+        toast.success(
+          isAuto
+            ? `Withdrawal of $${amt.toLocaleString()} submitted — processing automatically`
+            : `Withdrawal of $${amt.toLocaleString()} submitted — pending approval`,
+        );
         // Reset so the user can't re-fire the same withdrawal.
         setWithdrawAmount('');
         setWithdrawOxapayDetails('');
