@@ -36,6 +36,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Trades', href: '/trades', icon: CandlestickChart, perm: 'trades.view' },
   { label: 'Book Management', href: '/book', icon: BookOpen, perm: 'trades.view' },
   { label: 'Deposits', href: '/deposits', icon: Wallet, perm: 'deposits.view' },
+  { label: 'Deposit Requests', href: '/deposit-requests', icon: Wallet, perm: 'deposits.view' },
   { label: 'Approvals', href: '/approvals', icon: ShieldCheck, perm: 'funds.approve' },
   { label: 'Transactions', href: '/transactions', icon: Receipt, perm: 'deposits.view' },
   { label: 'Banks', href: '/banks', icon: Landmark, perm: 'banks.view' },

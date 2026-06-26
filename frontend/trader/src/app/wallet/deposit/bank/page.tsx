@@ -23,6 +23,16 @@ interface BankDetails {
   qr_code_url?: string;
 }
 
+interface DepositReq {
+  id: string;
+  amount: number | null;
+  status: string;
+  admin_qr?: string | null;
+  admin_bank_text?: string | null;
+  admin_upi?: string | null;
+  admin_note?: string | null;
+}
+
 function copyText(text: string, label: string) {
   navigator.clipboard?.writeText(text);
   toast.success(`${label} copied`);
@@ -39,8 +49,36 @@ export default function BankDepositPage() {
   const [showConfirm, setShowConfirm] = useState(false);
   const [minDeposit, setMinDeposit] = useState(0);
   const [reference] = useState(() => 'SWD-' + Math.random().toString(36).slice(2, 8).toUpperCase());
+  // Personal payment-details requests (admin-assigned QR / bank / UPI).
+  const [myReqs, setMyReqs] = useState<DepositReq[]>([]);
+  const [reqBusy, setReqBusy] = useState(false);
 
   const bank = banks.find((b) => b.id === selectedId) ?? banks[0] ?? null;
+  const approvedReq = myReqs.find((r) => r.status === 'approved');
+  const pendingReq = myReqs.find((r) => r.status === 'pending');
+
+  const loadMyReqs = useCallback(async () => {
+    try {
+      const r = await api.get<{ items: DepositReq[] }>('/wallet/deposit/my-requests');
+      setMyReqs(Array.isArray(r?.items) ? r.items : []);
+    } catch { /* non-fatal */ }
+  }, []);
+  useEffect(() => { void loadMyReqs(); }, [loadMyReqs]);
+
+  const submitRequest = async () => {
+    const amt = parseFloat(amount);
+    if (!amt || amt <= 0) { toast.error('Enter an amount first'); return; }
+    setReqBusy(true);
+    try {
+      await api.post('/wallet/deposit/request', { amount: amt });
+      toast.success('Request sent — the admin will share payment details shortly.');
+      await loadMyReqs();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Could not send request');
+    } finally {
+      setReqBusy(false);
+    }
+  };
 
   useEffect(() => {
     api.get<{ min_deposit_amount_usd?: number }>('/auth/platform-status')
@@ -151,6 +189,38 @@ export default function BankDepositPage() {
             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-text-tertiary font-bold">$</span>
             <input type="number" min="1" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} onBlur={() => void loadBanks()} placeholder="0.00" className="w-full pl-7 pr-4 py-3 rounded-xl border border-border-primary bg-bg-secondary text-text-primary placeholder:text-text-tertiary outline-none focus:border-accent/50 font-mono font-bold text-lg" />
           </div>
+        </div>
+
+        {/* Personal payment details (admin-assigned via request → approve). */}
+        <div className="rounded-xl border border-accent/30 bg-accent/5 p-4 space-y-3">
+          {approvedReq ? (
+            <>
+              <p className="text-xs font-bold text-text-primary">Your personal payment details</p>
+              {approvedReq.admin_note && (
+                <p className="text-[11px] text-text-secondary">{approvedReq.admin_note}</p>
+              )}
+              {approvedReq.admin_bank_text && (
+                <pre className="whitespace-pre-wrap break-words text-[11px] font-mono text-text-primary bg-bg-base rounded-lg p-2 border border-border-primary">{approvedReq.admin_bank_text}</pre>
+              )}
+              {approvedReq.admin_upi && <Row label="UPI ID" value={approvedReq.admin_upi} />}
+              {approvedReq.admin_qr && (
+                <div className="pt-1 flex justify-center">
+                  <img src={approvedReq.admin_qr} alt="Personal payment QR" className="w-full max-w-[220px] max-h-48 object-contain rounded-lg border border-border-primary bg-bg-base" />
+                </div>
+              )}
+              <p className="text-[10px] text-text-tertiary">Pay using the above, then submit your reference + screenshot below.</p>
+            </>
+          ) : pendingReq ? (
+            <p className="text-xs text-amber-300">⏳ Your request is pending — the admin will share your personal payment details shortly. Refresh to check.</p>
+          ) : (
+            <div className="space-y-2">
+              <p className="text-xs font-bold text-text-primary">Need personal payment details?</p>
+              <p className="text-[11px] text-text-secondary">Enter the amount above, then request a personal QR / bank / UPI from the admin.</p>
+              <button type="button" onClick={() => void submitRequest()} disabled={reqBusy} className="w-full rounded-lg bg-accent text-black py-2 text-xs font-bold disabled:opacity-50">
+                {reqBusy ? 'Sending…' : 'Request payment details'}
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Bank picker + details */}

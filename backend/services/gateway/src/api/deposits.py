@@ -502,6 +502,34 @@ async def get_payment_methods(
     }
 
 
+class DepositDetailsRequest(BaseModel):
+    amount: Decimal
+
+
+@router.post("/deposit/request")
+async def request_deposit_details(
+    body: DepositDetailsRequest,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """User asks an admin for personal payment details (QR / bank / UPI) for a
+    bank deposit. Admin approves it and the details surface back here."""
+    from ..services import deposit_request_service
+    return await deposit_request_service.create_request(
+        current_user["user_id"], body.amount, db,
+    )
+
+
+@router.get("/deposit/my-requests")
+async def my_deposit_requests(
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """The user's deposit-details requests with the admin's reply once approved."""
+    from ..services import deposit_request_service
+    return await deposit_request_service.list_my_requests(current_user["user_id"], db)
+
+
 @router.get("/bonus/overview")
 async def get_bonus_overview(
     current_user: dict = Depends(get_current_user),

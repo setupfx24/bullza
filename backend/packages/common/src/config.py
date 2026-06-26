@@ -248,6 +248,10 @@ class Settings(BaseSettings):
 
     class Config:
         env_file = ".env"
+        # Tolerate env vars meant for OTHER services in a shared .env (e.g. the
+        # market-data timescale_* keys). Without this, an unrelated extra key
+        # crashes startup with extra_forbidden (2026-06-26).
+        extra = "ignore"
 
     # ─── Fail-closed validation ───────────────────────────────────────────
     @model_validator(mode="after")

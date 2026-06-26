@@ -71,6 +71,30 @@ class Deposit(Base):
     user = relationship("User", foreign_keys=[user_id], lazy="selectin")
 
 
+class DepositRequest(Base):
+    """A user asks an admin for personal payment details from the bank-deposit
+    page (migration 0082). Admin approves and attaches a personal QR / bank
+    text / UPI id; the user pays and finishes via the normal manual deposit."""
+    __tablename__ = "deposit_requests"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True)
+    amount = Column(Numeric(18, 2))
+    # pending | approved | rejected
+    status = Column(String(20), nullable=False, default="pending", index=True)
+    # Whatever the admin chooses to send back — any combination. The QR is a
+    # base64 data-URL (rendered inline like ticket attachments — no file infra).
+    admin_qr = Column(Text)
+    admin_bank_text = Column(Text)
+    admin_upi = Column(String(255))
+    admin_note = Column(Text)
+    approved_by = Column(UUID(as_uuid=True), ForeignKey("users.id"))
+    created_at = Column(DateTime(timezone=True), default=datetime.utcnow)
+    responded_at = Column(DateTime(timezone=True))
+
+    user = relationship("User", foreign_keys=[user_id], lazy="selectin")
+
+
 class Withdrawal(Base):
     __tablename__ = "withdrawals"
 
