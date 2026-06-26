@@ -96,8 +96,14 @@ class StreamSpreadCache:
                         from packages.common.src.settings_store import (
                             get_bool_setting, get_float_setting,
                         )
+                        # Default OFF (client 2026-06-26): the volatility-based
+                        # spread widening moved bid/ask away from mid on every
+                        # vol burst, so a BUY's P&L (priced off bid) showed a
+                        # loss / jumped around even while the market rose. A
+                        # fixed admin spread makes the running P&L track the mid
+                        # smoothly. Set variable_spread_enabled=true to re-enable.
                         self._var_enabled = await get_bool_setting(
-                            "variable_spread_enabled", True
+                            "variable_spread_enabled", False
                         )
                         mm = await get_float_setting("variable_spread_max_mult", 2.0)
                         self._var_max_mult = max(1.0, min(float(mm or 2.0), 5.0))
