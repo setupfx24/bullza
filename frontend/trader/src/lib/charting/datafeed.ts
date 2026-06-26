@@ -43,47 +43,11 @@ const BINANCE_PAIRS: Record<string, string> = {
   LINKUSD: 'LINKUSDT', DOTUSD: 'DOTUSDT', AVAXUSD: 'AVAXUSDT',
 };
 
-const RESOLUTION_TO_BINANCE: Record<string, string> = {
-  '1': '1m', '5': '5m', '15': '15m', '30': '30m',
-  '60': '1h', '240': '4h', D: '1d', '1D': '1d',
-};
+// Binance history fetch was removed (client 2026-06-26): InfoWay feeds crypto
+// too, so the engine /bars endpoint is the single candle source for every
+// symbol. BINANCE_PAIRS above is kept only to classify a symbol as crypto.
 
-const _binanceCache = new Map<string, { bars: Bar[]; ts: number }>();
-
-async function fetchBinanceKlines(
-  symbol: string, resolution: string, from: number, to: number,
-): Promise<Bar[]> {
-  const pair = BINANCE_PAIRS[symbol.toUpperCase()];
-  if (!pair) return [];
-
-  const interval = RESOLUTION_TO_BINANCE[resolution] || '5m';
-  const cacheKey = `${pair}:${interval}`;
-
-  const cached = _binanceCache.get(cacheKey);
-  if (cached && Date.now() - cached.ts < 60_000) {
-    return cached.bars.filter((b) => b.time >= from * 1000 && b.time <= to * 1000);
-  }
-
-  try {
-    const params = new URLSearchParams({
-      symbol: pair, interval,
-      startTime: String(from * 1000), endTime: String(to * 1000), limit: '1000',
-    });
-    const resp = await fetch(`https://api.binance.com/api/v3/klines?${params}`);
-    if (!resp.ok) return [];
-    const data = await resp.json();
-    const bars: Bar[] = (data as number[][]).map((k) => ({
-      time: Number(k[0]), open: Number(k[1]), high: Number(k[2]),
-      low: Number(k[3]), close: Number(k[4]), volume: Number(k[5]),
-    }));
-    _binanceCache.set(cacheKey, { bars, ts: Date.now() });
-    return bars;
-  } catch {
-    return [];
-  }
-}
-
-/* ─── Synthetic historical candles (non-crypto) ─── */
+/* ─── Synthetic historical candles (fallback) ─── */
 
 function seededRand(seed: number) {
   let s = Math.abs(seed) % 2147483647;
@@ -310,17 +274,9 @@ export const swisDexDatafeed: IBasicDataFeed = {
         }
       } catch { /* backend unavailable — fall through */ }
 
-      // 2. Crypto fallback → Binance, ONLY if the engine had no bars yet
-      //    (e.g. fresh deploy before the aggregator has filled in history).
-      if (BINANCE_PAIRS[sym]) {
-        const bars = await fetchBinanceKlines(sym, String(resolution), from, to);
-        if (bars.length > 0) {
-          onResult(bars, { noData: false });
-          return;
-        }
-      }
-
-      // 3. Last resort — synthetic walk anchored to the current live mid.
+      // 2. Last resort — synthetic walk anchored to the current live mid.
+      //    (Binance was removed: InfoWay feeds crypto too, so the engine /bars
+      //    above is the single source for every symbol — client 2026-06-26.)
       //    Used only if both backend and Binance failed (fresh deploy with
       //    no aggregated bars in TimescaleDB yet). Synthetic bars do NOT
       //    aggregate across TFs, so this is intentionally the final fallback.
