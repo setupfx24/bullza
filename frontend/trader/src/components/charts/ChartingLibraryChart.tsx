@@ -19,16 +19,20 @@ import { swisDexDatafeed } from '@/lib/charting/datafeed';
 
 // The licensed library attaches `TradingView` to window once the script runs.
 // Use `any` for the widget/chart — the bundled .d.ts is huge and we only touch
-// a few methods, each guarded by try/catch.
+// a few methods, each guarded by try/catch. Read it via a local cast rather
+// than augmenting the global Window (AdvancedChart.tsx already declares
+// window.TradingView with a different widget type — augmenting again clashes).
 type TVWidget = { onChartReady?: (cb: () => void) => void; activeChart?: () => any; remove?: () => void };
-declare global {
-  interface Window { TradingView?: { widget?: new (opts: Record<string, unknown>) => TVWidget } }
+type TVWidgetCtor = new (opts: Record<string, unknown>) => TVWidget;
+function tvCtor(): TVWidgetCtor | undefined {
+  if (typeof window === 'undefined') return undefined;
+  return (window as unknown as { TradingView?: { widget?: TVWidgetCtor } }).TradingView?.widget;
 }
 
 let _libPromise: Promise<void> | null = null;
 function loadChartingLibrary(): Promise<void> {
   if (typeof window === 'undefined') return Promise.resolve();
-  if (window.TradingView?.widget) return Promise.resolve();
+  if (tvCtor()) return Promise.resolve();
   if (_libPromise) return _libPromise;
   _libPromise = new Promise<void>((resolve, reject) => {
     const s = document.createElement('script');
@@ -59,9 +63,10 @@ export default function ChartingLibraryChart() {
     linesRef.current.clear();
 
     loadChartingLibrary().then(() => {
-      if (cancelled || !containerRef.current || !window.TradingView?.widget) return;
+      const Ctor = tvCtor();
+      if (cancelled || !containerRef.current || !Ctor) return;
       try { widgetRef.current?.remove?.(); } catch { /* noop */ }
-      const w = new window.TradingView.widget({
+      const w = new Ctor({
         symbol: selectedSymbol || 'XAUUSD',
         interval: '5',
         container: containerRef.current,
