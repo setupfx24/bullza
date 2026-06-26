@@ -24,9 +24,11 @@ import TerminalLeftRail, { type TerminalSpaceId } from '@/components/trading/Ter
 
 // Client 2026-06-19 chose TradingView's polished Advanced Chart over the
 // broker-fed native chart, accepting that its prices are TradingView's own
-// feed (not the order-panel bid/ask). The native broker chart lives in
-// components/charts/Chart.tsx if we want to switch back.
-const LiveChart = dynamic(() => import('@/components/charts/AdvancedChart'), { ssr: false });
+// Full TradingView Charting Library fed by OUR engine data (candles match the
+// running P&L). The licensed library lives in public/charting_library/ and the
+// datafeed in src/lib/charting/datafeed.ts. Revert to
+// '@/components/charts/AdvancedChart' for the public OANDA widget.
+const LiveChart = dynamic(() => import('@/components/charts/ChartingLibraryChart'), { ssr: false });
 const TradingViewNewsTimeline = dynamic(() => import('@/components/charts/TradingViewNewsTimeline'), {
   ssr: false,
 });
