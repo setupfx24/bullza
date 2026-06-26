@@ -98,37 +98,49 @@ export default function ChartingLibraryChart() {
 
     const sym = (selectedSymbol || '').toUpperCase();
     const mine = positions.filter((p) => (p.symbol || '').toUpperCase() === sym);
-    const seen = new Set<string>();
 
+    // Build the full set of desired lines: entry + (SL) + (TP) per position.
+    // dashed=true → SL/TP drawn as a dashed line to stand apart from the entry.
+    type Desired = { key: string; price: number; color: string; text: string; qty: string; dashed: boolean };
+    const desired: Desired[] = [];
     for (const p of mine) {
-      seen.add(p.id);
-      const color = p.side === 'buy' ? '#22c55e' : '#ef4444';
+      const entryColor = p.side === 'buy' ? '#22c55e' : '#ef4444';
       const pnl = Number(p.profit || 0);
-      const label = `${p.side.toUpperCase()} ${p.lots}  ${pnl >= 0 ? '+' : ''}${pnl.toFixed(2)}`;
+      desired.push({
+        key: p.id, price: Number(p.open_price), color: entryColor,
+        text: `${p.side.toUpperCase()} ${p.lots}  ${pnl >= 0 ? '+' : ''}${pnl.toFixed(2)}`,
+        qty: String(p.lots), dashed: false,
+      });
+      if (p.stop_loss && Number(p.stop_loss) > 0) {
+        desired.push({ key: `${p.id}-sl`, price: Number(p.stop_loss), color: '#f59e0b', text: 'SL', qty: '', dashed: true });
+      }
+      if (p.take_profit && Number(p.take_profit) > 0) {
+        desired.push({ key: `${p.id}-tp`, price: Number(p.take_profit), color: '#14b8a6', text: 'TP', qty: '', dashed: true });
+      }
+    }
 
-      let line = linesRef.current.get(p.id);
+    const seen = new Set<string>();
+    for (const d of desired) {
+      seen.add(d.key);
+      let line = linesRef.current.get(d.key);
       if (!line) {
-        try {
-          line = chart.createPositionLine();
-          line.setLineColor(color)
-            .setBodyBackgroundColor(color).setBodyBorderColor(color).setBodyTextColor('#ffffff')
-            .setQuantityBackgroundColor(color).setQuantityBorderColor(color);
-          linesRef.current.set(p.id, line);
-        } catch { continue; }
+        try { line = chart.createPositionLine(); linesRef.current.set(d.key, line); }
+        catch { continue; }
       }
       try {
-        // Recolour in case the side/PnL flipped, then update price + labels.
-        line.setLineColor(color).setBodyBackgroundColor(color).setBodyBorderColor(color)
-          .setQuantityBackgroundColor(color).setQuantityBorderColor(color)
-          .setPrice(Number(p.open_price)).setText(label).setQuantity(String(p.lots));
+        line.setPrice(d.price)
+          .setText(d.text).setQuantity(d.qty)
+          .setLineColor(d.color).setLineStyle(d.dashed ? 1 : 0)
+          .setBodyBackgroundColor(d.color).setBodyBorderColor(d.color).setBodyTextColor('#ffffff')
+          .setQuantityBackgroundColor(d.color).setQuantityBorderColor(d.color);
       } catch { /* noop */ }
     }
 
-    // Drop lines for positions that closed / left this symbol.
-    for (const [id, line] of linesRef.current) {
-      if (!seen.has(id)) {
+    // Drop lines for positions / SL / TP that are gone.
+    for (const [key, line] of linesRef.current) {
+      if (!seen.has(key)) {
         try { line.remove(); } catch { /* noop */ }
-        linesRef.current.delete(id);
+        linesRef.current.delete(key);
       }
     }
   }, [positions, selectedSymbol, ready]);
