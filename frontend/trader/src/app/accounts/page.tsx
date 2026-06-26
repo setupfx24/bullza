@@ -358,11 +358,17 @@ export default function AccountsPage() {
 
   const submitUnifiedTransfer = async () => {
     if (demoFundingBlocked) { toast.error(DEMO_FUNDING_MSG); return; }
-    const amt = parseFloat(transferAmount);
+    let amt = parseFloat(transferAmount);
     if (!amt || amt <= 0) { toast.error('Enter a valid amount'); return; }
     if (uniFrom === uniTo) { toast.error('Select different source and destination'); return; }
     if (uniFrom === 'wallet' && uniTo === 'wallet') { toast.error('Cannot transfer wallet to wallet'); return; }
-    if (amt > uniFromBalance + 1e-9) { toast.error('Insufficient balance'); return; }
+    // "Max" fills the 2-decimal display, which can sit a hair above the true
+    // balance (e.g. 16694.4599 shown as 16694.46). Treat a within-1-cent
+    // overshoot as "transfer all" and send the exact balance (client 2026-06-26).
+    if (amt > uniFromBalance) {
+      if (amt - uniFromBalance <= 0.01) { amt = uniFromBalance; }
+      else { toast.error('Insufficient balance'); return; }
+    }
 
     setTransferSubmitting(true);
     try {

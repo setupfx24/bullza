@@ -1657,14 +1657,21 @@ async def transfer_trading_to_main(req, user_id: UUID, db: AsyncSession) -> dict
         )
 
     free = (account.balance or Decimal("0")) - (account.margin_used or Decimal("0"))
-    if free < amt:
-        raise HTTPException(
-            status_code=400,
-            detail=(
-                f"Insufficient available balance on this trading account. "
-                f"Available: ${float(free):.2f} (${float(account.margin_used or 0):.2f} locked in open trades)."
-            ),
-        )
+    # The UI's "Max" fills the 2-decimal DISPLAY value, which can round a hair
+    # above the true free balance (e.g. 16694.4599 shown as 16694.46) and trip
+    # a strict `free < amt`. Treat a within-1-cent overshoot as "transfer all"
+    # and clamp to the exact free balance (client 2026-06-26).
+    if amt > free:
+        if amt - free <= Decimal("0.01"):
+            amt = free
+        else:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"Insufficient available balance on this trading account. "
+                    f"Available: ${float(free):.2f} (${float(account.margin_used or 0):.2f} locked in open trades)."
+                ),
+            )
 
     user_q = await db.execute(
         select(User).where(User.id == user_id).with_for_update()
