@@ -22,6 +22,26 @@ from ..services import wallet_service
 
 router = APIRouter()
 
+
+async def _manual_enabled_for_user(user_id, db: AsyncSession) -> bool:
+    """Effective bank/manual-deposit availability for ONE user: the global
+    `wallet.manual_enabled` toggle, overridden by the per-user
+    `users.bank_deposit_enabled` (NULL = follow global). The deposit-submit
+    endpoints MUST use this — not the bare global — so a specifically-enabled
+    user can still bank-deposit when the global rail is off (client 2026-06-26).
+    """
+    from packages.common.src.settings_store import get_bool_setting
+    from packages.common.src.models import User
+    from sqlalchemy import select
+    manual = await get_bool_setting("wallet.manual_enabled", True)
+    row = (await db.execute(
+        select(User.bank_deposit_enabled).where(User.id == user_id)
+    )).first()
+    if row and row[0] is not None:
+        manual = bool(row[0])
+    return manual
+
+
 # Per-user throttle on money-out endpoints (security review). A
 # legitimate trader withdraws a handful of times a day; an
 # account-takeover or scripted-abuse attempt hammers it. 10 attempts /
@@ -59,8 +79,7 @@ async def create_manual_deposit(
     # /payment-methods endpoint exposes also hard-rejects API calls
     # when manual is disabled.
     from fastapi import HTTPException
-    from packages.common.src.settings_store import get_bool_setting
-    if not await get_bool_setting("wallet.manual_enabled", True):
+    if not await _manual_enabled_for_user(current_user["user_id"], db):
         raise HTTPException(
             status_code=403,
             detail="Manual deposits are currently disabled. Please use the crypto channel.",
@@ -164,12 +183,11 @@ async def create_manual_withdrawal(
 ):
     """Manual payout: user provides UPI ID and/or a QR image for finance to pay out (main wallet)."""
     from fastapi import HTTPException
-    from packages.common.src.settings_store import get_bool_setting
     await check_rate_limit(
         "withdraw", str(current_user["user_id"]),
         max_requests=WITHDRAW_MAX_PER_WINDOW, window_sec=WITHDRAW_WINDOW_SEC,
     )
-    if not await get_bool_setting("wallet.manual_enabled", True):
+    if not await _manual_enabled_for_user(current_user["user_id"], db):
         raise HTTPException(
             status_code=403,
             detail="Manual withdrawals are currently disabled. Please use the crypto channel.",

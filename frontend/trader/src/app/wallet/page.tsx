@@ -932,6 +932,15 @@ function WalletPageContent() {
     balanceTransfer.mode === 'to_main' &&
     transferCreditUsd > 0 &&
     (transferBalanceUsd - transferAmtUsd) < transferCreditUsd;
+  // Heads-up when a to-main transfer would empty the trading account (balance
+  // → 0). Only when there's no bonus credit, since the credit-forfeit block
+  // already warns in that case (client 2026-06-26).
+  const transferWouldEmpty =
+    !!balanceTransfer &&
+    balanceTransfer.mode === 'to_main' &&
+    transferCreditUsd <= 0 &&
+    transferAmtUsd > 0 &&
+    (transferBalanceUsd - transferAmtUsd) <= 0.005;
 
   if (loading) {
     return (
@@ -2144,6 +2153,15 @@ function WalletPageContent() {
                     <span>I understand my {fmtAccountMoney(transferCreditUsd, transferIsCent)} credit will be forfeited.</span>
                   </label>
                 ) : null}
+              </div>
+            ) : null}
+
+            {/* Empty-account heads-up (client 2026-06-26): warn before a
+                transfer zeroes out the trading account. */}
+            {transferWouldEmpty ? (
+              <div className="mb-3 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2.5 text-[11px] leading-relaxed text-amber-200">
+                ⚠️ This transfer moves your <strong>entire balance</strong> out — the account will be left at{' '}
+                <strong>{fmtAccountMoney(0, transferIsCent)}</strong>. You can move funds back from your main wallet anytime.
               </div>
             ) : null}
 

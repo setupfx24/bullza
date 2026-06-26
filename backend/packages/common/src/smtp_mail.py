@@ -185,6 +185,11 @@ def _send_sync(to_email: str, subject: str, html: str, text: Optional[str], cate
             html_part.add_related(
                 logo_bytes[0], maintype="image", subtype=logo_bytes[1],
                 cid=f"<{_LOGO_CID}>",
+                # Mark it inline WITH a filename — without these the logo shows
+                # up as a stray "noname" attachment in Gmail/Outlook
+                # (client 2026-06-26).
+                disposition="inline",
+                filename=f"logo.{logo_bytes[1] or 'png'}",
             )
         except Exception:
             logger.exception("Failed to embed inline logo — mail will use remote URL fallback")
