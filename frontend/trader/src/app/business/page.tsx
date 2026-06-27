@@ -2,7 +2,7 @@
 
 
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 
 import { clsx } from 'clsx';
 
@@ -54,9 +54,30 @@ export default function BusinessPage() {
 
   const [tab, setTab] = useState<TabId>('ib');
 
-  const tabIndex = TABS.findIndex((t) => t.id === tab);
+  // A Sub-IB does NOT run the IB Program — their dashboard is My Network (their
+  // normal invitees) + Sub-Broker (downline who became Sub-IB). Hide the IB
+  // Program tab for them (client 2026-06-26).
+  const [bizType, setBizType] = useState<string | null>(null);
+  useEffect(() => {
+    api.get<{ ib_type?: string }>('/business/status')
+      .then((s) => setBizType(s?.ib_type ?? null))
+      .catch(() => {});
+  }, []);
+
+  const visibleTabs = useMemo(
+    () => (bizType === 'sub_ib' ? TABS.filter((t) => t.id !== 'ib') : TABS),
+    [bizType],
+  );
+  // Keep the active tab valid for the visible set (Sub-IB default = Sub-Broker).
+  useEffect(() => {
+    if (!visibleTabs.some((t) => t.id === tab)) setTab(visibleTabs[0]?.id ?? 'network');
+  }, [visibleTabs, tab]);
+
+  const tabIndex = visibleTabs.findIndex((t) => t.id === tab);
 
   const slideIndex = tabIndex >= 0 ? tabIndex : 0;
+
+  const tabCount = visibleTabs.length || 1;
 
   if (isDemo) {
     return (
@@ -107,9 +128,9 @@ export default function BusinessPage() {
 
                 <div
 
-                  className="absolute top-0 h-full w-1/3 transition-[transform] duration-500 ease-[cubic-bezier(0.34,1.45,0.64,1)] will-change-transform"
+                  className="absolute top-0 h-full transition-[transform] duration-500 ease-[cubic-bezier(0.34,1.45,0.64,1)] will-change-transform"
 
-                  style={{ transform: `translate3d(${slideIndex * 100}%,0,0)` }}
+                  style={{ width: `${100 / tabCount}%`, transform: `translate3d(${slideIndex * 100}%,0,0)` }}
 
                 >
 
@@ -129,7 +150,7 @@ export default function BusinessPage() {
 
               </div>
 
-              {TABS.map((t) => {
+              {visibleTabs.map((t) => {
 
                 const active = tab === t.id;
 
