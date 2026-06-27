@@ -12,8 +12,51 @@ from packages.common.src.models import User
 from packages.common.src.admin_schemas import RejectRequest
 from services import deposit_service
 from services import deposit_request_service
+from services import payment_method_service
 
 router = APIRouter(prefix="/finance", tags=["Finance"])
+
+
+@router.get("/payment-methods")
+async def list_payment_methods(
+    admin: User = Depends(require_permission("deposits.view")),
+    db: AsyncSession = Depends(get_db),
+):
+    return await payment_method_service.list_all(db)
+
+
+@router.post("/payment-methods")
+async def create_payment_method(
+    body: dict,
+    request: Request,
+    admin: User = Depends(require_permission("config.update")),
+    db: AsyncSession = Depends(get_db),
+):
+    return await payment_method_service.create(
+        body, admin.id, request.client.host if request.client else None, db)
+
+
+@router.put("/payment-methods/{method_id}")
+async def update_payment_method(
+    method_id: uuid.UUID,
+    body: dict,
+    request: Request,
+    admin: User = Depends(require_permission("config.update")),
+    db: AsyncSession = Depends(get_db),
+):
+    return await payment_method_service.update(
+        method_id, body, admin.id, request.client.host if request.client else None, db)
+
+
+@router.delete("/payment-methods/{method_id}")
+async def delete_payment_method(
+    method_id: uuid.UUID,
+    request: Request,
+    admin: User = Depends(require_permission("config.update")),
+    db: AsyncSession = Depends(get_db),
+):
+    return await payment_method_service.delete(
+        method_id, admin.id, request.client.host if request.client else None, db)
 
 
 class ApproveDepositReqBody(BaseModel):

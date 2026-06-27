@@ -530,6 +530,30 @@ async def my_deposit_requests(
     return await deposit_request_service.list_my_requests(current_user["user_id"], db)
 
 
+@router.get("/deposit/methods")
+async def deposit_methods(
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Admin-configured deposit methods (QR / UPI / bank / notice / declaration /
+    min-max) that drive the XM-style deposit flow."""
+    from ..services import payment_method_service
+    return await payment_method_service.list_methods(db)
+
+
+@router.get("/deposit/fx-quote")
+async def deposit_fx_quote(
+    currency: str = Query("INR"),
+    amount: Decimal | None = Query(None),
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Live <currency>->USD rate + the USD a local amount will credit (the form
+    shows this as the user types)."""
+    from ..services import payment_method_service
+    return await payment_method_service.quote(currency, amount, db)
+
+
 @router.get("/bonus/overview")
 async def get_bonus_overview(
     current_user: dict = Depends(get_current_user),
