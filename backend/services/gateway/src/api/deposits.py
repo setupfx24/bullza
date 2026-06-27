@@ -554,6 +554,26 @@ async def deposit_fx_quote(
     return await payment_method_service.quote(currency, amount, db)
 
 
+class MethodDepositRequest(BaseModel):
+    method_id: UUID
+    pay_amount: Decimal
+    utr: str | None = None
+
+
+@router.post("/deposit/method")
+async def create_method_deposit(
+    body: MethodDepositRequest,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Confirm-Payment submit for the XM-style flow — converts the local amount
+    to USD at the latest rate and opens a pending manual deposit."""
+    from ..services import payment_method_service
+    return await payment_method_service.create_method_deposit(
+        current_user["user_id"], body.method_id, body.pay_amount, body.utr, db,
+    )
+
+
 @router.get("/bonus/overview")
 async def get_bonus_overview(
     current_user: dict = Depends(get_current_user),

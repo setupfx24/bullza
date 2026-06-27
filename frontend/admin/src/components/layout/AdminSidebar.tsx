@@ -40,6 +40,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Approvals', href: '/approvals', icon: ShieldCheck, perm: 'funds.approve' },
   { label: 'Transactions', href: '/transactions', icon: Receipt, perm: 'deposits.view' },
   { label: 'Banks', href: '/banks', icon: Landmark, perm: 'banks.view' },
+  { label: 'Payment Methods', href: '/payment-methods', icon: Landmark, perm: 'deposits.view' },
   { label: 'Account types', href: '/account-types', icon: Layers, perm: 'config.view' },
   {
     label: 'Config', icon: Sliders, perm: 'config.view',
