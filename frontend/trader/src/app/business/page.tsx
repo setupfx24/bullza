@@ -57,16 +57,25 @@ export default function BusinessPage() {
   // A Sub-IB does NOT run the IB Program — their dashboard is My Network (their
   // normal invitees) + Sub-Broker (downline who became Sub-IB). Hide the IB
   // Program tab for them (client 2026-06-26).
-  const [bizType, setBizType] = useState<string | null>(null);
+  const [bizSubIb, setBizSubIb] = useState(false);
   useEffect(() => {
-    api.get<{ ib_type?: string }>('/business/status')
-      .then((s) => setBizType(s?.ib_type ?? null))
-      .catch(() => {});
+    // The IB dashboard is the source of truth for is_sub_ib (drives the
+    // "You're a Sub-IB" prompt); status carries ib_type. Check both so the IB
+    // Program tab hides regardless of which one resolves first.
+    Promise.allSettled([
+      api.get<{ ib_type?: string; is_sub_ib?: boolean }>('/business/status'),
+      api.get<{ ib_type?: string; is_sub_ib?: boolean }>('/business/ib/dashboard'),
+    ]).then((res) => {
+      const sub = res.some((r) =>
+        r.status === 'fulfilled' && (r.value?.is_sub_ib === true || r.value?.ib_type === 'sub_ib'),
+      );
+      setBizSubIb(sub);
+    });
   }, []);
 
   const visibleTabs = useMemo(
-    () => (bizType === 'sub_ib' ? TABS.filter((t) => t.id !== 'ib') : TABS),
-    [bizType],
+    () => (bizSubIb ? TABS.filter((t) => t.id !== 'ib') : TABS),
+    [bizSubIb],
   );
   // Keep the active tab valid for the visible set (Sub-IB default = Sub-Broker).
   useEffect(() => {
