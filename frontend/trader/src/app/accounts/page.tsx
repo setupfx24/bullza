@@ -318,14 +318,21 @@ export default function AccountsPage() {
   /* ── Unified transfer helpers ── */
   useEffect(() => {
     if (uniInitialized || loading) return;
+    // Only mark initialised once we've actually picked valid accounts. If the
+    // effect fires while liveAccounts is still empty (loading flipped before
+    // the list arrived), marking it initialised left uniTo='' forever — the
+    // <select> then showed the first option while the state stayed empty, so
+    // the transfer POSTed an empty UUID (client 2026-06-26).
     if (liveAccounts.length >= 2) {
       setUniFrom(liveAccounts[0].id);
       setUniTo(liveAccounts[1].id);
+      setUniInitialized(true);
     } else if (liveAccounts.length === 1) {
       setUniFrom('wallet');
       setUniTo(liveAccounts[0].id);
+      setUniInitialized(true);
     }
-    setUniInitialized(true);
+    // 0 accounts → leave un-initialised; re-runs when the list loads.
   }, [loading, liveAccounts, uniInitialized]);
 
   /** All selectable options: wallet + each live account */
@@ -360,6 +367,7 @@ export default function AccountsPage() {
     if (demoFundingBlocked) { toast.error(DEMO_FUNDING_MSG); return; }
     let amt = parseFloat(transferAmount);
     if (!amt || amt <= 0) { toast.error('Enter a valid amount'); return; }
+    if (!uniFrom || !uniTo) { toast.error('Select a source and destination account'); return; }
     if (uniFrom === uniTo) { toast.error('Select different source and destination'); return; }
     if (uniFrom === 'wallet' && uniTo === 'wallet') { toast.error('Cannot transfer wallet to wallet'); return; }
     // "Max" fills the 2-decimal display, which can sit a hair above the true
