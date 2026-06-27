@@ -1282,11 +1282,11 @@ function WalletPageContent() {
                           key={method}
                           type="button"
                           onClick={() => {
-                            // Bank deposit opens its own dedicated page (client
-                            // 2026-06-23: "naya page khulna chahiye XM ki tarah").
-                            // Crypto stays inline (client 2026-06-24: "crypto
-                            // jaisa hai waisa hi rahega").
-                            if (method === 'manual') { router.push('/wallet/deposit/bank'); return; }
+                            // Bank / UPI deposit opens the XM-style multi-step
+                            // methods flow (admin-configured QR/UPI/bank per
+                            // method, live INR->USD). Crypto stays inline (client
+                            // 2026-06-24/26).
+                            if (method === 'manual') { router.push('/wallet/deposit/methods'); return; }
                             setDepositUiSection(method);
                           }}
                           className={clsx(
