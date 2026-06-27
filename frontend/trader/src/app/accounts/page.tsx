@@ -925,6 +925,7 @@ export default function AccountsPage() {
                       step="0.01"
                       value={transferAmount}
                       onChange={(e) => { setTransferAmount(e.target.value); setTransferAgree(false); }}
+                      onWheel={(e) => e.currentTarget.blur()}
                       placeholder="0.00"
                       className="w-full px-4 py-3.5 rounded-xl border border-border-primary bg-bg-base font-mono font-semibold text-text-primary text-base placeholder:text-text-tertiary focus:outline-none focus:ring-2 focus:ring-accent/40 focus:border-accent/50"
                     />

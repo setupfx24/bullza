@@ -3,6 +3,7 @@ import './globals.css';
 import { Suspense } from 'react';
 import { Toaster } from 'react-hot-toast';
 import { ThemeProvider } from '@/components/ThemeProvider';
+import NumberInputWheelGuard from '@/components/util/NumberInputWheelGuard';
 import MobileBottomNav from '@/components/layout/MobileBottomNav';
 import { AuthProvider } from '@/components/providers/AuthProvider';
 import GoogleAuthProvider from '@/components/providers/GoogleAuthProvider';
@@ -59,6 +60,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <GoogleAuthProvider>
             <NotificationListener />
             <ProfileCompleteGate />
+            <NumberInputWheelGuard />
             {children}
             <Suspense fallback={null}>
               <MobileBottomNav />

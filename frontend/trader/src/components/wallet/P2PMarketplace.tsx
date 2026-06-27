@@ -193,6 +193,9 @@ export default function P2PMarketplace({ mode }: { mode: Side }) {
               step="0.01"
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
+              // Stop the mouse wheel from silently changing the amount when the
+              // field is focused (e.g. 1000 -> 999.97 from a few scroll ticks).
+              onWheel={(e) => e.currentTarget.blur()}
               placeholder="0.00"
               className="w-full pl-7 pr-4 py-2.5 rounded-xl border border-border-primary bg-bg-secondary text-text-primary placeholder:text-text-tertiary outline-none focus:border-accent/50 font-mono font-bold text-base"
             />
