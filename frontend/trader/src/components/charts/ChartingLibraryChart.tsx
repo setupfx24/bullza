@@ -78,6 +78,13 @@ export default function ChartingLibraryChart() {
         timezone: 'Asia/Kolkata',
         disabled_features: ['use_localstorage_for_settings', 'header_symbol_search'],
         enabled_features: [],
+        // Faint SwisDex/symbol watermark in the chart background (restores the
+        // branding the old Advanced Chart widget showed) — client 2026-06-26.
+        overrides: {
+          'symbolWatermarkProperties.transparency': 84,
+          'symbolWatermarkProperties.color': theme === 'light'
+            ? 'rgba(40,40,40,0.10)' : 'rgba(200,200,200,0.10)',
+        },
       });
       widgetRef.current = w;
       try { w.onChartReady?.(() => { if (!cancelled) setReady(true); }); } catch { /* noop */ }
