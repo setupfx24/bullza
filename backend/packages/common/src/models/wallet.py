@@ -30,6 +30,30 @@ class BankAccount(Base):
     created_at = Column(DateTime(timezone=True), default=datetime.utcnow)
 
 
+class PaymentMethod(Base):
+    """Per-method deposit config (migration 0083) — each method (UPI, Local
+    Bank, ...) has its own admin-set QR / UPI / bank text, the notice +
+    declaration the user accepts, min/max and pay currency. Funds settle in USD
+    in the main wallet after live conversion."""
+    __tablename__ = "payment_methods"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    method_key = Column(String(40), unique=True, nullable=False)
+    display_name = Column(String(100), nullable=False)
+    enabled = Column(Boolean, nullable=False, default=True)
+    sort_order = Column(Integer, nullable=False, default=0)
+    pay_currency = Column(String(10), nullable=False, default="INR")
+    qr_image = Column(Text)        # base64 data-URL
+    upi_id = Column(String(255))
+    bank_text = Column(Text)
+    notice = Column(Text)          # step-2 "Accept & Continue" note
+    declaration = Column(Text)     # step-4 checkbox text
+    min_amount = Column(Numeric(18, 2))
+    max_amount = Column(Numeric(18, 2))
+    created_at = Column(DateTime(timezone=True), default=datetime.utcnow)
+    updated_at = Column(DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
 class Deposit(Base):
     __tablename__ = "deposits"
 

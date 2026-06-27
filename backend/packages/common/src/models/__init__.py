@@ -40,6 +40,7 @@ from .trading import (
 )
 from .wallet import (
     BankAccount, Deposit, DepositRequest, Withdrawal, Transaction,
+    PaymentMethod,
     ChargeConfig, SpreadConfig, SwapConfig,
 )
 from .business import (
@@ -88,6 +89,7 @@ __all__ = [
     "AccountGroup", "TradingAccount", "Order", "Position", "TradeHistory",
     # wallet
     "BankAccount", "Deposit", "DepositRequest", "Withdrawal", "Transaction",
+    "PaymentMethod",
     "ChargeConfig", "SpreadConfig", "SwapConfig",
     # business
     "IBProfile", "IBApplication", "IBCommissionPlan", "IBCommission", "Referral",
