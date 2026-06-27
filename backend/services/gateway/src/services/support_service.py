@@ -121,6 +121,28 @@ async def create_ticket(
         import logging
         logging.getLogger(__name__).exception("support ticket email failed")
 
+    # In-app alert for EVERY admin so a new ticket surfaces on their bell — not
+    # only the email + open-count (client 2026-06-26: "report admin ke paas
+    # nahi pahunch rahi"). Best-effort — never fail the ticket over a notify.
+    try:
+        from packages.common.src.notify import create_notification
+        from packages.common.src.models import User as _Adm
+        admin_ids = (await db.execute(
+            select(_Adm.id).where(_Adm.role.in_(["admin", "super_admin"]))
+        )).scalars().all()
+        for aid in admin_ids:
+            await create_notification(
+                db, aid,
+                title="New support ticket",
+                message=(subject or "A user submitted a support ticket."),
+                notif_type="info",
+                action_url="/support",
+            )
+        await db.commit()
+    except Exception:
+        import logging
+        logging.getLogger(__name__).exception("support ticket admin notify failed")
+
     return {
         "id": str(ticket.id),
         "subject": ticket.subject,

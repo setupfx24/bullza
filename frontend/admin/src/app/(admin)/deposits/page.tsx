@@ -320,18 +320,11 @@ export default function DepositsPage() {
       const params: Record<string, string> = {
         page: String(page),
         per_page: String(PAGE_SIZE),
-        // This is the funding History tab — only real money movements
-        // (deposits/withdrawals/adjustments) belong here. Exclude trade P&L
-        // (booked as "profit"/"loss", not "trade") AND the non-funding fee /
-        // commission ledger types — trade insurance, PAMM/MAM master fees, IB
-        // & referral commissions — which were leaking in (client 2026-06-26).
-        // notin_ is an exact match, so each concrete type must be listed.
-        exclude: [
-          'trading', 'trade', 'profit', 'loss', 'commission', 'swap',
-          'insurance_fee', 'insurance_payout',
-          'master_commission', 'performance_fee',
-          'ib_commission', 'referral_commission', 'ib_referral_bounty', 'admin_commission',
-        ].join(','),
+        // Funding History tab = ONLY real deposits + withdrawals. Whitelist
+        // (server-side `Transaction.type IN (...)`), so transfers, trade P&L,
+        // fees, commissions, bonuses etc. never leak in — robust against any
+        // new transaction type (client 2026-06-26).
+        only: 'deposit,withdrawal',
       };
       if (dateFrom) params.start_date = dateFrom;
       if (dateTo) params.end_date = dateTo;
