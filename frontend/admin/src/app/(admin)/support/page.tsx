@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { adminApi } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { Loader2, RefreshCw, Send, ArrowLeft, MessageSquare, Lock } from 'lucide-react';
@@ -82,6 +82,19 @@ export default function SupportPage() {
   }, [statusFilter, priorityFilter]);
 
   useEffect(() => { fetchTickets(); }, [fetchTickets]);
+
+  // Deep-link from the dashboard (/support?ticket=<id>) — auto-open that ticket
+  // so the admin lands straight on the reply box (client 2026-06-26).
+  const autoOpenedRef = useRef(false);
+  useEffect(() => {
+    if (autoOpenedRef.current || tickets.length === 0 || typeof window === 'undefined') return;
+    const id = new URLSearchParams(window.location.search).get('ticket');
+    if (!id) return;
+    autoOpenedRef.current = true;
+    const t = tickets.find((x) => x.id === id) ?? ({ id } as Ticket);
+    void openTicket(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tickets]);
 
   useEffect(() => {
     adminApi.get<{ employees: Employee[] }>('/employees').then((r) => setEmployees(r.employees || [])).catch(() => {});

@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import Link from 'next/link';
 import { adminApi } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import {
@@ -390,7 +391,11 @@ export default function DashboardPage() {
             ) : (
               <div className="divide-y divide-border-primary">
                 {tickets.map((t) => (
-                  <div key={t.id} className="px-4 py-2.5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 text-xs">
+                  <Link
+                    key={t.id}
+                    href={`/support?ticket=${t.id}`}
+                    className="px-4 py-2.5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 text-xs hover:bg-bg-hover transition-fast"
+                  >
                     <div className="min-w-0">
                       <span className="text-text-primary">{t.subject}</span>
                       <span className="text-text-tertiary ml-2 break-all">{t.user_email || '—'}</span>
@@ -400,7 +405,7 @@ export default function DashboardPage() {
                         ? formatDistanceToNow(new Date(t.created_at), { addSuffix: true })
                         : ''}
                     </span>
-                  </div>
+                  </Link>
                 ))}
               </div>
             )}
