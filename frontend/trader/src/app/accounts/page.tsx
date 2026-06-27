@@ -140,6 +140,9 @@ export default function AccountsPage() {
   /** Unified transfer source/dest ID: 'wallet' or account UUID. */
   const [uniFrom, setUniFrom] = useState('wallet');
   const [uniTo, setUniTo] = useState('');
+  // Agreement to the credit-forfeit rule when a transfer OUT of a trading
+  // account would drop its balance below its bonus credit.
+  const [transferAgree, setTransferAgree] = useState(false);
   const [uniInitialized, setUniInitialized] = useState(false);
 
   const fetchWalletSummary = useCallback(async () => {
@@ -357,7 +360,23 @@ export default function AccountsPage() {
     return a ? Math.max(0, Number(a.free_margin ?? 0)) : 0;
   }, [uniFrom, liveAccounts, mainWalletBalance]);
 
+  // Credit-forfeit warning: moving money OUT of a trading account that drops
+  // its balance below its bonus credit forfeits the whole (non-insurance)
+  // credit (client 2026-06-26).
+  const uniFromAccount = useMemo(
+    () => (uniFrom === 'wallet' ? null : liveAccounts.find((x) => x.id === uniFrom) ?? null),
+    [uniFrom, liveAccounts],
+  );
+  const uniFromCredit = Number(uniFromAccount?.credit ?? 0);
+  const uniWouldForfeit = useMemo(() => {
+    if (!uniFromAccount || uniFromCredit <= 0) return false;
+    const amt = parseFloat(transferAmount);
+    if (Number.isNaN(amt) || amt <= 0) return false;
+    return (Number(uniFromAccount.balance ?? 0) - amt) < uniFromCredit;
+  }, [uniFromAccount, uniFromCredit, transferAmount]);
+
   const swapFromTo = () => {
+    setTransferAgree(false);
     const prev = uniFrom;
     setUniFrom(uniTo);
     setUniTo(prev);
@@ -905,11 +924,30 @@ export default function AccountsPage() {
                       min="0.01"
                       step="0.01"
                       value={transferAmount}
-                      onChange={(e) => setTransferAmount(e.target.value)}
+                      onChange={(e) => { setTransferAmount(e.target.value); setTransferAgree(false); }}
                       placeholder="0.00"
                       className="w-full px-4 py-3.5 rounded-xl border border-border-primary bg-bg-base font-mono font-semibold text-text-primary text-base placeholder:text-text-tertiary focus:outline-none focus:ring-2 focus:ring-accent/40 focus:border-accent/50"
                     />
                   </div>
+
+                  {/* ── Credit-forfeit warning ── */}
+                  {uniWouldForfeit && (
+                    <div className="mb-3 rounded-xl border border-red-500/40 bg-red-500/10 px-3 py-2.5 text-[11px] leading-relaxed text-red-300">
+                      <p className="font-semibold">
+                        ⚠️ This transfer drops this account below its {fmt(uniFromCredit)} bonus credit —
+                        your entire {fmt(uniFromCredit)} credit will be forfeited (insurance payouts are kept).
+                      </p>
+                      <label className="mt-2 flex items-start gap-2 cursor-pointer text-text-secondary">
+                        <input
+                          type="checkbox"
+                          checked={transferAgree}
+                          onChange={(e) => setTransferAgree(e.target.checked)}
+                          className="mt-0.5 accent-red-500"
+                        />
+                        <span>I understand my {fmt(uniFromCredit)} credit will be forfeited.</span>
+                      </label>
+                    </div>
+                  )}
 
                   {/* ── SUBMIT ── */}
                   <button
@@ -920,7 +958,8 @@ export default function AccountsPage() {
                       transferSubmitting ||
                       !transferAmount.trim() ||
                       uniFromBalance <= 0 ||
-                      uniFrom === uniTo
+                      uniFrom === uniTo ||
+                      (uniWouldForfeit && !transferAgree)
                     }
                     className="w-full py-3.5 rounded-xl bg-[#55a630] text-white text-base font-bold hover:bg-[#3f7d22] disabled:opacity-45 disabled:pointer-events-none transition-colors flex items-center justify-center gap-2"
                   >
