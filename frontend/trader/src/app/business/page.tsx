@@ -578,35 +578,6 @@ function IBTab() {
 
     <div className="space-y-4">
 
-      {/* IB vs Sub-IB header (client spec 2026-06-16). Only someone introduced
-          by the Super IB (SDA05) is a full IB; everyone else is a Sub-IB and
-          can request an upgrade by contacting SwisDex. */}
-      <div className="flex items-center justify-between gap-3 rounded-lg border border-border-primary bg-bg-secondary px-4 py-3">
-        <div className="flex items-center gap-2 min-w-0">
-          <span className={clsx(
-            'text-xs font-semibold px-2 py-0.5 rounded-md shrink-0',
-            dashboard?.ib_type === 'super_ib' ? 'bg-accent/15 text-accent'
-              : dashboard?.is_sub_ib ? 'bg-warning/15 text-warning'
-              : 'bg-success/15 text-success',
-          )}>
-            {dashboard?.ib_type === 'super_ib' ? 'Super IB' : dashboard?.is_sub_ib ? 'Sub-IB' : 'IB'}
-          </span>
-          {dashboard?.is_sub_ib && (
-            <span className="text-xs text-text-secondary truncate">
-              You are a Sub-IB — you earn on your own referrals and downline.
-            </span>
-          )}
-        </div>
-        {dashboard?.can_request_ib_upgrade && (
-          <a
-            href="/support?topic=ib-upgrade"
-            className="text-xs font-medium px-3 py-1.5 rounded-md bg-accent/15 text-accent border border-accent/30 hover:bg-accent/25 whitespace-nowrap shrink-0"
-          >
-            Contact SwisDex to become IB
-          </a>
-        )}
-      </div>
-
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
 
         {[
@@ -622,11 +593,6 @@ function IBTab() {
           { label: 'Active Users', value: `${status?.active_users || 0}${status?.total_referred ? ` / ${status.total_referred}` : ''}`, color: 'text-success' },
 
           { label: 'Referrals', value: String(dashboard?.total_referrals ?? status?.total_referred ?? 0), color: 'text-accent' },
-
-          // dashboard.level is the raw tree depth (Super IB = 1, full IB = 2,
-          // sub-IB = 3). Display it relative to the Super IB so a full IB shows
-          // L1 and a sub-IB shows L2 (client 2026-06-29: "full IB ko L2 kyun").
-          { label: 'Level', value: `L${Math.max(1, (dashboard?.level || 2) - 1)}`, color: 'text-text-primary' },
 
         ].map(c => (
 
@@ -994,6 +960,11 @@ function SubBrokerTab() {
 
   const [dashboard, setDashboard] = useState<any>(null);
 
+  // The full IB-dashboard payload (tier, deposit pool, per-user commission
+  // breakdown) — surfaced here so a Sub-IB sees their tier/pool/earnings even
+  // though the IB Program tab is hidden for them (client 2026-06-29).
+  const [ibDash, setIbDash] = useState<any>(null);
+
   const [loading, setLoading] = useState(true);
 
 
@@ -1010,13 +981,12 @@ function SubBrokerTab() {
 
         if (s.is_ib) {
 
-          try {
-
-            const d = await api.get<any>('/business/sub-broker/dashboard');
-
-            setDashboard(d);
-
-          } catch {}
+          const [d, ib] = await Promise.allSettled([
+            api.get<any>('/business/sub-broker/dashboard'),
+            api.get<any>('/business/ib/dashboard'),
+          ]);
+          if (d.status === 'fulfilled') setDashboard(d.value);
+          if (ib.status === 'fulfilled') setIbDash(ib.value);
 
         }
 
@@ -1099,6 +1069,61 @@ function SubBrokerTab() {
           </div>
 
         </div>
+
+
+
+        {/* Tier + deposit pool (client 2026-06-29: a Sub-IB must see which tier
+            they fall in and their downline deposit pool). */}
+        {ibDash && (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div className="rounded-xl border border-border-primary bg-card p-3 noise-texture">
+              <p className="text-xxs text-text-tertiary">Your Tier</p>
+              <p className="text-lg font-bold mt-0.5 text-accent">{ibDash.tier?.label || 'Unranked'}</p>
+              <p className="text-xxs text-text-tertiary">{ibDash.tier?.per_lot != null ? `$${fmt(ibDash.tier.per_lot)}/lot` : 'No tier yet'}</p>
+            </div>
+            <div className="rounded-xl border border-border-primary bg-card p-3 noise-texture">
+              <p className="text-xxs text-text-tertiary">Deposit Pool</p>
+              <p className="text-lg font-bold font-mono tabular-nums mt-0.5 text-accent">${fmt(status?.deposit_pool_usd ?? ibDash.referral_deposit_total ?? 0)}</p>
+            </div>
+            <div className="rounded-xl border border-border-primary bg-card p-3 noise-texture">
+              <p className="text-xxs text-text-tertiary">Active Users</p>
+              <p className="text-lg font-bold font-mono tabular-nums mt-0.5 text-success">{ibDash.activations ?? status?.active_users ?? 0}</p>
+            </div>
+            <div className="rounded-xl border border-border-primary bg-card p-3 noise-texture">
+              <p className="text-xxs text-text-tertiary">Next Tier</p>
+              <p className="text-sm font-bold mt-0.5 text-text-primary">{ibDash.next_tier?.label || 'Top tier'}</p>
+              <p className="text-xxs text-text-tertiary">
+                {ibDash.next_tier
+                  ? [ibDash.needed_activations_for_next ? `${ibDash.needed_activations_for_next} more users` : null,
+                     ibDash.needed_amount_for_next ? `$${fmt(ibDash.needed_amount_for_next)} more pool` : null]
+                     .filter(Boolean).join(' or ') || '—'
+                  : '—'}
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Per-user commission breakdown — "kis user se kitna mila" (client
+            2026-06-29). Same data the full-IB dashboard shows. */}
+        {ibDash?.earnings_by_user?.length > 0 && (
+          <div className="rounded-xl border border-border-primary bg-card noise-texture overflow-hidden">
+            <div className="px-4 py-3 border-b border-border-primary"><h3 className="text-xs font-semibold text-text-primary">Commission by User</h3></div>
+            <table className="w-full text-xs">
+              <thead><tr className="border-b border-border-primary text-xxs text-text-tertiary">
+                <th className="px-4 py-2 text-left">User</th><th className="px-4 py-2 text-right">Trades</th><th className="px-4 py-2 text-right">Earned</th>
+              </tr></thead>
+              <tbody>
+                {ibDash.earnings_by_user.map((u: any) => (
+                  <tr key={u.user_id} className="border-b border-border-primary/50 hover:bg-bg-hover/30">
+                    <td className="px-4 py-2"><p className="text-text-primary">{u.name || u.email}</p><p className="text-xxs text-text-tertiary">{u.email}</p></td>
+                    <td className="px-4 py-2 text-right font-mono text-text-secondary">{u.trades_attributed}</td>
+                    <td className="px-4 py-2 text-right font-mono text-success">${fmt(u.total_commission || 0)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
 
 
 

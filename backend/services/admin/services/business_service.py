@@ -326,14 +326,20 @@ async def approve_ib_application(
     if app.status != "pending":
         raise HTTPException(status_code=400, detail="Application is not pending")
 
+    user_q = await db.execute(select(User).where(User.id == app.user_id))
+    user = user_q.scalar_one_or_none()
+    # KYC gate (client 2026-06-29): an IB cannot be approved until the applicant
+    # has cleared KYC. Blocks promoting a user who applied before finishing KYC.
+    if user is None or (user.kyc_status or "pending").lower() not in ("approved", "verified"):
+        raise HTTPException(
+            status_code=400,
+            detail="User has not completed KYC verification — cannot approve as IB.",
+        )
+
     app.status = "approved"
     app.approved_by = admin_id
     app.approved_at = datetime.utcnow()
-
-    user_q = await db.execute(select(User).where(User.id == app.user_id))
-    user = user_q.scalar_one_or_none()
-    if user:
-        user.role = "ib"
+    user.role = "ib"
 
     referral_code = "IB" + "".join(secrets.choice(string.ascii_uppercase + string.digits) for _ in range(8))
 
@@ -800,14 +806,20 @@ async def approve_sub_broker(
     if app.status != "pending":
         raise HTTPException(status_code=400, detail="Application is not pending")
 
+    user_q = await db.execute(select(User).where(User.id == app.user_id))
+    user = user_q.scalar_one_or_none()
+    # KYC gate (client 2026-06-29): a Sub-IB cannot be approved until the
+    # applicant has cleared KYC.
+    if user is None or (user.kyc_status or "pending").lower() not in ("approved", "verified"):
+        raise HTTPException(
+            status_code=400,
+            detail="User has not completed KYC verification — cannot approve as Sub-IB.",
+        )
+
     app.status = "approved"
     app.approved_by = admin_id
     app.approved_at = datetime.utcnow()
-
-    user_q = await db.execute(select(User).where(User.id == app.user_id))
-    user = user_q.scalar_one_or_none()
-    if user:
-        user.role = "sub_broker"
+    user.role = "sub_broker"
 
     referral_code = "SB" + "".join(secrets.choice(string.ascii_uppercase + string.digits) for _ in range(8))
 
