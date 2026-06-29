@@ -968,10 +968,6 @@ function SubBrokerTab() {
 
   const [loading, setLoading] = useState(true);
 
-  const [applying, setApplying] = useState(false);
-
-  const [companyName, setCompanyName] = useState('');
-
 
 
   useEffect(() => {
@@ -1001,26 +997,6 @@ function SubBrokerTab() {
     })();
 
   }, []);
-
-
-
-  const handleApply = async () => {
-
-    setApplying(true);
-
-    try {
-
-      await api.post('/business/apply-sub-broker', { company_name: companyName || undefined });
-
-      toast.success('Sub-broker application submitted!');
-
-      const s = await api.get<any>('/business/status');
-
-      setStatus(s);
-
-    } catch (e: any) { toast.error(e.message || 'Failed'); } finally { setApplying(false); }
-
-  };
 
 
 
@@ -1160,46 +1136,39 @@ function SubBrokerTab() {
     );
   }
 
-  return (
-
-    <div className="rounded-xl border border-border-primary bg-card p-6 sm:p-10 noise-texture text-center space-y-5 max-w-2xl mx-auto">
-
-      <h3 className="text-lg sm:text-xl font-bold text-text-primary">Become a Sub-Broker</h3>
-
-      <p className="text-xs sm:text-sm text-text-secondary max-w-md mx-auto leading-relaxed">Partner with us as a sub-broker. Get your own referral code, manage clients, and earn revenue share on all their trading activity.</p>
-
-      <div className="max-w-sm mx-auto text-left">
-
-        <label className="text-xxs text-text-secondary block mb-1">Company Name (optional)</label>
-
-        <input type="text" value={companyName} onChange={e => setCompanyName(e.target.value)} placeholder="Your company name" className="skeu-input w-full text-text-primary rounded-xl py-2.5 px-4 text-xs border-border-primary focus:border-accent focus:ring-1 focus:ring-accent/30" />
-
+  // A user who can become a FULL IB (introduced by the Super IB, or with no
+  // referrer) is on the IB track — they must NOT be offered the sub-broker /
+  // sub-IB apply (client 2026-06-29: "IB ko sub-IB banne ka option dikh raha
+  // hai"). Only a user introduced by ANOTHER IB (can_become_ib === false)
+  // belongs here. (!== false also covers the undefined/loading case → safer to
+  // hide the form than to wrongly offer it.)
+  if (status?.can_become_ib !== false) {
+    return (
+      <div className="rounded-xl border border-border-primary bg-card p-6 sm:p-8 noise-texture text-center max-w-lg mx-auto space-y-2">
+        <div className="text-2xl">🚀</div>
+        <h3 className="text-sm font-semibold text-text-primary">Become a full IB instead</h3>
+        <p className="text-xxs text-text-tertiary">
+          You&apos;re eligible for the full Introducing Broker program — apply from the
+          <span className="text-accent font-medium"> IB Program</span> tab. The sub-broker
+          path is only for users who joined through an existing IB.
+        </p>
       </div>
+    );
+  }
 
-      <button
-
-        type="button"
-
-        onClick={handleApply}
-
-        disabled={applying}
-
-        className={clsx(
-
-          'w-full max-w-xs mx-auto px-6 py-3.5 rounded-xl text-sm font-bold transition-all border-2 border-accent',
-
-          applying ? 'opacity-50 cursor-not-allowed' : 'bg-accent text-black hover:brightness-110 shadow-[0_0_24px_rgba(85,166,48,0.35)]',
-
-        )}
-
-      >
-
-        {applying ? 'Submitting...' : 'Apply as Sub-Broker'}
-
-      </button>
-
+  // can_become_ib === false → introduced by another IB → sub-IB track. The
+  // single apply entry point is the IB Program tab's "Apply as Sub-IB" button
+  // (client 2026-06-29: keep sub-IB apply in ONE place — no duplicate form).
+  return (
+    <div className="rounded-xl border border-border-primary bg-card p-6 sm:p-8 noise-texture text-center max-w-lg mx-auto space-y-2">
+      <div className="text-2xl">🤝</div>
+      <h3 className="text-sm font-semibold text-text-primary">Apply as a Sub-IB</h3>
+      <p className="text-xxs text-text-tertiary">
+        You joined through an Introducing Broker. Apply as a Sub-IB from the
+        <span className="text-accent font-medium"> IB Program</span> tab — once approved,
+        your downline and earnings show up here and in My Network.
+      </p>
     </div>
-
   );
 
 }
