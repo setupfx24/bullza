@@ -375,11 +375,13 @@ function IBTab() {
       // introducing IB and earn per-lot MLM commission on their own downline
       // (client 2026-06-29). Same min-deposit gate as the full-IB flow.
       const subElig = status?.eligibility as
-        | { min_deposit_required_usd: number; total_deposits_usd: number; is_eligible: boolean }
+        | { min_deposit_required_usd: number; total_deposits_usd: number; is_eligible: boolean; kyc_approved?: boolean }
         | undefined;
       const subMin = subElig?.min_deposit_required_usd ?? 0;
       const subDeposits = subElig?.total_deposits_usd ?? 0;
-      const subEligible = subElig ? subElig.is_eligible : true;
+      const subKyc = subElig?.kyc_approved !== false; // KYC cleared (or unknown)
+      const subDepositOk = subMin <= 0 || subDeposits >= subMin;
+      const subEligible = subElig ? subElig.is_eligible : true; // deposit AND kyc
       const subPct = subMin > 0 ? Math.min(100, (subDeposits / subMin) * 100) : 100;
       const subRemaining = Math.max(0, subMin - subDeposits);
       return (
@@ -393,25 +395,34 @@ function IBTab() {
             own network and earn per-lot commission on your downline&apos;s trades.
           </p>
 
-          {subElig && subMin > 0 && (
-            <div className="rounded-lg border border-border-primary bg-bg-secondary p-4 text-left">
-              <div className="flex items-center justify-between gap-2 mb-2">
-                <span className="text-xs font-semibold text-text-secondary">Eligibility</span>
-                <span className={clsx('text-xs font-bold tabular-nums', subEligible ? 'text-success' : 'text-warning')}>
-                  ${fmt(subDeposits)} / ${fmt(subMin)}
-                </span>
-              </div>
-              <div className="h-2 rounded-full bg-bg-tertiary overflow-hidden">
-                <div
-                  className={clsx('h-full transition-all', subEligible ? 'bg-success' : 'bg-warning')}
-                  style={{ width: `${subPct}%` }}
-                />
-              </div>
-              <p className={clsx('text-[11px] mt-2', subEligible ? 'text-success' : 'text-text-tertiary')}>
-                {subEligible
-                  ? 'You meet the minimum deposit requirement. Apply below.'
-                  : `Deposit ${'$' + fmt(subRemaining)} more in approved funds to apply as a Sub-IB.`}
-              </p>
+          {subElig && (subMin > 0 || !subKyc) && (
+            <div className="rounded-lg border border-border-primary bg-bg-secondary p-4 text-left space-y-2">
+              {!subKyc && (
+                <p className="text-[11px] text-warning">
+                  ⚠ Complete your KYC verification first — it&apos;s required before becoming a Sub-IB.
+                </p>
+              )}
+              {subMin > 0 && (
+                <>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-xs font-semibold text-text-secondary">Eligibility</span>
+                    <span className={clsx('text-xs font-bold tabular-nums', subDepositOk ? 'text-success' : 'text-warning')}>
+                      ${fmt(subDeposits)} / ${fmt(subMin)}
+                    </span>
+                  </div>
+                  <div className="h-2 rounded-full bg-bg-tertiary overflow-hidden">
+                    <div
+                      className={clsx('h-full transition-all', subDepositOk ? 'bg-success' : 'bg-warning')}
+                      style={{ width: `${subPct}%` }}
+                    />
+                  </div>
+                  <p className={clsx('text-[11px]', subDepositOk ? 'text-success' : 'text-text-tertiary')}>
+                    {subDepositOk
+                      ? 'You meet the minimum deposit requirement.'
+                      : `Deposit ${'$' + fmt(subRemaining)} more in approved funds to apply as a Sub-IB.`}
+                  </p>
+                </>
+              )}
             </div>
           )}
 
@@ -426,21 +437,25 @@ function IBTab() {
                 : 'bg-accent text-black hover:brightness-110 shadow-[0_0_24px_rgba(85,166,48,0.35)]',
             )}
           >
-            {applying ? 'Submitting...' : subEligible ? 'Apply as Sub-IB' : 'Deposit to Unlock'}
+            {applying ? 'Submitting...' : subEligible ? 'Apply as Sub-IB' : (!subKyc ? 'Complete KYC first' : 'Deposit to Unlock')}
           </button>
         </div>
       );
     }
 
     const eligibility = status?.eligibility as
-      | { min_deposit_required_usd: number; total_deposits_usd: number; is_eligible: boolean }
+      | { min_deposit_required_usd: number; total_deposits_usd: number; is_eligible: boolean; kyc_approved?: boolean }
       | undefined;
 
     const minRequired = eligibility?.min_deposit_required_usd ?? 0;
 
     const currentDeposits = eligibility?.total_deposits_usd ?? 0;
 
-    const eligible = eligibility ? eligibility.is_eligible : true;
+    const kycOk = eligibility?.kyc_approved !== false; // KYC cleared (or unknown)
+
+    const depositOk = minRequired <= 0 || currentDeposits >= minRequired;
+
+    const eligible = eligibility ? eligibility.is_eligible : true; // deposit AND kyc
 
     const pct = minRequired > 0 ? Math.min(100, (currentDeposits / minRequired) * 100) : 100;
 
@@ -452,43 +467,53 @@ function IBTab() {
 
         <h3 className="text-lg sm:text-xl font-bold text-text-primary">Become an Introducing Broker</h3>
 
-        {eligibility && minRequired > 0 && (
+        {eligibility && (minRequired > 0 || !kycOk) && (
 
-          <div className="rounded-lg border border-border-primary bg-bg-secondary p-4 text-left">
+          <div className="rounded-lg border border-border-primary bg-bg-secondary p-4 text-left space-y-2">
 
-            <div className="flex items-center justify-between gap-2 mb-2">
+            {!kycOk && (
+              <p className="text-[11px] text-warning">
+                ⚠ Complete your KYC verification first — it&apos;s required before becoming an IB.
+              </p>
+            )}
 
-              <span className="text-xs font-semibold text-text-secondary">Eligibility</span>
+            {minRequired > 0 && (
+              <>
+                <div className="flex items-center justify-between gap-2">
 
-              <span className={clsx('text-xs font-bold tabular-nums', eligible ? 'text-success' : 'text-warning')}>
+                  <span className="text-xs font-semibold text-text-secondary">Eligibility</span>
 
-                ${fmt(currentDeposits)} / ${fmt(minRequired)}
+                  <span className={clsx('text-xs font-bold tabular-nums', depositOk ? 'text-success' : 'text-warning')}>
 
-              </span>
+                    ${fmt(currentDeposits)} / ${fmt(minRequired)}
 
-            </div>
+                  </span>
 
-            <div className="h-2 rounded-full bg-bg-tertiary overflow-hidden">
+                </div>
 
-              <div
+                <div className="h-2 rounded-full bg-bg-tertiary overflow-hidden">
 
-                className={clsx('h-full transition-all', eligible ? 'bg-success' : 'bg-warning')}
+                  <div
 
-                style={{ width: `${pct}%` }}
+                    className={clsx('h-full transition-all', depositOk ? 'bg-success' : 'bg-warning')}
 
-              />
+                    style={{ width: `${pct}%` }}
 
-            </div>
+                  />
 
-            <p className={clsx('text-[11px] mt-2', eligible ? 'text-success' : 'text-text-tertiary')}>
+                </div>
 
-              {eligible
+                <p className={clsx('text-[11px]', depositOk ? 'text-success' : 'text-text-tertiary')}>
 
-                ? 'You meet the minimum deposit requirement. Apply below.'
+                  {depositOk
 
-                : `Deposit ${'$' + fmt(remaining)} more in approved funds to qualify for the IB program.`}
+                    ? 'You meet the minimum deposit requirement.'
 
-            </p>
+                    : `Deposit ${'$' + fmt(remaining)} more in approved funds to qualify for the IB program.`}
+
+                </p>
+              </>
+            )}
 
           </div>
 
@@ -516,7 +541,7 @@ function IBTab() {
 
         >
 
-          {applying ? 'Submitting...' : eligible ? 'Apply Now' : 'Deposit to Unlock'}
+          {applying ? 'Submitting...' : eligible ? 'Apply Now' : (!kycOk ? 'Complete KYC first' : 'Deposit to Unlock')}
 
         </button>
 

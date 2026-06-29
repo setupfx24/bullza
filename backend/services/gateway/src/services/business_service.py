@@ -132,6 +132,16 @@ async def _can_self_apply_ib(db: AsyncSession, user_id: UUID) -> bool:
     return super_prof is not None and super_prof.user_id == introducer_id
 
 
+async def _kyc_approved(db: AsyncSession, user_id: UUID) -> bool:
+    """KYC must be cleared before a user can become an IB or Sub-IB (client
+    2026-06-29). Treat both 'approved' and 'verified' as cleared, matching the
+    rest of the gateway (profile_service)."""
+    kyc = (await db.execute(
+        select(User.kyc_status).where(User.id == user_id)
+    )).scalar_one_or_none()
+    return (kyc or "pending").lower() in ("approved", "verified")
+
+
 async def _ib_pool_and_active(db: AsyncSession, ib_user_id: UUID) -> tuple[float, int, int]:
     """Returns (deposit_pool_usd, active_users, total_referred) for an IB's
     direct downline (client 2026-06-19: the IB should see how much its users
@@ -197,10 +207,16 @@ async def ib_status(user_id: UUID, db: AsyncSession) -> dict:
     # an unexplained disabled button.
     min_deposit = await _get_ib_min_deposit_usd()
     total_deposits = await _get_user_total_deposits(user_id, db)
+    # KYC must be cleared before applying (client 2026-06-29). is_eligible now
+    # requires BOTH the min deposit AND KYC, so the apply button stays disabled
+    # until both are done; kyc_approved is surfaced so the UI can say which gate
+    # is still open.
+    kyc_ok = await _kyc_approved(db, user_id)
     eligibility = {
         "min_deposit_required_usd": min_deposit,
         "total_deposits_usd": total_deposits,
-        "is_eligible": total_deposits >= min_deposit,
+        "kyc_approved": kyc_ok,
+        "is_eligible": total_deposits >= min_deposit and kyc_ok,
     }
     # Whether this user may use the self-apply flow at all, or only see the
     # "Contact SwisDex to become an IB" prompt (client 2026-06-19).
@@ -246,6 +262,13 @@ async def apply_ib(user_id: UUID, application_data: dict | None, db: AsyncSessio
             status_code=403,
             detail="Direct IB applications are open only to users introduced by SwisDex. "
                    "Please contact SwisDex to become an IB.",
+        )
+
+    # KYC gate (client 2026-06-29): must be KYC-approved before becoming an IB.
+    if not await _kyc_approved(db, user_id):
+        raise HTTPException(
+            status_code=403,
+            detail="Please complete KYC verification before applying to become an IB.",
         )
 
     # Minimum-deposit gate. Admin sets the threshold via system_settings →
@@ -295,6 +318,13 @@ async def apply_sub_broker(user_id: UUID, application_data: dict | None, db: Asy
     )
     if existing_profile.scalar_one_or_none():
         raise HTTPException(status_code=400, detail="You already have a business profile")
+
+    # KYC gate (client 2026-06-29): KYC-approved required before becoming a Sub-IB.
+    if not await _kyc_approved(db, user_id):
+        raise HTTPException(
+            status_code=403,
+            detail="Please complete KYC verification before applying to become a Sub-IB.",
+        )
 
     # Same min-deposit gate as IB — sub-broker is just a higher tier of IB.
     min_deposit = await _get_ib_min_deposit_usd()
