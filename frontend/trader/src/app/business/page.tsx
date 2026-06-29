@@ -1034,6 +1034,14 @@ function SubBrokerTab() {
 
             { label: 'Sub-Brokers', value: String(dashboard.direct_clients || 0), color: 'text-accent' },
 
+            // Pool + active users come from /business/status (always present),
+            // so a Sub-IB sees their direct downline's deposit pool up top even
+            // if the richer /ib/dashboard fetch is slow/unavailable (client
+            // 2026-06-29: "Sub-IB ko direct user ka pool amount nahi dikh raha").
+            { label: 'Users Deposit Pool', value: `$${fmt(status?.deposit_pool_usd || 0)}`, color: 'text-accent' },
+
+            { label: 'Active Users', value: `${status?.active_users || 0}${status?.total_referred ? ` / ${status.total_referred}` : ''}`, color: 'text-success' },
+
             { label: 'Total Earned', value: `$${fmt(dashboard.total_earned || 0)}`, color: 'text-success' },
 
             { label: 'Pending', value: `$${fmt(dashboard.pending_payout || 0)}`, color: 'text-warning' },
@@ -1072,26 +1080,18 @@ function SubBrokerTab() {
 
 
 
-        {/* Tier + deposit pool (client 2026-06-29: a Sub-IB must see which tier
-            they fall in and their downline deposit pool). */}
+        {/* Which tier the Sub-IB falls in + progress to the next one (client
+            2026-06-29). Pool / active users are shown in the top cards above. */}
         {ibDash && (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 gap-3">
             <div className="rounded-xl border border-border-primary bg-card p-3 noise-texture">
               <p className="text-xxs text-text-tertiary">Your Tier</p>
               <p className="text-lg font-bold mt-0.5 text-accent">{ibDash.tier?.label || 'Unranked'}</p>
-              <p className="text-xxs text-text-tertiary">{ibDash.tier?.per_lot != null ? `$${fmt(ibDash.tier.per_lot)}/lot` : 'No tier yet'}</p>
-            </div>
-            <div className="rounded-xl border border-border-primary bg-card p-3 noise-texture">
-              <p className="text-xxs text-text-tertiary">Deposit Pool</p>
-              <p className="text-lg font-bold font-mono tabular-nums mt-0.5 text-accent">${fmt(status?.deposit_pool_usd ?? ibDash.referral_deposit_total ?? 0)}</p>
-            </div>
-            <div className="rounded-xl border border-border-primary bg-card p-3 noise-texture">
-              <p className="text-xxs text-text-tertiary">Active Users</p>
-              <p className="text-lg font-bold font-mono tabular-nums mt-0.5 text-success">{ibDash.activations ?? status?.active_users ?? 0}</p>
+              <p className="text-xxs text-text-tertiary">{ibDash.tier?.per_lot != null ? `$${fmt(ibDash.tier.per_lot)}/lot` : 'No tier yet — base rate applies'}</p>
             </div>
             <div className="rounded-xl border border-border-primary bg-card p-3 noise-texture">
               <p className="text-xxs text-text-tertiary">Next Tier</p>
-              <p className="text-sm font-bold mt-0.5 text-text-primary">{ibDash.next_tier?.label || 'Top tier'}</p>
+              <p className="text-lg font-bold mt-0.5 text-text-primary">{ibDash.next_tier?.label || 'Top tier'}</p>
               <p className="text-xxs text-text-tertiary">
                 {ibDash.next_tier
                   ? [ibDash.needed_activations_for_next ? `${ibDash.needed_activations_for_next} more users` : null,
