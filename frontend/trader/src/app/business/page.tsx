@@ -566,11 +566,11 @@ function IBTab() {
           )}>
             {dashboard?.ib_type === 'super_ib' ? 'Super IB' : dashboard?.is_sub_ib ? 'Sub-IB' : 'IB'}
           </span>
-          <span className="text-xs text-text-secondary truncate">
-            {dashboard?.is_sub_ib
-              ? 'You are a Sub-IB — you earn on your own referrals and downline.'
-              : 'You are a full IB.'}
-          </span>
+          {dashboard?.is_sub_ib && (
+            <span className="text-xs text-text-secondary truncate">
+              You are a Sub-IB — you earn on your own referrals and downline.
+            </span>
+          )}
         </div>
         {dashboard?.can_request_ib_upgrade && (
           <a
@@ -598,7 +598,10 @@ function IBTab() {
 
           { label: 'Referrals', value: String(dashboard?.total_referrals ?? status?.total_referred ?? 0), color: 'text-accent' },
 
-          { label: 'Level', value: `L${dashboard?.level || 1}`, color: 'text-text-primary' },
+          // dashboard.level is the raw tree depth (Super IB = 1, full IB = 2,
+          // sub-IB = 3). Display it relative to the Super IB so a full IB shows
+          // L1 and a sub-IB shows L2 (client 2026-06-29: "full IB ko L2 kyun").
+          { label: 'Level', value: `L${Math.max(1, (dashboard?.level || 2) - 1)}`, color: 'text-text-primary' },
 
         ].map(c => (
 
@@ -1229,7 +1232,7 @@ function NetworkTab() {
 
           <span className="text-text-tertiary">Your Code: <span className="text-accent font-mono font-bold">{tree.root?.referral_code}</span></span>
 
-          <span className="text-text-tertiary">Level: <span className="text-text-primary font-bold">L{tree.root?.level}</span></span>
+          <span className="text-text-tertiary">Level: <span className="text-text-primary font-bold">L{Math.max(1, (tree.root?.level || 2) - 1)}</span></span>
 
           <span className="text-text-tertiary">Total Earned: <span className="text-success font-mono font-bold">${fmt(tree.root?.total_earned || 0)}</span></span>
 
