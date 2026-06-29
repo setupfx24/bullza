@@ -767,6 +767,50 @@ async def cancel_order(order_id: UUID, user_id: UUID, db: AsyncSession) -> dict:
 
 # ─── Positions ────────────────────────────────────────────────────────────
 
+async def user_close_quote(
+    db: AsyncSession,
+    instrument,
+    user_id: UUID,
+    account_id: UUID,
+    account_group_id,
+    tick: dict,
+) -> tuple[Decimal, Decimal]:
+    """The bid/ask the user would CLOSE at: the live tick MID re-spread with the
+    SAME per-user / master spread used at open and close (mirrors the close path
+    in close_position). The raw broadcast spread can be WIDER than the user's
+    configured spread, so valuing floating P&L off the raw tick showed a bigger
+    loss than the user actually realises on close — the position looked like it
+    "went straight to loss" and didn't track the displayed price (client
+    2026-06-29). Returns (close_bid, close_ask)."""
+    raw_bid = Decimal(str(tick["bid"]))
+    raw_ask = Decimal(str(tick["ask"]))
+    mid = (raw_bid + raw_ask) / Decimal("2")
+    pip = Decimal(str(getattr(instrument, "pip_size", None) or "0.0001"))
+    digits = int(getattr(instrument, "digits", None) or 5)
+    c_bid, c_ask = raw_bid, raw_ask
+    mult = await _live_spread_mult(instrument.symbol)
+    try:
+        master = (await db.execute(
+            select(MasterAccount).where(MasterAccount.account_id == account_id)
+        )).scalar_one_or_none()
+        if master and master.spread_markup_pips:
+            c_bid, c_ask = symmetric_quote_from_mid(
+                mid, Decimal(str(master.spread_markup_pips)) * mult, "pips", pip, digits, Decimal("0"),
+            )
+        else:
+            sv, st, _ = await resolve_spread_config(
+                db, instrument, user_id=user_id, account_group_id=account_group_id,
+            )
+            if sv and sv > 0:
+                c_bid, c_ask = symmetric_quote_from_mid(mid, sv * mult, st, pip, digits, Decimal("0"))
+    except Exception as _e:
+        logger.warning(
+            "user_close_quote spread resolution failed for %s (user=%s): %s",
+            getattr(instrument, "symbol", "?"), user_id, _e,
+        )
+    return c_bid, c_ask
+
+
 async def list_positions(account_id: UUID, user_id: UUID, status: str, db: AsyncSession) -> list[dict]:
     # Load the account WITH its group so we know the lot scaling
     # multiplier for the display swap below. Cent accounts persist
@@ -837,7 +881,15 @@ async def list_positions(account_id: UUID, user_id: UUID, status: str, db: Async
 
         if tick_data and pos_status == "open":
             tick = json.loads(tick_data)
-            current_price = float(tick["bid"]) if sv == "buy" else float(tick["ask"])
+            # Value the position at the user's CLOSE quote (mid re-spread with
+            # the user's own spread), NOT the raw broadcast bid/ask — otherwise
+            # the floating loss is bigger than what close_position realises and
+            # the P&L doesn't track the displayed price (client 2026-06-29).
+            _cb, _ca = await user_close_quote(
+                db, pos.instrument, user_id, pos.account_id,
+                account_row.account_group_id, tick,
+            )
+            current_price = float(_cb) if sv == "buy" else float(_ca)
             # Use the async P&L converter so cross pairs (NZDJPY etc.) get
             # the JPY→USD conversion via live USDJPY tick. The sync version
             # silently returns raw JPY for cross pairs which historically

@@ -87,12 +87,25 @@ async def portfolio_summary(user_id: UUID, account_id: UUID | None, db: AsyncSes
     holdings = {}
     open_positions_detail: list[dict] = []
 
+    # Map account_id -> account so each position can be valued with its own
+    # account-group spread (same as the trade screen / close path).
+    acct_by_id = {a.id: a for a in accounts}
+    from .trading_service import user_close_quote
+
     for pos in open_positions:
         symbol = pos.instrument.symbol if pos.instrument else "?"
-        prices = await _get_current_price(symbol)
-        if prices:
-            bid, ask = prices
-            cp = bid if (pos.side == OrderSide.BUY or pos.side.value == "buy") else ask
+        # Value at the user's CLOSE quote (mid re-spread with the user's own
+        # spread), NOT the raw broadcast bid/ask — keeps floating P&L in step
+        # with what close actually realises (client 2026-06-29).
+        tick_raw = await redis_client.get(PriceChannel.tick_key(symbol))
+        if tick_raw and pos.instrument:
+            tick = json.loads(tick_raw)
+            _acct = acct_by_id.get(pos.account_id)
+            c_bid, c_ask = await user_close_quote(
+                db, pos.instrument, user_id, pos.account_id,
+                getattr(_acct, "account_group_id", None), tick,
+            )
+            cp = c_bid if (pos.side == OrderSide.BUY or pos.side.value == "buy") else c_ask
             pnl = _compute_pnl(pos, cp)
         else:
             pnl = pos.profit or Decimal("0")
