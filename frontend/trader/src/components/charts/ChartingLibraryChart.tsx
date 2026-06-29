@@ -54,9 +54,19 @@ export default function ChartingLibraryChart() {
   const widgetRef = useRef<TVWidget | null>(null);
   // Map position id -> chart position-line object, so we update/remove in place.
   const linesRef = useRef<Map<string, any>>(new Map());
+  // The symbol the widget is currently displaying. Used to avoid a redundant
+  // setSymbol() right after creation and to detect a real change.
+  const appliedSymbolRef = useRef<string>('');
   const [ready, setReady] = useState(false);
 
-  // Create / recreate the widget when the symbol or theme changes.
+  // Create the widget once (and recreate ONLY on theme change — that needs a
+  // full rebuild). The symbol is intentionally NOT a dependency here: changing
+  // it is handled in-place by the effect below via setSymbol(). Tearing down and
+  // rebuilding the whole widget on every symbol change left a visible window
+  // where the chart still showed the OLD symbol while the order ticket already
+  // showed the NEW one — and if the async rebuild errored (swallowed below) the
+  // chart got stuck on the stale symbol (live desync 2026-06-29: chart EURUSD
+  // vs ticket XAUUSD).
   useEffect(() => {
     let cancelled = false;
     setReady(false);
@@ -66,8 +76,11 @@ export default function ChartingLibraryChart() {
       const Ctor = tvCtor();
       if (cancelled || !containerRef.current || !Ctor) return;
       try { widgetRef.current?.remove?.(); } catch { /* noop */ }
+      // Read the latest symbol from the store at creation time (the effect does
+      // not depend on it, so the closure value could be stale).
+      const initialSymbol = useTradingStore.getState().selectedSymbol || 'XAUUSD';
       const w = new Ctor({
-        symbol: selectedSymbol || 'XAUUSD',
+        symbol: initialSymbol,
         interval: '5',
         container: containerRef.current,
         datafeed: swisDexDatafeed,
@@ -87,6 +100,7 @@ export default function ChartingLibraryChart() {
         },
       });
       widgetRef.current = w;
+      appliedSymbolRef.current = initialSymbol;
       try { w.onChartReady?.(() => { if (!cancelled) setReady(true); }); } catch { /* noop */ }
     }).catch(() => { /* library missing/unapproved */ });
 
@@ -95,9 +109,31 @@ export default function ChartingLibraryChart() {
       setReady(false);
       try { widgetRef.current?.remove?.(); } catch { /* noop */ }
       widgetRef.current = null;
+      appliedSymbolRef.current = '';
       linesRef.current.clear();
     };
-  }, [selectedSymbol, theme]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [theme]);
+
+  // Change the symbol IN PLACE when selectedSymbol changes — keeps the chart in
+  // lock-step with the order ticket (both read the same store symbol) instead of
+  // rebuilding the widget. TradingView drives the datafeed's unsubscribe →
+  // resolveSymbol → getBars → subscribeBars for the new symbol.
+  useEffect(() => {
+    if (!ready) return;
+    const w = widgetRef.current;
+    const sym = selectedSymbol || 'XAUUSD';
+    if (!w?.activeChart || appliedSymbolRef.current === sym) return;
+    try {
+      const chart = w.activeChart();
+      // Position lines are symbol-specific overlays; drop our refs so the
+      // reconcile effect re-creates them for the new symbol.
+      for (const [, line] of linesRef.current) { try { line.remove(); } catch { /* noop */ } }
+      linesRef.current.clear();
+      chart?.setSymbol?.(sym, () => { /* resolved */ });
+      appliedSymbolRef.current = sym;
+    } catch { /* noop */ }
+  }, [selectedSymbol, ready]);
 
   // Reconcile BUY/SELL position lines whenever positions change (or once the
   // chart becomes ready).
