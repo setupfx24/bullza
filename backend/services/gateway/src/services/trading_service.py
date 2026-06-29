@@ -296,11 +296,15 @@ async def place_order(
                 user_id=user_id,
                 account_group_id=account.account_group_id,
             )
-            if sv and sv > 0:
-                new_bid, new_ask = symmetric_quote_from_mid(
-                    mid, sv * _mult, st, pip, digits, Decimal("0"),
-                )
-                bid, ask = new_bid, new_ask
+            # ALWAYS derive the quote from the mid with the admin-configured
+            # spread — never fall back to the raw broadcast spread. When no
+            # spread_config matches, resolve_spread_config returns 0, so
+            # sv == 0 → bid == ask == mid → ZERO spread for that instrument
+            # (client 2026-06-29: "admin ne set nahi kiya to spread 0 hona
+            # chahiye", not the market spread).
+            bid, ask = symmetric_quote_from_mid(
+                mid, (sv or Decimal("0")) * _mult, st or "pips", pip, digits, Decimal("0"),
+            )
         except Exception as _e:
             logger.warning(
                 "Per-user spread resolution failed for %s (user=%s): %s",
@@ -801,8 +805,10 @@ async def user_close_quote(
             sv, st, _ = await resolve_spread_config(
                 db, instrument, user_id=user_id, account_group_id=account_group_id,
             )
-            if sv and sv > 0:
-                c_bid, c_ask = symmetric_quote_from_mid(mid, sv * mult, st, pip, digits, Decimal("0"))
+            # No config → 0 → mid (no market spread), same as open/close.
+            c_bid, c_ask = symmetric_quote_from_mid(
+                mid, (sv or Decimal("0")) * mult, st or "pips", pip, digits, Decimal("0"),
+            )
     except Exception as _e:
         logger.warning(
             "user_close_quote spread resolution failed for %s (user=%s): %s",
@@ -1138,10 +1144,11 @@ async def close_position(position_id: UUID, req, user_id: UUID, db: AsyncSession
                 db, pos.instrument, user_id=user_id,
                 account_group_id=account.account_group_id,
             )
-            if _sv_c and _sv_c > 0:
-                c_bid, c_ask = symmetric_quote_from_mid(
-                    _mid_c, _sv_c * _mult_c, _st_c, _pip_c, _digits_c, Decimal("0"),
-                )
+            # Always re-spread from the mid; no config → 0 → close at mid (no
+            # market spread), symmetric with the open path (client 2026-06-29).
+            c_bid, c_ask = symmetric_quote_from_mid(
+                _mid_c, (_sv_c or Decimal("0")) * _mult_c, _st_c or "pips", _pip_c, _digits_c, Decimal("0"),
+            )
     except Exception as _se:
         logger.warning(
             "Close-side spread resolution failed for %s (user=%s): %s",

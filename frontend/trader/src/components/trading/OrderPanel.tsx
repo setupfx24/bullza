@@ -97,12 +97,16 @@ export default function OrderPanel() {
   // spread (falls back to the broadcast quote until /my-spread resolves).
   const _mid = tick ? (tick.bid + tick.ask) / 2 : 0;
   const _pipSize = mySpread?.pip_size || instrumentInfo?.pip_size || 0.0001;
+  // No admin spread config → ZERO spread (bid == ask == mid), never the raw
+  // market spread. /my-spread returns 0 when nothing is configured; the final
+  // `: 0` only bites if that fetch outright failed — still don't show the market
+  // spread (client 2026-06-29).
   const _userSpreadPrice =
     mySpread && _mid
       ? (mySpread.spread_type === 'percentage'
           ? _mid * (mySpread.effective_value / 100)
           : mySpread.effective_value * _pipSize)
-      : (tick?.spread ?? 0);
+      : 0;
   const userBid = _mid ? _mid - _userSpreadPrice / 2 : (tick?.bid ?? 0);
   const userAsk = _mid ? _mid + _userSpreadPrice / 2 : (tick?.ask ?? 0);
   const userSpreadPips = _pipSize ? _userSpreadPrice / _pipSize : 0;
