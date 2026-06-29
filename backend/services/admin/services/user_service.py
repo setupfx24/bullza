@@ -1101,6 +1101,12 @@ async def delete_user(
         "DELETE FROM user_bonuses WHERE user_id = :uid",
         "DELETE FROM master_accounts WHERE user_id = :uid",
         "DELETE FROM ticket_messages WHERE sender_id = :uid",
+        # Personal bank-deposit requests (migration 0082). user_id is a RESTRICT
+        # FK so an uncleaned row blocks the final user delete (client 2026-06-29:
+        # "deposit_requests_user_id_fkey" violation). approved_by points at the
+        # admin who responded — NULL it on rows this user reviewed for others.
+        "DELETE FROM deposit_requests WHERE user_id = :uid",
+        "UPDATE deposit_requests SET approved_by = NULL WHERE approved_by = :uid",
     ]
     for _sql in _optional:
         try:
