@@ -358,13 +358,17 @@ async def get_bars(
     now_epoch = int(_time.time())
     has_recent = bars and (now_epoch - bars[-1]["time"]) < bar_sec * 3
 
-    # --- 2. Binance fallback for crypto when Redis is empty or stale ---
-    if not has_recent and is_crypto:
-        binance_bars = await _fetch_binance_klines(sym, resolution, from_time, to_time)
-        if binance_bars:
-            existing_ts = {b["time"] for b in bars}
-            bars = bars + [b for b in binance_bars if b["time"] not in existing_ts]
-            bars.sort(key=lambda x: x["time"])
+    # --- 2. Binance fallback for crypto: REMOVED (client 2026-06-29) ---
+    # Crypto history MUST come from the same feed the platform trades on — the LP
+    # feed (Corecen/InfoWay) aggregated by BarAggregator into Redis. Binance
+    # returns real-world BTC (~80k) which diverged from our LP's BTC quote
+    # (~60k), drawing a ~9,000-point GAP between the chart history and the live
+    # bar. AllTick is no better here (its BTCUSDT is also real-world), so crypto
+    # now uses Redis only; when Redis is cold the frontend's synthetic fallback
+    # (anchored to the live mid) fills in WITHOUT a gap, and BarAggregator
+    # backfills real, live-matching bars going forward. The frontend datafeed
+    # already dropped Binance on 2026-06-26 — this aligns the backend.
+    # (is_crypto is still used below to keep AllTick — also real-world — off crypto.)
 
     # --- 3. AllTick fallback for non-crypto when Redis is thin or pre-from ---
     # Triggers when:
