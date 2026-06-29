@@ -754,46 +754,50 @@ async def sub_broker_dashboard(user_id: UUID, db: AsyncSession) -> dict:
     if not profile:
         raise HTTPException(status_code=404, detail="Sub-broker profile not found")
 
-    # The Sub-Broker view lists only downline who themselves became a
-    # sub-IB / sub-broker (i.e. have their own active IBProfile). A plain
-    # referred trader who never applied stays out of here — they only show in
-    # My Network (ib_tree). Client 2026-06-29: "agar referral diya user sub-IB
-    # nahi bana to wo sub-broker me nahi, sirf my network me dikhe."
-    direct_referrals = await db.execute(
-        select(func.count())
-        .select_from(Referral)
-        .join(IBProfile, IBProfile.user_id == Referral.referred_id)
-        .where(Referral.ib_profile_id == profile.id, IBProfile.is_active == True)
-    )
-    direct_count = direct_referrals.scalar()
+    # The Sub-Broker view lists only this IB's SUB-IBs — downline whose own
+    # IBProfile sits directly under this profile (parent_ib_id == profile.id),
+    # i.e. they classify as 'sub_ib'. Two cases are deliberately excluded and
+    # belong in My Network instead (client 2026-06-29):
+    #   - a plain referred trader who never became an IB (no child IBProfile);
+    #   - a user the SUPER IB referred who became an IB — they are a FULL IB
+    #     (_resolve_ib_type: a child of the Super IB is 'ib', not 'sub_ib'),
+    #     so the Super IB's sub-broker list is empty.
+    super_id = await _get_super_ib_profile_id(db)
+    is_super = super_id is not None and profile.id == super_id
 
-    client_result = await db.execute(
-        select(
-            Referral.referred_id, User.email, User.first_name, User.last_name,
-            User.status, User.kyc_status, User.created_at,
-        )
-        .join(User, Referral.referred_id == User.id)
-        .join(IBProfile, IBProfile.user_id == Referral.referred_id)
-        .where(Referral.ib_profile_id == profile.id, IBProfile.is_active == True)
-        .order_by(Referral.created_at.desc()).limit(50)
-    )
-    clients = client_result.all()
+    client_list: list[dict] = []
+    direct_count = 0
+    if not is_super:
+        direct_count = (await db.execute(
+            select(func.count()).select_from(IBProfile).where(
+                IBProfile.parent_ib_id == profile.id, IBProfile.is_active == True,
+            )
+        )).scalar() or 0
 
-    client_list = []
-    for referred_id, email, fname, lname, status, kyc, joined in clients:
-        acct_result = await db.execute(
-            select(func.count(), func.coalesce(func.sum(TradingAccount.balance), 0))
-            .where(TradingAccount.user_id == referred_id)
-        )
-        acct_stats = acct_result.one()
-        client_list.append({
-            "user_id": str(referred_id), "email": email,
-            "name": f"{fname or ''} {lname or ''}".strip(),
-            "status": status, "kyc_status": kyc,
-            "accounts_count": acct_stats[0],
-            "total_balance": float(acct_stats[1]),
-            "joined_at": joined.isoformat() if joined else None,
-        })
+        client_rows = (await db.execute(
+            select(
+                IBProfile.user_id, User.email, User.first_name, User.last_name,
+                User.status, User.kyc_status, User.created_at,
+            )
+            .join(User, IBProfile.user_id == User.id)
+            .where(IBProfile.parent_ib_id == profile.id, IBProfile.is_active == True)
+            .order_by(IBProfile.created_at.desc()).limit(50)
+        )).all()
+
+        for referred_id, email, fname, lname, status, kyc, joined in client_rows:
+            acct_result = await db.execute(
+                select(func.count(), func.coalesce(func.sum(TradingAccount.balance), 0))
+                .where(TradingAccount.user_id == referred_id)
+            )
+            acct_stats = acct_result.one()
+            client_list.append({
+                "user_id": str(referred_id), "email": email,
+                "name": f"{fname or ''} {lname or ''}".strip(),
+                "status": status, "kyc_status": kyc,
+                "accounts_count": acct_stats[0],
+                "total_balance": float(acct_stats[1]),
+                "joined_at": joined.isoformat() if joined else None,
+            })
 
     total_comm = await db.execute(
         select(func.coalesce(func.sum(IBCommission.amount), 0)).where(IBCommission.ib_id == profile.id)
