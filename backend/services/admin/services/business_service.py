@@ -810,10 +810,34 @@ async def approve_sub_broker(
         user.role = "sub_broker"
 
     referral_code = "SB" + "".join(secrets.choice(string.ascii_uppercase + string.digits) for _ in range(8))
+
+    # Link the new Sub-IB under its introducing IB. A sub-broker is always a
+    # deeper node (a user who joined via another IB's code), so its IBProfile
+    # MUST carry parent_ib_id — otherwise _resolve_ib_type sees a NULL parent
+    # and wrongly classifies it as a full IB, AND the per-lot MLM commission
+    # engine (which walks up via parent_ib_id) can't pay the uplines. Detect
+    # the parent from the Referral row written at signup, mirroring
+    # approve_ib_application.
+    parent_ib_id = None
+    parent_level = 0
+    referral_q = await db.execute(
+        select(Referral).where(Referral.referred_id == app.user_id)
+    )
+    referral = referral_q.scalar_one_or_none()
+    if referral and referral.ib_profile_id:
+        parent_q = await db.execute(
+            select(IBProfile).where(IBProfile.id == referral.ib_profile_id, IBProfile.is_active == True)
+        )
+        parent_ib = parent_q.scalar_one_or_none()
+        if parent_ib:
+            parent_ib_id = parent_ib.id
+            parent_level = parent_ib.level or 1
+
     profile = IBProfile(
         user_id=app.user_id,
         referral_code=referral_code,
-        level=1,
+        level=parent_level + 1,
+        parent_ib_id=parent_ib_id,
     )
     db.add(profile)
 

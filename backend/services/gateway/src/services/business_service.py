@@ -754,8 +754,16 @@ async def sub_broker_dashboard(user_id: UUID, db: AsyncSession) -> dict:
     if not profile:
         raise HTTPException(status_code=404, detail="Sub-broker profile not found")
 
+    # The Sub-Broker view lists only downline who themselves became a
+    # sub-IB / sub-broker (i.e. have their own active IBProfile). A plain
+    # referred trader who never applied stays out of here — they only show in
+    # My Network (ib_tree). Client 2026-06-29: "agar referral diya user sub-IB
+    # nahi bana to wo sub-broker me nahi, sirf my network me dikhe."
     direct_referrals = await db.execute(
-        select(func.count()).select_from(Referral).where(Referral.ib_profile_id == profile.id)
+        select(func.count())
+        .select_from(Referral)
+        .join(IBProfile, IBProfile.user_id == Referral.referred_id)
+        .where(Referral.ib_profile_id == profile.id, IBProfile.is_active == True)
     )
     direct_count = direct_referrals.scalar()
 
@@ -765,7 +773,8 @@ async def sub_broker_dashboard(user_id: UUID, db: AsyncSession) -> dict:
             User.status, User.kyc_status, User.created_at,
         )
         .join(User, Referral.referred_id == User.id)
-        .where(Referral.ib_profile_id == profile.id)
+        .join(IBProfile, IBProfile.user_id == Referral.referred_id)
+        .where(Referral.ib_profile_id == profile.id, IBProfile.is_active == True)
         .order_by(Referral.created_at.desc()).limit(50)
     )
     clients = client_result.all()

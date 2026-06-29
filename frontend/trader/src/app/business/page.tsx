@@ -316,6 +316,30 @@ function IBTab() {
 
 
 
+  // Deeper users (introduced by another IB, not the Super IB) can't apply as a
+  // full IB — they self-apply as a Sub-IB instead. On approval they're linked
+  // under their introducing IB and earn per-lot MLM commission on their own
+  // downline (client 2026-06-29).
+  const handleApplySubIb = async () => {
+
+    setApplying(true);
+
+    try {
+
+      await api.post('/business/apply-sub-broker', {});
+
+      toast.success('Sub-IB application submitted!');
+
+      const s = await api.get<any>('/business/status');
+
+      setStatus(s);
+
+    } catch (e: any) { toast.error(e.message || 'Failed'); } finally { setApplying(false); }
+
+  };
+
+
+
   if (loading) return <Spinner />;
 
 
@@ -330,7 +354,7 @@ function IBTab() {
 
         <h3 className="text-sm font-semibold text-text-primary">Application Pending</h3>
 
-        <p className="text-xxs text-text-tertiary mt-1">Your IB application is under review by the admin team.</p>
+        <p className="text-xxs text-text-tertiary mt-1">Your application is under review by the admin team.</p>
 
       </div>
 
@@ -346,22 +370,64 @@ function IBTab() {
     // self-apply. A user introduced by another IB/affiliate sees ONLY a
     // "Contact SwisDex to become an IB" prompt — no self-apply / eligibility.
     if (status?.can_become_ib === false) {
+      // Introduced by another IB (not the Super IB) → can't apply as a full IB,
+      // but CAN self-apply as a Sub-IB. On approval they're linked under their
+      // introducing IB and earn per-lot MLM commission on their own downline
+      // (client 2026-06-29). Same min-deposit gate as the full-IB flow.
+      const subElig = status?.eligibility as
+        | { min_deposit_required_usd: number; total_deposits_usd: number; is_eligible: boolean }
+        | undefined;
+      const subMin = subElig?.min_deposit_required_usd ?? 0;
+      const subDeposits = subElig?.total_deposits_usd ?? 0;
+      const subEligible = subElig ? subElig.is_eligible : true;
+      const subPct = subMin > 0 ? Math.min(100, (subDeposits / subMin) * 100) : 100;
+      const subRemaining = Math.max(0, subMin - subDeposits);
       return (
-        <div className="rounded-xl border border-border-primary bg-card p-6 sm:p-10 noise-texture text-center space-y-4 max-w-lg mx-auto">
+        <div className="rounded-xl border border-border-primary bg-card p-6 sm:p-10 noise-texture text-center space-y-5 max-w-2xl mx-auto">
           <div className="text-3xl">🤝</div>
-          <span className="inline-block text-xs font-semibold px-2.5 py-0.5 rounded-md bg-warning/15 text-warning">You&apos;re a Sub-IB</span>
-          <h3 className="text-lg sm:text-xl font-bold text-text-primary">Sub-IB Account</h3>
+          <span className="inline-block text-xs font-semibold px-2.5 py-0.5 rounded-md bg-warning/15 text-warning">You joined under an IB</span>
+          <h3 className="text-lg sm:text-xl font-bold text-text-primary">Become a Sub-IB</h3>
           <p className="text-sm text-text-secondary leading-relaxed">
-            You joined through an Introducing Broker, so you&apos;re a Sub-IB. The full IB
-            program isn&apos;t available to apply for here — to become a full IB and earn
-            per-lot commissions, you need to contact the company.
+            You joined through an Introducing Broker, so the full IB program isn&apos;t
+            available here. You can apply as a <strong>Sub-IB</strong> instead — build your
+            own network and earn per-lot commission on your downline&apos;s trades.
           </p>
-          <a
-            href="/support?topic=become-ib"
-            className="inline-block px-6 py-3 rounded-xl text-sm font-bold bg-accent text-black hover:brightness-110 shadow-[0_0_24px_rgba(85,166,48,0.35)]"
+
+          {subElig && subMin > 0 && (
+            <div className="rounded-lg border border-border-primary bg-bg-secondary p-4 text-left">
+              <div className="flex items-center justify-between gap-2 mb-2">
+                <span className="text-xs font-semibold text-text-secondary">Eligibility</span>
+                <span className={clsx('text-xs font-bold tabular-nums', subEligible ? 'text-success' : 'text-warning')}>
+                  ${fmt(subDeposits)} / ${fmt(subMin)}
+                </span>
+              </div>
+              <div className="h-2 rounded-full bg-bg-tertiary overflow-hidden">
+                <div
+                  className={clsx('h-full transition-all', subEligible ? 'bg-success' : 'bg-warning')}
+                  style={{ width: `${subPct}%` }}
+                />
+              </div>
+              <p className={clsx('text-[11px] mt-2', subEligible ? 'text-success' : 'text-text-tertiary')}>
+                {subEligible
+                  ? 'You meet the minimum deposit requirement. Apply below.'
+                  : `Deposit ${'$' + fmt(subRemaining)} more in approved funds to apply as a Sub-IB.`}
+              </p>
+            </div>
+          )}
+
+          <button
+            type="button"
+            onClick={handleApplySubIb}
+            disabled={applying || !subEligible}
+            className={clsx(
+              'w-full max-w-xs mx-auto px-6 py-3.5 rounded-xl text-sm font-bold transition-all border-2 border-accent',
+              (applying || !subEligible)
+                ? 'opacity-50 cursor-not-allowed bg-bg-secondary text-text-tertiary'
+                : 'bg-accent text-black hover:brightness-110 shadow-[0_0_24px_rgba(85,166,48,0.35)]',
+            )}
           >
-            Contact SwisDex to become an IB
-          </a>
+            {applying ? 'Submitting...' : subEligible ? 'Apply as Sub-IB' : 'Deposit to Unlock'}
+          </button>
         </div>
       );
     }
@@ -992,7 +1058,7 @@ function SubBrokerTab() {
 
           {[
 
-            { label: 'Clients', value: String(dashboard.direct_clients || 0), color: 'text-accent' },
+            { label: 'Sub-Brokers', value: String(dashboard.direct_clients || 0), color: 'text-accent' },
 
             { label: 'Total Earned', value: `$${fmt(dashboard.total_earned || 0)}`, color: 'text-success' },
 
@@ -1036,7 +1102,7 @@ function SubBrokerTab() {
 
           <div className="rounded-xl border border-border-primary bg-card noise-texture overflow-hidden">
 
-            <div className="px-4 py-3 border-b border-border-primary"><h3 className="text-xs font-semibold text-text-primary">Your Clients</h3></div>
+            <div className="px-4 py-3 border-b border-border-primary"><h3 className="text-xs font-semibold text-text-primary">Your Sub-Brokers</h3></div>
 
             <table className="w-full text-xs">
 
