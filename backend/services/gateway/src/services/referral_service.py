@@ -108,6 +108,29 @@ async def maybe_pay_referral_on_first_deposit(
     return None
 
 
+async def _is_funded(db: AsyncSession, user_id: UUID) -> bool:
+    """A referred user counts as funded if they have >= 1 approved deposit OR an
+    admin manual credit (Transaction type 'adjustment', positive). Client
+    2026-06-30: admin credits count alongside real deposits for referral
+    qualification (same rule as the IB pool)."""
+    dep = (await db.execute(
+        select(func.count()).select_from(Deposit).where(
+            Deposit.user_id == user_id,
+            Deposit.status.in_(["approved", "auto_approved"]),
+        )
+    )).scalar() or 0
+    if dep > 0:
+        return True
+    cred = (await db.execute(
+        select(func.count()).select_from(Transaction).where(
+            Transaction.user_id == user_id,
+            Transaction.type == "adjustment",
+            Transaction.amount > 0,
+        )
+    )).scalar() or 0
+    return cred > 0
+
+
 async def maybe_pay_referral_after_trades(
     db: AsyncSession, user_id: UUID
 ) -> Optional[dict]:
@@ -148,15 +171,8 @@ async def maybe_pay_referral_after_trades(
     # "Funds their account" = at least one approved / auto_approved
     # deposit. Demo top-ups don't count — they have no Deposit row.
     funded_required = await get_bool_setting("referral_requires_funded", True)
-    if funded_required:
-        funded_count = (await db.execute(
-            select(func.count()).select_from(Deposit).where(
-                Deposit.user_id == user_id,
-                Deposit.status.in_(["approved", "auto_approved"]),
-            )
-        )).scalar() or 0
-        if funded_count <= 0:
-            return None
+    if funded_required and not await _is_funded(db, user_id):
+        return None
 
     # ── Qualification gate: minimum N closed trades ───────────────────
     # Defaults to 3 to match the trader-page promise. Admin can adjust
@@ -264,7 +280,26 @@ async def claim_referral_bounty(
     if referred.referred_by_user_id != referrer_id:
         return None, "not_found"
     if referred.referral_qualified_at is None:
-        return None, "not_eligible"
+        # Self-heal: a qualifying trade may have run maybe_pay_referral_after_
+        # trades BEFORE the user crossed the (now satisfied) gates — e.g. they
+        # were funded via an admin credit that the old rule ignored, so
+        # referral_qualified_at was never stamped. Re-check the live gates and
+        # stamp now so the claim isn't permanently stuck (client 2026-06-30).
+        kyc_required = await get_bool_setting("referral_requires_kyc", True)
+        funded_required = await get_bool_setting("referral_requires_funded", True)
+        required_trades = await get_int_setting("referral_qualifying_trades", 3)
+        kyc_ok = (not kyc_required) or (referred.kyc_status or "pending").lower() == "approved"
+        funded_ok = (not funded_required) or await _is_funded(db, referred_user_id)
+        trades_n = (await db.execute(
+            select(func.count()).select_from(TradeHistory)
+            .join(TradingAccount, TradingAccount.id == TradeHistory.account_id)
+            .where(TradingAccount.user_id == referred_user_id)
+        )).scalar() or 0
+        trades_ok = int(trades_n) >= int(required_trades)
+        if kyc_ok and funded_ok and trades_ok:
+            referred.referral_qualified_at = datetime.now(timezone.utc)
+        else:
+            return None, "not_eligible"
     if referred.referral_claimed_at is not None:
         return None, "already_claimed"
 
@@ -361,17 +396,9 @@ async def list_my_referrals(db: AsyncSession, user_id: UUID) -> dict:
 
         kyc_ok = (r.kyc_status or "pending").lower() == "approved"
 
-        # Treat the friend as funded if they have at least one approved
-        # deposit — same gate `maybe_pay_referral_after_trades` uses
-        # before stamping referral_qualified_at.
-        from packages.common.src.models import Deposit
-        funded_count = (await db.execute(
-            select(func.count()).select_from(Deposit).where(
-                Deposit.user_id == r.id,
-                Deposit.status.in_(["approved", "auto_approved"]),
-            )
-        )).scalar() or 0
-        funded_ok = funded_count > 0
+        # Treat the friend as funded if they have an approved deposit OR an
+        # admin credit — same gate `maybe_pay_referral_after_trades` uses.
+        funded_ok = await _is_funded(db, r.id)
 
         trades_ok = int(trade_count) >= int(required_trades)
 
