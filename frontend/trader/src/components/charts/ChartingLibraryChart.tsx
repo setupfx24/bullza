@@ -13,9 +13,11 @@
  * Revert to '@/components/charts/AdvancedChart' for the public widget.
  */
 import { useEffect, useRef, useState } from 'react';
+import toast from 'react-hot-toast';
 import { useTradingStore } from '@/stores/tradingStore';
 import { useUIStore } from '@/stores/uiStore';
 import { swisDexDatafeed } from '@/lib/charting/datafeed';
+import api from '@/lib/api/client';
 
 // The licensed library attaches `TradingView` to window once the script runs.
 // Use `any` for the widget/chart — the bundled .d.ts is huge and we only touch
@@ -45,9 +47,63 @@ function loadChartingLibrary(): Promise<void> {
   return _libPromise;
 }
 
+// ── Drag / cancel handlers for the interactive chart order-lines ──────────
+// Attached once to a TradingView orderLine. `this` is the line, so we read the
+// dropped price via this.getPrice(), PUT it to the backend, then refresh the
+// store so the line snaps to the server truth. On rejection we revert the line
+// to the last-known value. Fresh data is read from the store at call time so a
+// stale closure can't send an outdated SL/TP.
+function _movePositionField(posId: string, field: 'stop_loss' | 'take_profit') {
+  return function (this: any) {
+    const line = this;
+    const price = Number(line.getPrice());
+    const st = useTradingStore.getState();
+    const pos = (st.positions || []).find((p: any) => p.id === posId);
+    const body: any = {
+      stop_loss: pos?.stop_loss ?? null,
+      take_profit: pos?.take_profit ?? null,
+    };
+    body[field] = price;
+    api.put(`/positions/${posId}`, body)
+      .then(() => { toast.success(field === 'stop_loss' ? 'Stop loss updated' : 'Take profit updated'); st.refreshPositions(); })
+      .catch((e: any) => {
+        toast.error(e?.message || 'Update failed');
+        const orig = field === 'stop_loss' ? pos?.stop_loss : pos?.take_profit;
+        if (orig) { try { line.setPrice(Number(orig)); } catch { /* noop */ } }
+      });
+  };
+}
+
+function _moveOrderField(orderId: string, field: 'price' | 'stop_loss' | 'take_profit') {
+  return function (this: any) {
+    const line = this;
+    const price = Number(line.getPrice());
+    const st = useTradingStore.getState();
+    const ord = (st.pendingOrders || []).find((o: any) => o.id === orderId);
+    api.put(`/orders/${orderId}`, { [field]: price })
+      .then(() => { toast.success('Order updated'); st.refreshPendingOrders(); })
+      .catch((e: any) => {
+        toast.error(e?.message || 'Update failed');
+        const orig = field === 'price' ? ord?.price : field === 'stop_loss' ? ord?.stop_loss : ord?.take_profit;
+        if (orig) { try { line.setPrice(Number(orig)); } catch { /* noop */ } }
+      });
+  };
+}
+
+function _cancelOrder(orderId: string) {
+  return function () {
+    const st = useTradingStore.getState();
+    api.delete(`/orders/${orderId}`)
+      .then(() => { toast.success('Order cancelled'); st.refreshPendingOrders(); })
+      .catch((e: any) => { toast.error(e?.message || 'Cancel failed'); });
+  };
+}
+
+
 export default function ChartingLibraryChart() {
   const selectedSymbol = useTradingStore((s) => s.selectedSymbol);
   const positions = useTradingStore((s) => s.positions);
+  const pendingOrders = useTradingStore((s) => s.pendingOrders);
   const theme = useUIStore((s) => s.theme);
 
   const containerRef = useRef<HTMLDivElement>(null);
@@ -135,8 +191,10 @@ export default function ChartingLibraryChart() {
     } catch { /* noop */ }
   }, [selectedSymbol, ready]);
 
-  // Reconcile BUY/SELL position lines whenever positions change (or once the
-  // chart becomes ready).
+  // Reconcile chart lines whenever positions / pending orders change. Open
+  // positions get an entry line (P&L) plus DRAGGABLE SL/TP lines; pending
+  // orders get a draggable+cancellable entry line plus their SL/TP. Dragging an
+  // SL/TP/entry line PUTs the new price to the backend (see the _move* helpers).
   useEffect(() => {
     const w = widgetRef.current;
     if (!ready || !w?.activeChart) return;
@@ -145,25 +203,51 @@ export default function ChartingLibraryChart() {
     if (!chart?.createPositionLine) return;
 
     const sym = (selectedSymbol || '').toUpperCase();
-    const mine = positions.filter((p) => (p.symbol || '').toUpperCase() === sym);
+    const myPos = positions.filter((p) => (p.symbol || '').toUpperCase() === sym);
+    const myPending = (pendingOrders || []).filter((o: any) => (o.symbol || '').toUpperCase() === sym);
 
-    // Build the full set of desired lines: entry + (SL) + (TP) per position.
-    // dashed=true → SL/TP drawn as a dashed line to stand apart from the entry.
-    type Desired = { key: string; price: number; color: string; text: string; qty: string; dashed: boolean };
+    type Desired = {
+      key: string; price: number; color: string; text: string; qty: string;
+      dashed: boolean;
+      // 'position' → createPositionLine (static, shows P&L). 'order' →
+      // createOrderLine (DRAGGABLE; onMove/onCancel handlers).
+      kind: 'position' | 'order';
+      onMove?: (this: any) => void;
+      onCancel?: () => void;
+    };
     const desired: Desired[] = [];
-    for (const p of mine) {
+
+    // ── Open positions ──
+    for (const p of myPos) {
       const entryColor = p.side === 'buy' ? '#22c55e' : '#ef4444';
       const pnl = Number(p.profit || 0);
       desired.push({
         key: p.id, price: Number(p.open_price), color: entryColor,
         text: `${p.side.toUpperCase()} ${p.lots}  ${pnl >= 0 ? '+' : ''}${pnl.toFixed(2)}`,
-        qty: String(p.lots), dashed: false,
+        qty: String(p.lots), dashed: false, kind: 'position',
       });
       if (p.stop_loss && Number(p.stop_loss) > 0) {
-        desired.push({ key: `${p.id}-sl`, price: Number(p.stop_loss), color: '#f59e0b', text: 'SL', qty: '', dashed: true });
+        desired.push({ key: `${p.id}-sl`, price: Number(p.stop_loss), color: '#f59e0b', text: 'SL', qty: '', dashed: true, kind: 'order', onMove: _movePositionField(p.id, 'stop_loss') });
       }
       if (p.take_profit && Number(p.take_profit) > 0) {
-        desired.push({ key: `${p.id}-tp`, price: Number(p.take_profit), color: '#14b8a6', text: 'TP', qty: '', dashed: true });
+        desired.push({ key: `${p.id}-tp`, price: Number(p.take_profit), color: '#14b8a6', text: 'TP', qty: '', dashed: true, kind: 'order', onMove: _movePositionField(p.id, 'take_profit') });
+      }
+    }
+
+    // ── Pending orders (limit/stop) ──
+    for (const o of myPending) {
+      const pColor = o.side === 'buy' ? '#3b82f6' : '#a855f7';
+      desired.push({
+        key: `ord-${o.id}`, price: Number(o.price), color: pColor,
+        text: `${String(o.order_type || '').toUpperCase()} ${o.side.toUpperCase()}`,
+        qty: String(o.lots), dashed: false, kind: 'order',
+        onMove: _moveOrderField(o.id, 'price'), onCancel: _cancelOrder(o.id),
+      });
+      if (o.stop_loss && Number(o.stop_loss) > 0) {
+        desired.push({ key: `ord-${o.id}-sl`, price: Number(o.stop_loss), color: '#f59e0b', text: 'SL', qty: '', dashed: true, kind: 'order', onMove: _moveOrderField(o.id, 'stop_loss') });
+      }
+      if (o.take_profit && Number(o.take_profit) > 0) {
+        desired.push({ key: `ord-${o.id}-tp`, price: Number(o.take_profit), color: '#14b8a6', text: 'TP', qty: '', dashed: true, kind: 'order', onMove: _moveOrderField(o.id, 'take_profit') });
       }
     }
 
@@ -172,8 +256,17 @@ export default function ChartingLibraryChart() {
       seen.add(d.key);
       let line = linesRef.current.get(d.key);
       if (!line) {
-        try { line = chart.createPositionLine(); linesRef.current.set(d.key, line); }
-        catch { continue; }
+        try {
+          line = (d.kind === 'order' && chart.createOrderLine) ? chart.createOrderLine() : chart.createPositionLine();
+          linesRef.current.set(d.key, line);
+          // Drag / cancel handlers are attached ONCE at creation (order lines
+          // only). They close over the stable id and read fresh data at call
+          // time, so re-rendering doesn't need to re-bind them.
+          if (d.kind === 'order') {
+            try { if (d.onMove && line.onMove) line.onMove(d.onMove); } catch { /* noop */ }
+            try { if (d.onCancel && line.onCancel) line.onCancel(d.onCancel); } catch { /* noop */ }
+          }
+        } catch { continue; }
       }
       try {
         line.setPrice(d.price)
@@ -182,16 +275,19 @@ export default function ChartingLibraryChart() {
           .setBodyBackgroundColor(d.color).setBodyBorderColor(d.color).setBodyTextColor('#ffffff')
           .setQuantityBackgroundColor(d.color).setQuantityBorderColor(d.color);
       } catch { /* noop */ }
+      if (d.onCancel) {
+        try { line.setCancelButtonBorderColor(d.color).setCancelButtonBackgroundColor(d.color).setCancelButtonIconColor('#ffffff'); } catch { /* noop */ }
+      }
     }
 
-    // Drop lines for positions / SL / TP that are gone.
+    // Drop lines whose position / order / SL / TP is gone.
     for (const [key, line] of linesRef.current) {
       if (!seen.has(key)) {
         try { line.remove(); } catch { /* noop */ }
         linesRef.current.delete(key);
       }
     }
-  }, [positions, selectedSymbol, ready]);
+  }, [positions, pendingOrders, selectedSymbol, ready]);
 
   return <div ref={containerRef} className="w-full h-full min-h-[320px]" />;
 }
