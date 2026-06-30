@@ -49,6 +49,19 @@ SERVER_SILENCE_THRESHOLD = 60.0    # server disconnects at 60s
 RECONNECT_BACKOFF_BASE = 2.0
 RECONNECT_BACKOFF_MAX = 60.0
 
+# --- Live → official candle reconciliation ----------------------------------
+# Our tick-aggregated candles APPROXIMATE InfoWay's official OHLC but aren't
+# byte-identical (we de-spike + sample only the ticks we receive). That left a
+# small step at the boundary between InfoWay history (getBars) and our live
+# aggregation (subscribeBars). To make CLOSED candles match the deep history —
+# and TradingView — a background loop periodically overwrites recent closed bars
+# with InfoWay's OFFICIAL values. Only the in-progress bar stays aggregator-built
+# (live), and it reconciles too the moment it closes. (client 2026-06-30)
+RECONCILE_TFS = ("5m", "1m", "15m", "30m", "1h")  # 5m first — most-viewed
+RECONCILE_COUNT = 6          # last few CLOSED bars to re-assert per (symbol, tf)
+RECONCILE_SPACING = 1.5      # seconds between REST calls — stay under ~60/min cap
+RECONCILE_WARMUP = 45.0      # let the feed + initial seed settle before first pass
+
 
 # ─── Symbol mapping ───────────────────────────────────────────────────────
 # Platform symbol -> InfoWay "code" used in subscribe payloads.
@@ -171,6 +184,12 @@ class InfoWayFeed:
                     name=f"infoway-conn-{idx}",
                 )
             )
+
+        # Background: keep CLOSED candles aligned with InfoWay's official OHLC so
+        # chart history and the live edge share one basis (no seam).
+        self._tasks.append(
+            asyncio.create_task(self._reconcile_loop(), name="infoway-reconcile")
+        )
 
         await asyncio.gather(*self._tasks, return_exceptions=True)
 
@@ -393,6 +412,56 @@ class InfoWayFeed:
             await pipe.execute()
         except Exception as exc:  # noqa: BLE001
             logger.warning("InfoWay merge bars failed %s %s: %s", symbol, tf_name, exc)
+
+    async def _reconcile_loop(self) -> None:
+        """Continuously re-assert InfoWay's OFFICIAL OHLC over recent CLOSED bars
+        so the chart's completed candles match the deep history exactly — no seam
+        between InfoWay history and our live tick aggregation. Round-robin across
+        all symbols + intraday timeframes, spaced to respect InfoWay's request
+        cap. The in-progress (current-period) bar is left to the aggregator; only
+        bars whose period has already ended are overwritten."""
+        from packages.common.src.infoway_rest import fetch_klines
+        from .bar_aggregator import TIMEFRAMES
+
+        try:
+            await asyncio.sleep(RECONCILE_WARMUP)
+        except asyncio.CancelledError:
+            return
+
+        while self._running:
+            codes = sorted({_infoway_code_for(s) for s in self._instruments.keys()})
+            # TF-major: re-assert the most-viewed timeframe (5m) across EVERY
+            # symbol first, then the next, so a given symbol's 5m chart goes
+            # InfoWay-official within one symbol-sweep (~symbols × spacing), not a
+            # full all-TF cycle.
+            for tf_name in RECONCILE_TFS:
+                tf_sec = TIMEFRAMES.get(tf_name)
+                if not tf_sec:
+                    continue
+                for code in codes:
+                    if not self._running:
+                        return
+                    plat = _platform_code_for(code, self._instruments)
+                    if not plat:
+                        continue
+                    try:
+                        now = int(time.time())
+                        bars = await fetch_klines(
+                            plat, tf_name, count=RECONCILE_COUNT,
+                            end_ts=now, token=self._token,
+                        )
+                        if bars:
+                            # Only CLOSED periods — never clobber the live bar.
+                            cur_start = (now // tf_sec) * tf_sec
+                            closed = [b for b in bars if int(b["time"]) < cur_start]
+                            if closed:
+                                await self._merge_bars(plat, tf_name, tf_sec, closed)
+                    except Exception as exc:  # noqa: BLE001
+                        logger.debug("InfoWay reconcile %s %s failed: %s", plat, tf_name, exc)
+                    try:
+                        await asyncio.sleep(RECONCILE_SPACING)
+                    except asyncio.CancelledError:
+                        return
 
     async def _run_socket(self, conn_idx: int, codes: List[str]) -> None:
         url = self._ws_url()
