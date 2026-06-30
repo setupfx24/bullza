@@ -1064,19 +1064,74 @@ function SubBrokerTab() {
 
 
 
-        <div className="rounded-xl border border-border-primary bg-card p-4 noise-texture">
+        <div className="rounded-xl border border-border-primary bg-card p-4 noise-texture space-y-3">
 
-          <p className="text-xxs text-text-tertiary mb-2">Your Referral Code</p>
+          {/* Full shareable referral link (client 2026-06-30: Sub-IB ka link
+              generate nahi ho raha tha — sirf code dikh raha tha). */}
+          <div>
+            <p className="text-xxs text-text-tertiary mb-1">Your referral link</p>
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                readOnly
+                value={ibDash?.referral_link || (typeof window !== 'undefined' ? `${window.location.origin}/auth/register?ref=${dashboard.referral_code}` : '')}
+                className="flex-1 text-xs font-mono bg-bg-secondary border border-border-primary rounded-lg px-3 py-2 text-text-primary focus:outline-none"
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  const link = ibDash?.referral_link || `${window.location.origin}/auth/register?ref=${dashboard.referral_code}`;
+                  navigator.clipboard.writeText(link);
+                  toast.success('Link copied!');
+                }}
+                className="shrink-0 px-3 py-2 text-xs font-semibold rounded-lg border border-accent text-accent hover:bg-accent hover:text-black transition-colors"
+              >
+                Copy
+              </button>
+            </div>
+          </div>
 
-          <div className="flex items-center gap-2">
-
-            <span className="text-lg font-bold font-mono text-accent">{dashboard.referral_code}</span>
-
-            <button type="button" onClick={() => { navigator.clipboard.writeText(dashboard.referral_code); toast.success('Copied!'); }} className="px-2 py-1 text-xxs font-semibold rounded-lg border border-accent text-accent hover:bg-accent hover:text-black transition-colors">Copy</button>
-
+          <div>
+            <p className="text-xxs text-text-tertiary mb-1">Your referral code</p>
+            <div className="flex items-center gap-2">
+              <span className="text-lg font-bold font-mono text-accent">{dashboard.referral_code}</span>
+              <button type="button" onClick={() => { navigator.clipboard.writeText(dashboard.referral_code); toast.success('Copied!'); }} className="px-2 py-1 text-xxs font-semibold rounded-lg border border-accent text-accent hover:bg-accent hover:text-black transition-colors">Copy</button>
+            </div>
           </div>
 
         </div>
+
+        {/* Transfer commission to main wallet — a Sub-IB withdraws their
+            earnings the same way a full IB does (client 2026-06-30: "total earn
+            dikha raha hai par claim/wallet me nahi ja raha"). */}
+        {ibDash && (
+          <div className="rounded-xl border border-success/30 bg-success/[0.06] p-4 flex flex-wrap items-center justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-xxs uppercase tracking-wider text-text-tertiary">Available commission</p>
+              <p className="text-2xl font-bold text-success font-mono tabular-nums mt-0.5">${fmt(ibDash.commission_balance || 0)}</p>
+              <p className="text-[11px] text-text-tertiary mt-0.5">Transfer moves it into your main wallet — then withdraw from the Wallet page.</p>
+            </div>
+            <button
+              type="button"
+              onClick={async () => {
+                try {
+                  const res = await api.post<{ transferred: number }>('/business/ib/transfer', {});
+                  toast.success(`$${fmt(res.transferred)} moved to main wallet`);
+                  const [d, ib] = await Promise.allSettled([
+                    api.get<any>('/business/sub-broker/dashboard'),
+                    api.get<any>('/business/ib/dashboard'),
+                  ]);
+                  if (d.status === 'fulfilled') setDashboard(d.value);
+                  if (ib.status === 'fulfilled') setIbDash(ib.value);
+                } catch (e: any) { toast.error(e?.message || 'Transfer failed'); }
+              }}
+              disabled={!(ibDash.commission_balance > 0)}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-success hover:bg-success/90 text-black font-semibold text-sm disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              Transfer to Main Wallet
+            </button>
+          </div>
+        )}
 
 
 
