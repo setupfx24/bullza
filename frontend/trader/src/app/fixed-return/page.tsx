@@ -142,6 +142,20 @@ export default function FixedReturnPage() {
       toast.error(`Minimum lock amount is ${fmtUsd(minAmount)}`);
       return;
     }
+    // Upfront confirmation before committing funds. Skip on the bonus-forfeit
+    // re-submit (acknowledgeBonusForfeit=true) — that path already confirmed
+    // here once and shows its own bonus warning next (client 2026-06-30).
+    if (!acknowledgeBonusForfeit) {
+      const summary =
+        `Confirm your staking lock:\n\n` +
+        `• Amount: ${fmtUsd(principal)}\n` +
+        `• Lock period: ${cfg.lock_months} months\n` +
+        `• Payout cycle: ${tenureLabel}\n\n` +
+        `This amount will be locked from your main wallet for the full term. ` +
+        `Early withdrawal carries a ${cfg.early_withdrawal_fee_pct}% penalty and ` +
+        `claws back interest paid to date.\n\nDo you want to proceed?`;
+      if (!window.confirm(summary)) return;
+    }
     setSubmitting(true);
     try {
       await api.post('/fixed-return/lock', {
