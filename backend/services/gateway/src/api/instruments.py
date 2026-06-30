@@ -9,6 +9,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from packages.common.src.alltick_rest import fetch_klines as alltick_fetch_klines
+from packages.common.src.infoway_rest import fetch_klines as infoway_fetch_klines
 from packages.common.src.auth import get_current_user
 from packages.common.src.config import get_settings
 from packages.common.src.database import get_db
@@ -228,6 +229,73 @@ async def _backfill_alltick_bars(
     return merged
 
 
+async def _backfill_infoway_bars(
+    sym: str, tf: str, *, end_ts: int = 0,
+) -> list[dict]:
+    """On-demand InfoWay REST history backfill — the SAME provider as the live
+    feed, so chart history and live bars share one price basis (no seam). Works
+    for EVERY asset class: infoway_rest routes the host + code per market
+    (forex/metals/indices/oil → common, crypto → crypto host + USDT, US stocks →
+    stock host + .US). Merges with Redis (dedup by time) and writes back so the
+    next request is warm. Returns oldest → newest. (client 2026-06-30)
+    """
+    settings = get_settings()
+    token = (getattr(settings, "INFOWAY_TOKEN", "") or "").strip()
+    if not token:
+        return []
+
+    try:
+        bars = await infoway_fetch_klines(sym, tf, count=500, end_ts=end_ts, token=token)
+    except Exception as exc:
+        _logger.warning("infoway on-demand fetch failed for %s %s: %s", sym, tf, exc)
+        return []
+
+    if not bars:
+        return []
+
+    list_key = f"bars:{sym}:{tf}"
+    existing_raw = await redis_client.lrange(list_key, 0, 999)
+    seen_ts: set = set()
+    merged: list[dict] = []
+    for raw in existing_raw:
+        try:
+            b = _json.loads(raw)
+            t = int(b.get("time", 0))
+            if t in seen_ts:
+                continue
+            seen_ts.add(t)
+            merged.append({
+                "time": t,
+                "open": float(b["open"]),
+                "high": float(b["high"]),
+                "low": float(b["low"]),
+                "close": float(b["close"]),
+                "volume": float(b.get("volume", 0.0)),
+                "tick_count": int(b.get("tick_count") or 0),
+            })
+        except Exception:
+            continue
+    for b in bars:
+        if b["time"] in seen_ts:
+            continue
+        seen_ts.add(b["time"])
+        merged.append(b)
+    merged.sort(key=lambda x: x["time"])
+
+    try:
+        pipe = redis_client.pipeline()
+        pipe.delete(list_key)
+        for b in merged:
+            entry = {**b, "symbol": sym, "timeframe": tf}
+            pipe.lpush(list_key, _json.dumps(entry))
+        pipe.ltrim(list_key, 0, 999)
+        await pipe.execute()
+    except Exception as exc:
+        _logger.warning("infoway cache writeback failed for %s %s: %s", sym, tf, exc)
+
+    return merged
+
+
 @router.get("/{symbol}/my-spread")
 async def get_my_spread(
     symbol: str,
@@ -370,21 +438,22 @@ async def get_bars(
     # already dropped Binance on 2026-06-26 — this aligns the backend.
     # (is_crypto is still used below to keep AllTick — also real-world — off crypto.)
 
-    # --- 3. AllTick fallback for non-crypto when Redis is thin or pre-from ---
-    # Triggers when:
-    #   • Redis returned fewer bars than fits the visible window, or
-    #   • the user is panning/scrolling further back than what's cached
-    #     (`from_time` older than the oldest Redis bar).
-    needs_alltick_backfill = (
-        not is_crypto
-        and (not has_recent or len(bars) < 50 or (from_time and (not bars or from_time < bars[0]["time"])))
+    # --- 3. InfoWay REST history backfill (EVERY asset class) when Redis is
+    # thin or the user pans before the cache. SAME provider as the live feed, so
+    # history and live share one price basis — no boundary seam. Replaces the old
+    # AllTick (non-crypto) + Binance (crypto) backfills, which were DIFFERENT
+    # price sources and caused the jumps (client 2026-06-30). infoway_rest routes
+    # the host + code per market (forex/metals/indices/oil, crypto, stocks).
+    # Triggers when Redis returned fewer bars than the window needs, or the user
+    # is panning older than what's cached.
+    needs_backfill = (
+        not has_recent or len(bars) < 50 or (from_time and (not bars or from_time < bars[0]["time"]))
     )
-    if needs_alltick_backfill:
-        # Walk back from the oldest bar we already have so we extend rather
-        # than refetch what's in cache. end_ts=0 means "latest" — appropriate
-        # for the cold-cache case.
+    if needs_backfill:
+        # Walk back from the oldest bar we already have so we extend rather than
+        # refetch what's in cache. end_ts=0 means "latest" (cold-cache case).
         end_ts = bars[0]["time"] if bars and from_time and from_time < bars[0]["time"] else 0
-        merged = await _backfill_alltick_bars(sym, tf, end_ts=end_ts)
+        merged = await _backfill_infoway_bars(sym, tf, end_ts=end_ts)
         if merged:
             bars = [b for b in merged if _filter_window(b)]
             bars.sort(key=lambda x: x["time"])

@@ -343,7 +343,7 @@ class InfoWayFeed:
                 if need < 1:
                     continue
                 bars = await fetch_klines(
-                    code, tf_name, count=min(need, 500),
+                    plat, tf_name, count=min(need, 500),
                     end_ts=int(now), token=self._token,
                 )
                 if not bars:

@@ -35,28 +35,54 @@ _TF_TO_KLINETYPE = {
     "1m": 1, "5m": 2, "15m": 3, "30m": 4, "1h": 5, "4h": 7, "1d": 8,
 }
 
+# Market routing — InfoWay serves different host PATHS and symbol CODES per
+# asset class (verified live 2026-06-30 against the batch_kline endpoint):
+#   • forex / metals / indices / oil → /common/  + identity code
+#   • crypto                          → /crypto/  + <BASE>USDT
+#   • US stocks                       → /stock/   + <TICKER>.US
+# A couple of platform codes also differ from InfoWay's (NATGAS→NGAS, US100→
+# NAS100). Anything else falls through to /common/ + identity.
+_CRYPTO = {"BTCUSD", "ETHUSD", "LTCUSD", "XRPUSD", "SOLUSD", "ADAUSD", "BNBUSD", "DOGEUSD"}
+_STOCKS = {"AAPL", "AMZN", "GOOGL", "META", "MSFT", "NFLX", "NVDA", "TSLA"}
+_CODE_OVERRIDE = {"NATGAS": "NGAS", "US100": "NAS100"}
+
+
+def _route(symbol: str) -> tuple[str, str]:
+    """Return (business, infoway_code) for a platform symbol."""
+    s = (symbol or "").strip().upper()
+    if s in _CRYPTO:
+        base = s[:-3] if s.endswith("USD") else s
+        return "crypto", base + "USDT"
+    if s in _STOCKS:
+        return "stock", s + ".US"
+    if s in _CODE_OVERRIDE:
+        return "common", _CODE_OVERRIDE[s]
+    return "common", s
+
 
 async def fetch_klines(
-    infoway_code: str,
+    symbol: str,
     tf_name: str,
     count: int = 500,
     end_ts: int = 0,
     token: str = "",
-    business: str = "common",
 ) -> list[dict]:
-    """Up to ``count`` historical candles for ONE InfoWay code, ASCENDING by
-    time. Returns ``[]`` on any failure (caller treats absence as "leave the
-    gap" rather than crash). ``end_ts`` (unix sec) requests history ending at
-    that time; omit for the latest."""
+    """Up to ``count`` historical candles for ONE platform symbol, ASCENDING by
+    time. Routes to the right InfoWay host + code per asset class internally.
+    Returns ``[]`` on any failure (caller treats absence as "leave the gap"
+    rather than crash). ``end_ts`` (unix sec) requests history ending at that
+    time; omit for the latest."""
     kline_type = _TF_TO_KLINETYPE.get(tf_name)
-    if not kline_type or not (infoway_code or "").strip() or not (token or "").strip():
+    if not kline_type or not (symbol or "").strip() or not (token or "").strip():
         return []
+
+    business, infoway_code = _route(symbol)
 
     body: dict = {
         "klineType": kline_type,
         "klineNum": min(max(int(count), 1), 500),
         # ONE code only — batch returns just 2 bars per product (see module doc).
-        "codes": infoway_code.strip(),
+        "codes": infoway_code,
     }
     if end_ts and int(end_ts) > 0:
         body["timestamp"] = int(end_ts)
