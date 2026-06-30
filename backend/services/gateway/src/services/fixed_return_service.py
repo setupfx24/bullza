@@ -217,6 +217,7 @@ async def create_lock(
     principal: Decimal,
     tenure_label: str,
     db: AsyncSession,
+    acknowledge_bonus_forfeit: bool = False,
 ) -> dict:
     if principal <= 0:
         raise HTTPException(status_code=400, detail="Principal must be positive")
@@ -260,9 +261,41 @@ async def create_lock(
             detail=f"Insufficient wallet balance (have ${balance:,.2f}, need ${principal:,.2f})",
         )
 
-    user.main_wallet_balance = balance - principal
-
     now = datetime.now(timezone.utc)
+    remaining = balance - principal
+
+    # Bonus rule (client 2026-06-30): the trading bonus must stay "backed" by
+    # real wallet money. If locking would leave LESS than the bonus amount in
+    # the wallet, the ENTIRE bonus is forfeited — and the user must accept that
+    # via a confirm popup first. If they haven't (acknowledge_bonus_forfeit is
+    # False), reject with 409 so the UI can prompt instead of silently burning
+    # the bonus.
+    bonus = Decimal(str(user.main_wallet_bonus or 0))
+    forfeit_bonus = bonus > 0 and remaining < bonus
+    if forfeit_bonus and not acknowledge_bonus_forfeit:
+        # 409 + a plain-string detail so the trader UI (which only surfaces
+        # err.message + err.status) can show the warning verbatim in an
+        # "agree" confirm popup, then re-submit with acknowledge_bonus_forfeit.
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                f"Locking ${principal:,.2f} leaves less than your ${bonus:,.2f} "
+                f"bonus in the wallet, so your entire ${bonus:,.2f} bonus will be "
+                f"forfeited (it can't be used for staking)."
+            ),
+        )
+
+    user.main_wallet_balance = remaining
+    if forfeit_bonus:
+        user.main_wallet_bonus = Decimal("0")
+        user.bonus_forfeited_at = now
+        db.add(Transaction(
+            user_id=user_id,
+            type="bonus_forfeit",
+            amount=-bonus,
+            balance_after=user.main_wallet_balance,
+            description=f"Bonus forfeited — locked ${principal:,.2f} into AI Powered Staking",
+        ))
     # Maturity = anniversary − 1 day (Mig 0067 / client spec 2026-06-08)
     # so users can withdraw on the eve of their lock anniversary.
     matures_at = _add_months(now, lock_months) - timedelta(days=1)

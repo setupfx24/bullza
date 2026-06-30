@@ -136,7 +136,7 @@ export default function FixedReturnPage() {
   const minAmount = cfg?.tiers[0]?.min_amount ?? 0;
   const eligible = principal >= minAmount && tenureIdx >= 0;
 
-  const submitLock = async () => {
+  const submitLock = async (acknowledgeBonusForfeit = false) => {
     if (!cfg) return;
     if (!eligible) {
       toast.error(`Minimum lock amount is ${fmtUsd(minAmount)}`);
@@ -144,10 +144,23 @@ export default function FixedReturnPage() {
     }
     setSubmitting(true);
     try {
-      await api.post('/fixed-return/lock', { principal, tenure_label: tenureLabel });
+      await api.post('/fixed-return/lock', {
+        principal,
+        tenure_label: tenureLabel,
+        acknowledge_bonus_forfeit: acknowledgeBonusForfeit,
+      });
       toast.success(`Locked ${fmtUsd(principal)} for ${cfg.lock_months} months`);
       await load();
     } catch (e: any) {
+      // 409 → locking would forfeit the user's bonus. Show the warning and let
+      // them agree, then re-submit with acknowledgement (client 2026-06-30).
+      if (e?.status === 409 && !acknowledgeBonusForfeit) {
+        setSubmitting(false);
+        if (window.confirm(`${e?.message || 'Your bonus will be forfeited.'}\n\nDo you agree and want to continue?`)) {
+          return submitLock(true);
+        }
+        return;
+      }
       toast.error(e?.message || 'Lock failed');
     } finally {
       setSubmitting(false);
@@ -286,7 +299,7 @@ export default function FixedReturnPage() {
             </select>
 
             <button
-              onClick={submitLock}
+              onClick={() => submitLock()}
               disabled={submitting || !eligible}
               className="mt-4 inline-flex items-center justify-center gap-2 w-full px-4 py-2.5 bg-accent text-white font-semibold rounded-md hover:bg-accent/90 disabled:opacity-50 transition-fast"
             >
