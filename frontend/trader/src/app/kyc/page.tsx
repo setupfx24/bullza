@@ -609,7 +609,7 @@ export default function KycPage() {
                     <div className="flex flex-col items-center gap-1 text-center py-2">
                       <Camera size={18} className="text-text-tertiary" />
                       <span className="text-xs text-text-secondary">
-                        Take/upload a selfie holding your ID · JPG, PNG, WEBP
+                        Upload a selfie holding your ID · JPG, PNG, WEBP
                       </span>
                     </div>
                   )}
