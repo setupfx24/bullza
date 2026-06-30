@@ -21,6 +21,16 @@ interface ReferralDashboard {
   fr_referral_mode?: 'principal' | 'interest';
   fr_referral_principal_pct?: number;
   fr_referral_interest_pct?: number;
+  // Per-entry commission breakdown — direct bounty vs AI-Powered-Staking, each
+  // attributed to the referred user by name.
+  commission_ledger?: CommissionLedgerEntry[];
+}
+
+interface CommissionLedgerEntry {
+  amount: number;
+  description: string;
+  source: 'staking' | 'referral';
+  created_at: string | null;
 }
 
 interface ReferralRow {
@@ -227,6 +237,44 @@ export default function ReferralPage() {
         ) : (
           <section className="rounded-xl border border-border-primary bg-card p-6 text-center text-sm text-text-secondary">
             Your referral code is being generated. Refresh the page in a moment.
+          </section>
+        )}
+
+        {/* Commission breakdown — where each chunk came from + which friend */}
+        {(head?.commission_ledger?.length ?? 0) > 0 && (
+          <section className="rounded-xl border border-border-primary bg-card p-5 space-y-3">
+            <div>
+              <p className="text-sm font-semibold text-text-primary">Commission breakdown</p>
+              <p className="text-[11px] text-text-tertiary mt-0.5">
+                Where each commission came from — direct referral bounty vs AI Powered Staking — and from which friend.
+              </p>
+            </div>
+            <div className="divide-y divide-border-primary/60 -mt-1">
+              {head!.commission_ledger!.map((e, i) => (
+                <div key={i} className="flex items-center justify-between gap-3 py-2.5">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span
+                        className={`shrink-0 text-[10px] font-semibold px-1.5 py-0.5 rounded uppercase tracking-wide ${
+                          e.source === 'staking' ? 'bg-accent/15 text-accent' : 'bg-buy/15 text-buy'
+                        }`}
+                      >
+                        {e.source === 'staking' ? 'Staking' : 'Referral'}
+                      </span>
+                      <span className="text-xs text-text-secondary truncate">{e.description}</span>
+                    </div>
+                    {e.created_at && (
+                      <span className="text-[10px] text-text-tertiary">
+                        {new Date(e.created_at).toLocaleDateString()}
+                      </span>
+                    )}
+                  </div>
+                  <span className="shrink-0 font-mono tabular-nums text-buy font-semibold">
+                    +${fmt(e.amount)}
+                  </span>
+                </div>
+              ))}
+            </div>
           </section>
         )}
 

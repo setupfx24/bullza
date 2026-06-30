@@ -318,6 +318,19 @@ async def claim_referral_bounty(
         Decimal(str(referrer.referral_commission_balance or 0)) + amount
     )
     referred.referral_claimed_at = datetime.now(timezone.utc)
+    # Record a ledger row so the bounty (a) counts toward total_earned and
+    # (b) shows up in the /referral commission breakdown, attributed to the
+    # referred user by name (client 2026-06-30).
+    referred_display = " ".join(
+        filter(None, [referred.first_name, referred.last_name])
+    ).strip() or (referred.email or "a referral")
+    db.add(Transaction(
+        user_id=referrer_id,
+        type="referral_commission",
+        amount=amount,
+        balance_after=None,
+        description=f"Referral bounty from {referred_display}",
+    ))
     return amount, None
 
 
@@ -513,6 +526,28 @@ async def get_my_referral_dashboard(db: AsyncSession, user_id: UUID) -> dict:
         )
     )).scalar() or 0
 
+    # Per-entry commission breakdown so the trader sees WHERE each chunk came
+    # from — direct referral bounty vs AI-Powered-Staking referral — and from
+    # which referred user (carried in the transaction description).
+    ledger_rows = (await db.execute(
+        select(Transaction.amount, Transaction.description, Transaction.created_at)
+        .where(
+            Transaction.user_id == user_id,
+            Transaction.type == "referral_commission",
+        )
+        .order_by(Transaction.created_at.desc())
+        .limit(50)
+    )).all()
+    commission_ledger = [
+        {
+            "amount": float(r.amount or 0),
+            "description": r.description or "Referral commission",
+            "source": "staking" if "staking" in (r.description or "").lower() else "referral",
+            "created_at": r.created_at.isoformat() if r.created_at else None,
+        }
+        for r in ledger_rows
+    ]
+
     amount_usd = await get_float_setting("referral_commission_amount_usd", 5.0)
     required_trades = await get_int_setting("referral_qualifying_trades", 3)
     # Per-account-type breakdown — the trader page renders this so the
@@ -564,6 +599,9 @@ async def get_my_referral_dashboard(db: AsyncSession, user_id: UUID) -> dict:
         "fr_referral_mode": (user.fr_referral_mode or "principal"),
         "fr_referral_principal_pct": float(await get_float_setting("fr_referral_principal_pct", 0.0)),
         "fr_referral_interest_pct": float(await get_float_setting("fr_referral_interest_pct", 0.0)),
+        # Per-entry breakdown (direct bounty vs AI-Powered-Staking referral),
+        # each attributed to the referred user by name.
+        "commission_ledger": commission_ledger,
     }
 
 

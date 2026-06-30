@@ -227,11 +227,17 @@ async def _pay_fr_referral(
     is > 0. Best-effort — never blocks the lock / payout. (client 2026-06-30)
     """
     try:
-        referrer_id = (await db.execute(
-            select(User.referred_by_user_id).where(User.id == referred_user_id)
-        )).scalar_one_or_none()
+        referred_row = (await db.execute(
+            select(
+                User.referred_by_user_id, User.first_name, User.last_name, User.email,
+            ).where(User.id == referred_user_id)
+        )).first()
+        if not referred_row:
+            return
+        referrer_id, _rf, _rl, _re = referred_row
         if not referrer_id or referrer_id == referred_user_id:
             return
+        referred_display = " ".join(filter(None, [_rf, _rl])).strip() or (_re or "a referral")
         referrer = (await db.execute(
             select(User).where(User.id == referrer_id).with_for_update()
         )).scalar_one_or_none()
@@ -256,7 +262,7 @@ async def _pay_fr_referral(
             amount=commission,
             balance_after=None,
             description=(
-                f"Staking referral — {pct}% of "
+                f"AI Powered Staking referral from {referred_display} — {pct}% of "
                 f"{'principal' if kind == 'principal' else 'interest payout'}"
             ),
         ))
