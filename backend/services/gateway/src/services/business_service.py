@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from packages.common.src.models import (
     IBProfile, IBApplication, IBCommission, IBCommissionPlan,
-    Referral, User, TradingAccount, Deposit,
+    Referral, User, TradingAccount, Deposit, Transaction,
 )
 from packages.common.src.settings_store import get_float_setting
 
@@ -144,29 +144,45 @@ async def _kyc_approved(db: AsyncSession, user_id: UUID) -> bool:
 
 async def _ib_pool_and_active(db: AsyncSession, ib_user_id: UUID) -> tuple[float, int, int]:
     """Returns (deposit_pool_usd, active_users, total_referred) for an IB's
-    direct downline (client 2026-06-19: the IB should see how much its users
-    have collectively deposited and how many are active, which drives the
-    per-lot commission tier). 'Active' = a referred user with >=1 approved
-    deposit (funded)."""
+    direct downline. The pool counts approved deposits PLUS admin manual
+    credits (Transaction type 'adjustment', positive) — client 2026-06-30:
+    "deposit aur admin credit dono" should fund the IB pool / drive the tier.
+    'Active' = a referred user funded by a deposit OR an admin credit."""
     referred = (await db.execute(
         select(Referral.referred_id).where(Referral.referrer_id == ib_user_id)
     )).scalars().all()
     total_referred = len(referred)
     if not referred:
         return 0.0, 0, 0
-    pool = (await db.execute(
+    deposits_sum = (await db.execute(
         select(func.coalesce(func.sum(Deposit.amount), 0)).where(
             Deposit.user_id.in_(referred),
             Deposit.status.in_(["approved", "auto_approved"]),
         )
     )).scalar() or 0
-    active = (await db.execute(
-        select(func.count(func.distinct(Deposit.user_id))).where(
+    credits_sum = (await db.execute(
+        select(func.coalesce(func.sum(Transaction.amount), 0)).where(
+            Transaction.user_id.in_(referred),
+            Transaction.type == "adjustment",
+            Transaction.amount > 0,
+        )
+    )).scalar() or 0
+    pool = float(deposits_sum) + float(credits_sum)
+    dep_users = set((await db.execute(
+        select(func.distinct(Deposit.user_id)).where(
             Deposit.user_id.in_(referred),
             Deposit.status.in_(["approved", "auto_approved"]),
         )
-    )).scalar() or 0
-    return float(pool), int(active), total_referred
+    )).scalars().all())
+    cred_users = set((await db.execute(
+        select(func.distinct(Transaction.user_id)).where(
+            Transaction.user_id.in_(referred),
+            Transaction.type == "adjustment",
+            Transaction.amount > 0,
+        )
+    )).scalars().all())
+    active = len(dep_users | cred_users)
+    return pool, active, total_referred
 
 
 async def ib_status(user_id: UUID, db: AsyncSession) -> dict:
