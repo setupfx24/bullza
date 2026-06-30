@@ -22,7 +22,12 @@ interface Overview {
   deposits: { total: number; by_method: Row[] };
   withdrawals: { total: number; by_method: Row[] };
   net_credit: { total: number; bonus: number; account_credit: number; insurance_credited_lifetime: number };
-  fixed_return: { collected: number; interest_paid_to_date: number; projected_payable: number; accrued_to_date?: number; accrued_unpaid?: number; by_tenure: Row[]; maturing: Row[] };
+  fixed_return: {
+    collected: number; interest_paid_to_date: number; projected_payable: number;
+    accrued_to_date?: number; accrued_unpaid?: number; by_tenure: Row[]; maturing: Row[];
+    by_user?: { user_id: string | null; name: string; email: string | null; principal: number; interest_accrued: number; interest_paid: number; count: number }[];
+    referral_commission?: { user_id: string | null; name: string; email: string | null; amount: number; count: number }[];
+  };
   pending_deposits: { total: number; by_method: Row[] };
   pending_withdrawals: { total: number; by_method: Row[] };
 }
@@ -291,6 +296,62 @@ export default function FinanceOverviewPage() {
             <div>
               <p className="text-xs font-semibold text-text-secondary mb-1">Maturing (by month)</p>
               {methodTable(data.fixed_return.maturing, 'principal')}
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-text-secondary mb-1">Interest by user — whose locks generated how much</p>
+              {(data.fixed_return.by_user?.length ?? 0) > 0 ? (
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="text-text-tertiary border-b border-border-primary">
+                      <th className="text-left py-1.5 font-medium">User</th>
+                      <th className="text-right py-1.5 font-medium">Interest accrued</th>
+                      <th className="text-right py-1.5 font-medium">Interest paid</th>
+                      <th className="text-right py-1.5 font-medium">Principal</th>
+                      <th className="text-right py-1.5 font-medium">Locks</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.fixed_return.by_user!.map((u, i) => (
+                      <tr key={i} className="border-b border-border-primary/40">
+                        <td className="py-1.5">
+                          {u.user_id ? <a href={`/users/${u.user_id}`} className="text-accent hover:underline">{u.name}</a> : u.name}
+                          {u.email && <span className="text-text-tertiary"> · {u.email}</span>}
+                        </td>
+                        <td className="py-1.5 text-right font-mono text-buy">{fmt(u.interest_accrued)}</td>
+                        <td className="py-1.5 text-right font-mono text-text-primary">{fmt(u.interest_paid)}</td>
+                        <td className="py-1.5 text-right font-mono text-text-tertiary">{fmt(u.principal)}</td>
+                        <td className="py-1.5 text-right text-text-tertiary">{u.count}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              ) : <p className="text-xs text-text-tertiary">No active locks.</p>}
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-text-secondary mb-1">Staking referral commission by user — who received how much</p>
+              {(data.fixed_return.referral_commission?.length ?? 0) > 0 ? (
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="text-text-tertiary border-b border-border-primary">
+                      <th className="text-left py-1.5 font-medium">User</th>
+                      <th className="text-right py-1.5 font-medium">Commission</th>
+                      <th className="text-right py-1.5 font-medium">Payouts</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.fixed_return.referral_commission!.map((u, i) => (
+                      <tr key={i} className="border-b border-border-primary/40">
+                        <td className="py-1.5">
+                          {u.user_id ? <a href={`/users/${u.user_id}`} className="text-accent hover:underline">{u.name}</a> : u.name}
+                          {u.email && <span className="text-text-tertiary"> · {u.email}</span>}
+                        </td>
+                        <td className="py-1.5 text-right font-mono text-buy">{fmt(u.amount)}</td>
+                        <td className="py-1.5 text-right text-text-tertiary">{u.count}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              ) : <p className="text-xs text-text-tertiary">No staking referral commission yet.</p>}
             </div>
           </div>
         ),

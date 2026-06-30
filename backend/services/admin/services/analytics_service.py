@@ -378,6 +378,7 @@ async def finance_overview(db: AsyncSession, start_date=None, end_date=None) -> 
     _now = datetime.now(timezone.utc)
     by_tenure: dict[str, dict] = {}
     maturing: dict[str, dict] = {}
+    by_user: dict = {}  # uid -> {principal, interest_paid, interest_accrued, count}
     for lk in active_locks:
         p = float(lk.principal or 0)
         fr_collected += p
@@ -399,7 +400,15 @@ async def finance_overview(db: AsyncSession, start_date=None, end_date=None) -> 
         except Exception:
             days_elapsed = 0
         total_days = max(1, cycles * td)
-        fr_accrued += min(projected, daily_interest * min(days_elapsed, total_days))
+        this_accrued = min(projected, daily_interest * min(days_elapsed, total_days))
+        fr_accrued += this_accrued
+        bu = by_user.setdefault(lk.user_id, {
+            "principal": 0.0, "interest_paid": 0.0, "interest_accrued": 0.0, "count": 0,
+        })
+        bu["principal"] += p
+        bu["interest_paid"] += paid
+        bu["interest_accrued"] += this_accrued
+        bu["count"] += 1
         t = lk.tenure_label or "—"
         by_tenure.setdefault(t, {"tenure": t, "principal": 0.0, "count": 0})
         by_tenure[t]["principal"] += p
@@ -416,6 +425,53 @@ async def finance_overview(db: AsyncSession, start_date=None, end_date=None) -> 
     fr_maturing = sorted(
         [{**v, "principal": round(v["principal"], 2)} for v in maturing.values()],
         key=lambda x: x["month"],
+    )
+
+    # Per-user interest breakdown — how much interest each user's locks have
+    # generated (accrued day-by-day to date) and how much was actually paid out.
+    umap_fr = await _user_label_map(db, list(by_user.keys()))
+    fr_by_user = sorted(
+        [
+            {
+                "user_id": str(uid) if uid else None,
+                "name": umap_fr.get(uid, {}).get("name", "—"),
+                "email": umap_fr.get(uid, {}).get("email"),
+                "principal": round(v["principal"], 2),
+                "interest_accrued": round(v["interest_accrued"], 2),
+                "interest_paid": round(v["interest_paid"], 2),
+                "count": v["count"],
+            }
+            for uid, v in by_user.items()
+        ],
+        key=lambda x: x["interest_accrued"], reverse=True,
+    )[:100]
+
+    # Per-user AI-Powered-Staking referral commission RECEIVED — credited into a
+    # referrer's referral_commission_balance and recorded as a referral_commission
+    # transaction whose description mentions "staking". Date-scoped like the rest.
+    comm_q = select(
+        Transaction.user_id,
+        func.coalesce(func.sum(Transaction.amount), 0),
+        func.count(Transaction.id),
+    ).where(
+        Transaction.type == "referral_commission",
+        func.lower(Transaction.description).like("%staking%"),
+    )
+    comm_q = _dr(comm_q, Transaction.created_at).group_by(Transaction.user_id)
+    comm_rows = (await db.execute(comm_q)).all()
+    umap_comm = await _user_label_map(db, [r[0] for r in comm_rows if r[0]])
+    fr_referral_commission = sorted(
+        [
+            {
+                "user_id": str(uid) if uid else None,
+                "name": umap_comm.get(uid, {}).get("name", "—"),
+                "email": umap_comm.get(uid, {}).get("email"),
+                "amount": round(float(total or 0), 2),
+                "count": int(cnt or 0),
+            }
+            for uid, total, cnt in comm_rows
+        ],
+        key=lambda x: x["amount"], reverse=True,
     )
 
     return {
@@ -438,6 +494,9 @@ async def finance_overview(db: AsyncSession, start_date=None, end_date=None) -> 
             "accrued_unpaid": round(max(0.0, fr_accrued - fr_interest_paid), 2),
             "by_tenure": fr_by_tenure,
             "maturing": fr_maturing,
+            # Per-user interest generated + per-user staking referral commission.
+            "by_user": fr_by_user,
+            "referral_commission": fr_referral_commission,
         },
         "pending_deposits": {"total": pdep_total, "by_method": pdep_methods},
         "pending_withdrawals": {"total": pwd_total, "by_method": pwd_methods},
