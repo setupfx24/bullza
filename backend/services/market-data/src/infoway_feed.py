@@ -28,6 +28,7 @@ import contextlib
 import json
 import logging
 import secrets
+import time
 import urllib.parse
 from datetime import datetime, timezone
 from typing import Dict, List, Optional
@@ -314,6 +315,85 @@ class InfoWayFeed:
                 logger.debug("InfoWay heartbeat send failed: %s", exc)
                 return
 
+    async def _backfill_gap(self, conn_idx: int, codes: List[str], since_ts: float) -> None:
+        """Fill bars:{sym}:{tf} for the disconnect window [since_ts, now] from
+        InfoWay's OWN history. Per-symbol fetch (a multi-symbol batch returns
+        only 2 bars — useless for a gap), merged by time, never replacing other
+        bars. Best-effort: a failed fetch leaves an honest gap, never blocks the
+        reconnect."""
+        from packages.common.src.infoway_rest import fetch_klines
+        from .bar_aggregator import TIMEFRAMES
+
+        now = time.time()
+        gap_sec = now - since_ts
+        # Skip trivial gaps (≤ ~1 bar) and absurd ones (> 24h = cold restart, not
+        # a live-session drop — leave that to normal seeding).
+        if gap_sec < 90 or gap_sec > 86400:
+            return
+        logger.warning(
+            "InfoWay [conn-%d] disconnect window ~%.0fs — backfilling %d symbol(s) from history",
+            conn_idx, gap_sec, len(codes),
+        )
+        for code in codes:
+            plat = _platform_code_for(code, self._instruments)
+            if not plat:
+                continue
+            for tf_name, tf_sec in TIMEFRAMES.items():
+                need = int(gap_sec // tf_sec) + 3  # cover the gap + small overlap
+                if need < 1:
+                    continue
+                bars = await fetch_klines(
+                    code, tf_name, count=min(need, 500),
+                    end_ts=int(now), token=self._token,
+                )
+                if not bars:
+                    continue
+                lo = int(since_ts) - tf_sec  # one bar of overlap before the gap
+                bars = [b for b in bars if b["time"] >= lo]
+                if bars:
+                    await self._merge_bars(plat, tf_name, tf_sec, bars)
+
+    async def _merge_bars(
+        self, symbol: str, tf_name: str, tf_sec: int, new_bars: List[dict],
+    ) -> None:
+        """Read-merge-write bars:{sym}:{tf}: overlay new_bars keyed by aligned
+        time (DEDUP), sort ascending, rewrite newest-first (the aggregator's
+        lpush convention), cap 1000. Never drops bars that aren't being
+        replaced — InfoWay history fills the hole without disturbing the rest."""
+        from packages.common.src.redis_client import redis_client
+
+        list_key = f"bars:{symbol}:{tf_name}"
+        try:
+            raw = await redis_client.lrange(list_key, 0, 999)
+            by_time: Dict[int, dict] = {}
+            for item in raw:
+                try:
+                    b = json.loads(item)
+                    by_time[int(b["time"])] = b
+                except (json.JSONDecodeError, KeyError, TypeError, ValueError):
+                    continue
+            for nb in new_bars:
+                t = (int(nb["time"]) // tf_sec) * tf_sec
+                by_time[t] = {
+                    "symbol": symbol,
+                    "timeframe": tf_name,
+                    "time": t,
+                    "open": nb["open"],
+                    "high": nb["high"],
+                    "low": nb["low"],
+                    "close": nb["close"],
+                    "volume": nb.get("volume", 0),
+                }
+            merged = sorted(by_time.values(), key=lambda b: int(b["time"]))
+            pipe = redis_client.pipeline()
+            pipe.delete(list_key)
+            for b in merged:  # oldest→newest lpush lands newest at index 0
+                pipe.lpush(list_key, json.dumps(b))
+            pipe.ltrim(list_key, 0, 999)
+            await pipe.execute()
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("InfoWay merge bars failed %s %s: %s", symbol, tf_name, exc)
+
     async def _run_socket(self, conn_idx: int, codes: List[str]) -> None:
         url = self._ws_url()
         # InfoWay accepts a comma-separated list under `codes` (string).
@@ -345,6 +425,13 @@ class InfoWayFeed:
                         len(codes),
                     )
                     backoff = RECONNECT_BACKOFF_BASE
+
+                    # Backfill the window we were disconnected for from InfoWay's
+                    # OWN history (same source → no price-basis seam) BEFORE
+                    # resuming live, so the chart has no gap/jump. Skips the very
+                    # first connect (_last_msg_ts == 0) and clamps the gap.
+                    if self._last_msg_ts > 0:
+                        await self._backfill_gap(conn_idx, codes, self._last_msg_ts)
 
                     hb_task = asyncio.create_task(
                         self._heartbeat_loop(ws),
