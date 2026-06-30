@@ -81,7 +81,7 @@ class BarAggregator:
             "high": bar.high,
             "low": bar.low,
             "close": bar.close,
-            "volume": bar.volume,
+            "volume": bar.tick_count,
             "tick_count": bar.tick_count,
         }
 
@@ -157,17 +157,16 @@ class BarAggregator:
                                 self._store_bar(symbol, tf_name, old_bar, bar_start)
                             )
                         last_close = bar.close
-                        # Fill every missed window with a doji so the chart
-                        # never sees a gap. Capped to avoid CPU spikes on
-                        # very long outages — the first 10 windows we fill
-                        # explicitly, anything beyond that we let the next
-                        # real tick handle (an honest gap is better than
-                        # 1000 doji bars). 10 covers the ~50min worst case
-                        # at 5m TF, ~10h at 1h TF.
+                        # Fill only TINY micro-pauses (≤2 missed windows) with a
+                        # doji so the time axis stays smooth, but leave genuine
+                        # gaps REAL — painting many flat synthetic bars during a
+                        # real outage misleads users and any indicator that reads
+                        # them (client 2026-06-30, was 10). Anything beyond 2
+                        # windows shows as an honest gap until the next tick.
                         cur_start = bar_start + tf_seconds
                         filled = 0
                         ts_iso = datetime.fromtimestamp(cur_start, tz=timezone.utc).isoformat()
-                        while cur_start + tf_seconds <= now_epoch and filled < 10:
+                        while cur_start + tf_seconds <= now_epoch and filled < 2:
                             doji = BarData(last_close, ts_iso)
                             doji.tick_count = 0  # mark as filler
                             await self._store_bar(symbol, tf_name, doji, cur_start)
@@ -189,7 +188,7 @@ class BarAggregator:
                         "high": bar.high,
                         "low": bar.low,
                         "close": bar.close,
-                        "volume": bar.volume,
+                        "volume": bar.tick_count,
                         "tick_count": bar.tick_count,
                     }
                     bar_key = f"bar:current:{symbol}:{tf_name}"

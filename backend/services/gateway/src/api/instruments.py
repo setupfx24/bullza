@@ -409,15 +409,15 @@ async def get_bars(
         except Exception:
             pass
 
-    # --- 5. Fill SMALL gaps with flat carry-forward bars ---
-    # The feed micro-pauses (a minute or few with no/bad ticks) left holes in
-    # the series, so the chart drew a choppy/jumpy time axis. Insert flat bars
-    # (open=high=low=close=prev close, volume 0) for missing slots. Large gaps
-    # (engine downtime) stay as a jump — filling hours of flat candles would
-    # look worse than the gap. (client 2026-06-26)
+    # --- 5. Fill only TINY gaps with flat carry-forward bars ---
+    # Bridge ONLY 1-2-slot feed micro-pauses so the time axis stays smooth; a
+    # genuine gap (the feed actually dropped a stretch) is left REAL rather than
+    # painted over with flat synthetic candles, which mislead users and any
+    # indicator reading them (client 2026-06-30, was ~1h of fill). Anything
+    # larger stays an honest gap until real bars arrive.
     if len(bars) >= 2 and bar_sec > 0:
         bars.sort(key=lambda x: x["time"])
-        max_fill = max(20, 3600 // bar_sec)  # ~1h worth of slots, or >= 20 bars
+        max_fill = 2  # only micro-pauses; bigger holes stay a real gap
         filled: list[dict] = []
         for i, cur in enumerate(bars):
             if i > 0:
