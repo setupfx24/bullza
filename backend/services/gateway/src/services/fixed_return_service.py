@@ -878,9 +878,15 @@ def _serialize_lock(r: FixedReturnLock) -> dict:
         anchor = r.locked_at
         if anchor and anchor.tzinfo is None:
             anchor = anchor.replace(tzinfo=timezone.utc)
+    # Count WHOLE CALENDAR DAYS in IST (UTC+5:30), not rolling 24h periods, so
+    # the displayed accrued interest ticks up at local 12:00 AM each day rather
+    # than at the lock's time-of-day (client 2026-06-30: "jo interest show ho
+    # raha hai woh 12am par update ho jaye"). The actual payout cadence is
+    # unchanged — this only affects the live accrued projection shown to the user.
     days_elapsed = 0
     if anchor is not None:
-        days_elapsed = max(0, (now - anchor).days)
+        _ist = timezone(timedelta(hours=5, minutes=30))
+        days_elapsed = max(0, (now.astimezone(_ist).date() - anchor.astimezone(_ist).date()).days)
     # rate_pct is per 30-day month per client spec, so daily ≈ rate/30.
     daily_rate = rate_pct / Decimal("100") / Decimal("30")
     accrued_since_last = (
