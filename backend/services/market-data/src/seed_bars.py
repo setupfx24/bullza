@@ -8,10 +8,15 @@ Usage (inside the market-data container):
     python -m src.seed_bars --force         # reseed even if Redis has bars
     python -m src.seed_bars --flush-non-crypto  # drop simulated history first
 
-Crypto symbols: fetches REAL historical klines from Binance public API.
-Non-crypto symbols: fetches REAL historical klines from AllTick REST.
-Falls back to skipping (NOT simulated bars) if AllTick is unavailable —
-serving an empty chart is better than serving believable lies.
+ALL symbols: fetches REAL historical klines from InfoWay REST — the SAME
+provider as the live WebSocket feed — so chart history and live bars share
+one price basis (no boundary seam). infoway_rest routes the host + code per
+asset class (forex/metals/indices/oil → common, crypto → crypto host + USDT,
+US stocks → stock host + .US). Falls back to skipping (NOT simulated bars) if
+InfoWay is unavailable — serving an empty chart is better than believable lies.
+
+Migration note: after switching from AllTick/Binance, run once with --force to
+replace any stale-source bars (esp. old Binance crypto) with InfoWay history.
 """
 import argparse
 import asyncio
@@ -21,6 +26,7 @@ import logging
 import httpx
 
 from packages.common.src.alltick_rest import fetch_klines as alltick_fetch_klines
+from packages.common.src.infoway_rest import fetch_klines as infoway_fetch_klines
 from packages.common.src.config import get_settings
 from packages.common.src.redis_client import redis_client
 
@@ -173,18 +179,15 @@ async def seed(force: bool = False):
     logger.info("Found %d symbols: %s", len(symbols), ", ".join(sorted(symbols)))
 
     settings = get_settings()
-    alltick_token = (settings.ALLTICK_TOKEN or "").strip()
+    infoway_token = (getattr(settings, "INFOWAY_TOKEN", "") or "").strip()
+
+    if not infoway_token:
+        logger.warning("No INFOWAY_TOKEN configured — cannot seed bars")
+        return
 
     for sym in sorted(symbols):
         segment = _guess_segment(sym)
-        is_crypto = sym in BINANCE_PAIRS
-        source = "binance" if is_crypto else ("alltick" if alltick_token else "skip")
-
-        if not is_crypto and not alltick_token:
-            logger.info("Skipping %s — no ALLTICK_TOKEN configured", sym)
-            continue
-
-        logger.info("Seeding %s (segment=%s, source=%s)", sym, segment, source)
+        logger.info("Seeding %s (segment=%s, source=infoway)", sym, segment)
 
         for tf_name, _tf_seconds in TIMEFRAMES.items():
             list_key = f"bars:{sym}:{tf_name}"
@@ -195,21 +198,17 @@ async def seed(force: bool = False):
                     logger.info("  %s:%s already has %d bars, skipping", sym, tf_name, existing)
                     continue
 
-            if is_crypto:
-                bars = await _fetch_binance_klines(sym, tf_name, BARS_COUNT)
-                if not bars:
-                    logger.warning("  %s:%s Binance fetch returned 0 bars", sym, tf_name)
-                    continue
-            else:
-                # Real history from AllTick REST. If AllTick is down or the
-                # symbol isn't supported, return [] and skip — never fall
-                # back to simulated bars.
-                bars = await alltick_fetch_klines(
-                    sym, tf_name, count=BARS_COUNT, token=alltick_token,
-                )
-                if not bars:
-                    logger.warning("  %s:%s AllTick fetch returned 0 bars", sym, tf_name)
-                    continue
+            # Real history from InfoWay REST — the SAME provider as the live feed,
+            # routed per asset class (forex/metals/indices/oil → common, crypto →
+            # crypto host + USDT, US stocks → stock host + .US). History and live
+            # therefore share one price basis (no seam). If InfoWay is down or the
+            # symbol isn't supported, return [] and skip — never simulated bars.
+            bars = await infoway_fetch_klines(
+                sym, tf_name, count=BARS_COUNT, end_ts=0, token=infoway_token,
+            )
+            if not bars:
+                logger.warning("  %s:%s InfoWay fetch returned 0 bars", sym, tf_name)
+                continue
 
             # Clear old data and write new bars. lpush newest-first to match
             # the BarAggregator's live-write convention (see bar_aggregator.py).
