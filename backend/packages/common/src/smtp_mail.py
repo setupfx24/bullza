@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 import smtplib
 import urllib.request
 from email.message import EmailMessage
@@ -20,6 +21,26 @@ from typing import Optional
 from .config import get_settings
 
 logger = logging.getLogger(__name__)
+
+# Brand logo bundled INSIDE the backend image so inline embedding never depends
+# on a live network fetch of EMAIL_LOGO_URL (a transient fetch failure used to
+# drop the logo to a remote <img> that image-blocking clients then hid). Read
+# from disk first; the URL fetch below is only a fallback.
+_LOCAL_LOGO_PATH = os.path.join(
+    os.path.dirname(__file__), "email_templates", "swisdex_logo.png",
+)
+
+
+def _get_local_logo_bytes() -> Optional[tuple[bytes, str]]:
+    """Bytes of the logo bundled with the backend, or None if it's absent."""
+    try:
+        with open(_LOCAL_LOGO_PATH, "rb") as f:
+            data = f.read()
+        if data:
+            return (data, "png")
+    except Exception:
+        pass
+    return None
 
 # Cache of fetched logo bytes keyed by URL → (bytes, image_subtype). Filled
 # lazily on the first send so we hit the network once, then embed the logo
@@ -165,7 +186,9 @@ def _send_sync(to_email: str, subject: str, html: str, text: Optional[str], cate
     logo_bytes: Optional[tuple[bytes, str]] = None
     logo_url = (getattr(s, "EMAIL_LOGO_URL", "") or "").strip()
     if logo_url and logo_url in html:
-        logo_bytes = _get_logo_bytes(logo_url)
+        # Prefer the bundled logo (no network) and only fetch the URL if it's
+        # missing from the image — guarantees the inline logo on every send.
+        logo_bytes = _get_local_logo_bytes() or _get_logo_bytes(logo_url)
         if logo_bytes:
             html = html.replace(logo_url, f"cid:{_LOGO_CID}")
 
