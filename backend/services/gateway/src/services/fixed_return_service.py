@@ -212,6 +212,58 @@ def _first_payout_date(lock_dt: datetime, cycle_months: int, payout_day: int = 2
 
 # ─── Lock flow ───────────────────────────────────────────────────────
 
+async def _pay_fr_referral(
+    db: AsyncSession, referred_user_id: UUID, basis_amount: Decimal, kind: str,
+) -> None:
+    """Pay the AI-Powered-Staking referral commission to the referred user's
+    referrer, into their referral_commission_balance (withdrawn from /referral).
+
+      kind='principal' → fires ONCE when the referred user locks; pct =
+                         fr_referral_principal_pct of the principal.
+      kind='interest'  → fires on EACH interest payout; pct =
+                         fr_referral_interest_pct of that payout.
+
+    Only pays when the referrer's chosen mode matches `kind` and the admin %
+    is > 0. Best-effort — never blocks the lock / payout. (client 2026-06-30)
+    """
+    try:
+        referrer_id = (await db.execute(
+            select(User.referred_by_user_id).where(User.id == referred_user_id)
+        )).scalar_one_or_none()
+        if not referrer_id or referrer_id == referred_user_id:
+            return
+        referrer = (await db.execute(
+            select(User).where(User.id == referrer_id).with_for_update()
+        )).scalar_one_or_none()
+        if referrer is None:
+            return
+        mode = (referrer.fr_referral_mode or "principal").lower()
+        if mode != kind:
+            return
+        setting = "fr_referral_principal_pct" if kind == "principal" else "fr_referral_interest_pct"
+        pct = Decimal(str(await get_float_setting(setting, 0.0)))
+        if pct <= 0:
+            return
+        commission = (Decimal(str(basis_amount)) * pct / Decimal("100")).quantize(Decimal("0.01"))
+        if commission <= 0:
+            return
+        referrer.referral_commission_balance = (
+            Decimal(str(referrer.referral_commission_balance or 0)) + commission
+        )
+        db.add(Transaction(
+            user_id=referrer.id,
+            type="referral_commission",
+            amount=commission,
+            balance_after=None,
+            description=(
+                f"Staking referral — {pct}% of "
+                f"{'principal' if kind == 'principal' else 'interest payout'}"
+            ),
+        ))
+    except Exception as _e:  # noqa: BLE001
+        logger.warning("AI-Staking referral payout (%s) failed: %s", kind, _e)
+
+
 async def create_lock(
     user_id: UUID,
     principal: Decimal,
@@ -336,6 +388,11 @@ async def create_lock(
         balance_after=user.main_wallet_balance,
         description=f"Fixed Return lock — {tenure['label']} cycle @ {rate_pct}% / {lock_months}m",
     ))
+
+    # AI-Staking referral: pay the referrer their principal-% commission now
+    # (only fires if the referrer chose 'principal' mode and admin set a %).
+    await _pay_fr_referral(db, user_id, principal, "principal")
+
     await db.commit()
     await db.refresh(lock)
     return _serialize_lock(lock)
@@ -845,6 +902,9 @@ async def accrue_due_payouts(db: AsyncSession) -> int:
                     f"#{lock.payouts_count} ({lock.rate_pct}%)"
                 ),
             ))
+            # AI-Staking referral: pay the referrer their interest-% cut of this
+            # payout (only if they chose 'interest' mode and admin set a %).
+            await _pay_fr_referral(db, lock.user_id, interest, "interest")
             # Notification: "you can withdraw" — informs the user the
             # interest just landed in their main wallet and they're free
             # to withdraw it (the wallet itself is always withdrawable).

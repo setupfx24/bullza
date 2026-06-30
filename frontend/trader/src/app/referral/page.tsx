@@ -17,6 +17,10 @@ interface ReferralDashboard {
   pending_referrals?: number;
   total_earned: number;
   required_trades?: number;
+  // AI-Powered-Staking referral payout mode + admin-set percentages.
+  fr_referral_mode?: 'principal' | 'interest';
+  fr_referral_principal_pct?: number;
+  fr_referral_interest_pct?: number;
 }
 
 interface ReferralRow {
@@ -223,6 +227,48 @@ export default function ReferralPage() {
         ) : (
           <section className="rounded-xl border border-border-primary bg-card p-6 text-center text-sm text-text-secondary">
             Your referral code is being generated. Refresh the page in a moment.
+          </section>
+        )}
+
+        {/* AI-Powered-Staking referral payout mode (client 2026-06-30) */}
+        {head?.referral_code && (
+          <section className="rounded-xl border border-border-primary bg-card p-5 space-y-3">
+            <div>
+              <p className="text-sm font-semibold text-text-primary">AI Powered Staking — referral payout</p>
+              <p className="text-[11px] text-text-tertiary mt-0.5">
+                When someone you referred locks into AI Powered Staking, choose how your commission is paid.
+              </p>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {([
+                { mode: 'principal' as const, label: 'On principal', pct: head.fr_referral_principal_pct ?? 0, desc: 'Paid once when they lock — % of their principal.' },
+                { mode: 'interest' as const, label: 'On interest', pct: head.fr_referral_interest_pct ?? 0, desc: 'Paid on every interest payout — % of each payout.' },
+              ]).map((opt) => {
+                const active = (head.fr_referral_mode ?? 'principal') === opt.mode;
+                return (
+                  <button
+                    key={opt.mode}
+                    type="button"
+                    onClick={async () => {
+                      try {
+                        await api.put('/business/referral/fr-mode', { mode: opt.mode });
+                        setHead((h) => (h ? { ...h, fr_referral_mode: opt.mode } : h));
+                        toast.success('Payout mode saved');
+                      } catch (e: any) { toast.error(e?.message || 'Failed to save'); }
+                    }}
+                    className={`text-left rounded-lg border p-3 transition-colors ${active ? 'border-accent bg-accent/10' : 'border-border-primary hover:bg-bg-hover/30'}`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-semibold text-text-primary">{opt.label}</span>
+                      <span className="text-xs font-mono text-accent">{opt.pct}%</span>
+                    </div>
+                    <p className="text-[10px] text-text-tertiary mt-1">{opt.desc}</p>
+                    {active && <span className="inline-block mt-1.5 text-[10px] text-accent">✓ Selected</span>}
+                  </button>
+                );
+              })}
+            </div>
+            <p className="text-[10px] text-text-tertiary">Commission lands in your referral balance above — withdraw it from here.</p>
           </section>
         )}
 

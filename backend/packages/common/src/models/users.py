@@ -115,6 +115,13 @@ class User(Base):
     referral_commission_balance = Column(
         Numeric(18, 8), nullable=False, default=0, server_default="0",
     )
+    # How THIS user (as a referrer) wants their AI-Powered-Staking referral
+    # commission paid (Migration 0084): 'principal' = a % of each referred
+    # user's principal once they lock; 'interest' = a % of each interest payout
+    # the referred user receives. The % values are admin settings.
+    fr_referral_mode = Column(
+        String(20), nullable=False, default="principal", server_default="principal",
+    )
     # Per-IB pool of accumulated trade commissions from the MLM chain.
     # Lives on the IB's user row. Increments inside the IB engine on
     # each qualifying trade; "Transfer to Main Wallet" on /business

@@ -19,6 +19,7 @@ from decimal import Decimal
 from typing import Optional
 from uuid import UUID
 
+from fastapi import HTTPException
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -557,7 +558,30 @@ async def get_my_referral_dashboard(db: AsyncSession, user_id: UUID) -> dict:
         # Kept for backward compat with any older client build that
         # still reads `commission_pct`. New clients ignore it.
         "commission_pct": 0.0,
+        # AI-Powered-Staking referral: the referrer's chosen payout mode and the
+        # admin-set percentages, so the /referral page can render the toggle and
+        # what each option pays (client 2026-06-30).
+        "fr_referral_mode": (user.fr_referral_mode or "principal"),
+        "fr_referral_principal_pct": float(await get_float_setting("fr_referral_principal_pct", 0.0)),
+        "fr_referral_interest_pct": float(await get_float_setting("fr_referral_interest_pct", 0.0)),
     }
+
+
+async def set_fr_referral_mode(db: AsyncSession, user_id: UUID, mode: str) -> str:
+    """Set the referrer's global AI-Staking referral payout mode (client
+    2026-06-30). 'principal' = a % of each referred user's principal once they
+    lock; 'interest' = a % of each interest payout they receive."""
+    m = (mode or "").strip().lower()
+    if m not in ("principal", "interest"):
+        raise HTTPException(status_code=400, detail="mode must be 'principal' or 'interest'")
+    user = (await db.execute(
+        select(User).where(User.id == user_id).with_for_update()
+    )).scalar_one_or_none()
+    if user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+    user.fr_referral_mode = m
+    await db.commit()
+    return m
 
 
 # ─── IB per-referral bounty (separate from user-level commission) ────
