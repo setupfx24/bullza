@@ -79,7 +79,7 @@ export default function FixedReturnConfigPage() {
         if (Number.isFinite(n) && n >= 1 && n <= 31) setPayoutDayEnd(Math.floor(n));
       }
     } catch (e: any) {
-      toast.error(e?.message || 'Failed to load Fixed Return config');
+      toast.error(e?.message || 'Failed to load AI Powered Staking config');
     } finally {
       setLoading(false);
     }
@@ -206,7 +206,7 @@ export default function FixedReturnConfigPage() {
           fixed_return_payout_day_end: payoutDayEnd,
         },
       });
-      toast.success('Fixed Return config saved');
+      toast.success('AI Powered Staking config saved');
     } catch (e: any) {
       toast.error(e?.message || 'Save failed');
     } finally {
@@ -226,7 +226,7 @@ export default function FixedReturnConfigPage() {
     <div className="p-6 space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-lg font-semibold text-text-primary">Fixed Return — Rate Matrix</h1>
+          <h1 className="text-lg font-semibold text-text-primary">AI Powered Staking — Rate Matrix</h1>
           <p className="text-xxs text-text-tertiary mt-0.5 max-w-3xl">
             Every lock runs for the full <strong>Lock period</strong> below. <strong>Tenure</strong> is the
             payout cadence — the user receives <em>principal × rate%</em> every cycle (Month / Quarter / etc.)

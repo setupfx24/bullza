@@ -49,7 +49,7 @@ const NAV_ITEMS: NavItem[] = [
       { label: 'Charges', href: '/config/charges' },
       { label: 'Spreads', href: '/config/spreads' },
       { label: 'Swaps', href: '/config/swaps' },
-      { label: 'Fixed Return', href: '/config/fixed-return' },
+      { label: 'AI Powered Staking', href: '/config/fixed-return' },
       { label: 'PAMM', href: '/config/pamm' },
       { label: 'IB Tiers', href: '/config/ib-tiers' },
       { label: 'Referral Tiers', href: '/config/referral-tiers' },
@@ -76,7 +76,7 @@ const NAV_ITEMS: NavItem[] = [
   // Top-level entry so a Fixed-Return manager role (fixed_return.view) can
   // reach the page without needing config.view (it also lives under Config
   // for super-admins). Same page either way.
-  { label: 'Fixed Return', href: '/config/fixed-return', icon: Wallet, perm: 'fixed_return.view' },
+  { label: 'AI Powered Staking', href: '/config/fixed-return', icon: Wallet, perm: 'fixed_return.view' },
   { label: 'Trade Insurance', href: '/insurance', icon: ShieldCheck, perm: '*' },
   // Play Zone + Lifestyle Fulfillment (gamification/rewards) are not used on
   // this platform — hidden from the sidebar. The pages + APIs still exist, so

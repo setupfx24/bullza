@@ -218,14 +218,14 @@ export function transactionTitle(tx: Transaction): string {
 
 function fixedReturnLabel(method: string): string {
   const m = (method || '').toLowerCase();
-  if (m.includes('interest')) return 'Fixed Return — Interest';
-  if (m.includes('matured')) return 'Fixed Return — Matured';
-  if (m.includes('early_request') || m.includes('early request')) return 'Fixed Return — Early withdrawal requested';
-  if (m.includes('early_rejected') || m.includes('early rejected')) return 'Fixed Return — Early withdrawal rejected';
-  if (m.includes('early')) return 'Fixed Return — Early withdrawal';
-  if (m.includes('grant')) return 'Fixed Return — Admin grant';
-  if (m.includes('lock')) return 'Fixed Return — Lock';
-  return 'Fixed Return';
+  if (m.includes('interest')) return 'AI Staking — Interest';
+  if (m.includes('matured')) return 'AI Staking — Matured';
+  if (m.includes('early_request') || m.includes('early request')) return 'AI Staking — Early withdrawal requested';
+  if (m.includes('early_rejected') || m.includes('early rejected')) return 'AI Staking — Early withdrawal rejected';
+  if (m.includes('early')) return 'AI Staking — Early withdrawal';
+  if (m.includes('grant')) return 'AI Staking — Admin grant';
+  if (m.includes('lock')) return 'AI Staking — Lock';
+  return 'AI Powered Staking';
 }
 
 export const PAGE_SIZES = [10, 25, 50] as const;
