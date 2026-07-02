@@ -129,7 +129,11 @@ function MyTasks() {
               </div>
               {t.description ? <p className="text-xs text-text-secondary mt-1 leading-relaxed">{t.description}</p> : null}
               <p className="text-[11px] text-text-tertiary mt-1">
-                {t.assigned_by_name ? `By ${t.assigned_by_name}` : ''}{t.due_date ? ` · Due ${t.due_date}` : ''}
+                {[
+                  t.assigned_by_name ? `By ${t.assigned_by_name}` : null,
+                  t.created_at ? `Assigned ${new Date(t.created_at).toLocaleDateString()}` : null,
+                  t.due_date ? `Due ${new Date(t.due_date + 'T12:00:00').toLocaleDateString()}` : null,
+                ].filter(Boolean).join(' · ')}
               </p>
               {t.status === 'undone' && t.undone_reason ? (
                 <p className="text-[11px] text-danger mt-1">Reason: {t.undone_reason}</p>
@@ -374,7 +378,10 @@ function Reports() {
                   </td>
                   <td className="px-3 py-2"><span className={cn('text-[10px] px-2 py-0.5 rounded-md font-medium uppercase', STATUS_STYLE[t.status])}>{t.status}</span></td>
                   <td className="px-3 py-2 text-danger text-[11px]">{t.status === 'undone' ? (t.undone_reason || '—') : ''}</td>
-                  <td className="px-3 py-2 text-text-tertiary text-[11px]">{t.created_at ? new Date(t.created_at).toLocaleDateString() : ''}</td>
+                  <td className="px-3 py-2 text-text-tertiary text-[11px]">
+                    {t.created_at ? new Date(t.created_at).toLocaleDateString() : ''}
+                    {t.due_date ? <span className="block text-text-tertiary/70">Due {new Date(t.due_date + 'T12:00:00').toLocaleDateString()}</span> : null}
+                  </td>
                 </tr>
               ))}
             </tbody>
