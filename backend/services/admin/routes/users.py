@@ -45,6 +45,27 @@ async def get_user_detail(
     return await user_service.get_user_detail(user_id=user_id, db=db)
 
 
+class PromotionalRequest(BaseModel):
+    is_promotional: bool
+
+
+@router.post("/{user_id}/accounts/{account_id}/promotional")
+async def set_account_promotional(
+    user_id: uuid.UUID,
+    account_id: uuid.UUID,
+    body: PromotionalRequest,
+    admin: User = Depends(require_permission("users.add_fund")),
+    db: AsyncSession = Depends(get_db),
+):
+    """Mark/unmark ONE of the user's trading accounts as promotional (pilot).
+    Promotional accounts are funded for showcase and stay fully live on the
+    user's own dashboard, but are excluded from admin's real company figures."""
+    return await user_service.set_account_promotional(
+        user_id=user_id, account_id=account_id,
+        is_promotional=body.is_promotional, db=db,
+    )
+
+
 @router.get("/{user_id}/deposits")
 async def get_user_deposits(
     user_id: uuid.UUID,

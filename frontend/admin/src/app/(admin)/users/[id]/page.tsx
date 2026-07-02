@@ -58,6 +58,7 @@ interface UserDetail {
     currency: string;
     is_demo: boolean;
     is_active: boolean;
+    is_promotional?: boolean;
   }[];
   total_deposit: number;
   total_withdrawal: number;
@@ -152,6 +153,7 @@ export default function UserDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [bankBusy, setBankBusy] = useState(false);
+  const [promoBusy, setPromoBusy] = useState<string | null>(null);
 
   const fetchUser = useCallback(async () => {
     setLoading(true);
@@ -171,6 +173,20 @@ export default function UserDetailPage() {
   }, [userId]);
 
   useEffect(() => { fetchUser(); }, [fetchUser]);
+
+  // Mark/unmark a trading account as promotional (pilot). Promo accounts stay
+  // fully live on the user's own dashboard but are excluded from admin's real
+  // company financials.
+  const togglePromo = async (accountId: string, next: boolean) => {
+    setPromoBusy(accountId);
+    try {
+      await adminApi.post(`/users/${userId}/accounts/${accountId}/promotional`, { is_promotional: next });
+      toast.success(next ? 'Marked promotional' : 'Removed from promotional');
+      await fetchUser();
+    } catch (e: any) {
+      toast.error(e?.message || 'Failed to update');
+    } finally { setPromoBusy(null); }
+  };
 
   if (loading) {
     return (
@@ -455,9 +471,27 @@ export default function UserDetailPage() {
                       <p className="text-sm font-semibold text-text-primary font-mono">{a.account_number}</p>
                       <p className="text-xs text-text-tertiary">{a.currency} · Leverage {a.leverage}:1 {a.is_demo ? '· Demo' : ''}</p>
                     </div>
-                    <span className={cn('px-2 py-1 rounded text-xxs font-semibold', a.is_active ? 'bg-success/15 text-success' : 'bg-danger/15 text-danger')}>
-                      {a.is_active ? 'Active' : 'Inactive'}
-                    </span>
+                    <div className="flex items-center gap-2 shrink-0">
+                      {a.is_promotional && (
+                        <span className="px-2 py-1 rounded text-xxs font-semibold bg-purple-500/15 text-purple-400">PROMO</span>
+                      )}
+                      <span className={cn('px-2 py-1 rounded text-xxs font-semibold', a.is_active ? 'bg-success/15 text-success' : 'bg-danger/15 text-danger')}>
+                        {a.is_active ? 'Active' : 'Inactive'}
+                      </span>
+                      <button
+                        onClick={() => togglePromo(a.id, !a.is_promotional)}
+                        disabled={promoBusy === a.id}
+                        title="Promotional accounts stay live for the user but are excluded from real company financials"
+                        className={cn(
+                          'px-2 py-1 rounded text-xxs font-semibold border transition-fast disabled:opacity-50',
+                          a.is_promotional
+                            ? 'border-danger/40 text-danger hover:bg-danger/10'
+                            : 'border-purple-500/40 text-purple-400 hover:bg-purple-500/10',
+                        )}
+                      >
+                        {promoBusy === a.id ? '…' : a.is_promotional ? 'Unset promo' : 'Mark promo'}
+                      </button>
+                    </div>
                   </div>
                   <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
                     {[

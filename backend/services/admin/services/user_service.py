@@ -78,8 +78,26 @@ def _account_to_out(a: TradingAccount) -> dict:
         "currency": a.currency,
         "is_demo": a.is_demo,
         "is_active": a.is_active,
+        "is_promotional": bool(getattr(a, "is_promotional", False)),
         "created_at": a.created_at,
     }
+
+
+async def set_account_promotional(
+    user_id: uuid.UUID, account_id: uuid.UUID, is_promotional: bool, db: AsyncSession,
+) -> dict:
+    """Flag/unflag ONE of the user's trading accounts as promotional (pilot)."""
+    acct = (await db.execute(
+        select(TradingAccount).where(
+            TradingAccount.id == account_id,
+            TradingAccount.user_id == user_id,
+        )
+    )).scalar_one_or_none()
+    if acct is None:
+        raise HTTPException(status_code=404, detail="Account not found for this user")
+    acct.is_promotional = bool(is_promotional)
+    await db.commit()
+    return {"account_id": str(account_id), "is_promotional": acct.is_promotional}
 
 
 async def list_users(

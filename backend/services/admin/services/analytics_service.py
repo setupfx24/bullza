@@ -270,49 +270,70 @@ async def finance_overview(db: AsyncSession, start_date=None, end_date=None) -> 
             q = q.where(col <= end_date)
         return q
 
+    # ── Promotional / pilot exclusion ─────────────────────────────────
+    # Accounts the admin flagged as promotional are marketing/showcase — their
+    # money must NEVER count in the broker's real company figures. Account-scoped
+    # rows (trades, positions, orders, deposits, withdrawals, credit) are excluded
+    # by account_id; user-scoped rows (FR, referral, IB, bonus wallet) by the
+    # owning user_id (a user is promo if ANY of their accounts is). (client 2026-07-02)
+    promo_acct_ids = [r[0] for r in (await db.execute(
+        select(TradingAccount.id).where(TradingAccount.is_promotional == True)
+    )).all()]
+    promo_user_ids = [r[0] for r in (await db.execute(
+        select(TradingAccount.user_id).where(TradingAccount.is_promotional == True).distinct()
+    )).all()]
+
+    def _xa(q, col):
+        """Exclude promotional ACCOUNTS from an account-scoped query."""
+        return q.where(col.notin_(promo_acct_ids)) if promo_acct_ids else q
+
+    def _xu(q, col):
+        """Exclude promotional USERS from a user-scoped query."""
+        return q.where(col.notin_(promo_user_ids)) if promo_user_ids else q
+
     # ── Net P&L sources ───────────────────────────────────────────────
     user_pnl = float((await db.execute(
-        _dr(select(func.coalesce(func.sum(TradeHistory.profit), 0)), TradeHistory.closed_at)
+        _xa(_dr(select(func.coalesce(func.sum(TradeHistory.profit), 0)), TradeHistory.closed_at), TradeHistory.account_id)
     )).scalar() or 0)
     broker_trading = -user_pnl  # user loss = broker gain
 
     commission = abs(float((await db.execute(
-        _dr(select(func.coalesce(func.sum(Position.commission), 0)).where(Position.commission != 0), Position.created_at)
+        _xa(_dr(select(func.coalesce(func.sum(Position.commission), 0)).where(Position.commission != 0), Position.created_at), Position.account_id)
     )).scalar() or 0))
     # Spread revenue — its OWN line, separate from commission (client
     # 2026-06-16). Tracked per filled order from 2026-06-17; older trades
     # show 0 (spread wasn't stored before).
     spread = float((await db.execute(
-        _dr(select(func.coalesce(func.sum(Order.spread_revenue), 0)).where(Order.status == "filled"), Order.created_at)
+        _xa(_dr(select(func.coalesce(func.sum(Order.spread_revenue), 0)).where(Order.status == "filled"), Order.created_at), Order.account_id)
     )).scalar() or 0)
     swap = abs(float((await db.execute(
-        _dr(select(func.coalesce(func.sum(Position.swap), 0)).where(Position.swap != 0), Position.created_at)
+        _xa(_dr(select(func.coalesce(func.sum(Position.swap), 0)).where(Position.swap != 0), Position.created_at), Position.account_id)
     )).scalar() or 0))
 
     admin_commission = float((await db.execute(
-        _dr(select(func.coalesce(func.sum(Transaction.amount), 0)).where(
+        _xa(_dr(select(func.coalesce(func.sum(Transaction.amount), 0)).where(
             Transaction.type == "admin_commission",
-        ), Transaction.created_at)
+        ), Transaction.created_at), Transaction.account_id)
     )).scalar() or 0)
 
     insurance_fees = abs(float((await db.execute(
-        _dr(select(func.coalesce(func.sum(Transaction.amount), 0)).where(
+        _xa(_dr(select(func.coalesce(func.sum(Transaction.amount), 0)).where(
             Transaction.type == "insurance_fee",
-        ), Transaction.created_at)
+        ), Transaction.created_at), Transaction.account_id)
     )).scalar() or 0))
     insurance_payouts = abs(float((await db.execute(
-        _dr(select(func.coalesce(func.sum(Transaction.amount), 0)).where(
+        _xa(_dr(select(func.coalesce(func.sum(Transaction.amount), 0)).where(
             Transaction.type == "insurance_payout",
-        ), Transaction.created_at)
+        ), Transaction.created_at), Transaction.account_id)
     )).scalar() or 0))
 
     ib_commission = float((await db.execute(
-        _dr(select(func.coalesce(func.sum(IBCommission.amount), 0)), IBCommission.created_at)
+        _xu(_dr(select(func.coalesce(func.sum(IBCommission.amount), 0)), IBCommission.created_at), IBCommission.user_id)
     )).scalar() or 0)
     referral_commission = abs(float((await db.execute(
-        _dr(select(func.coalesce(func.sum(Transaction.amount), 0)).where(
+        _xu(_dr(select(func.coalesce(func.sum(Transaction.amount), 0)).where(
             Transaction.type.in_(["referral_commission", "ib_referral_bounty"]),
-        ), Transaction.created_at)
+        ), Transaction.created_at), Transaction.user_id)
     )).scalar() or 0))
 
     pnl_sources = [
@@ -331,11 +352,11 @@ async def finance_overview(db: AsyncSession, start_date=None, end_date=None) -> 
     # ── Deposits / Withdrawals by method ──────────────────────────────
     async def _by_method(model, statuses):
         rows = (await db.execute(
-            _dr(
+            _xa(_dr(
                 select(model.method, func.coalesce(func.sum(model.amount), 0), func.count(model.id))
                 .where(model.status.in_(statuses)),
                 model.created_at,
-            ).group_by(model.method)
+            ), model.account_id).group_by(model.method)
         )).all()
         out = [{"method": (m or "other"), "amount": round(float(a or 0), 2), "count": int(c or 0)} for m, a, c in rows]
         out.sort(key=lambda x: x["amount"], reverse=True)
@@ -348,28 +369,29 @@ async def finance_overview(db: AsyncSession, start_date=None, end_date=None) -> 
 
     # ── Net credit (non-withdrawable tradable funds) ──────────────────
     bonus_wallet = float((await db.execute(
-        select(func.coalesce(func.sum(User.main_wallet_bonus), 0))
+        _xu(select(func.coalesce(func.sum(User.main_wallet_bonus), 0)), User.id)
     )).scalar() or 0)
     account_credit = float((await db.execute(
         select(func.coalesce(func.sum(TradingAccount.credit), 0))
+        .where(TradingAccount.is_promotional == False)
     )).scalar() or 0)
     # Best-effort split of the account-credit pool into insurance vs other
     # using lifetime credited transactions (the live balance itself doesn't
     # store its source).
     insurance_credited = abs(float((await db.execute(
-        select(func.coalesce(func.sum(Transaction.amount), 0)).where(
+        _xa(select(func.coalesce(func.sum(Transaction.amount), 0)).where(
             Transaction.type == "insurance_payout",
-        )
+        ), Transaction.account_id)
     )).scalar() or 0))
 
     # ── Fixed Return (separate from P&L) ──────────────────────────────
     # When a date window is given, scope to locks OPENED in that window
     # ("collected in this period"); otherwise all currently-active locks.
     active_locks = (await db.execute(
-        _dr(
+        _xu(_dr(
             select(FixedReturnLock).where(FixedReturnLock.state.in_(["active", "early_pending"])),
             FixedReturnLock.locked_at,
-        )
+        ), FixedReturnLock.user_id)
     )).scalars().all()
     fr_collected = 0.0
     fr_interest_paid = 0.0
@@ -457,7 +479,7 @@ async def finance_overview(db: AsyncSession, start_date=None, end_date=None) -> 
         Transaction.type == "referral_commission",
         func.lower(Transaction.description).like("%staking%"),
     )
-    comm_q = _dr(comm_q, Transaction.created_at).group_by(Transaction.user_id)
+    comm_q = _xu(_dr(comm_q, Transaction.created_at), Transaction.user_id).group_by(Transaction.user_id)
     comm_rows = (await db.execute(comm_q)).all()
     umap_comm = await _user_label_map(db, [r[0] for r in comm_rows if r[0]])
     fr_referral_commission = sorted(
