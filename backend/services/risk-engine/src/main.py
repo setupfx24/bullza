@@ -20,7 +20,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from packages.common.src.database import AsyncSessionLocal
 from packages.common.src.models import (
     Position, PositionStatus, TradingAccount, Instrument,
-    OrderSide, SwapConfig, Notification, Transaction, User,
+    OrderSide, SwapConfig, Notification, Transaction, User, TradeHistory,
 )
 from packages.common.src.redis_client import redis_client, PriceChannel
 from packages.common.src.config import get_settings
@@ -249,6 +249,26 @@ class RiskEngine:
             pos.close_price = close_price
             pos.profit = profit
             pos.closed_at = datetime.now(timezone.utc)
+
+            # Record the closed trade so it shows in Closed Positions / history —
+            # mirrors the manual-close path in gateway trading_service. Without
+            # this, a stop-out silently vanished from the trader's history
+            # (client 2026-07-02).
+            db.add(TradeHistory(
+                position_id=pos.id,
+                account_id=pos.account_id,
+                instrument_id=pos.instrument_id,
+                side=pos.side,
+                lots=pos.lots,
+                open_price=pos.open_price,
+                close_price=close_price,
+                swap=pos.swap or Decimal("0"),
+                commission=pos.commission or Decimal("0"),
+                profit=profit,
+                close_reason="stop_out",
+                opened_at=pos.created_at,
+                closed_at=pos.closed_at,
+            ))
 
             account.balance += profit
             # Release margin in account currency to mirror the USD-converted
