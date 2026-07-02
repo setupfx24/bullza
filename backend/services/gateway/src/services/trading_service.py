@@ -733,7 +733,10 @@ async def modify_order(order_id: UUID, req, user_id: UUID, db: AsyncSession) -> 
 
     await validate_account(order.account_id, user_id, db)
 
-    status_val = order.status.value if hasattr(order.status, 'value') else str(order.status)
+    # Normalise robustly: SQLAlchemy may hand back an OrderStatus enum member, a
+    # raw "pending" string, or a "OrderStatus.PENDING"-style repr depending on
+    # version/how the row was written — all must compare equal to "pending".
+    status_val = str(getattr(order.status, "value", order.status)).lower().split(".")[-1]
     if status_val != "pending":
         raise HTTPException(status_code=400, detail="Can only modify pending orders")
 
@@ -759,8 +762,14 @@ async def cancel_order(order_id: UUID, user_id: UUID, db: AsyncSession) -> dict:
 
     await validate_account(order.account_id, user_id, db)
 
-    status_val = order.status.value if hasattr(order.status, 'value') else str(order.status)
+    # Normalise robustly (see modify_order) — enum member, "pending" string, or
+    # "OrderStatus.PENDING" repr must all match.
+    status_val = str(getattr(order.status, "value", order.status)).lower().split(".")[-1]
     if status_val != "pending":
+        logger.info(
+            "cancel_order rejected: order %s raw_status=%r normalised=%r",
+            order_id, order.status, status_val,
+        )
         raise HTTPException(status_code=400, detail="Can only cancel pending orders")
 
     order.status = "cancelled"
