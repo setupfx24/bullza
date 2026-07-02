@@ -281,77 +281,109 @@ export default function FinanceOverviewPage() {
       sub: `Payable: ${fmt(data.fixed_return.projected_payable)}`, drill: {
         title: 'Fixed Return — by tenure & maturity',
         render: () => (
-          <div className="space-y-5">
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-center">
-              <div><p className="text-xxs text-text-tertiary uppercase">Collected</p><p className="font-mono text-text-primary">{fmt(data.fixed_return.collected)}</p></div>
-              <div><p className="text-xxs text-text-tertiary uppercase">Interest paid</p><p className="font-mono text-text-primary">{fmt(data.fixed_return.interest_paid_to_date)}</p></div>
-              <div><p className="text-xxs text-text-tertiary uppercase">Projected payable</p><p className="font-mono text-amber-400">{fmt(data.fixed_return.projected_payable)}</p></div>
-              <div><p className="text-xxs text-text-tertiary uppercase">Accrued to date</p><p className="font-mono text-text-primary">{fmt(data.fixed_return.accrued_to_date ?? 0)}</p></div>
-              <div><p className="text-xxs text-text-tertiary uppercase">Accrued unpaid</p><p className="font-mono text-amber-400">{fmt(data.fixed_return.accrued_unpaid ?? 0)}</p></div>
+          <div className="space-y-4">
+            {/* ── Overview tiles ── */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              {[
+                { label: 'Collected', val: data.fixed_return.collected, tone: 'text-text-primary' },
+                { label: 'Interest paid', val: data.fixed_return.interest_paid_to_date, tone: 'text-text-primary' },
+                { label: 'Projected payable', val: data.fixed_return.projected_payable, tone: 'text-amber-400' },
+                { label: 'Accrued to date', val: data.fixed_return.accrued_to_date ?? 0, tone: 'text-buy' },
+                { label: 'Accrued unpaid', val: data.fixed_return.accrued_unpaid ?? 0, tone: 'text-amber-400' },
+              ].map((c) => (
+                <div key={c.label} className="rounded-lg border border-border-primary bg-bg-secondary/50 px-3 py-2.5">
+                  <p className="text-[10px] text-text-tertiary uppercase tracking-wide">{c.label}</p>
+                  <p className={`font-mono text-sm font-semibold mt-0.5 ${c.tone}`}>{fmt(c.val)}</p>
+                </div>
+              ))}
             </div>
-            <div>
-              <p className="text-xs font-semibold text-text-secondary mb-1">By tenure (click for per-user)</p>
-              {methodTable(data.fixed_return.by_tenure, 'principal', 'fixed_return')}
+
+            {/* ── By tenure ── */}
+            <div className="rounded-lg border border-border-primary overflow-hidden">
+              <div className="px-3 py-2 bg-bg-tertiary/40 border-b border-border-primary">
+                <p className="text-xs font-semibold text-text-primary">By tenure</p>
+                <p className="text-[10px] text-text-tertiary">Locked principal per payout cycle — click a row for the per-user breakdown</p>
+              </div>
+              <div className="p-2.5">{methodTable(data.fixed_return.by_tenure, 'principal', 'fixed_return')}</div>
             </div>
-            <div>
-              <p className="text-xs font-semibold text-text-secondary mb-1">Maturing (by month)</p>
-              {methodTable(data.fixed_return.maturing, 'principal')}
+
+            {/* ── Maturing ── */}
+            <div className="rounded-lg border border-border-primary overflow-hidden">
+              <div className="px-3 py-2 bg-bg-tertiary/40 border-b border-border-primary">
+                <p className="text-xs font-semibold text-text-primary">Maturing</p>
+                <p className="text-[10px] text-text-tertiary">Principal maturing by month</p>
+              </div>
+              <div className="p-2.5">{methodTable(data.fixed_return.maturing, 'principal')}</div>
             </div>
-            <div>
-              <p className="text-xs font-semibold text-text-secondary mb-1">Interest by user — whose locks generated how much</p>
-              {(data.fixed_return.by_user?.length ?? 0) > 0 ? (
-                <table className="w-full text-xs">
-                  <thead>
-                    <tr className="text-text-tertiary border-b border-border-primary">
-                      <th className="text-left py-1.5 font-medium">User</th>
-                      <th className="text-right py-1.5 font-medium">Interest accrued</th>
-                      <th className="text-right py-1.5 font-medium">Interest paid</th>
-                      <th className="text-right py-1.5 font-medium">Principal</th>
-                      <th className="text-right py-1.5 font-medium">Locks</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {data.fixed_return.by_user!.map((u, i) => (
-                      <tr key={i} className="border-b border-border-primary/40">
-                        <td className="py-1.5">
-                          {u.user_id ? <a href={`/users/${u.user_id}`} className="text-accent hover:underline">{u.name}</a> : u.name}
-                          {u.email && <span className="text-text-tertiary"> · {u.email}</span>}
-                        </td>
-                        <td className="py-1.5 text-right font-mono text-buy">{fmt(u.interest_accrued)}</td>
-                        <td className="py-1.5 text-right font-mono text-text-primary">{fmt(u.interest_paid)}</td>
-                        <td className="py-1.5 text-right font-mono text-text-tertiary">{fmt(u.principal)}</td>
-                        <td className="py-1.5 text-right text-text-tertiary">{u.count}</td>
+
+            {/* ── Interest by user ── */}
+            <div className="rounded-lg border border-border-primary overflow-hidden">
+              <div className="px-3 py-2 bg-bg-tertiary/40 border-b border-border-primary">
+                <p className="text-xs font-semibold text-text-primary">Interest by user</p>
+                <p className="text-[10px] text-text-tertiary">Whose locks generated how much interest</p>
+              </div>
+              <div className="p-2.5">
+                {(data.fixed_return.by_user?.length ?? 0) > 0 ? (
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="text-text-tertiary border-b border-border-primary">
+                        <th className="text-left py-1.5 font-medium">User</th>
+                        <th className="text-right py-1.5 font-medium">Interest accrued</th>
+                        <th className="text-right py-1.5 font-medium">Interest paid</th>
+                        <th className="text-right py-1.5 font-medium">Principal</th>
+                        <th className="text-right py-1.5 font-medium">Locks</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              ) : <p className="text-xs text-text-tertiary">No active locks.</p>}
+                    </thead>
+                    <tbody>
+                      {data.fixed_return.by_user!.map((u, i) => (
+                        <tr key={i} className="border-b border-border-primary/40">
+                          <td className="py-1.5">
+                            {u.user_id ? <a href={`/users/${u.user_id}`} className="text-accent hover:underline">{u.name}</a> : u.name}
+                            {u.email && <span className="text-text-tertiary block text-[10px]">{u.email}</span>}
+                          </td>
+                          <td className="py-1.5 text-right font-mono text-buy">{fmt(u.interest_accrued)}</td>
+                          <td className="py-1.5 text-right font-mono text-text-primary">{fmt(u.interest_paid)}</td>
+                          <td className="py-1.5 text-right font-mono text-text-tertiary">{fmt(u.principal)}</td>
+                          <td className="py-1.5 text-right text-text-tertiary">{u.count}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                ) : <p className="text-xs text-text-tertiary py-1">No active locks.</p>}
+              </div>
             </div>
-            <div>
-              <p className="text-xs font-semibold text-text-secondary mb-1">Staking referral commission by user — who received how much</p>
-              {(data.fixed_return.referral_commission?.length ?? 0) > 0 ? (
-                <table className="w-full text-xs">
-                  <thead>
-                    <tr className="text-text-tertiary border-b border-border-primary">
-                      <th className="text-left py-1.5 font-medium">User</th>
-                      <th className="text-right py-1.5 font-medium">Commission</th>
-                      <th className="text-right py-1.5 font-medium">Payouts</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {data.fixed_return.referral_commission!.map((u, i) => (
-                      <tr key={i} className="border-b border-border-primary/40">
-                        <td className="py-1.5">
-                          {u.user_id ? <a href={`/users/${u.user_id}`} className="text-accent hover:underline">{u.name}</a> : u.name}
-                          {u.email && <span className="text-text-tertiary"> · {u.email}</span>}
-                        </td>
-                        <td className="py-1.5 text-right font-mono text-buy">{fmt(u.amount)}</td>
-                        <td className="py-1.5 text-right text-text-tertiary">{u.count}</td>
+
+            {/* ── Staking referral commission ── */}
+            <div className="rounded-lg border border-border-primary overflow-hidden">
+              <div className="px-3 py-2 bg-bg-tertiary/40 border-b border-border-primary">
+                <p className="text-xs font-semibold text-text-primary">Staking referral commission</p>
+                <p className="text-[10px] text-text-tertiary">Which referrer received how much from AI Powered Staking</p>
+              </div>
+              <div className="p-2.5">
+                {(data.fixed_return.referral_commission?.length ?? 0) > 0 ? (
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="text-text-tertiary border-b border-border-primary">
+                        <th className="text-left py-1.5 font-medium">User</th>
+                        <th className="text-right py-1.5 font-medium">Commission</th>
+                        <th className="text-right py-1.5 font-medium">Payouts</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              ) : <p className="text-xs text-text-tertiary">No staking referral commission yet.</p>}
+                    </thead>
+                    <tbody>
+                      {data.fixed_return.referral_commission!.map((u, i) => (
+                        <tr key={i} className="border-b border-border-primary/40">
+                          <td className="py-1.5">
+                            {u.user_id ? <a href={`/users/${u.user_id}`} className="text-accent hover:underline">{u.name}</a> : u.name}
+                            {u.email && <span className="text-text-tertiary block text-[10px]">{u.email}</span>}
+                          </td>
+                          <td className="py-1.5 text-right font-mono text-buy">{fmt(u.amount)}</td>
+                          <td className="py-1.5 text-right text-text-tertiary">{u.count}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                ) : <p className="text-xs text-text-tertiary py-1">No staking referral commission yet.</p>}
+              </div>
             </div>
           </div>
         ),
