@@ -43,6 +43,7 @@ interface UserDetail {
     email_verified?: boolean;
     two_factor_enabled?: boolean;
     bank_deposit_enabled?: boolean | null;
+    is_promotional?: boolean;
     created_at: string | null;
   };
   accounts: {
@@ -153,7 +154,7 @@ export default function UserDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [bankBusy, setBankBusy] = useState(false);
-  const [promoBusy, setPromoBusy] = useState<string | null>(null);
+  const [promoBusy, setPromoBusy] = useState(false);
 
   const fetchUser = useCallback(async () => {
     setLoading(true);
@@ -177,15 +178,15 @@ export default function UserDetailPage() {
   // Mark/unmark a trading account as promotional (pilot). Promo accounts stay
   // fully live on the user's own dashboard but are excluded from admin's real
   // company financials.
-  const togglePromo = async (accountId: string, next: boolean) => {
-    setPromoBusy(accountId);
+  const togglePromo = async (next: boolean) => {
+    setPromoBusy(true);
     try {
-      await adminApi.post(`/users/${userId}/accounts/${accountId}/promotional`, { is_promotional: next });
-      toast.success(next ? 'Marked promotional' : 'Removed from promotional');
+      await adminApi.post(`/users/${userId}/promotional`, { is_promotional: next });
+      toast.success(next ? 'User marked promotional' : 'User removed from promotional');
       await fetchUser();
     } catch (e: any) {
       toast.error(e?.message || 'Failed to update');
-    } finally { setPromoBusy(null); }
+    } finally { setPromoBusy(false); }
   };
 
   if (loading) {
@@ -457,6 +458,35 @@ export default function UserDetailPage() {
           </div>
         )}
 
+        {/* Whole-user promotional / pilot flag (client 2026-07-03) */}
+        {can('users.add_fund') && (
+          <div className="bg-bg-secondary border border-border-primary rounded-lg p-5 flex items-center justify-between gap-4">
+            <div className="min-w-0">
+              <h3 className="text-sm font-bold text-text-primary">
+                Promotional (pilot) account
+                {data.user.is_promotional && (
+                  <span className="ml-2 px-2 py-0.5 rounded text-xxs font-semibold bg-accent/15 text-accent align-middle">PROMO</span>
+                )}
+              </h3>
+              <p className="text-xxs text-text-tertiary mt-0.5">
+                Mark the WHOLE user as promotional. Everything stays live on their own dashboard,
+                but ALL their activity (every account&apos;s trades / deposits / withdrawals +
+                referral / IB / fixed return) is EXCLUDED from the real company financials.{' '}
+                {data.user.is_promotional ? 'Currently promotional.' : 'Currently a real account.'}
+              </p>
+            </div>
+            <button
+              type="button"
+              disabled={promoBusy}
+              onClick={() => togglePromo(!data.user.is_promotional)}
+              title="Promotional users are excluded from real company financials but fully live on their own dashboard"
+              className={cn('relative w-10 h-5 rounded-full transition-fast shrink-0', data.user.is_promotional ? 'bg-accent' : 'bg-bg-tertiary border border-border-primary', promoBusy && 'opacity-50')}
+            >
+              <span className={cn('absolute top-0.5 w-4 h-4 rounded-full bg-white transition-fast shadow-sm', data.user.is_promotional ? 'left-[22px]' : 'left-0.5')} />
+            </button>
+          </div>
+        )}
+
         {/* Trading Accounts */}
         <div className="bg-bg-secondary border border-border-primary rounded-lg p-5">
           <h2 className="text-base font-bold text-text-primary mb-4">Trading Accounts ({accounts.length})</h2>
@@ -471,27 +501,9 @@ export default function UserDetailPage() {
                       <p className="text-sm font-semibold text-text-primary font-mono">{a.account_number}</p>
                       <p className="text-xs text-text-tertiary">{a.currency} · Leverage {a.leverage}:1 {a.is_demo ? '· Demo' : ''}</p>
                     </div>
-                    <div className="flex items-center gap-2 shrink-0">
-                      {a.is_promotional && (
-                        <span className="px-2 py-1 rounded text-xxs font-semibold bg-purple-500/15 text-purple-400">PROMO</span>
-                      )}
-                      <span className={cn('px-2 py-1 rounded text-xxs font-semibold', a.is_active ? 'bg-success/15 text-success' : 'bg-danger/15 text-danger')}>
-                        {a.is_active ? 'Active' : 'Inactive'}
-                      </span>
-                      <button
-                        onClick={() => togglePromo(a.id, !a.is_promotional)}
-                        disabled={promoBusy === a.id}
-                        title="Promotional accounts stay live for the user but are excluded from real company financials"
-                        className={cn(
-                          'px-2 py-1 rounded text-xxs font-semibold border transition-fast disabled:opacity-50',
-                          a.is_promotional
-                            ? 'border-danger/40 text-danger hover:bg-danger/10'
-                            : 'border-purple-500/40 text-purple-400 hover:bg-purple-500/10',
-                        )}
-                      >
-                        {promoBusy === a.id ? '…' : a.is_promotional ? 'Unset promo' : 'Mark promo'}
-                      </button>
-                    </div>
+                    <span className={cn('px-2 py-1 rounded text-xxs font-semibold', a.is_active ? 'bg-success/15 text-success' : 'bg-danger/15 text-danger')}>
+                      {a.is_active ? 'Active' : 'Inactive'}
+                    </span>
                   </div>
                   <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
                     {[

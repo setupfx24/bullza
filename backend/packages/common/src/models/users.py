@@ -29,6 +29,11 @@ class User(Base):
     postal_code = Column(String(20))
     role = Column(String(20), default="user")
     status = Column(String(20), default="active")
+    # Promotional / pilot user (client 2026-07-03): admin flags the WHOLE user as
+    # promotional. Everything shows on the user's own dashboard as normal, but ALL
+    # their activity (every account's trades/deposits/withdrawals + user-scoped
+    # FR / referral / IB / bonus) is EXCLUDED from admin's real company financials.
+    is_promotional = Column(Boolean, default=False, server_default="false", nullable=False)
     kyc_status = Column(String(20), default="pending")
     # KYC reminder cadence stage: 0 = none sent, 1 = 3-day reminder fired,
     # 2 = 7-day reminder fired (terminal — no further reminders).

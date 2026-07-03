@@ -271,17 +271,17 @@ async def finance_overview(db: AsyncSession, start_date=None, end_date=None) -> 
         return q
 
     # ── Promotional / pilot exclusion ─────────────────────────────────
-    # Accounts the admin flagged as promotional are marketing/showcase — their
-    # money must NEVER count in the broker's real company figures. Account-scoped
-    # rows (trades, positions, orders, deposits, withdrawals, credit) are excluded
-    # by account_id; user-scoped rows (FR, referral, IB, bonus wallet) by the
-    # owning user_id (a user is promo if ANY of their accounts is). (client 2026-07-02)
-    promo_acct_ids = [r[0] for r in (await db.execute(
-        select(TradingAccount.id).where(TradingAccount.is_promotional == True)
-    )).all()]
+    # The admin flags a WHOLE USER as promotional (marketing/showcase). Their
+    # money must NEVER count in the broker's real company figures. User-scoped
+    # rows (FR, referral, IB, bonus wallet) are excluded by user_id; account-
+    # scoped rows (trades, positions, orders, deposits, withdrawals, credit) by
+    # the ids of ALL accounts those promo users own. (client 2026-07-03)
     promo_user_ids = [r[0] for r in (await db.execute(
-        select(TradingAccount.user_id).where(TradingAccount.is_promotional == True).distinct()
+        select(User.id).where(User.is_promotional == True)
     )).all()]
+    promo_acct_ids = [r[0] for r in (await db.execute(
+        select(TradingAccount.id).where(TradingAccount.user_id.in_(promo_user_ids))
+    )).all()] if promo_user_ids else []
 
     def _xa(q, col):
         """Exclude promotional ACCOUNTS from an account-scoped query."""
@@ -372,8 +372,7 @@ async def finance_overview(db: AsyncSession, start_date=None, end_date=None) -> 
         _xu(select(func.coalesce(func.sum(User.main_wallet_bonus), 0)), User.id)
     )).scalar() or 0)
     account_credit = float((await db.execute(
-        select(func.coalesce(func.sum(TradingAccount.credit), 0))
-        .where(TradingAccount.is_promotional == False)
+        _xa(select(func.coalesce(func.sum(TradingAccount.credit), 0)), TradingAccount.id)
     )).scalar() or 0)
     # Best-effort split of the account-credit pool into insurance vs other
     # using lifetime credited transactions (the live balance itself doesn't

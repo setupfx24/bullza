@@ -59,6 +59,8 @@ def _user_to_out(u: User) -> dict:
         "two_factor_enabled": bool(getattr(u, "two_factor_enabled", False)),
         # Per-user bank deposit visibility (None = follow global toggle).
         "bank_deposit_enabled": getattr(u, "bank_deposit_enabled", None),
+        # Whole-user promotional/pilot flag — excluded from real company figures.
+        "is_promotional": bool(getattr(u, "is_promotional", False)),
     }
 
 
@@ -83,21 +85,18 @@ def _account_to_out(a: TradingAccount) -> dict:
     }
 
 
-async def set_account_promotional(
-    user_id: uuid.UUID, account_id: uuid.UUID, is_promotional: bool, db: AsyncSession,
+async def set_user_promotional(
+    user_id: uuid.UUID, is_promotional: bool, db: AsyncSession,
 ) -> dict:
-    """Flag/unflag ONE of the user's trading accounts as promotional (pilot)."""
-    acct = (await db.execute(
-        select(TradingAccount).where(
-            TradingAccount.id == account_id,
-            TradingAccount.user_id == user_id,
-        )
+    """Flag/unflag the WHOLE user as promotional (pilot)."""
+    user = (await db.execute(
+        select(User).where(User.id == user_id)
     )).scalar_one_or_none()
-    if acct is None:
-        raise HTTPException(status_code=404, detail="Account not found for this user")
-    acct.is_promotional = bool(is_promotional)
+    if user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+    user.is_promotional = bool(is_promotional)
     await db.commit()
-    return {"account_id": str(account_id), "is_promotional": acct.is_promotional}
+    return {"user_id": str(user_id), "is_promotional": user.is_promotional}
 
 
 async def list_users(
