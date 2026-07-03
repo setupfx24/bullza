@@ -130,6 +130,15 @@ export default function DepositMethodsPage() {
                 <span className="font-bold text-accent">{usd != null ? `$${usd.toFixed(2)} USD` : '—'}</span>{' '}
                 at the latest rate.
               </p>
+              {(() => {
+                const n = parseFloat(amount);
+                if (!amount || Number.isNaN(n)) return null;
+                if (sel.min_amount != null && n < sel.min_amount)
+                  return <p className="text-[11px] text-red-400">Minimum deposit is {sel.min_amount} {cur}.</p>;
+                if (sel.max_amount != null && n > sel.max_amount)
+                  return <p className="text-[11px] text-red-400">Maximum deposit is {sel.max_amount} {cur}.</p>;
+                return null;
+              })()}
             </div>
 
             {sel.upi_id ? <p className="text-[11px] text-text-tertiary">Pay to UPI: <span className="font-mono text-text-primary">{sel.upi_id}</span></p> : null}
@@ -141,7 +150,17 @@ export default function DepositMethodsPage() {
               </label>
             ) : null}
 
-            <button type="button" disabled={!amount || (!!sel.declaration && !agreed)} onClick={() => setConfirmOpen(true)} className="w-full py-3 rounded-xl bg-[#55a630] text-white font-bold disabled:opacity-50">Deposit</button>
+            <button
+              type="button"
+              disabled={
+                !amount ||
+                (!!sel.declaration && !agreed) ||
+                (sel.min_amount != null && parseFloat(amount) < sel.min_amount) ||
+                (sel.max_amount != null && parseFloat(amount) > sel.max_amount)
+              }
+              onClick={() => setConfirmOpen(true)}
+              className="w-full py-3 rounded-xl bg-[#55a630] text-white font-bold disabled:opacity-50"
+            >Deposit</button>
           </>
         )}
 
@@ -179,7 +198,7 @@ export default function DepositMethodsPage() {
           <div className="relative w-full max-w-md rounded-2xl border border-border-primary bg-bg-primary p-5 space-y-3">
             <p className="text-sm font-bold">Before you proceed with {sel.display_name}:</p>
             <p className="text-xs text-text-secondary whitespace-pre-wrap">{sel.notice || 'Follow the payment instructions carefully and submit the UTR / reference immediately after payment, or the funds may not be credited.'}</p>
-            <button type="button" onClick={() => { setNoticeOpen(false); setStep('form'); }} className="w-full py-2.5 rounded-xl bg-[#2563eb] text-white font-bold">Accept and Continue</button>
+            <button type="button" onClick={() => { setNoticeOpen(false); setStep('form'); }} className="w-full py-2.5 rounded-xl bg-[#55a630] text-white font-bold">Accept and Continue</button>
           </div>
         </div>
       )}
@@ -197,7 +216,7 @@ export default function DepositMethodsPage() {
             <p className="text-xs">Deposit <b>{cur} {Number(amount).toLocaleString()}</b>{usd != null ? <> (≈ <b>${usd.toFixed(2)} USD</b>)</> : null} into your account.</p>
             <div className="flex gap-2">
               <button type="button" onClick={() => setConfirmOpen(false)} className="flex-1 py-2.5 rounded-xl border border-border-primary text-text-secondary font-semibold">Cancel</button>
-              <button type="button" onClick={() => { setConfirmOpen(false); setStep('qr'); }} className="flex-1 py-2.5 rounded-xl bg-[#2563eb] text-white font-bold">Confirm</button>
+              <button type="button" onClick={() => { setConfirmOpen(false); setStep('qr'); }} className="flex-1 py-2.5 rounded-xl bg-[#55a630] text-white font-bold">Confirm</button>
             </div>
           </div>
         </div>
