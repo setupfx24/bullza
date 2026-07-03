@@ -177,10 +177,27 @@ interface Subscription {
   symbol: string;
   resolution: string;
   onTick: SubscribeBarsCallback;
+  /** TradingView's "your data changed, drop cache + re-fetch" callback. Called
+   *  on a socket RECONNECT so bars missed during the drop are re-pulled. */
+  resetCache?: () => void;
   unsubscribe: () => void;
 }
 
 const subscriptions = new Map<string, Subscription>();
+
+// Register ONCE: when the bar socket re-connects after a drop, reset every live
+// subscription's cache so TradingView re-calls getBars and fills any gap left by
+// the missed realtime bars (client 2026-07-03).
+let _reconnectHooked = false;
+function ensureReconnectHook() {
+  if (_reconnectHooked) return;
+  _reconnectHooked = true;
+  barSocket.onReconnect(() => {
+    for (const sub of subscriptions.values()) {
+      try { sub.resetCache?.(); } catch { /* ignore */ }
+    }
+  });
+}
 
 /* ─── Helpers ─── */
 
@@ -300,9 +317,11 @@ export const swisDexDatafeed: IBasicDataFeed = {
   subscribeBars: (
     symbolInfo: LibrarySymbolInfo, resolution: ResolutionString,
     onTick: SubscribeBarsCallback, listenerGuid: string,
+    onResetCacheNeededCallback?: () => void,
   ) => {
     const sym = (symbolInfo.ticker || symbolInfo.name).toUpperCase();
     const res = String(resolution);
+    ensureReconnectHook();
 
     // Subscribe to the gateway's bar-update channel. The server pushes a
     // pre-aggregated OHLC snapshot on every tick (the same data the
@@ -323,7 +342,10 @@ export const swisDexDatafeed: IBasicDataFeed = {
       });
     });
 
-    subscriptions.set(listenerGuid, { symbol: sym, resolution: res, onTick, unsubscribe: unsub });
+    subscriptions.set(listenerGuid, {
+      symbol: sym, resolution: res, onTick,
+      resetCache: onResetCacheNeededCallback, unsubscribe: unsub,
+    });
   },
 
   unsubscribeBars: (listenerGuid: string) => {
