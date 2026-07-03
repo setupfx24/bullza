@@ -30,6 +30,7 @@ const RM_METHODS: { key: string; label: string; hint: string }[] = [
   { key: 'UPI', label: 'UPI', hint: 'Your RM will share a UPI ID to pay to.' },
   { key: 'USDT', label: 'USDT', hint: 'Your RM will share a USDT (TRC20/ERC20) address.' },
   { key: 'Local Bank Transfer', label: 'Local Bank Transfer', hint: 'Your RM will share bank account / IFSC details.' },
+  { key: 'Cash', label: 'Cash', hint: 'Your RM will coordinate an in-person / cash payment with you.' },
 ];
 
 interface UserProfile {
