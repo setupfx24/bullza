@@ -283,13 +283,26 @@ async def finance_overview(db: AsyncSession, start_date=None, end_date=None) -> 
         select(TradingAccount.id).where(TradingAccount.user_id.in_(promo_user_ids))
     )).all()] if promo_user_ids else []
 
+    # Demo accounts/users are practice money — like promo, they must NEVER count
+    # in the real company figures. Excluded the same way (client 2026-07-03).
+    demo_acct_ids = [r[0] for r in (await db.execute(
+        select(TradingAccount.id).where(TradingAccount.is_demo == True)
+    )).all()]
+    demo_user_ids = [r[0] for r in (await db.execute(
+        select(User.id).where(User.is_demo == True)
+    )).all()]
+
+    # Combined promo + demo exclusion sets used by the helpers below.
+    excl_acct_ids = list(set(promo_acct_ids) | set(demo_acct_ids))
+    excl_user_ids = list(set(promo_user_ids) | set(demo_user_ids))
+
     def _xa(q, col):
-        """Exclude promotional ACCOUNTS from an account-scoped query."""
-        return q.where(col.notin_(promo_acct_ids)) if promo_acct_ids else q
+        """Exclude promo + demo ACCOUNTS from an account-scoped query."""
+        return q.where(col.notin_(excl_acct_ids)) if excl_acct_ids else q
 
     def _xu(q, col):
-        """Exclude promotional USERS from a user-scoped query."""
-        return q.where(col.notin_(promo_user_ids)) if promo_user_ids else q
+        """Exclude promo + demo USERS from a user-scoped query."""
+        return q.where(col.notin_(excl_user_ids)) if excl_user_ids else q
 
     # ── Net P&L sources ───────────────────────────────────────────────
     user_pnl = float((await db.execute(
