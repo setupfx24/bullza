@@ -589,6 +589,30 @@ async def finance_overview_drill(
             q = q.where(col <= end_date)
         return q
 
+    # Same promo + demo exclusion as the overview cards, so the per-user drill
+    # totals MATCH the source figures (client 2026-07-03 — drills were counting
+    # demo/promo users the cards excluded).
+    promo_user_ids = [r[0] for r in (await db.execute(
+        select(User.id).where(User.is_promotional == True)
+    )).all()]
+    promo_acct_ids = [r[0] for r in (await db.execute(
+        select(TradingAccount.id).where(TradingAccount.user_id.in_(promo_user_ids))
+    )).all()] if promo_user_ids else []
+    demo_acct_ids = [r[0] for r in (await db.execute(
+        select(TradingAccount.id).where(TradingAccount.is_demo == True)
+    )).all()]
+    demo_user_ids = [r[0] for r in (await db.execute(
+        select(User.id).where(User.is_demo == True)
+    )).all()]
+    excl_acct_ids = list(set(promo_acct_ids) | set(demo_acct_ids))
+    excl_user_ids = list(set(promo_user_ids) | set(demo_user_ids))
+
+    def _xa(q, col):
+        return q.where(col.notin_(excl_acct_ids)) if excl_acct_ids else q
+
+    def _xu(q, col):
+        return q.where(col.notin_(excl_user_ids)) if excl_user_ids else q
+
     if section in ("deposits", "pending_deposits", "withdrawals", "pending_withdrawals"):
         if section.endswith("deposits"):
             model = Deposit
@@ -602,7 +626,7 @@ async def finance_overview_drill(
         )
         if method and method != "all":
             q = q.where(func.coalesce(model.method, "other") == method)
-        q = _dr(q, model.created_at).group_by(model.user_id)
+        q = _xa(_dr(q, model.created_at), model.account_id).group_by(model.user_id)
         rows = (await db.execute(q)).all()
         umap = await _user_label_map(db, [r[0] for r in rows if r[0]])
         for uid, amt, cnt in rows:
@@ -619,12 +643,12 @@ async def finance_overview_drill(
         # Per-user bonus wallet + account credit (the two tradable-but-not-
         # withdrawable pools shown in the Net Credit card).
         bonus_rows = (await db.execute(
-            select(User.id, func.coalesce(User.main_wallet_bonus, 0))
-            .where(func.coalesce(User.main_wallet_bonus, 0) != 0)
+            _xu(select(User.id, func.coalesce(User.main_wallet_bonus, 0))
+                .where(func.coalesce(User.main_wallet_bonus, 0) != 0), User.id)
         )).all()
         credit_rows = (await db.execute(
-            select(TradingAccount.user_id, func.coalesce(func.sum(TradingAccount.credit), 0))
-            .where(TradingAccount.credit != 0)
+            _xa(select(TradingAccount.user_id, func.coalesce(func.sum(TradingAccount.credit), 0))
+                .where(TradingAccount.credit != 0), TradingAccount.id)
             .group_by(TradingAccount.user_id)
         )).all()
         acc: dict = {}
@@ -649,7 +673,7 @@ async def finance_overview_drill(
         q = select(FixedReturnLock).where(FixedReturnLock.state.in_(["active", "early_pending"]))
         if tenure:
             q = q.where(FixedReturnLock.tenure_label == tenure)
-        q = _dr(q, FixedReturnLock.locked_at)
+        q = _xu(_dr(q, FixedReturnLock.locked_at), FixedReturnLock.user_id)
         locks = (await db.execute(q)).scalars().all()
         acc: dict = {}
         for lk in locks:
@@ -677,14 +701,14 @@ async def finance_overview_drill(
         # TradeHistory.user_id directly raised an AttributeError → HTTP 500 on
         # this drill.
         rows = (await db.execute(
-            _dr(
+            _xa(_dr(
                 select(
                     TradingAccount.user_id,
                     func.coalesce(func.sum(TradeHistory.profit), 0),
                     func.count(TradeHistory.id),
                 ).join(TradingAccount, TradingAccount.id == TradeHistory.account_id),
                 TradeHistory.closed_at,
-            ).group_by(TradingAccount.user_id)
+            ), TradeHistory.account_id).group_by(TradingAccount.user_id)
         )).all()
         umap = await _user_label_map(db, [r[0] for r in rows if r[0]])
         for uid, profit, cnt in rows:
@@ -703,12 +727,12 @@ async def finance_overview_drill(
         # Position.user_id would raise → HTTP 500).
         col = Position.commission if section == "commission" else Position.swap
         rows = (await db.execute(
-            _dr(
+            _xa(_dr(
                 select(TradingAccount.user_id, func.coalesce(func.sum(col), 0), func.count(Position.id))
                 .join(TradingAccount, TradingAccount.id == Position.account_id)
                 .where(col != 0),
                 Position.created_at,
-            ).group_by(TradingAccount.user_id)
+            ), Position.account_id).group_by(TradingAccount.user_id)
         )).all()
         umap = await _user_label_map(db, [r[0] for r in rows if r[0]])
         for uid, amt, cnt in rows:
@@ -725,12 +749,12 @@ async def finance_overview_drill(
         # Spread revenue per user — from filled orders (orders.spread_revenue),
         # joined to trading_accounts for the owner (client 2026-06-16).
         rows = (await db.execute(
-            _dr(
+            _xa(_dr(
                 select(TradingAccount.user_id, func.coalesce(func.sum(Order.spread_revenue), 0), func.count(Order.id))
                 .join(TradingAccount, TradingAccount.id == Order.account_id)
                 .where(Order.status == "filled", Order.spread_revenue != 0),
                 Order.created_at,
-            ).group_by(TradingAccount.user_id)
+            ), Order.account_id).group_by(TradingAccount.user_id)
         )).all()
         umap = await _user_label_map(db, [r[0] for r in rows if r[0]])
         for uid, amt, cnt in rows:
@@ -749,13 +773,13 @@ async def finance_overview_drill(
         # instead of just a per-user total (client 2026-07-03).
         from packages.common.src.models import InsurancePolicy
         rows = (await db.execute(
-            _dr(
+            _xu(_dr(
                 select(
                     InsurancePolicy.user_id, InsurancePolicy.fee, InsurancePolicy.tier,
                     InsurancePolicy.coverage_pct, Instrument.symbol,
                 ).join(Instrument, Instrument.id == InsurancePolicy.instrument_id),
                 InsurancePolicy.activated_at,
-            ).order_by(InsurancePolicy.activated_at.desc())
+            ), InsurancePolicy.user_id).order_by(InsurancePolicy.activated_at.desc())
         )).all()
         umap = await _user_label_map(db, [r[0] for r in rows if r[0]])
         for uid, fee, tier, cov, symbol in rows:
@@ -776,11 +800,11 @@ async def finance_overview_drill(
             "referral": ["referral_commission", "ib_referral_bounty"],
         }
         rows = (await db.execute(
-            _dr(
+            _xu(_dr(
                 select(Transaction.user_id, func.coalesce(func.sum(Transaction.amount), 0), func.count(Transaction.id))
                 .where(Transaction.type.in_(type_map[section])),
                 Transaction.created_at,
-            ).group_by(Transaction.user_id)
+            ), Transaction.user_id).group_by(Transaction.user_id)
         )).all()
         umap = await _user_label_map(db, [r[0] for r in rows if r[0]])
         for uid, amt, cnt in rows:
@@ -796,11 +820,11 @@ async def finance_overview_drill(
     elif section == "ib_commission":
         # IBCommission.ib_id → ib_profiles.id → user. Group by the IB's user.
         rows = (await db.execute(
-            _dr(
+            _xu(_dr(
                 select(IBProfile.user_id, func.coalesce(func.sum(IBCommission.amount), 0), func.count(IBCommission.id))
                 .join(IBProfile, IBProfile.id == IBCommission.ib_id),
                 IBCommission.created_at,
-            ).group_by(IBProfile.user_id)
+            ), IBProfile.user_id).group_by(IBProfile.user_id)
         )).all()
         umap = await _user_label_map(db, [r[0] for r in rows if r[0]])
         for uid, amt, cnt in rows:
