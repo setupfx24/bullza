@@ -201,15 +201,25 @@ async def analytics_dashboard(
     )
     total_followers = total_followers_q.scalar() or 0
 
-    bonus_given_q = await db.execute(
-        select(func.coalesce(func.sum(UserBonus.amount), 0))
-    )
-    total_bonus_given = float(bonus_given_q.scalar() or 0)
+    # "Bonus given" = ALL non-deposit tradable money handed to users: account
+    # CREDIT (Give Credit) + bonus WALLET (main_wallet_bonus). Previously this
+    # summed only UserBonus rows, so credit/grants showed $0 even after money had
+    # been given — matches Finance Overview's Net Credit now (client 2026-07-03).
+    credit_sum = (await db.execute(
+        select(func.coalesce(func.sum(TradingAccount.credit), 0))
+    )).scalar() or 0
+    wallet_bonus_sum = (await db.execute(
+        select(func.coalesce(func.sum(User.main_wallet_bonus), 0))
+    )).scalar() or 0
+    total_bonus_given = float(credit_sum) + float(wallet_bonus_sum)
 
-    active_bonus_q = await db.execute(
+    active_credit = (await db.execute(
+        select(func.count()).select_from(TradingAccount).where(TradingAccount.credit > 0)
+    )).scalar() or 0
+    active_user_bonus = (await db.execute(
         select(func.count(UserBonus.id)).where(UserBonus.status == "active")
-    )
-    active_bonuses = active_bonus_q.scalar() or 0
+    )).scalar() or 0
+    active_bonuses = int(active_credit) + int(active_user_bonus)
 
     return {
         "today": today,
