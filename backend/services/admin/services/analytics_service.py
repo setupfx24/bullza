@@ -328,7 +328,7 @@ async def finance_overview(db: AsyncSession, start_date=None, end_date=None) -> 
     )).scalar() or 0))
 
     ib_commission = float((await db.execute(
-        _xu(_dr(select(func.coalesce(func.sum(IBCommission.amount), 0)), IBCommission.created_at), IBCommission.user_id)
+        _xu(_dr(select(func.coalesce(func.sum(IBCommission.amount), 0)), IBCommission.created_at), IBCommission.source_user_id)
     )).scalar() or 0)
     referral_commission = abs(float((await db.execute(
         _xu(_dr(select(func.coalesce(func.sum(Transaction.amount), 0)).where(
