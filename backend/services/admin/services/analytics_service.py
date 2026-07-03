@@ -733,10 +733,35 @@ async def finance_overview_drill(
                 "count": int(cnt or 0),
             })
 
-    elif section in ("pamm_mam", "insurance_fees", "insurance_payouts", "referral"):
+    elif section == "insurance_fees":
+        # Per-POLICY detail — each insured trade with the instrument it was on,
+        # its tier + coverage, and the exact fee. Answers "how much fee on what"
+        # instead of just a per-user total (client 2026-07-03).
+        from packages.common.src.models import InsurancePolicy
+        rows = (await db.execute(
+            _dr(
+                select(
+                    InsurancePolicy.user_id, InsurancePolicy.fee, InsurancePolicy.tier,
+                    InsurancePolicy.coverage_pct, Instrument.symbol,
+                ).join(Instrument, Instrument.id == InsurancePolicy.instrument_id),
+                InsurancePolicy.activated_at,
+            ).order_by(InsurancePolicy.activated_at.desc())
+        )).all()
+        umap = await _user_label_map(db, [r[0] for r in rows if r[0]])
+        for uid, fee, tier, cov, symbol in rows:
+            info = umap.get(uid, {})
+            uname = info.get("name", "—")
+            users.append({
+                "user_id": str(uid) if uid else None,
+                "name": f"{uname} · {symbol} · {tier} ({float(cov or 0):.0f}%)",
+                "email": info.get("email"),
+                "amount": round(abs(float(fee or 0)), 2),
+                "count": 1,
+            })
+
+    elif section in ("pamm_mam", "insurance_payouts", "referral"):
         type_map = {
             "pamm_mam": ["admin_commission"],
-            "insurance_fees": ["insurance_fee"],
             "insurance_payouts": ["insurance_payout"],
             "referral": ["referral_commission", "ib_referral_bounty"],
         }
