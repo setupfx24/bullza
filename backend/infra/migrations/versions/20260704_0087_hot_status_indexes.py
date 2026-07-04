@@ -9,9 +9,13 @@ queries degrade into full sequential scans over an ever-growing table.
 
 Add partial indexes keyed on account_id and filtered to the live rows only, so
 both the "all open/pending" scans and the per-account lookups use an index that
-stays small (it only covers live rows). Non-concurrent CREATE so it runs inside
-Alembic's migration transaction; the tables are small enough that the brief
-lock during deploy is acceptable, and IF NOT EXISTS keeps it idempotent.
+stays small (it only covers live rows).
+
+Built CONCURRENTLY: positions/orders are the live trading tables, so a plain
+CREATE INDEX would take a SHARE lock and BLOCK every trade open/close for the
+duration of the build. CONCURRENTLY never blocks writes. It cannot run inside a
+transaction, so we drop out of Alembic's per-migration transaction via
+autocommit_block(). IF NOT EXISTS keeps it idempotent on re-run.
 
 Revision ID: 0087
 Revises: 0086
@@ -26,16 +30,20 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.execute("""
-        CREATE INDEX IF NOT EXISTS ix_positions_open_account
-            ON positions (account_id) WHERE status = 'open';
-    """)
-    op.execute("""
-        CREATE INDEX IF NOT EXISTS ix_orders_pending_account
-            ON orders (account_id) WHERE status = 'pending';
-    """)
+    # autocommit_block() runs these statements outside the migration's
+    # transaction, which CREATE INDEX CONCURRENTLY requires.
+    with op.get_context().autocommit_block():
+        op.execute(
+            "CREATE INDEX CONCURRENTLY IF NOT EXISTS ix_positions_open_account "
+            "ON positions (account_id) WHERE status = 'open';"
+        )
+        op.execute(
+            "CREATE INDEX CONCURRENTLY IF NOT EXISTS ix_orders_pending_account "
+            "ON orders (account_id) WHERE status = 'pending';"
+        )
 
 
 def downgrade() -> None:
-    op.execute("DROP INDEX IF EXISTS ix_positions_open_account;")
-    op.execute("DROP INDEX IF EXISTS ix_orders_pending_account;")
+    with op.get_context().autocommit_block():
+        op.execute("DROP INDEX CONCURRENTLY IF EXISTS ix_positions_open_account;")
+        op.execute("DROP INDEX CONCURRENTLY IF EXISTS ix_orders_pending_account;")
