@@ -199,6 +199,44 @@ function ensureReconnectHook() {
   });
 }
 
+/* ─── Bid-based chart shift ─── */
+//
+// The engine's BarAggregator builds candles from the raw tick MID
+// (market-data/src/bar_aggregator.py: mid = (bid+ask)/2), but every other
+// price the trader sees — the order panel's BID/ASK and the positions
+// panel's "current" price (bid for buys) — is the spread-widened quote.
+// With a wide admin spread (e.g. BTCUSD 1700 points) the chart floated
+// half a spread above the bid, so chart / BID / P&L all looked different.
+//
+// Fix (client 2026-07-04): draw the chart at the BID, the MT4/MT5
+// convention — shift every bar down by half the live spread taken from
+// the same store tick the panels render. Chart last price == panel BID ==
+// buy-position current price by construction. Historical bars are shifted
+// by the CURRENT half-spread (fixed-markup assumption), which keeps the
+// candle series continuous with the live bar.
+
+function halfSpreadOf(tick: { bid: number; ask: number } | null | undefined): number {
+  if (!tick || tick.bid <= 0 || tick.ask < tick.bid) return 0;
+  return (tick.ask - tick.bid) / 2;
+}
+
+function symbolDigits(sym: string): number {
+  const inst = useTradingStore.getState().instruments.find(
+    (i) => i.symbol.toUpperCase() === sym,
+  );
+  return inst?.digits ?? 5;
+}
+
+function toBidBar(bar: Bar, halfSpread: number, digits: number): Bar {
+  if (halfSpread <= 0) return bar;
+  const shift = (v: number) => Number((v - halfSpread).toFixed(digits));
+  return {
+    ...bar,
+    open: shift(bar.open), high: shift(bar.high),
+    low: shift(bar.low), close: shift(bar.close),
+  };
+}
+
 /* ─── Helpers ─── */
 
 function segmentToSymbolType(segment: string | undefined): string {
@@ -281,10 +319,18 @@ export const swisDexDatafeed: IBasicDataFeed = {
           const data = await res.json();
           const rawBars = Array.isArray(data?.bars) ? data.bars : [];
           if (rawBars.length > 0) {
-            const bars: Bar[] = rawBars.map((b: any) => ({
+            // Engine bars are MID-based — shift to BID so the chart matches
+            // the panel bid / P&L current price (see "Bid-based chart shift").
+            // waitForPrice resolves instantly when a tick is already in the
+            // store; the timeout only bites on a dead feed, where hs=0 keeps
+            // the (mid) bars rather than blocking the chart.
+            const liveTick = await waitForPrice(sym, 2500);
+            const hs = halfSpreadOf(liveTick);
+            const digits = symbolDigits(sym);
+            const bars: Bar[] = rawBars.map((b: any) => toBidBar({
               time: b.time * 1000, open: b.open, high: b.high,
               low: b.low, close: b.close, volume: b.volume,
-            }));
+            }, hs, digits));
             onResult(bars, { noData: false });
             return;
           }
@@ -299,9 +345,10 @@ export const swisDexDatafeed: IBasicDataFeed = {
       //    aggregate across TFs, so this is intentionally the final fallback.
       const tick = await waitForPrice(sym);
       if (tick && tick.bid > 0) {
-        const mid = (tick.bid + tick.ask) / 2;
+        // Anchor the synthetic walk at the BID, not the mid, for the same
+        // chart==bid alignment as the engine-bar path above.
         const spread = Math.abs(tick.ask - tick.bid);
-        const bars = generateSyntheticBars(sym, mid, spread, String(resolution), from, to);
+        const bars = generateSyntheticBars(sym, tick.bid, spread, String(resolution), from, to);
         if (bars.length > 0) {
           onResult(bars, { noData: false });
           return;
@@ -331,15 +378,19 @@ export const swisDexDatafeed: IBasicDataFeed = {
     const unsub = barSocket.subscribe(sym, res, (bar: ServerBar) => {
       const sub = subscriptions.get(listenerGuid);
       if (!sub) return;
-      // Server emits seconds — TradingView expects milliseconds.
-      sub.onTick({
+      // Server bars are MID-based — shift to BID from the live store tick so
+      // the in-progress candle's close tracks the panel BID exactly (see
+      // "Bid-based chart shift"). Server emits seconds — TV wants ms.
+      const hs = halfSpreadOf(useTradingStore.getState().prices[sym]);
+      const digits = symbolDigits(sym);
+      sub.onTick(toBidBar({
         time: bar.time * 1000,
         open: bar.open,
         high: bar.high,
         low: bar.low,
         close: bar.close,
         volume: bar.volume,
-      });
+      }, hs, digits));
     });
 
     subscriptions.set(listenerGuid, {
