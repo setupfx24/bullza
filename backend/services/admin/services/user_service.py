@@ -1226,9 +1226,14 @@ async def trigger_password_reset(
             "Reset token created; SMTP unconfigured — check server logs"
         ),
         "sent": bool(sent),
-        # Only surface the link in non-prod; prod admins must rely on
-        # the email so the token doesn't leak to the audit log UI.
-        "reset_link": link if settings.ENVIRONMENT != "production" else None,
+        # Only surface the link in a genuine dev environment; prod admins must
+        # rely on the email so the account-takeover token never leaks in-band.
+        # Use the SAME canonical dev set as config.py (an `!= "production"`
+        # test would still expose the link under ENVIRONMENT=staging/prod/etc).
+        "reset_link": (
+            link if settings.ENVIRONMENT.lower() in ("development", "dev", "local", "test")
+            else None
+        ),
     }
 
 

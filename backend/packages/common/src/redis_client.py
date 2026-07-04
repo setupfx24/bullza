@@ -1,11 +1,22 @@
+import os
+
 import redis.asyncio as aioredis
 from .config import get_settings
 
 settings = get_settings()
 
+# Each streaming WebSocket handler (/ws/prices, /ws/bars, /ws/trades, /ws/admin)
+# holds one pooled connection for its whole lifetime, and the SAME pool also
+# serves every transient REST/pubsub op. A non-blocking pool raises
+# "Too many connections" on the (max+1)th checkout — it does NOT queue — so a
+# 50-cap put a hard ceiling of ~50 concurrent streaming clients per worker.
+# Default raised to 500 and made env-tunable so prod can size it to load
+# without a code change.
+_REDIS_MAX_CONNECTIONS = int(os.getenv("REDIS_MAX_CONNECTIONS", "500"))
+
 redis_pool = aioredis.ConnectionPool.from_url(
     settings.REDIS_URL,
-    max_connections=50,
+    max_connections=_REDIS_MAX_CONNECTIONS,
     decode_responses=True,
 )
 

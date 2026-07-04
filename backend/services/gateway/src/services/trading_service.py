@@ -1190,6 +1190,11 @@ async def close_position(position_id: UUID, req, user_id: UUID, db: AsyncSession
     _close_mult = Decimal(str(
         getattr(account.account_group, "lot_size_multiplier", None) or 1
     ))
+    # Defence in depth: the schema already enforces lots > 0, but never let a
+    # non-positive partial-close volume through here — a negative value would
+    # flip the P&L ratio (loss booked as profit) and grow the position.
+    if req.lots is not None and Decimal(str(req.lots)) <= 0:
+        raise HTTPException(status_code=400, detail="Close volume must be greater than zero")
     _close_req_scaled = (
         Decimal(str(req.lots)) * _close_mult if req.lots else None
     )

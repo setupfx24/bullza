@@ -843,6 +843,10 @@ async def login_user(
             )
         if not totp_code:
             raise AuthServiceError("2FA code required")
+        # Per-ACCOUNT throttle on the 2FA step (keyed on user id, not just IP)
+        # so a holder of a valid password can't brute-force the 6-digit TOTP by
+        # rotating source IPs. Legitimate users need only a couple of attempts.
+        await rate_limit_http(request, "login-2fa", 5, 300.0, extra_key=str(user.id))
         totp = pyotp.TOTP(secret)
         if not totp.verify(totp_code):
             raise AuthServiceError("Invalid 2FA code", 401)
@@ -1121,6 +1125,12 @@ async def bootstrap_session(access_token: str, request: Request, db: AsyncSessio
     try:
         payload = decode_token(access_token.strip())
     except Exception:
+        raise AuthServiceError("Invalid token", 401)
+    # Only a real session (access) token may bootstrap a session. Access tokens
+    # carry no `type` claim; single-purpose tokens (e.g. email_verify) set one.
+    # Without this check a leaked verify-email link token could be exchanged
+    # for full session cookies.
+    if payload.get("type"):
         raise AuthServiceError("Invalid token", 401)
     try:
         uid = UUID(str(payload["sub"]))

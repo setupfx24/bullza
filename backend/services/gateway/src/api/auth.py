@@ -181,7 +181,7 @@ async def demo_login(request: Request, db: AsyncSession = Depends(get_db)):
             pass
         raise HTTPException(
             status_code=500,
-            detail=f"Demo sign-in failed — {type(e).__name__}: {e}",
+            detail="Demo sign-in failed, please try again.",
         )
 
 
@@ -204,7 +204,7 @@ async def google_auth(req: GoogleAuthRequest, request: Request, db: AsyncSession
             pass
         raise HTTPException(
             status_code=500,
-            detail=f"Google sign-in failed — {type(e).__name__}: {e}",
+            detail="Google sign-in failed, please try again.",
         )
 
 
@@ -245,7 +245,7 @@ async def wallet_verify(
             pass
         raise HTTPException(
             status_code=500,
-            detail=f"Wallet sign-in failed — {type(e).__name__}: {e}",
+            detail="Wallet sign-in failed, please try again.",
         )
 
 
@@ -338,15 +338,23 @@ async def verify_2fa(
         raise HTTPException(status_code=e.status_code, detail=e.detail)
 
 
+class ChangePasswordBody(BaseModel):
+    old_password: str
+    new_password: str
+
+
 @router.post("/password/change")
 async def change_password(
-    old_password: str, new_password: str,
+    body: ChangePasswordBody,
     current_user: dict = Depends(get_current_user), db: AsyncSession = Depends(get_db),
 ):
+    # Passwords MUST travel in the request body, never as query params — as
+    # bare `str` args FastAPI bound them to the query string, leaking both the
+    # old and new password into nginx/proxy access logs and browser history.
     try:
         return await _change_password(
             user_id=current_user["user_id"],
-            old_password=old_password, new_password=new_password, db=db,
+            old_password=body.old_password, new_password=body.new_password, db=db,
         )
     except AuthServiceError as e:
         raise HTTPException(status_code=e.status_code, detail=e.detail)

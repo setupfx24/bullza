@@ -623,7 +623,12 @@ async def handle_oxapay_webhook(
         deposit.status = "auto_approved"
         deposit.approved_at = datetime.utcnow()
 
-        user_q = await db.execute(select(User).where(User.id == deposit.user_id))
+        # Lock the user row so two deposits settling concurrently for the same
+        # user can't both read a stale main_wallet_balance and lose an update
+        # (the admin approve path already locks; the webhook path did not).
+        user_q = await db.execute(
+            select(User).where(User.id == deposit.user_id).with_for_update()
+        )
         user_row = user_q.scalar_one_or_none()
         if not user_row:
             logger.error("OxaPay webhook: user not found for deposit %s", order_id)
@@ -1009,7 +1014,12 @@ async def handle_nowpayments_webhook(
         deposit.status = "auto_approved"
         deposit.approved_at = datetime.utcnow()
 
-        user_q = await db.execute(select(User).where(User.id == deposit.user_id))
+        # Lock the user row so two deposits settling concurrently for the same
+        # user can't both read a stale main_wallet_balance and lose an update
+        # (the admin approve path already locks; the webhook path did not).
+        user_q = await db.execute(
+            select(User).where(User.id == deposit.user_id).with_for_update()
+        )
         user_row = user_q.scalar_one_or_none()
         if not user_row:
             logger.error("NOWPayments webhook: user not found for deposit %s", order_id)
@@ -1558,22 +1568,22 @@ async def internal_wallet_transfer(req, user_id: UUID, db: AsyncSession) -> dict
     if req.from_account_id == req.to_account_id:
         raise HTTPException(status_code=400, detail="Choose two different accounts")
 
-    fq = await db.execute(
+    # Lock BOTH account rows FOR UPDATE before the free-balance check and the
+    # read-modify-write below, mirroring transfer_trading_to_main (audit
+    # finding C2). Without this, two concurrent transfers out of the same
+    # source each read the stale source balance and each credits its
+    # destination in full — minting money. Lock in a deterministic id order
+    # so two opposite-direction transfers can't deadlock.
+    rows = (await db.execute(
         select(TradingAccount).where(
-            TradingAccount.id == req.from_account_id,
+            TradingAccount.id.in_([req.from_account_id, req.to_account_id]),
             TradingAccount.user_id == user_id,
             TradingAccount.is_demo == False,
-        )
-    )
-    from_a = fq.scalar_one_or_none()
-    tq = await db.execute(
-        select(TradingAccount).where(
-            TradingAccount.id == req.to_account_id,
-            TradingAccount.user_id == user_id,
-            TradingAccount.is_demo == False,
-        )
-    )
-    to_a = tq.scalar_one_or_none()
+        ).order_by(TradingAccount.id).with_for_update()
+    )).scalars().all()
+    by_id = {a.id: a for a in rows}
+    from_a = by_id.get(req.from_account_id)
+    to_a = by_id.get(req.to_account_id)
     if not from_a or not to_a:
         raise HTTPException(status_code=404, detail="Account not found")
 
