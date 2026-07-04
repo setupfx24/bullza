@@ -1126,11 +1126,12 @@ async def bootstrap_session(access_token: str, request: Request, db: AsyncSessio
         payload = decode_token(access_token.strip())
     except Exception:
         raise AuthServiceError("Invalid token", 401)
-    # Only a real session (access) token may bootstrap a session. Access tokens
-    # carry no `type` claim; single-purpose tokens (e.g. email_verify) set one.
-    # Without this check a leaked verify-email link token could be exchanged
-    # for full session cookies.
-    if payload.get("type"):
+    # Normal access tokens carry NO `type` claim; admin "Login As" impersonation
+    # tokens carry type="user" (login_as_user) and are DELIBERATELY meant to open
+    # a session for the target user. Any OTHER type (email_verify, password-reset,
+    # …) is a single-purpose link token that must NOT be exchangeable for a
+    # session — without this a leaked verify-email token could mint full cookies.
+    if payload.get("type") not in (None, "user"):
         raise AuthServiceError("Invalid token", 401)
     try:
         uid = UUID(str(payload["sub"]))
