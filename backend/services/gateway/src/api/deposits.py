@@ -456,6 +456,22 @@ async def create_rm_request(
             f"(phone {phone})"
         ),
     ))
+    # Persist the request so admin can see it in the panel (not just the RM's
+    # inbox) — the RM Requests → Manual tab reads this table (migration 0093).
+    from packages.common.src.models import RmManualRequest
+    db.add(RmManualRequest(
+        user_id=user_row.id,
+        side=side,
+        amount=amount,
+        method=(pay_method or None),
+        phone=phone,
+        payout_details=(
+            body.payout_details.strip()
+            if (side == "withdraw" and body.payout_details) else None
+        ),
+        note=(body.note.strip() if body.note else None),
+        status="new",
+    ))
     await db.commit()
 
     return {

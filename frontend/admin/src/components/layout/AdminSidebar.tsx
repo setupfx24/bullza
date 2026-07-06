@@ -71,6 +71,7 @@ const NAV_ITEMS: NavItem[] = [
   },
   { label: 'My Clients (RM)', href: '/rm-portal', icon: HandCoins, perm: 'rm.view' },
   { label: 'RM Requests', href: '/rm-requests', icon: UserCheck, perm: 'rm.manage' },
+  { label: 'RM Manual Requests', href: '/rm-manual-requests', icon: ClipboardList, perm: 'rm.manage' },
   { label: 'Analytics', href: '/analytics', icon: BarChart3, perm: 'analytics.view' },
   { label: 'Audit logs', href: '/audit-logs', icon: ScrollText, perm: 'audit_logs.view' },
   { label: 'Bonus', href: '/bonus', icon: Gift, perm: 'bonus.view' },

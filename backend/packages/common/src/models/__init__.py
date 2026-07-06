@@ -71,7 +71,7 @@ from .staking import (
 from .fixed_return import FixedReturnLock
 from .vip import VipPass
 from .share import SharedTrade
-from .rm import RMFundingRequest
+from .rm import RMFundingRequest, RmManualRequest
 
 
 __all__ = [
@@ -116,5 +116,5 @@ __all__ = [
     # share
     "SharedTrade",
     # rm
-    "RMFundingRequest",
+    "RMFundingRequest", "RmManualRequest",
 ]
