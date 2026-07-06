@@ -243,19 +243,24 @@ async def _pay_fr_referral(
         )).scalar_one_or_none()
         if referrer is None:
             return
-        mode = (referrer.fr_referral_mode or "principal").lower()
-        if mode != kind:
-            return
-        # The GLOBAL (standard) % everyone gets, and the per-referrer OVERRIDE
-        # (migration 0090). The referrer is paid at the override when set; the
-        # PORTION ABOVE the standard % is a promotional EXPENSE (extra income to
-        # the user, logged for admin's Promotional Expenses).
-        setting = "fr_referral_principal_pct" if kind == "principal" else "fr_referral_interest_pct"
-        global_pct = Decimal(str(await get_float_setting(setting, 0.0)))
+        # Per-referrer OVERRIDE for THIS leg (migration 0090). A custom offer
+        # pays on its leg REGARDLESS of the referrer's mode — so admin can pay a
+        # user on BOTH principal AND interest by setting both overrides. Without
+        # an override, the referrer earns only on their chosen mode leg
+        # (unchanged behaviour for everyone else). This is the fix for
+        # "custom % not working": mode=principal previously killed the interest
+        # override entirely (client 2026-07-06).
         override = (
             referrer.fr_referral_principal_pct_override if kind == "principal"
             else referrer.fr_referral_interest_pct_override
         )
+        mode = (referrer.fr_referral_mode or "principal").lower()
+        if override is None and mode != kind:
+            return
+        # The GLOBAL (standard) % this leg pays; the portion ABOVE it is the
+        # promotional EXPENSE (extra income) logged below.
+        setting = "fr_referral_principal_pct" if kind == "principal" else "fr_referral_interest_pct"
+        global_pct = Decimal(str(await get_float_setting(setting, 0.0)))
         pct = Decimal(str(override)) if override is not None else global_pct
         if pct <= 0:
             return
