@@ -375,13 +375,17 @@ async def finance_overview(db: AsyncSession, start_date=None, end_date=None) -> 
     net_pnl_total = round(sum(s["amount"] for s in pnl_sources), 2)
 
     # ── Deposits / Withdrawals by method ──────────────────────────────
+    # Exclude by USER, not account: deposits/withdrawals credit the MAIN WALLET
+    # so their account_id is NULL, and `account_id NOT IN (promo/demo ids)`
+    # evaluates NULL→dropped, which silently zeroed every wallet deposit/
+    # withdrawal once any promo/demo account existed (client 2026-07-06).
     async def _by_method(model, statuses):
         rows = (await db.execute(
-            _xa(_dr(
+            _xu(_dr(
                 select(model.method, func.coalesce(func.sum(model.amount), 0), func.count(model.id))
                 .where(model.status.in_(statuses)),
                 model.created_at,
-            ), model.account_id).group_by(model.method)
+            ), model.user_id).group_by(model.method)
         )).all()
         out = [{"method": (m or "other"), "amount": round(float(a or 0), 2), "count": int(c or 0)} for m, a, c in rows]
         out.sort(key=lambda x: x["amount"], reverse=True)
@@ -659,7 +663,9 @@ async def finance_overview_drill(
         )
         if method and method != "all":
             q = q.where(func.coalesce(model.method, "other") == method)
-        q = _xa(_dr(q, model.created_at), model.account_id).group_by(model.user_id)
+        # Exclude by USER (deposits/withdrawals are wallet-scoped, account_id is
+        # NULL) so the drill matches the card and NULL rows aren't dropped.
+        q = _xu(_dr(q, model.created_at), model.user_id).group_by(model.user_id)
         rows = (await db.execute(q)).all()
         umap = await _user_label_map(db, [r[0] for r in rows if r[0]])
         for uid, amt, cnt in rows:
