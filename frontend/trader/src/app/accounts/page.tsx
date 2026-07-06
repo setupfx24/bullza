@@ -143,6 +143,8 @@ export default function AccountsPage() {
   // Agreement to the credit-forfeit rule when a transfer OUT of a trading
   // account would drop its balance below its bonus credit.
   const [transferAgree, setTransferAgree] = useState(false);
+  // Proper confirmation popup shown when a transfer would forfeit bonus credit.
+  const [forfeitConfirmOpen, setForfeitConfirmOpen] = useState(false);
   const [uniInitialized, setUniInitialized] = useState(false);
 
   const fetchWalletSummary = useCallback(async () => {
@@ -931,36 +933,31 @@ export default function AccountsPage() {
                     />
                   </div>
 
-                  {/* ── Credit-forfeit warning ── */}
+                  {/* ── Credit-forfeit warning (info only; the acknowledgement is
+                      a proper confirmation popup shown on Transfer) ── */}
                   {uniWouldForfeit && (
                     <div className="mb-3 rounded-xl border border-red-500/40 bg-red-500/10 px-3 py-2.5 text-[11px] leading-relaxed text-red-300">
                       <p className="font-semibold">
                         ⚠️ This transfer drops this account below its {fmt(uniFromCredit)} bonus credit —
                         your entire {fmt(uniFromCredit)} credit will be forfeited (insurance payouts are kept).
+                        You&apos;ll be asked to confirm.
                       </p>
-                      <label className="mt-2 flex items-start gap-2 cursor-pointer text-text-secondary">
-                        <input
-                          type="checkbox"
-                          checked={transferAgree}
-                          onChange={(e) => setTransferAgree(e.target.checked)}
-                          className="mt-0.5 accent-red-500"
-                        />
-                        <span>I understand my {fmt(uniFromCredit)} credit will be forfeited.</span>
-                      </label>
                     </div>
                   )}
 
                   {/* ── SUBMIT ── */}
                   <button
                     type="button"
-                    onClick={() => void submitUnifiedTransfer()}
+                    onClick={() => {
+                      if (uniWouldForfeit) { setForfeitConfirmOpen(true); }
+                      else { void submitUnifiedTransfer(); }
+                    }}
                     disabled={
                       demoFundingBlocked ||
                       transferSubmitting ||
                       !transferAmount.trim() ||
                       uniFromBalance <= 0 ||
-                      uniFrom === uniTo ||
-                      (uniWouldForfeit && !transferAgree)
+                      uniFrom === uniTo
                     }
                     className="w-full py-3.5 rounded-xl bg-[#55a630] text-white text-base font-bold hover:bg-[#3f7d22] disabled:opacity-45 disabled:pointer-events-none transition-colors flex items-center justify-center gap-2"
                   >
@@ -973,6 +970,40 @@ export default function AccountsPage() {
           </div>
         )}
       </div>
+
+      {/* Bonus-forfeit confirmation popup */}
+      {forfeitConfirmOpen && (
+        <div className="fixed inset-0 z-[130] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/60" onClick={() => setForfeitConfirmOpen(false)} />
+          <div className="relative w-full max-w-sm bg-bg-secondary border border-red-500/40 rounded-2xl shadow-modal p-6 text-center space-y-4">
+            <div className="mx-auto w-12 h-12 rounded-full bg-red-500/15 flex items-center justify-center text-2xl" aria-hidden>⚠️</div>
+            <h2 className="text-base font-bold text-text-primary">Bonus credit will be forfeited</h2>
+            <p className="text-sm text-text-secondary leading-relaxed">
+              This transfer drops the account below its{' '}
+              <span className="font-bold text-text-primary">{fmt(uniFromCredit)}</span> bonus credit. Your{' '}
+              <span className="font-bold text-red-400">entire {fmt(uniFromCredit)} credit</span> will be forfeited
+              (insurance payouts are kept). This can&apos;t be undone.
+            </p>
+            <div className="flex gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => setForfeitConfirmOpen(false)}
+                className="flex-1 py-2.5 rounded-xl border border-border-primary text-text-secondary hover:bg-bg-hover text-sm font-medium"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={transferSubmitting}
+                onClick={() => { setForfeitConfirmOpen(false); void submitUnifiedTransfer(); }}
+                className="flex-1 py-2.5 rounded-xl bg-red-500 text-white hover:bg-red-600 text-sm font-bold disabled:opacity-50"
+              >
+                Yes, forfeit &amp; transfer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </DashboardShell>
   );
 }
