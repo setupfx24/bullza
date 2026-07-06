@@ -545,13 +545,26 @@ async def deposit_methods(
 async def deposit_fx_quote(
     currency: str = Query("INR"),
     amount: Decimal | None = Query(None),
+    method_id: UUID | None = Query(None),
     current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Live <currency>->USD rate + the USD a local amount will credit (the form
-    shows this as the user types)."""
+    """<currency>->USD rate + the USD a local amount will credit (shown as the
+    user types). If `method_id` has an admin-fixed rate, it's used over the API."""
     from ..services import payment_method_service
-    return await payment_method_service.quote(currency, amount, db)
+    return await payment_method_service.quote(currency, amount, db, method_id=method_id)
+
+
+@router.get("/withdraw/fx-quote")
+async def withdraw_fx_quote(
+    amount: Decimal | None = Query(None),
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """For a bank withdrawal entered in USD, the local currency the user will
+    receive (≈), at the admin-fixed withdrawal rate when set."""
+    from ..services import payment_method_service
+    return await payment_method_service.withdrawal_quote(amount, db)
 
 
 class MethodDepositRequest(BaseModel):

@@ -99,6 +99,60 @@ async def set_user_promotional(
     return {"user_id": str(user_id), "is_promotional": user.is_promotional}
 
 
+async def get_fr_referral_override(user_id: uuid.UUID, db: AsyncSession) -> dict:
+    """Current per-referrer FR referral-commission % override + the global
+    defaults it falls back to, for the admin user-detail override card."""
+    from packages.common.src.settings_store import get_float_setting
+    user = (await db.execute(select(User).where(User.id == user_id))).scalar_one_or_none()
+    if user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+    po = user.fr_referral_principal_pct_override
+    io = user.fr_referral_interest_pct_override
+    return {
+        "user_id": str(user_id),
+        "mode": (user.fr_referral_mode or "principal"),
+        "principal_pct_override": (float(po) if po is not None else None),
+        "interest_pct_override": (float(io) if io is not None else None),
+        "global_principal_pct": float(await get_float_setting("fr_referral_principal_pct", 0.0)),
+        "global_interest_pct": float(await get_float_setting("fr_referral_interest_pct", 0.0)),
+    }
+
+
+async def set_fr_referral_override(
+    user_id: uuid.UUID, principal_pct, interest_pct, db: AsyncSession,
+) -> dict:
+    """Set/clear a referrer's custom FR referral-commission %. Pass None on a
+    leg to CLEAR it (that leg then falls back to the global setting)."""
+    user = (await db.execute(select(User).where(User.id == user_id))).scalar_one_or_none()
+    if user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    def _norm(v):
+        if v is None or v == "":
+            return None
+        d = Decimal(str(v))
+        if d < 0:
+            raise HTTPException(status_code=400, detail="Percentage cannot be negative")
+        if d > 100:
+            raise HTTPException(status_code=400, detail="Percentage cannot exceed 100")
+        return d
+
+    user.fr_referral_principal_pct_override = _norm(principal_pct)
+    user.fr_referral_interest_pct_override = _norm(interest_pct)
+    await db.commit()
+    return {
+        "user_id": str(user_id),
+        "principal_pct_override": (
+            float(user.fr_referral_principal_pct_override)
+            if user.fr_referral_principal_pct_override is not None else None
+        ),
+        "interest_pct_override": (
+            float(user.fr_referral_interest_pct_override)
+            if user.fr_referral_interest_pct_override is not None else None
+        ),
+    }
+
+
 async def list_users(
     page: int, per_page: int, search: str | None,
     status_filter: str | None, kyc_filter: str | None,

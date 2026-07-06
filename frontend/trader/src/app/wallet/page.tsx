@@ -270,6 +270,20 @@ function WalletPageContent() {
   const [manualWithdrawNotes, setManualWithdrawNotes] = useState('');
   const [manualWithdrawQrFile, setManualWithdrawQrFile] = useState<File | null>(null);
   const [withdrawSubmitting, setWithdrawSubmitting] = useState(false);
+  // Bank withdrawal: local-currency estimate the user receives for their USD
+  // amount, at the admin-fixed withdrawal rate (informational only).
+  const [withdrawInr, setWithdrawInr] = useState<{ currency: string | null; local_amount: number | null } | null>(null);
+  useEffect(() => {
+    if (fundMainTab !== 'withdraw' || withdrawUiSection !== 'bank') { setWithdrawInr(null); return; }
+    const n = parseFloat(withdrawAmount);
+    if (Number.isNaN(n) || n <= 0) { setWithdrawInr(null); return; }
+    const t = setTimeout(() => {
+      api.get<{ currency: string | null; local_amount: number | null }>(`/wallet/withdraw/fx-quote?amount=${n}`)
+        .then((q) => setWithdrawInr(q && q.local_amount != null ? q : null))
+        .catch(() => setWithdrawInr(null));
+    }, 400);
+    return () => clearTimeout(t);
+  }, [withdrawAmount, withdrawUiSection, fundMainTab]);
 
   /** Compact card transfers: trading ↔ main */
   const [balanceTransfer, setBalanceTransfer] = useState<{
@@ -1790,6 +1804,15 @@ function WalletPageContent() {
                             className="w-full pl-7 pr-4 py-3 rounded-xl border border-border-primary bg-bg-secondary text-text-primary placeholder:text-text-tertiary outline-none focus:border-accent/50 font-mono font-bold text-lg"
                           />
                         </div>
+                        {withdrawInr?.local_amount != null && (
+                          <p className="text-[11px] text-text-secondary mt-1.5">
+                            You&apos;ll receive ≈{' '}
+                            <span className="font-bold text-text-primary">
+                              {withdrawInr.local_amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {withdrawInr.currency}
+                            </span>{' '}
+                            at the current bank rate.
+                          </p>
+                        )}
                       </div>
 
                       <div className="rounded-xl border border-border-primary bg-bg-secondary px-4 py-3 space-y-2">

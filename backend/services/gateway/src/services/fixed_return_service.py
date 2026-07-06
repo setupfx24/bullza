@@ -246,8 +246,17 @@ async def _pay_fr_referral(
         mode = (referrer.fr_referral_mode or "principal").lower()
         if mode != kind:
             return
-        setting = "fr_referral_principal_pct" if kind == "principal" else "fr_referral_interest_pct"
-        pct = Decimal(str(await get_float_setting(setting, 0.0)))
+        # Per-referrer override wins over the global setting for this leg
+        # (migration 0090). NULL override → fall back to the global %.
+        override = (
+            referrer.fr_referral_principal_pct_override if kind == "principal"
+            else referrer.fr_referral_interest_pct_override
+        )
+        if override is not None:
+            pct = Decimal(str(override))
+        else:
+            setting = "fr_referral_principal_pct" if kind == "principal" else "fr_referral_interest_pct"
+            pct = Decimal(str(await get_float_setting(setting, 0.0)))
         if pct <= 0:
             return
         commission = (Decimal(str(basis_amount)) * pct / Decimal("100")).quantize(Decimal("0.01"))

@@ -134,6 +134,87 @@ function RMAssignCard({ userId, currentRmId, currentRmName, onSaved }: {
   );
 }
 
+/** Per-referrer override of the Fixed Return referral commission %. Blank on a
+ *  leg = fall back to the global rate. Hidden if the endpoint 403s. */
+function FrReferralOverrideCard({ userId }: { userId: string }) {
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [info, setInfo] = useState<{
+    mode: string; principal_pct_override: number | null; interest_pct_override: number | null;
+    global_principal_pct: number; global_interest_pct: number;
+  } | null>(null);
+  const [prin, setPrin] = useState('');
+  const [intr, setIntr] = useState('');
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const d = await adminApi.get<any>(`/users/${userId}/fr-referral-override`);
+      setInfo(d);
+      setPrin(d.principal_pct_override != null ? String(d.principal_pct_override) : '');
+      setIntr(d.interest_pct_override != null ? String(d.interest_pct_override) : '');
+    } catch {
+      setInfo(null);
+    } finally {
+      setLoading(false);
+    }
+  }, [userId]);
+  useEffect(() => { load(); }, [load]);
+
+  if (loading || !info) return null;
+
+  const save = async () => {
+    setSaving(true);
+    try {
+      await adminApi.post(`/users/${userId}/fr-referral-override`, {
+        principal_pct: prin.trim() === '' ? null : parseFloat(prin),
+        interest_pct: intr.trim() === '' ? null : parseFloat(intr),
+      });
+      toast.success('Fixed Return referral override saved');
+      load();
+    } catch (e: any) {
+      toast.error(e?.message || 'Failed to save override');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="bg-bg-secondary border border-border-primary rounded-lg p-5">
+      <h2 className="text-base font-bold text-text-primary mb-1">Fixed Return referral commission</h2>
+      <p className="text-xxs text-text-tertiary mb-3">
+        Custom % this user earns for referring Fixed Return (AI Powered Staking) lockers.
+        Leave a field blank to use the global rate. Their payout mode is{' '}
+        <span className="text-text-secondary">{info.mode}</span> (commission applies to that leg).
+      </p>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div>
+          <label className="block text-xxs text-text-tertiary uppercase tracking-wide">Principal % override</label>
+          <input type="number" min="0" max="100" step="0.01" value={prin}
+            onChange={(e) => setPrin(e.target.value)}
+            placeholder={`Global: ${info.global_principal_pct}%`}
+            className="w-full mt-1 py-1.5 px-2 bg-bg-input border border-border-primary rounded-md text-sm text-text-primary" />
+        </div>
+        <div>
+          <label className="block text-xxs text-text-tertiary uppercase tracking-wide">Interest % override</label>
+          <input type="number" min="0" max="100" step="0.01" value={intr}
+            onChange={(e) => setIntr(e.target.value)}
+            placeholder={`Global: ${info.global_interest_pct}%`}
+            className="w-full mt-1 py-1.5 px-2 bg-bg-input border border-border-primary rounded-md text-sm text-text-primary" />
+        </div>
+      </div>
+      <div className="flex items-center gap-3 mt-3">
+        <button onClick={save} disabled={saving}
+          className="text-sm font-medium bg-accent text-white rounded-md px-3 py-1.5 disabled:opacity-50">
+          {saving ? 'Saving…' : 'Save'}
+        </button>
+        <button type="button" onClick={() => { setPrin(''); setIntr(''); }}
+          className="text-xs text-text-tertiary hover:text-text-primary underline">Clear both (use global)</button>
+      </div>
+    </div>
+  );
+}
+
 function kycColor(k: string) {
   switch (k?.toLowerCase()) {
     case 'verified': case 'approved': return 'bg-success/15 text-success';
@@ -343,6 +424,9 @@ export default function UserDetailPage() {
           currentRmName={data.assigned_rm_name}
           onSaved={fetchUser}
         />
+
+        {/* Per-referrer Fixed Return referral commission % override */}
+        <FrReferralOverrideCard userId={userId} />
 
         {/* Deposit history — how each deposit was made + which admin approved */}
         <div className="bg-bg-secondary border border-border-primary rounded-lg p-5">

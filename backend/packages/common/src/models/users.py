@@ -127,6 +127,11 @@ class User(Base):
     fr_referral_mode = Column(
         String(20), nullable=False, default="principal", server_default="principal",
     )
+    # Per-referrer OVERRIDE of the FR referral commission % (migration 0090).
+    # NULL = fall back to the global fr_referral_principal_pct / _interest_pct
+    # setting for that leg; a value pins a custom rate for THIS referrer only.
+    fr_referral_principal_pct_override = Column(Numeric(8, 4), nullable=True)
+    fr_referral_interest_pct_override = Column(Numeric(8, 4), nullable=True)
     # Per-IB pool of accumulated trade commissions from the MLM chain.
     # Lives on the IB's user row. Increments inside the IB engine on
     # each qualifying trade; "Transfer to Main Wallet" on /business

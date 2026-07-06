@@ -1,14 +1,16 @@
 """Admin Analytics Service — dashboard stats, exposure, profitable users."""
 from datetime import datetime, timedelta, timezone
+from decimal import Decimal, InvalidOperation
 
-from sqlalchemy import select, func, case
+from fastapi import HTTPException
+from sqlalchemy import select, func, case, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from packages.common.src.models import (
     User, Position, Order, Transaction, Deposit, Withdrawal,
     Instrument, PositionStatus, OrderSide, TradingAccount,
     TradeHistory, MasterAccount, IBProfile, IBCommission,
-    InvestorAllocation, CopyTrade, UserBonus,
+    InvestorAllocation, CopyTrade, UserBonus, PromotionalExpense,
 )
 
 
@@ -518,8 +520,57 @@ async def finance_overview(db: AsyncSession, start_date=None, end_date=None) -> 
         key=lambda x: x["amount"], reverse=True,
     )
 
+    # ── Promotional Expenses (money the broker GIVES OUT as incentive) ────
+    # Aggregated at read-time from existing ledgers so ALL history is covered
+    # with no changes to the pay-out code paths, plus manual admin-logged
+    # entries from promotional_expenses. Auto categories use the same promo+demo
+    # user exclusion as everything else (so the demo showcase account's seeded
+    # commissions don't count); manual entries are deliberate records and are
+    # summed as-is. referral_commission rows are split by description:
+    # '%staking%' = FR referral, '%bounty%' = normal referral (the '%withdrawn%'
+    # internal sweep rows match neither, so they're never double-counted).
+    pe_deposit_bonus = abs(float((await db.execute(
+        _xu(_dr(select(func.coalesce(func.sum(Transaction.amount), 0)).where(
+            Transaction.type == "bonus",
+        ), Transaction.created_at), Transaction.user_id)
+    )).scalar() or 0))
+    pe_fr_referral = abs(float((await db.execute(
+        _xu(_dr(select(func.coalesce(func.sum(Transaction.amount), 0)).where(
+            Transaction.type == "referral_commission",
+            func.lower(Transaction.description).like("%staking%"),
+        ), Transaction.created_at), Transaction.user_id)
+    )).scalar() or 0))
+    pe_referral_bounty = abs(float((await db.execute(
+        _xu(_dr(select(func.coalesce(func.sum(Transaction.amount), 0)).where(
+            Transaction.type == "referral_commission",
+            func.lower(Transaction.description).like("%bounty%"),
+        ), Transaction.created_at), Transaction.user_id)
+    )).scalar() or 0))
+    pe_ib_bounty = abs(float((await db.execute(
+        _xu(_dr(select(func.coalesce(func.sum(Transaction.amount), 0)).where(
+            Transaction.type == "ib_referral_bounty",
+        ), Transaction.created_at), Transaction.user_id)
+    )).scalar() or 0))
+    # Manual entries — deliberate admin records; summed as-is (no promo/demo
+    # exclusion, and NULL user_id "general" entries still count).
+    pe_manual = abs(float((await db.execute(
+        _dr(select(func.coalesce(func.sum(PromotionalExpense.amount), 0)),
+            PromotionalExpense.created_at)
+    )).scalar() or 0))
+
+    promo_expense_sources = [
+        {"key": "deposit_bonus",   "label": "Deposit / welcome bonuses",        "amount": round(pe_deposit_bonus, 2)},
+        {"key": "fr_referral",     "label": "Fixed Return referral commission", "amount": round(pe_fr_referral, 2)},
+        {"key": "referral_bounty", "label": "Referral bounties",                "amount": round(pe_referral_bounty, 2)},
+        {"key": "ib_bounty",       "label": "IB first-deposit bounties",        "amount": round(pe_ib_bounty, 2)},
+        {"key": "ib_commission",   "label": "IB trade commission",              "amount": round(ib_commission, 2)},
+        {"key": "manual",          "label": "Manual promotional entries",       "amount": round(pe_manual, 2)},
+    ]
+    promo_expense_total = round(sum(s["amount"] for s in promo_expense_sources), 2)
+
     return {
         "net_pnl": {"total": net_pnl_total, "sources": pnl_sources},
+        "promotional_expenses": {"total": promo_expense_total, "sources": promo_expense_sources},
         "deposits": {"total": dep_total, "by_method": dep_methods},
         "withdrawals": {"total": wd_total, "by_method": wd_methods},
         "net_credit": {
@@ -837,6 +888,60 @@ async def finance_overview_drill(
                 "count": int(cnt or 0),
             })
 
+    elif section == "promotional_expenses":
+        # Per-user total across every promotional-expense category + manual
+        # entries, mirroring the card's auto aggregate (same promo+demo
+        # exclusion; manual entries summed as-is).
+        acc: dict = {}
+
+        def _pe_add(uid, amt, cnt=1):
+            e = acc.setdefault(uid, {"amount": 0.0, "count": 0})
+            e["amount"] += abs(float(amt or 0))
+            e["count"] += int(cnt or 0)
+
+        for uid, amt, cnt in (await db.execute(
+            _xu(_dr(select(Transaction.user_id, func.coalesce(func.sum(Transaction.amount), 0), func.count(Transaction.id))
+                .where(Transaction.type == "bonus"), Transaction.created_at),
+                Transaction.user_id).group_by(Transaction.user_id)
+        )).all():
+            _pe_add(uid, amt, cnt)
+        for uid, amt, cnt in (await db.execute(
+            _xu(_dr(select(Transaction.user_id, func.coalesce(func.sum(Transaction.amount), 0), func.count(Transaction.id))
+                .where(Transaction.type == "referral_commission",
+                       or_(func.lower(Transaction.description).like("%staking%"),
+                           func.lower(Transaction.description).like("%bounty%"))),
+                Transaction.created_at), Transaction.user_id).group_by(Transaction.user_id)
+        )).all():
+            _pe_add(uid, amt, cnt)
+        for uid, amt, cnt in (await db.execute(
+            _xu(_dr(select(Transaction.user_id, func.coalesce(func.sum(Transaction.amount), 0), func.count(Transaction.id))
+                .where(Transaction.type == "ib_referral_bounty"), Transaction.created_at),
+                Transaction.user_id).group_by(Transaction.user_id)
+        )).all():
+            _pe_add(uid, amt, cnt)
+        for uid, amt, cnt in (await db.execute(
+            _xu(_dr(select(IBProfile.user_id, func.coalesce(func.sum(IBCommission.amount), 0), func.count(IBCommission.id))
+                .join(IBProfile, IBProfile.id == IBCommission.ib_id), IBCommission.created_at),
+                IBProfile.user_id).group_by(IBProfile.user_id)
+        )).all():
+            _pe_add(uid, amt, cnt)
+        for uid, amt, cnt in (await db.execute(
+            _dr(select(PromotionalExpense.user_id, func.coalesce(func.sum(PromotionalExpense.amount), 0), func.count(PromotionalExpense.id)),
+                PromotionalExpense.created_at).group_by(PromotionalExpense.user_id)
+        )).all():
+            _pe_add(uid, amt, cnt)
+
+        umap = await _user_label_map(db, [k for k in acc.keys() if k])
+        for uid, e in acc.items():
+            info = umap.get(uid, {})
+            users.append({
+                "user_id": str(uid) if uid else None,
+                "name": (info.get("name", "—") if uid else "General (no user)"),
+                "email": info.get("email"),
+                "amount": round(e["amount"], 2),
+                "count": e["count"],
+            })
+
     # Sorting: trading supports gainers (most profit first) / losers (most
     # loss first); everything else sorts by amount descending.
     if section == "trading" and sort == "losers":
@@ -852,6 +957,68 @@ async def finance_overview_drill(
         "sort": sort,
         "users": users,
         "total": round(sum(u["amount"] for u in users), 2),
+    }
+
+
+# ── Promotional Expenses — manual entries ─────────────────────────────────
+
+async def add_promotional_expense(
+    db: AsyncSession, *, admin_id, amount, category: str | None,
+    note: str | None, user_id=None,
+) -> dict:
+    """Log a manual promotional give-away (money the broker gave for promotion
+    that has no other ledger row). Admin-only; recorded in promotional_expenses
+    and surfaced in the Promotional Expenses card total."""
+    from dependencies import write_audit_log
+    try:
+        amt = Decimal(str(amount))
+    except (InvalidOperation, TypeError):
+        raise HTTPException(status_code=400, detail="Invalid amount")
+    if amt <= 0:
+        raise HTTPException(status_code=400, detail="Amount must be greater than zero")
+
+    row = PromotionalExpense(
+        user_id=user_id,
+        amount=amt,
+        category=((category or "manual").strip() or "manual")[:40],
+        note=(note or None),
+        created_by=admin_id,
+    )
+    db.add(row)
+    await db.flush()
+    await write_audit_log(
+        db, admin_id, "promo_expense_add", "promotional_expense", row.id,
+        new_values={
+            "amount": str(amt), "category": row.category,
+            "user_id": str(user_id) if user_id else None, "note": note,
+        },
+    )
+    await db.commit()
+    return {"id": str(row.id), "amount": float(row.amount), "category": row.category}
+
+
+async def list_promotional_expenses(db: AsyncSession, *, limit: int = 100) -> dict:
+    """Recent manual promotional-expense entries (for the card's manual list)."""
+    rows = (await db.execute(
+        select(PromotionalExpense)
+        .order_by(PromotionalExpense.created_at.desc())
+        .limit(max(1, min(limit, 500)))
+    )).scalars().all()
+    umap = await _user_label_map(db, [r.user_id for r in rows if r.user_id])
+    return {
+        "items": [
+            {
+                "id": str(r.id),
+                "user_id": str(r.user_id) if r.user_id else None,
+                "user_name": (umap.get(r.user_id, {}).get("name") if r.user_id else None),
+                "user_email": (umap.get(r.user_id, {}).get("email") if r.user_id else None),
+                "amount": float(r.amount or 0),
+                "category": r.category,
+                "note": r.note,
+                "created_at": r.created_at.isoformat() if r.created_at else None,
+            }
+            for r in rows
+        ]
     }
 
 

@@ -65,6 +65,37 @@ async def set_user_promotional(
     )
 
 
+class FrReferralOverrideBody(BaseModel):
+    # null on a leg = clear it (fall back to the global %).
+    principal_pct: float | None = None
+    interest_pct: float | None = None
+
+
+@router.get("/{user_id}/fr-referral-override")
+async def get_fr_referral_override(
+    user_id: uuid.UUID,
+    admin: User = Depends(require_permission("users.view")),
+    db: AsyncSession = Depends(get_db),
+):
+    """This referrer's custom FR referral-commission % (and the global defaults)."""
+    return await user_service.get_fr_referral_override(user_id=user_id, db=db)
+
+
+@router.post("/{user_id}/fr-referral-override")
+async def set_fr_referral_override(
+    user_id: uuid.UUID,
+    body: FrReferralOverrideBody,
+    admin: User = Depends(require_permission("users.add_fund")),
+    db: AsyncSession = Depends(get_db),
+):
+    """Set/clear a custom FR referral-commission % for this referrer. Send null
+    on a leg to clear it (that leg falls back to the global setting)."""
+    return await user_service.set_fr_referral_override(
+        user_id=user_id, principal_pct=body.principal_pct,
+        interest_pct=body.interest_pct, db=db,
+    )
+
+
 @router.get("/{user_id}/deposits")
 async def get_user_deposits(
     user_id: uuid.UUID,

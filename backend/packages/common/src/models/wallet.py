@@ -3,7 +3,7 @@ import uuid
 from datetime import datetime
 
 from sqlalchemy import (
-    Column, String, Boolean, Integer, DateTime, ForeignKey, Text, Numeric,
+    Column, String, Boolean, Integer, DateTime, Date, ForeignKey, Text, Numeric,
 )
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import relationship
@@ -50,6 +50,12 @@ class PaymentMethod(Base):
     declaration = Column(Text)     # step-4 checkbox text
     min_amount = Column(Numeric(18, 2))
     max_amount = Column(Numeric(18, 2))
+    # Admin-fixed FX rate for this method: USD per 1 unit of pay_currency
+    # (e.g. 0.012 for INR ⇒ 1 USD ≈ 83 INR). When set, the method uses it
+    # INSTEAD of the live FX API. NULL = live API (migration 0091). Deposit and
+    # withdrawal are priced separately so admin can set a spread between them.
+    usd_rate = Column(Numeric(18, 6), nullable=True)             # deposit leg
+    withdrawal_usd_rate = Column(Numeric(18, 6), nullable=True)  # withdrawal leg
     created_at = Column(DateTime(timezone=True), default=datetime.utcnow)
     updated_at = Column(DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -157,6 +163,48 @@ class Transaction(Base):
     description = Column(Text)
     created_by = Column(UUID(as_uuid=True), ForeignKey("users.id"))
     created_at = Column(DateTime(timezone=True), default=datetime.utcnow)
+
+
+class PromotionalExpense(Base):
+    """Admin-logged ad-hoc promotional give-away (migration 0088).
+
+    Holds ONLY manual entries an admin records for promotional pay-outs that
+    have no existing ledger row — e.g. off-matrix extra Fixed Return interest
+    or a custom benefit. Admin-only; never shown in a user's wallet history.
+    The Promotional Expenses card sums these on top of the read-time
+    aggregates over transactions / ib_commissions.
+    """
+    __tablename__ = "promotional_expenses"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    # The recipient of the give-away (nullable so a general promo cost can be
+    # logged without pinning it to one user).
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    amount = Column(Numeric(18, 2), nullable=False)
+    category = Column(String(40), nullable=False, default="manual", server_default="manual")
+    note = Column(Text)
+    created_by = Column(UUID(as_uuid=True), ForeignKey("users.id"))
+    created_at = Column(DateTime(timezone=True), default=datetime.utcnow)
+
+
+class CompanyExpense(Base):
+    """SwisDex operating-expense ledger (migration 0089).
+
+    A Tally/Excel-style running book of the broker's own business expenses
+    (rent, salaries, marketing, tools, …). Admin-managed CRUD; unrelated to
+    user money movement. Distinct from PromotionalExpense (user give-aways).
+    """
+    __tablename__ = "company_expenses"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    expense_date = Column(Date, nullable=False)
+    name = Column(String(200), nullable=False)
+    amount = Column(Numeric(18, 2), nullable=False)
+    reason = Column(Text)
+    result = Column(Text)
+    created_by = Column(UUID(as_uuid=True), ForeignKey("users.id"))
+    created_at = Column(DateTime(timezone=True), default=datetime.utcnow)
+    updated_at = Column(DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
 class ChargeConfig(Base):

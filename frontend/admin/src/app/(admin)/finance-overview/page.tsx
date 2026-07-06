@@ -12,13 +12,14 @@
  */
 import { useCallback, useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
-import { Loader2, X, TrendingUp, ArrowDownCircle, ArrowUpCircle, Gift, Lock, Clock, ChevronRight } from 'lucide-react';
+import { Loader2, X, TrendingUp, ArrowDownCircle, ArrowUpCircle, Gift, Lock, Clock, ChevronRight, Megaphone, Plus } from 'lucide-react';
 import { adminApi } from '@/lib/api';
 import DateField from '@/components/ui/DateField';
 
 interface Row { label?: string; method?: string; tenure?: string; month?: string; amount?: number; principal?: number; count?: number; key?: string }
 interface Overview {
   net_pnl: { total: number; sources: Row[] };
+  promotional_expenses: { total: number; sources: Row[] };
   deposits: { total: number; by_method: Row[] };
   withdrawals: { total: number; by_method: Row[] };
   net_credit: { total: number; bonus: number; account_credit: number; insurance_credited_lifetime: number };
@@ -143,6 +144,9 @@ export default function FinanceOverviewPage() {
   const [userDrill, setUserDrill] = useState<UserDrill>(null);
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
+  const [addOpen, setAddOpen] = useState(false);
+  const [addForm, setAddForm] = useState({ amount: '', category: 'extra_fr_interest', user_id: '', note: '' });
+  const [submitting, setSubmitting] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -159,6 +163,28 @@ export default function FinanceOverviewPage() {
     }
   }, [dateFrom, dateTo]);
   useEffect(() => { load(); }, [load]);
+
+  const submitExpense = async () => {
+    const amt = parseFloat(addForm.amount);
+    if (!amt || amt <= 0) { toast.error('Enter an amount greater than zero'); return; }
+    setSubmitting(true);
+    try {
+      await adminApi.post('/analytics/promotional-expenses', {
+        amount: amt,
+        category: addForm.category,
+        note: addForm.note.trim() || undefined,
+        user_id: addForm.user_id.trim() || undefined,
+      });
+      toast.success('Promotional expense logged');
+      setAddOpen(false);
+      setAddForm({ amount: '', category: 'extra_fr_interest', user_id: '', note: '' });
+      load();
+    } catch (e: any) {
+      toast.error(e?.message || 'Failed to add promotional expense');
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   if (loading && !data) {
     return <div className="flex items-center justify-center h-96"><Loader2 className="animate-spin text-text-tertiary" size={22} /></div>;
@@ -243,6 +269,44 @@ export default function FinanceOverviewPage() {
               </tr>
             </tbody>
           </table>
+        ),
+      },
+    },
+    {
+      title: 'Promotional Expenses', value: data.promotional_expenses.total, icon: Megaphone,
+      sub: 'Incentives given out', drill: {
+        title: 'Promotional Expenses — by category',
+        render: () => (
+          <div className="space-y-3">
+            <table className="w-full text-sm"><tbody>
+              {data.promotional_expenses.sources.map((s, i) => (
+                <tr key={i} className="border-t border-border-primary/50">
+                  <td className="py-2 text-text-primary">{s.label}</td>
+                  <td className="py-2 text-right font-mono text-text-primary">{fmt(s.amount)}</td>
+                </tr>
+              ))}
+              <tr className="border-t-2 border-border-primary font-bold">
+                <td className="py-2 text-text-primary">Total promotional spend</td>
+                <td className="py-2 text-right font-mono text-text-primary">{fmt(data.promotional_expenses.total)}</td>
+              </tr>
+            </tbody></table>
+            <div className="flex items-center justify-between">
+              <button
+                type="button"
+                onClick={() => setUserDrill({ title: 'Promotional Expenses — by user', section: 'promotional_expenses' })}
+                className="text-xs text-accent hover:underline inline-flex items-center gap-0.5"
+              >
+                View by user <ChevronRight size={11} />
+              </button>
+              <button
+                type="button"
+                onClick={() => { setDrill(null); setAddOpen(true); }}
+                className="text-xs inline-flex items-center gap-1 rounded-md border border-border-primary px-2.5 py-1.5 text-text-secondary hover:bg-bg-hover"
+              >
+                <Plus size={12} /> Add Promotional Expense
+              </button>
+            </div>
+          </div>
         ),
       },
     },
@@ -472,6 +536,74 @@ export default function FinanceOverviewPage() {
             </div>
             <div className="p-5">
               <UserBreakdown section={userDrill.section} method={userDrill.method} tenure={userDrill.tenure} initialSort={userDrill.sort} startDate={dateFrom} endDate={dateTo} />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add Promotional Expense modal */}
+      {addOpen && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/60" onClick={() => setAddOpen(false)} />
+          <div className="relative w-full max-w-md bg-bg-secondary border border-border-primary rounded-xl shadow-modal">
+            <div className="flex items-center justify-between px-5 py-3 border-b border-border-primary">
+              <h2 className="text-sm font-bold text-text-primary">Add Promotional Expense</h2>
+              <button onClick={() => setAddOpen(false)} className="p-1.5 rounded-md text-text-tertiary hover:bg-bg-hover hover:text-text-primary"><X size={16} /></button>
+            </div>
+            <div className="p-5 space-y-3">
+              <p className="text-xxs text-text-tertiary">
+                Log a give-away that has no other record (e.g. extra Fixed Return interest or a custom benefit).
+                It's added to the Promotional Expenses total. To also move money into a user's wallet, use Add Fund on the user page.
+              </p>
+              <div>
+                <label className="block text-xxs text-text-tertiary uppercase tracking-wide">Amount (USD) *</label>
+                <input
+                  type="number" min="0" step="0.01" value={addForm.amount}
+                  onChange={(e) => setAddForm({ ...addForm, amount: e.target.value })}
+                  className="w-full mt-1 rounded-md bg-bg-tertiary border border-border-primary px-3 py-2 text-sm text-text-primary font-mono"
+                  placeholder="0.00"
+                />
+              </div>
+              <div>
+                <label className="block text-xxs text-text-tertiary uppercase tracking-wide">Category</label>
+                <select
+                  value={addForm.category}
+                  onChange={(e) => setAddForm({ ...addForm, category: e.target.value })}
+                  className="w-full mt-1 rounded-md bg-bg-tertiary border border-border-primary px-3 py-2 text-sm text-text-primary"
+                >
+                  <option value="extra_fr_interest">Extra Fixed Return interest</option>
+                  <option value="fr_referral_bonus">Fixed Return referral bonus</option>
+                  <option value="custom_benefit">Custom promotional benefit</option>
+                  <option value="manual">Other</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xxs text-text-tertiary uppercase tracking-wide">Recipient user ID (optional)</label>
+                <input
+                  type="text" value={addForm.user_id}
+                  onChange={(e) => setAddForm({ ...addForm, user_id: e.target.value })}
+                  className="w-full mt-1 rounded-md bg-bg-tertiary border border-border-primary px-3 py-2 text-sm text-text-primary font-mono"
+                  placeholder="UUID (leave blank for a general promo cost)"
+                />
+              </div>
+              <div>
+                <label className="block text-xxs text-text-tertiary uppercase tracking-wide">Note</label>
+                <textarea
+                  value={addForm.note} rows={2}
+                  onChange={(e) => setAddForm({ ...addForm, note: e.target.value })}
+                  className="w-full mt-1 rounded-md bg-bg-tertiary border border-border-primary px-3 py-2 text-sm text-text-primary"
+                  placeholder="What was given and why"
+                />
+              </div>
+              <div className="flex justify-end gap-2 pt-1">
+                <button onClick={() => setAddOpen(false)} className="text-xs px-3 py-2 rounded-md border border-border-primary text-text-secondary hover:bg-bg-hover">Cancel</button>
+                <button
+                  onClick={submitExpense} disabled={submitting}
+                  className="text-xs px-3 py-2 rounded-md bg-accent text-white hover:opacity-90 disabled:opacity-50 inline-flex items-center gap-1"
+                >
+                  {submitting && <Loader2 size={12} className="animate-spin" />} Save
+                </button>
+              </div>
             </div>
           </div>
         </div>

@@ -26,6 +26,7 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
   { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { label: 'Finance Overview', href: '/finance-overview', icon: BarChart3, perm: 'analytics.finance' },
+  { label: 'SwisDex Expenses', href: '/swisdex-expenses', icon: Receipt, perm: 'analytics.finance' },
   { label: 'Users', href: '/users', icon: Users, perm: 'users.view' },
   {
     label: 'Identity verification',

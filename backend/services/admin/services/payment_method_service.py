@@ -25,6 +25,8 @@ def _serialize(m: PaymentMethod) -> dict:
         "declaration": m.declaration,
         "min_amount": float(m.min_amount) if m.min_amount is not None else None,
         "max_amount": float(m.max_amount) if m.max_amount is not None else None,
+        "usd_rate": float(m.usd_rate) if m.usd_rate is not None else None,
+        "withdrawal_usd_rate": float(m.withdrawal_usd_rate) if m.withdrawal_usd_rate is not None else None,
     }
 
 
@@ -48,7 +50,7 @@ def _apply(m: PaymentMethod, body: dict) -> None:
         if fld in body:
             v = body[fld]
             setattr(m, fld, (str(v).strip() or None) if v is not None else None)
-    for fld in ("min_amount", "max_amount"):
+    for fld in ("min_amount", "max_amount", "usd_rate", "withdrawal_usd_rate"):
         if fld in body:
             v = body[fld]
             setattr(m, fld, v if v not in (None, "") else None)

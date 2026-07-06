@@ -51,18 +51,20 @@ export default function DepositMethodsPage() {
       .catch(() => {});
   }, []);
 
-  // Live USD preview as the amount changes.
-  const refreshUsd = useCallback(async (cur: string, amt: string) => {
+  // Live USD preview as the amount changes. Passes method_id so a method with
+  // an admin-fixed rate previews at that fixed rate (not the live API).
+  const refreshUsd = useCallback(async (cur: string, amt: string, methodId?: string) => {
     const n = parseFloat(amt);
     if (!cur || Number.isNaN(n) || n <= 0) { setUsd(null); return; }
     try {
-      const q = await api.get<{ usd: number | null }>(`/wallet/deposit/fx-quote?currency=${encodeURIComponent(cur)}&amount=${n}`);
+      const mp = methodId ? `&method_id=${encodeURIComponent(methodId)}` : '';
+      const q = await api.get<{ usd: number | null }>(`/wallet/deposit/fx-quote?currency=${encodeURIComponent(cur)}&amount=${n}${mp}`);
       setUsd(typeof q?.usd === 'number' ? q.usd : null);
     } catch { setUsd(null); }
   }, []);
   useEffect(() => {
     if (step !== 'form' || !sel) return;
-    const t = setTimeout(() => void refreshUsd(sel.pay_currency, amount), 400);
+    const t = setTimeout(() => void refreshUsd(sel.pay_currency, amount, sel.id), 400);
     return () => clearTimeout(t);
   }, [amount, sel, step, refreshUsd]);
 

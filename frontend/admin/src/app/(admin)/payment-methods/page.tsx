@@ -23,6 +23,8 @@ interface Method {
   declaration?: string | null;
   min_amount?: number | null;
   max_amount?: number | null;
+  usd_rate?: number | null;
+  withdrawal_usd_rate?: number | null;
 }
 
 type Draft = Partial<Method> & { _new?: boolean };
@@ -31,6 +33,7 @@ const EMPTY: Draft = {
   _new: true, method_key: '', display_name: '', enabled: true, sort_order: 0,
   pay_currency: 'INR', qr_image: '', upi_id: '', bank_text: '', notice: '',
   declaration: '', min_amount: undefined, max_amount: undefined,
+  usd_rate: undefined, withdrawal_usd_rate: undefined,
 };
 
 export default function PaymentMethodsPage() {
@@ -73,6 +76,7 @@ export default function PaymentMethodsPage() {
         upi_id: draft.upi_id || null, bank_text: draft.bank_text || null,
         notice: draft.notice || null, declaration: draft.declaration || null,
         min_amount: draft.min_amount ?? null, max_amount: draft.max_amount ?? null,
+        usd_rate: draft.usd_rate ?? null, withdrawal_usd_rate: draft.withdrawal_usd_rate ?? null,
       };
       if (draft._new) await adminApi.post('/finance/payment-methods', body);
       else await adminApi.put(`/finance/payment-methods/${draft.id}`, body);
@@ -148,7 +152,14 @@ export default function PaymentMethodsPage() {
               {field('Sort order', <input type="number" value={draft.sort_order ?? 0} onChange={(e) => setDraft({ ...draft, sort_order: Number(e.target.value) })} className={inputCls} />)}
               {field('Min amount', <input type="number" value={draft.min_amount ?? ''} onChange={(e) => setDraft({ ...draft, min_amount: e.target.value === '' ? undefined : Number(e.target.value) })} className={inputCls} />)}
               {field('Max amount', <input type="number" value={draft.max_amount ?? ''} onChange={(e) => setDraft({ ...draft, max_amount: e.target.value === '' ? undefined : Number(e.target.value) })} className={inputCls} />)}
+              {field('Deposit USD rate', <input type="number" step="0.000001" value={draft.usd_rate ?? ''} onChange={(e) => setDraft({ ...draft, usd_rate: e.target.value === '' ? undefined : Number(e.target.value) })} placeholder="blank = live API" className={inputCls} />)}
+              {field('Withdrawal USD rate', <input type="number" step="0.000001" value={draft.withdrawal_usd_rate ?? ''} onChange={(e) => setDraft({ ...draft, withdrawal_usd_rate: e.target.value === '' ? undefined : Number(e.target.value) })} placeholder="blank = live API" className={inputCls} />)}
             </div>
+            <p className="text-[11px] text-text-tertiary -mt-1">
+              Rates = USD per 1 {draft.pay_currency || 'INR'} (e.g. 0.012). Blank = live FX API. Deposit &amp; withdrawal are priced separately.
+              {draft.usd_rate ? ` Deposit: 1 USD ≈ ${(1 / Number(draft.usd_rate)).toFixed(2)} ${draft.pay_currency || 'INR'}.` : ''}
+              {draft.withdrawal_usd_rate ? ` Withdrawal: 1 USD ≈ ${(1 / Number(draft.withdrawal_usd_rate)).toFixed(2)} ${draft.pay_currency || 'INR'}.` : ''}
+            </p>
             {field('UPI ID', <input value={draft.upi_id ?? ''} onChange={(e) => setDraft({ ...draft, upi_id: e.target.value })} placeholder="name@bank" className={inputCls} />)}
             {field('Bank details (account / IFSC / holder)', <textarea value={draft.bank_text ?? ''} onChange={(e) => setDraft({ ...draft, bank_text: e.target.value })} className={`${inputCls} h-16 resize-none`} />)}
             {field('QR image', <div><input type="file" accept="image/*" onChange={(e) => onQrFile(e.target.files?.[0] ?? null)} className="text-xs text-text-secondary" />{draft.qr_image ? <img src={draft.qr_image} alt="QR" className="mt-2 max-h-32 rounded border border-border-primary" /> : null}</div>)}
