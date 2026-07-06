@@ -10,6 +10,7 @@ import { useCallback, useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 import { Loader2, Plus, Trash2, Pencil, X, Receipt, Search } from 'lucide-react';
 import { adminApi } from '@/lib/api';
+import DateField from '@/components/ui/DateField';
 
 interface Expense {
   id: string;
@@ -142,13 +143,11 @@ export default function SwisDexExpensesPage() {
         </div>
         <div>
           <label className="block text-[10px] text-text-tertiary uppercase tracking-wide">From</label>
-          <input type="date" value={dateFrom} max={dateTo || undefined} onChange={(e) => setDateFrom(e.target.value)}
-            className="mt-0.5 py-2 px-2 rounded-md bg-bg-secondary border border-border-primary text-sm text-text-primary" />
+          <div className="mt-0.5"><DateField value={dateFrom} max={dateTo || undefined} onChange={setDateFrom} /></div>
         </div>
         <div>
           <label className="block text-[10px] text-text-tertiary uppercase tracking-wide">To</label>
-          <input type="date" value={dateTo} min={dateFrom || undefined} onChange={(e) => setDateTo(e.target.value)}
-            className="mt-0.5 py-2 px-2 rounded-md bg-bg-secondary border border-border-primary text-sm text-text-primary" />
+          <div className="mt-0.5"><DateField value={dateTo} min={dateFrom || undefined} onChange={setDateTo} /></div>
         </div>
         {isFiltered && (
           <button type="button" onClick={() => { setSearch(''); setDateFrom(''); setDateTo(''); }}
