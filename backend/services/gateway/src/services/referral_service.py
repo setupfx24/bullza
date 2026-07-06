@@ -579,8 +579,46 @@ async def get_my_referral_dashboard(db: AsyncSession, user_id: UUID) -> dict:
     kyc_required = await get_bool_setting("referral_requires_kyc", True)
     funded_required = await get_bool_setting("referral_requires_funded", True)
 
+    # Extra income = the promotional PREMIUM this user was paid ABOVE the
+    # standard rate via a per-user custom offer (logged in promotional_expenses,
+    # e.g. FR referral extra %). Shown as bonus/extra income on the /referral page.
+    from packages.common.src.models import PromotionalExpense
+    extra_income = float((await db.execute(
+        select(func.coalesce(func.sum(PromotionalExpense.amount), 0))
+        .where(PromotionalExpense.user_id == user_id)
+    )).scalar() or 0)
+    extra_rows = (await db.execute(
+        select(PromotionalExpense.amount, PromotionalExpense.note, PromotionalExpense.created_at)
+        .where(PromotionalExpense.user_id == user_id)
+        .order_by(PromotionalExpense.created_at.desc()).limit(50)
+    )).all()
+    extra_income_ledger = [
+        {
+            "amount": float(r.amount or 0),
+            "note": r.note or "Extra income",
+            "created_at": r.created_at.isoformat() if r.created_at else None,
+        }
+        for r in extra_rows
+    ]
+    # The user's EFFECTIVE FR referral % (their custom override if set, else the
+    # global) so the page can show the boosted rate they actually earn.
+    _g_prin = float(await get_float_setting("fr_referral_principal_pct", 0.0))
+    _g_int = float(await get_float_setting("fr_referral_interest_pct", 0.0))
+    _eff_prin = (
+        float(user.fr_referral_principal_pct_override)
+        if user.fr_referral_principal_pct_override is not None else _g_prin
+    )
+    _eff_int = (
+        float(user.fr_referral_interest_pct_override)
+        if user.fr_referral_interest_pct_override is not None else _g_int
+    )
+
     return {
         "referral_code": user.referral_code,
+        "extra_income": round(extra_income, 2),
+        "extra_income_ledger": extra_income_ledger,
+        "fr_referral_principal_pct_effective": _eff_prin,
+        "fr_referral_interest_pct_effective": _eff_int,
         "referrals": int(referrals),
         "qualified_referrals": int(qualified),
         "pending_referrals": int(max(0, int(referrals) - int(qualified))),

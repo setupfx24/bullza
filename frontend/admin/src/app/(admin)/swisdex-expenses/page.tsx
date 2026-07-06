@@ -8,7 +8,7 @@
  */
 import { useCallback, useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
-import { Loader2, Plus, Trash2, Pencil, X, Receipt } from 'lucide-react';
+import { Loader2, Plus, Trash2, Pencil, X, Receipt, Search } from 'lucide-react';
 import { adminApi } from '@/lib/api';
 
 interface Expense {
@@ -34,6 +34,10 @@ export default function SwisDexExpensesPage() {
   const [editing, setEditing] = useState<Expense | null>(null);
   const [form, setForm] = useState(emptyForm());
   const [saving, setSaving] = useState(false);
+  // Filters (applied client-side over the loaded ledger).
+  const [search, setSearch] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -97,6 +101,16 @@ export default function SwisDexExpensesPage() {
     }
   };
 
+  const q = search.trim().toLowerCase();
+  const filtered = rows.filter((e) => {
+    if (q && !(e.name || '').toLowerCase().includes(q)) return false;
+    if (dateFrom && (e.expense_date || '') < dateFrom) return false;
+    if (dateTo && (e.expense_date || '') > dateTo) return false;
+    return true;
+  });
+  const filteredTotal = filtered.reduce((s, e) => s + (e.amount || 0), 0);
+  const isFiltered = !!(q || dateFrom || dateTo);
+
   return (
     <div className="p-4 sm:p-6 space-y-4 max-w-6xl">
       <div className="flex items-center justify-between flex-wrap gap-2">
@@ -116,10 +130,38 @@ export default function SwisDexExpensesPage() {
         </button>
       </div>
 
+      {/* Filters — search by name, filter by date range */}
+      <div className="flex items-end gap-2 flex-wrap">
+        <div className="relative">
+          <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-tertiary" />
+          <input
+            type="text" value={search} onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search name…"
+            className="pl-7 pr-3 py-2 rounded-md bg-bg-secondary border border-border-primary text-sm text-text-primary min-w-[180px]"
+          />
+        </div>
+        <div>
+          <label className="block text-[10px] text-text-tertiary uppercase tracking-wide">From</label>
+          <input type="date" value={dateFrom} max={dateTo || undefined} onChange={(e) => setDateFrom(e.target.value)}
+            className="mt-0.5 py-2 px-2 rounded-md bg-bg-secondary border border-border-primary text-sm text-text-primary" />
+        </div>
+        <div>
+          <label className="block text-[10px] text-text-tertiary uppercase tracking-wide">To</label>
+          <input type="date" value={dateTo} min={dateFrom || undefined} onChange={(e) => setDateTo(e.target.value)}
+            className="mt-0.5 py-2 px-2 rounded-md bg-bg-secondary border border-border-primary text-sm text-text-primary" />
+        </div>
+        {isFiltered && (
+          <button type="button" onClick={() => { setSearch(''); setDateFrom(''); setDateTo(''); }}
+            className="text-xs text-text-tertiary hover:text-text-primary underline py-2">Clear</button>
+        )}
+      </div>
+
       <div className="rounded-xl border border-border-primary bg-bg-secondary overflow-hidden">
         <div className="flex items-center justify-between px-4 py-2.5 border-b border-border-primary bg-bg-tertiary/40">
-          <span className="text-xxs uppercase tracking-wide text-text-tertiary">Total expenses</span>
-          <span className="font-mono font-semibold text-text-primary">{fmt(total)}</span>
+          <span className="text-xxs uppercase tracking-wide text-text-tertiary">
+            {isFiltered ? `Filtered total (${filtered.length})` : 'Total expenses'}
+          </span>
+          <span className="font-mono font-semibold text-text-primary">{fmt(isFiltered ? filteredTotal : total)}</span>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm min-w-[720px]">
@@ -137,10 +179,12 @@ export default function SwisDexExpensesPage() {
               {loading && (
                 <tr><td colSpan={6} className="py-8 text-center"><Loader2 className="animate-spin inline text-text-tertiary" size={18} /></td></tr>
               )}
-              {!loading && rows.length === 0 && (
-                <tr><td colSpan={6} className="py-8 text-center text-text-tertiary text-xs">No expenses recorded yet.</td></tr>
+              {!loading && filtered.length === 0 && (
+                <tr><td colSpan={6} className="py-8 text-center text-text-tertiary text-xs">
+                  {isFiltered ? 'No expenses match your filters.' : 'No expenses recorded yet.'}
+                </td></tr>
               )}
-              {!loading && rows.map((e) => (
+              {!loading && filtered.map((e) => (
                 <tr key={e.id} className="border-b border-border-primary/50 hover:bg-bg-hover/30">
                   <td className="py-2.5 px-4 text-text-secondary whitespace-nowrap">{e.expense_date}</td>
                   <td className="py-2.5 px-4 text-text-primary">{e.name}</td>

@@ -21,6 +21,13 @@ interface ReferralDashboard {
   fr_referral_mode?: 'principal' | 'interest';
   fr_referral_principal_pct?: number;
   fr_referral_interest_pct?: number;
+  // The user's EFFECTIVE rate (custom override if admin set one, else global).
+  fr_referral_principal_pct_effective?: number;
+  fr_referral_interest_pct_effective?: number;
+  // Promotional EXTRA income — the premium paid above the standard rate via a
+  // custom per-user offer.
+  extra_income?: number;
+  extra_income_ledger?: { amount: number; note: string; created_at: string | null }[];
   // Per-entry commission breakdown — direct bounty vs AI-Powered-Staking, each
   // attributed to the referred user by name.
   commission_ledger?: CommissionLedgerEntry[];
@@ -177,6 +184,15 @@ export default function ReferralPage() {
             value={`$${fmt(head?.total_earned ?? 0)}`}
             tone="text-buy"
           />
+          {(head?.extra_income ?? 0) > 0 && (
+            <StatCard
+              icon={<Gift size={12} />}
+              label="Extra income"
+              value={`$${fmt(head?.extra_income ?? 0)}`}
+              tone="text-buy"
+              sub="bonus rate offered to you"
+            />
+          )}
         </section>
 
         {/* Withdraw bar — only when there's something to move */}

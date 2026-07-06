@@ -320,7 +320,18 @@ export const useTradingStore = create<TradingState>()((set, get) => ({
       positions: state.positions.map((pos) => {
         const pSym = String(pos.symbol || '').trim().toUpperCase();
         if (pSym !== sym) return pos;
-        const cp = pos.side === 'buy' ? normalized.bid : normalized.ask;
+        // Value floating P&L at the tick MID — the same "user close quote"
+        // basis the backend uses (trading_service.user_close_quote / list_positions),
+        // NOT the raw broadcast bid/ask. The broadcast carries the instrument
+        // spread, so pricing P&L off bid/ask made the frontend disagree with the
+        // backend by ~the spread and the number SNAPPED between the two on every
+        // refresh ("P&L jumping"). Mid matches the backend's close valuation
+        // (which is mid when no per-user spread is configured) so they stay in
+        // lockstep and the P&L stops flickering. Falls back to bid/ask if one
+        // side is missing.
+        const cp = (normalized.bid > 0 && normalized.ask > 0)
+          ? (normalized.bid + normalized.ask) / 2
+          : (pos.side === 'buy' ? normalized.bid : normalized.ask);
         const inst =
           state.instruments.find((i) => i.symbol === sym) ||
           state.instruments.find((i) => String(i.symbol).toUpperCase() === sym);

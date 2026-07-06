@@ -520,52 +520,34 @@ async def finance_overview(db: AsyncSession, start_date=None, end_date=None) -> 
         key=lambda x: x["amount"], reverse=True,
     )
 
-    # ── Promotional Expenses (money the broker GIVES OUT as incentive) ────
-    # Aggregated at read-time from existing ledgers so ALL history is covered
-    # with no changes to the pay-out code paths, plus manual admin-logged
-    # entries from promotional_expenses. Auto categories use the same promo+demo
-    # user exclusion as everything else (so the demo showcase account's seeded
-    # commissions don't count); manual entries are deliberate records and are
-    # summed as-is. referral_commission rows are split by description:
-    # '%staking%' = FR referral, '%bounty%' = normal referral (the '%withdrawn%'
-    # internal sweep rows match neither, so they're never double-counted).
-    pe_deposit_bonus = abs(float((await db.execute(
-        _xu(_dr(select(func.coalesce(func.sum(Transaction.amount), 0)).where(
-            Transaction.type == "bonus",
-        ), Transaction.created_at), Transaction.user_id)
-    )).scalar() or 0))
-    pe_fr_referral = abs(float((await db.execute(
-        _xu(_dr(select(func.coalesce(func.sum(Transaction.amount), 0)).where(
-            Transaction.type == "referral_commission",
-            func.lower(Transaction.description).like("%staking%"),
-        ), Transaction.created_at), Transaction.user_id)
-    )).scalar() or 0))
-    pe_referral_bounty = abs(float((await db.execute(
-        _xu(_dr(select(func.coalesce(func.sum(Transaction.amount), 0)).where(
-            Transaction.type == "referral_commission",
-            func.lower(Transaction.description).like("%bounty%"),
-        ), Transaction.created_at), Transaction.user_id)
-    )).scalar() or 0))
-    pe_ib_bounty = abs(float((await db.execute(
-        _xu(_dr(select(func.coalesce(func.sum(Transaction.amount), 0)).where(
-            Transaction.type == "ib_referral_bounty",
-        ), Transaction.created_at), Transaction.user_id)
-    )).scalar() or 0))
-    # Manual entries — deliberate admin records; summed as-is (no promo/demo
-    # exclusion, and NULL user_id "general" entries still count).
-    pe_manual = abs(float((await db.execute(
-        _dr(select(func.coalesce(func.sum(PromotionalExpense.amount), 0)),
-            PromotionalExpense.created_at)
-    )).scalar() or 0))
-
-    promo_expense_sources = [
-        {"key": "deposit_bonus",   "label": "Deposit / welcome bonuses",        "amount": round(pe_deposit_bonus, 2)},
-        {"key": "fr_referral",     "label": "Fixed Return referral commission", "amount": round(pe_fr_referral, 2)},
-        {"key": "referral_bounty", "label": "Referral bounties",                "amount": round(pe_referral_bounty, 2)},
-        {"key": "ib_bounty",       "label": "IB first-deposit bounties",        "amount": round(pe_ib_bounty, 2)},
-        {"key": "ib_commission",   "label": "IB trade commission",              "amount": round(ib_commission, 2)},
-        {"key": "manual",          "label": "Manual promotional entries",       "amount": round(pe_manual, 2)},
-    ]
+    # ── Promotional Expenses (ONLY the EXTRA above standard) ──────────────
+    # Read purely from the promotional_expenses ledger — the premium a user was
+    # paid ABOVE the standard rate via a per-user custom offer (e.g. FR referral
+    # extra %, auto-logged in _pay_fr_referral) plus manual admin entries. NOT
+    # the full commissions/bonuses (those are normal business cost, not
+    # promotional). These are deliberate expense records → summed as-is.
+    _PE_LABELS = {
+        "fr_referral_extra": "Fixed Return referral — extra %",
+        "extra_fr_interest": "Extra Fixed Return interest",
+        "fr_referral_bonus": "Fixed Return referral bonus",
+        "custom_benefit": "Custom promotional benefit",
+        "manual": "Manual entries",
+    }
+    pe_rows = (await db.execute(
+        _dr(select(PromotionalExpense.category, func.coalesce(func.sum(PromotionalExpense.amount), 0)),
+            PromotionalExpense.created_at).group_by(PromotionalExpense.category)
+    )).all()
+    promo_expense_sources = sorted(
+        [
+            {
+                "key": (cat or "manual"),
+                "label": _PE_LABELS.get(cat, (cat or "manual").replace("_", " ").title()),
+                "amount": round(float(amt or 0), 2),
+            }
+            for cat, amt in pe_rows
+        ],
+        key=lambda x: x["amount"], reverse=True,
+    )
     promo_expense_total = round(sum(s["amount"] for s in promo_expense_sources), 2)
 
     return {
@@ -889,57 +871,23 @@ async def finance_overview_drill(
             })
 
     elif section == "promotional_expenses":
-        # Per-user total across every promotional-expense category + manual
-        # entries, mirroring the card's auto aggregate (same promo+demo
-        # exclusion; manual entries summed as-is).
-        acc: dict = {}
-
-        def _pe_add(uid, amt, cnt=1):
-            e = acc.setdefault(uid, {"amount": 0.0, "count": 0})
-            e["amount"] += abs(float(amt or 0))
-            e["count"] += int(cnt or 0)
-
-        for uid, amt, cnt in (await db.execute(
-            _xu(_dr(select(Transaction.user_id, func.coalesce(func.sum(Transaction.amount), 0), func.count(Transaction.id))
-                .where(Transaction.type == "bonus"), Transaction.created_at),
-                Transaction.user_id).group_by(Transaction.user_id)
-        )).all():
-            _pe_add(uid, amt, cnt)
-        for uid, amt, cnt in (await db.execute(
-            _xu(_dr(select(Transaction.user_id, func.coalesce(func.sum(Transaction.amount), 0), func.count(Transaction.id))
-                .where(Transaction.type == "referral_commission",
-                       or_(func.lower(Transaction.description).like("%staking%"),
-                           func.lower(Transaction.description).like("%bounty%"))),
-                Transaction.created_at), Transaction.user_id).group_by(Transaction.user_id)
-        )).all():
-            _pe_add(uid, amt, cnt)
-        for uid, amt, cnt in (await db.execute(
-            _xu(_dr(select(Transaction.user_id, func.coalesce(func.sum(Transaction.amount), 0), func.count(Transaction.id))
-                .where(Transaction.type == "ib_referral_bounty"), Transaction.created_at),
-                Transaction.user_id).group_by(Transaction.user_id)
-        )).all():
-            _pe_add(uid, amt, cnt)
-        for uid, amt, cnt in (await db.execute(
-            _xu(_dr(select(IBProfile.user_id, func.coalesce(func.sum(IBCommission.amount), 0), func.count(IBCommission.id))
-                .join(IBProfile, IBProfile.id == IBCommission.ib_id), IBCommission.created_at),
-                IBProfile.user_id).group_by(IBProfile.user_id)
-        )).all():
-            _pe_add(uid, amt, cnt)
-        for uid, amt, cnt in (await db.execute(
-            _dr(select(PromotionalExpense.user_id, func.coalesce(func.sum(PromotionalExpense.amount), 0), func.count(PromotionalExpense.id)),
+        # Per-user total from the promotional_expenses ledger only (override
+        # extras + manual entries) — same source as the card.
+        rows = (await db.execute(
+            _dr(select(PromotionalExpense.user_id,
+                       func.coalesce(func.sum(PromotionalExpense.amount), 0),
+                       func.count(PromotionalExpense.id)),
                 PromotionalExpense.created_at).group_by(PromotionalExpense.user_id)
-        )).all():
-            _pe_add(uid, amt, cnt)
-
-        umap = await _user_label_map(db, [k for k in acc.keys() if k])
-        for uid, e in acc.items():
+        )).all()
+        umap = await _user_label_map(db, [r[0] for r in rows if r[0]])
+        for uid, amt, cnt in rows:
             info = umap.get(uid, {})
             users.append({
                 "user_id": str(uid) if uid else None,
                 "name": (info.get("name", "—") if uid else "General (no user)"),
                 "email": info.get("email"),
-                "amount": round(e["amount"], 2),
-                "count": e["count"],
+                "amount": round(abs(float(amt or 0)), 2),
+                "count": int(cnt or 0),
             })
 
     # Sorting: trading supports gainers (most profit first) / losers (most

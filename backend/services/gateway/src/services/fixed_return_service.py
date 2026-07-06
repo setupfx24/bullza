@@ -246,20 +246,21 @@ async def _pay_fr_referral(
         mode = (referrer.fr_referral_mode or "principal").lower()
         if mode != kind:
             return
-        # Per-referrer override wins over the global setting for this leg
-        # (migration 0090). NULL override → fall back to the global %.
+        # The GLOBAL (standard) % everyone gets, and the per-referrer OVERRIDE
+        # (migration 0090). The referrer is paid at the override when set; the
+        # PORTION ABOVE the standard % is a promotional EXPENSE (extra income to
+        # the user, logged for admin's Promotional Expenses).
+        setting = "fr_referral_principal_pct" if kind == "principal" else "fr_referral_interest_pct"
+        global_pct = Decimal(str(await get_float_setting(setting, 0.0)))
         override = (
             referrer.fr_referral_principal_pct_override if kind == "principal"
             else referrer.fr_referral_interest_pct_override
         )
-        if override is not None:
-            pct = Decimal(str(override))
-        else:
-            setting = "fr_referral_principal_pct" if kind == "principal" else "fr_referral_interest_pct"
-            pct = Decimal(str(await get_float_setting(setting, 0.0)))
+        pct = Decimal(str(override)) if override is not None else global_pct
         if pct <= 0:
             return
-        commission = (Decimal(str(basis_amount)) * pct / Decimal("100")).quantize(Decimal("0.01"))
+        basis = Decimal(str(basis_amount))
+        commission = (basis * pct / Decimal("100")).quantize(Decimal("0.01"))
         if commission <= 0:
             return
         referrer.referral_commission_balance = (
@@ -275,6 +276,25 @@ async def _pay_fr_referral(
                 f"{'principal' if kind == 'principal' else 'interest payout'}"
             ),
         ))
+        # Promotional extra = the premium above the standard rate (only when the
+        # referrer has a boosted override). Logged as a PromotionalExpense so it
+        # shows in admin's Promotional Expenses AND as the user's extra income.
+        extra_pct = pct - global_pct
+        if extra_pct > 0:
+            extra = (basis * extra_pct / Decimal("100")).quantize(Decimal("0.01"))
+            if extra > 0:
+                from packages.common.src.models import PromotionalExpense
+                db.add(PromotionalExpense(
+                    user_id=referrer.id,
+                    amount=extra,
+                    category="fr_referral_extra",
+                    note=(
+                        f"AI Powered Staking referral — extra {extra_pct}% "
+                        f"(paid {pct}% vs standard {global_pct}%) on "
+                        f"{'principal' if kind == 'principal' else 'interest payout'} "
+                        f"from {referred_display}"
+                    ),
+                ))
     except Exception as _e:  # noqa: BLE001
         logger.warning("AI-Staking referral payout (%s) failed: %s", kind, _e)
 
