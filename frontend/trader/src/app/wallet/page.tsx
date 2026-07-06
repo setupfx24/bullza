@@ -1675,15 +1675,17 @@ function WalletPageContent() {
                     <>
                       <div>
                         <p className="text-xs text-text-tertiary mb-3 font-medium uppercase tracking-wide">Payment Method</p>
-                        {/* Featured selected coin */}
-                        <div className="rounded-xl border border-border-primary bg-bg-secondary p-4 mb-2">
+                        {/* Featured selected coin — highlighted green so the
+                            chosen method is clearly the selected one. */}
+                        <div className="rounded-xl border-2 border-buy bg-buy/[0.08] p-4 mb-2 flex items-center justify-between gap-2">
                           <p className="text-base font-bold text-text-primary font-mono flex items-center gap-2.5">
-                            <span className="text-xl leading-none" aria-hidden>◆</span>
+                            <span className="text-xl leading-none text-buy" aria-hidden>◆</span>
                             <span>
                               {selectedWithdrawCrypto.label}{' '}
                               <span className="text-text-tertiary text-sm font-normal">({selectedWithdrawCrypto.sub})</span>
                             </span>
                           </p>
+                          <span className="shrink-0 text-[11px] font-semibold text-buy uppercase tracking-wide">Selected</span>
                         </div>
                         <div className="grid grid-cols-2 gap-2">
                           {CRYPTO_ASSETS.filter((c) => c.id !== selectedCryptoWithdraw).map((c) => (
