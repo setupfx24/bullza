@@ -50,9 +50,10 @@ class PaymentMethod(Base):
     declaration = Column(Text)     # step-4 checkbox text
     min_amount = Column(Numeric(18, 2))
     max_amount = Column(Numeric(18, 2))
-    # Admin-fixed FX rate for this method: USD per 1 unit of pay_currency
-    # (e.g. 0.012 for INR ⇒ 1 USD ≈ 83 INR). When set, the method uses it
-    # INSTEAD of the live FX API. NULL = live API (migration 0091). Deposit and
+    # Admin-fixed rate = the DOLLAR PRICE: how many pay_currency units make 1
+    # USD (e.g. 83 ⇒ 1 USD = 83 INR). When set, the method uses it INSTEAD of
+    # the live FX API. Deposit credits amount/rate (5000 INR ÷ 83 ≈ $60);
+    # withdrawal pays usd×rate. NULL = live API (migration 0091). Deposit and
     # withdrawal are priced separately so admin can set a spread between them.
     usd_rate = Column(Numeric(18, 6), nullable=True)             # deposit leg
     withdrawal_usd_rate = Column(Numeric(18, 6), nullable=True)  # withdrawal leg

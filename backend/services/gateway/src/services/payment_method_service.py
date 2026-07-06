@@ -53,26 +53,30 @@ async def get_method(method_id: UUID, db: AsyncSession) -> dict | None:
 
 async def quote(currency: str, amount, db: AsyncSession, method_id: UUID | None = None) -> dict:
     """Rate + the USD a `currency` amount would credit. If `method_id` names a
-    method with an admin-fixed usd_rate, that fixed rate is used INSTEAD of the
-    live API. usd is null when no rate is available (API down + no fallback)."""
-    rate = None
+    method with an admin-fixed rate, that is used INSTEAD of the live API.
+
+    The admin-fixed `usd_rate` is the DOLLAR PRICE = how many LOCAL units make
+    1 USD (e.g. 83 → 1 USD = 83 INR). We invert it to USD-per-unit (1/83) so the
+    credited USD = amount / dollar_price (5000 INR ÷ 83 ≈ $60.24). usd is null
+    when no rate is available."""
+    usd_per_unit = None  # USD value of 1 local unit
     if method_id is not None:
         m = (await db.execute(
             select(PaymentMethod).where(PaymentMethod.id == method_id)
         )).scalar_one_or_none()
-        if m is not None and m.usd_rate is not None:
-            rate = Decimal(str(m.usd_rate))
-    if rate is None:
-        rate = await fx_rate.usd_per_unit(currency)
+        if m is not None and m.usd_rate is not None and Decimal(str(m.usd_rate)) > 0:
+            usd_per_unit = Decimal("1") / Decimal(str(m.usd_rate))  # 1 / dollar-price
+    if usd_per_unit is None:
+        usd_per_unit = await fx_rate.usd_per_unit(currency)
     usd = None
-    if rate is not None and amount is not None:
+    if usd_per_unit is not None and amount is not None:
         try:
-            usd = float((Decimal(str(amount)) * rate).quantize(Decimal("0.01")))
+            usd = float((Decimal(str(amount)) * usd_per_unit).quantize(Decimal("0.01")))
         except Exception:
             usd = None
     return {
         "currency": (currency or "USD").upper(),
-        "usd_per_unit": float(rate) if rate is not None else None,
+        "usd_per_unit": float(usd_per_unit) if usd_per_unit is not None else None,
         "usd": usd,
     }
 
@@ -83,8 +87,10 @@ async def withdrawal_quote(usd_amount, db: AsyncSession) -> dict:
     (USD per 1 unit) when set, else the live API. The withdrawal itself still
     settles in USD — this is the informational 'you'll receive ≈ X' estimate.
 
-    Rate source: the enabled non-USD method that has a withdrawal_usd_rate set
-    (the 'Bank' method); otherwise the first enabled non-USD method (live API)."""
+    The admin-fixed `withdrawal_usd_rate` is the DOLLAR PRICE = local units per
+    1 USD (e.g. 85 → 1 USD = 85 INR), so local = usd × dollar_price. Rate source:
+    the enabled non-USD method that has a withdrawal_usd_rate set (the 'Bank'
+    method); otherwise the first enabled non-USD method (live API)."""
     methods = (await db.execute(
         select(PaymentMethod).where(PaymentMethod.enabled == True)  # noqa: E712
         .order_by(PaymentMethod.sort_order, PaymentMethod.display_name)
@@ -97,19 +103,22 @@ async def withdrawal_quote(usd_amount, db: AsyncSession) -> dict:
         return {"currency": None, "usd_per_unit": None, "local_amount": None}
 
     currency = (method.pay_currency or "INR").upper()
-    if method.withdrawal_usd_rate is not None:
-        rate = Decimal(str(method.withdrawal_usd_rate))          # USD per 1 unit
-    else:
-        rate = await fx_rate.usd_per_unit(currency)
     local = None
-    if rate and rate > 0 and usd_amount is not None:
+    dollar_price = None  # local units per 1 USD
+    if method.withdrawal_usd_rate is not None and Decimal(str(method.withdrawal_usd_rate)) > 0:
+        dollar_price = Decimal(str(method.withdrawal_usd_rate))
+    else:
+        upu = await fx_rate.usd_per_unit(currency)  # USD per 1 unit
+        if upu and upu > 0:
+            dollar_price = Decimal("1") / upu
+    if dollar_price and usd_amount is not None:
         try:
-            local = float((Decimal(str(usd_amount)) / rate).quantize(Decimal("0.01")))
+            local = float((Decimal(str(usd_amount)) * dollar_price).quantize(Decimal("0.01")))
         except Exception:
             local = None
     return {
         "currency": currency,
-        "usd_per_unit": float(rate) if rate else None,
+        "usd_per_unit": float(Decimal("1") / dollar_price) if dollar_price else None,
         "local_amount": local,
     }
 
@@ -144,9 +153,11 @@ async def create_method_deposit(
     if method.max_amount is not None and amt > Decimal(str(method.max_amount)):
         raise HTTPException(status_code=400, detail=f"Maximum is {method.max_amount} {method.pay_currency}")
 
-    # Admin-fixed rate for this method wins over the live API (client 2026-07-04).
-    if method.usd_rate is not None:
-        usd = (amt * Decimal(str(method.usd_rate))).quantize(Decimal("0.01"))
+    # Admin-fixed rate wins over the live API. usd_rate is the DOLLAR PRICE
+    # (local units per 1 USD, e.g. 83), so credited USD = amount / dollar_price
+    # (5000 INR ÷ 83 ≈ $60.24), NOT amount × rate (client 2026-07-06 fix).
+    if method.usd_rate is not None and Decimal(str(method.usd_rate)) > 0:
+        usd = (amt / Decimal(str(method.usd_rate))).quantize(Decimal("0.01"))
     else:
         usd = await fx_rate.convert_to_usd(amt, method.pay_currency or "INR")
     if usd is None or usd <= 0:

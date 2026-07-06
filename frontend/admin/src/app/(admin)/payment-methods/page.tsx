@@ -152,13 +152,13 @@ export default function PaymentMethodsPage() {
               {field('Sort order', <input type="number" value={draft.sort_order ?? 0} onChange={(e) => setDraft({ ...draft, sort_order: Number(e.target.value) })} className={inputCls} />)}
               {field('Min amount', <input type="number" value={draft.min_amount ?? ''} onChange={(e) => setDraft({ ...draft, min_amount: e.target.value === '' ? undefined : Number(e.target.value) })} className={inputCls} />)}
               {field('Max amount', <input type="number" value={draft.max_amount ?? ''} onChange={(e) => setDraft({ ...draft, max_amount: e.target.value === '' ? undefined : Number(e.target.value) })} className={inputCls} />)}
-              {field('Deposit USD rate', <input type="number" step="0.000001" value={draft.usd_rate ?? ''} onChange={(e) => setDraft({ ...draft, usd_rate: e.target.value === '' ? undefined : Number(e.target.value) })} placeholder="blank = live API" className={inputCls} />)}
-              {field('Withdrawal USD rate', <input type="number" step="0.000001" value={draft.withdrawal_usd_rate ?? ''} onChange={(e) => setDraft({ ...draft, withdrawal_usd_rate: e.target.value === '' ? undefined : Number(e.target.value) })} placeholder="blank = live API" className={inputCls} />)}
+              {field(`Deposit: 1 USD = ? ${draft.pay_currency || 'INR'}`, <input type="number" step="0.01" min="0" value={draft.usd_rate ?? ''} onChange={(e) => setDraft({ ...draft, usd_rate: e.target.value === '' ? undefined : Number(e.target.value) })} placeholder="e.g. 83 (blank = live)" className={inputCls} />)}
+              {field(`Withdrawal: 1 USD = ? ${draft.pay_currency || 'INR'}`, <input type="number" step="0.01" min="0" value={draft.withdrawal_usd_rate ?? ''} onChange={(e) => setDraft({ ...draft, withdrawal_usd_rate: e.target.value === '' ? undefined : Number(e.target.value) })} placeholder="e.g. 85 (blank = live)" className={inputCls} />)}
             </div>
             <p className="text-[11px] text-text-tertiary -mt-1">
-              Rates = USD per 1 {draft.pay_currency || 'INR'} (e.g. 0.012). Blank = live FX API. Deposit &amp; withdrawal are priced separately.
-              {draft.usd_rate ? ` Deposit: 1 USD ≈ ${(1 / Number(draft.usd_rate)).toFixed(2)} ${draft.pay_currency || 'INR'}.` : ''}
-              {draft.withdrawal_usd_rate ? ` Withdrawal: 1 USD ≈ ${(1 / Number(draft.withdrawal_usd_rate)).toFixed(2)} ${draft.pay_currency || 'INR'}.` : ''}
+              Enter the <b>dollar price</b> — how many {draft.pay_currency || 'INR'} equal 1 USD (e.g. 83). Blank = live FX API. Deposit &amp; withdrawal priced separately.
+              {draft.usd_rate ? ` Deposit: 5000 ${draft.pay_currency || 'INR'} → $${(5000 / Number(draft.usd_rate)).toFixed(2)}.` : ''}
+              {draft.withdrawal_usd_rate ? ` Withdrawal: $100 → ${(100 * Number(draft.withdrawal_usd_rate)).toFixed(2)} ${draft.pay_currency || 'INR'}.` : ''}
             </p>
             {field('UPI ID', <input value={draft.upi_id ?? ''} onChange={(e) => setDraft({ ...draft, upi_id: e.target.value })} placeholder="name@bank" className={inputCls} />)}
             {field('Bank details (account / IFSC / holder)', <textarea value={draft.bank_text ?? ''} onChange={(e) => setDraft({ ...draft, bank_text: e.target.value })} className={`${inputCls} h-16 resize-none`} />)}
