@@ -121,6 +121,20 @@ async def notifications_summary(
         fr_withdrawals = 0
         fr_new_locks = 0
 
+    # Trader-submitted "Request to RM" forms (mail-to-RM). Persisted in
+    # rm_manual_requests; admins want a bell ping for each new one so they
+    # don't rely on email alone. Count only status='new' (unhandled). Own
+    # savepoint so a pre-migration missing table can't poison the session.
+    rm_manual_new = 0
+    try:
+        async with db.begin_nested():
+            rm_manual_q = await db.execute(
+                text("SELECT COUNT(*) FROM rm_manual_requests WHERE status = 'new'")
+            )
+            rm_manual_new = int(rm_manual_q.scalar() or 0)
+    except Exception:
+        rm_manual_new = 0
+
     # `link` values are admin-frontend route paths. Withdrawals share the
     # /deposits page (tab=withdrawals); approvals get their own page; the
     # rest map 1:1 to existing routes.
@@ -131,6 +145,8 @@ async def notifications_summary(
          "label": "Approval requests", "link": "/approvals", "severity": "critical"},
         {"kind": "rm_funding",  "count": rm_pending, "perm": "rm.manage",
          "label": "RM funding requests", "link": "/rm-requests", "severity": "critical"},
+        {"kind": "rm_manual",   "count": rm_manual_new, "perm": "rm.manage",
+         "label": "New RM requests", "link": "/rm-manual-requests", "severity": "critical"},
         {"kind": "fixed_return_withdrawals", "count": fr_withdrawals, "perm": "fixed_return.view",
          "label": "Fixed-Return withdrawal requests", "link": "/config/fixed-return", "severity": "critical"},
         {"kind": "deposits",    "count": pending_deposits, "perm": "deposits.view",
