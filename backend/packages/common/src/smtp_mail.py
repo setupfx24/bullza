@@ -84,6 +84,24 @@ def smtp_configured() -> bool:
     return bool(s.SMTP_HOST and str(s.SMTP_HOST).strip())
 
 
+# Reserved / non-routable domains that can NEVER receive real mail (RFC 2606 /
+# RFC 6761) plus our own demo-account domain. Sending to these always produces
+# a "Undelivered Mail Returned to Sender" bounce that lands back in the sender
+# inbox and, in volume, hurts sender reputation (real mail starts landing in
+# spam). The demo downline seeded for the promo account use
+# `@swisdex-promo.local`, which is why the inbox filled with bounces. We drop
+# these at the single send choke point instead of attempting delivery.
+_UNDELIVERABLE_SUFFIXES = (
+    ".local", ".localhost", ".invalid", ".test", ".example",
+    "@example.com", "@example.net", "@example.org",
+)
+
+
+def _is_undeliverable(to_email: str) -> bool:
+    addr = (to_email or "").strip().lower()
+    return any(addr.endswith(sfx) for sfx in _UNDELIVERABLE_SUFFIXES)
+
+
 # ── Per-category From aliases ─────────────────────────────────────────
 # Callers pass a `category=` keyword to `send_email`. The category is
 # mapped to a settings field; if that field is blank, we fall through
@@ -258,6 +276,12 @@ async def send_email(
         return False
     if not to_email or "@" not in to_email:
         logger.warning("Skipping email — bad recipient %r", to_email)
+        return False
+    # Demo / reserved domains (e.g. the @swisdex-promo.local downline) never
+    # deliver — sending only generates bounce-backs to the sender inbox. Skip
+    # silently (info log, not warning) so demo data doesn't pollute the queue.
+    if _is_undeliverable(to_email):
+        logger.info("Skipping email — non-deliverable/demo recipient %s subj=%r", to_email, subject)
         return False
     try:
         await asyncio.to_thread(_send_sync, to_email, subject, html, text, category)
