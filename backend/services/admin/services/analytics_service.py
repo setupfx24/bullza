@@ -445,8 +445,15 @@ async def finance_overview(db: AsyncSession, start_date=None, end_date=None) -> 
         # from lock start until today (capped at maturity / projected total).
         td = int(lk.tenure_days or 30) or 30
         daily_interest = p * float(lk.rate_pct or 0) / 100.0 / td
+        # locked_at comes back tz-NAIVE from the DB (like every other datetime
+        # here); subtracting it from the aware _now raises TypeError, which the
+        # bare except swallowed → days_elapsed=0 → accrued was ALWAYS $0. Coerce
+        # to UTC-aware first, exactly like the rest of the codebase does.
         try:
-            days_elapsed = max(0, (_now - lk.locked_at).days) if lk.locked_at else 0
+            _la = lk.locked_at
+            if _la is not None and _la.tzinfo is None:
+                _la = _la.replace(tzinfo=timezone.utc)
+            days_elapsed = max(0, (_now - _la).days) if _la else 0
         except Exception:
             days_elapsed = 0
         total_days = max(1, cycles * td)
