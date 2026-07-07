@@ -305,8 +305,8 @@ export default function ReferralPage() {
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               {([
-                { mode: 'principal' as const, label: 'On principal', pct: head.fr_referral_principal_pct ?? 0, desc: 'Paid once when they lock — % of their principal.' },
-                { mode: 'interest' as const, label: 'On interest', pct: head.fr_referral_interest_pct ?? 0, desc: 'Paid on every interest payout — % of each payout.' },
+                { mode: 'principal' as const, label: 'On principal', pct: head.fr_referral_principal_pct_effective ?? head.fr_referral_principal_pct ?? 0, desc: 'Paid once when they lock — % of their principal.' },
+                { mode: 'interest' as const, label: 'On interest', pct: head.fr_referral_interest_pct_effective ?? head.fr_referral_interest_pct ?? 0, desc: 'Paid on every interest payout — % of each payout.' },
               ]).map((opt) => {
                 const active = (head.fr_referral_mode ?? 'principal') === opt.mode;
                 return (
