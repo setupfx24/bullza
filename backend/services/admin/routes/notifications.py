@@ -67,11 +67,15 @@ async def notifications_summary(
     # Filtering out approvals the *current* admin requested themselves
     # because the rules already block self-approval; surfacing them in the
     # bell would just be noise.
+    # Must match the Approvals page filter exactly (approvals.py list_pending):
+    # status='pending' AND not expired. Without the expires_at guard the bell
+    # counted stale EXPIRED approvals the page hides — "4 in bell, 0 on page".
     approval_q = await db.execute(
         text(
             """
             SELECT COUNT(*) FROM admin_approval_requests
-            WHERE status = 'pending' AND requested_by <> :me
+            WHERE status = 'pending' AND expires_at > NOW()
+              AND requested_by <> :me
             """
         ),
         {"me": str(admin.id)},
