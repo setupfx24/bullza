@@ -65,6 +65,7 @@ interface ReferralUser {
   trades: number;
   commission_generated: number;
   joined_at: string | null;
+  is_ib?: boolean;
 }
 
 interface UnassignedUser {
@@ -860,7 +861,12 @@ export default function IBPage() {
                               {ibReferrals.map((u) => (
                                 <div key={u.user_id} className="flex items-center justify-between px-3 py-2.5 border-b border-border-primary/50 hover:bg-bg-hover transition-fast">
                                   <div className="min-w-0">
-                                    <p className="text-xs text-text-primary truncate">{u.name || u.email}</p>
+                                    <div className="flex items-center gap-1.5 min-w-0">
+                                      <p className="text-xs text-text-primary truncate">{u.name || u.email}</p>
+                                      {u.is_ib && (
+                                        <span className="shrink-0 text-xxs px-1.5 py-0.5 rounded-sm bg-buy/10 text-buy border border-buy/20">sub-IB</span>
+                                      )}
+                                    </div>
                                     <p className="text-xxs text-text-tertiary truncate">{u.email}</p>
                                     <p className="text-xxs text-text-tertiary mt-0.5">{u.trades} trade{u.trades !== 1 ? 's' : ''} · ${formatMoney(u.commission_generated)} comm.</p>
                                   </div>
