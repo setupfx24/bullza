@@ -51,6 +51,13 @@ function loadChartingLibrary(): Promise<void> {
 // settings, timeframe) — survives page refreshes.
 const CHART_SAVE_KEY = 'swisdex_chart_layout_v1';
 
+// Stale-price thresholds (ms): how long without a tick before a position
+// line's P&L is treated as stale. Crypto trades 24/7 (short), forex/metals
+// are quiet at weekends (long so we don't spam "stale" when no ticks are
+// expected), otherwise a normal live-market threshold.
+const STALE_MS = { crypto: 3000, normal: 5000, weekendClosed: 60000 };
+const STALE_COLOR = '#6b7280';
+
 export default function ChartingLibraryChart() {
   const selectedSymbol = useTradingStore((s) => s.selectedSymbol);
   const positions = useTradingStore((s) => s.positions);
@@ -328,6 +335,67 @@ export default function ChartingLibraryChart() {
       }
     }
   }, [positions, pendingOrders, selectedSymbol, ready]);
+
+  // Stale-price watchdog. The reconcile above only runs when `positions`
+  // changes — i.e. on a tick — so if the feed stalls it simply STOPS and the
+  // last P&L freezes silently. This 1s interval independently detects "no tick
+  // for the selected symbol in > threshold" and greys the position entry lines
+  // to "... | -- (stale)". Recovery is automatic: the next tick re-runs the
+  // reconcile, which restores the live P&L label + colour. Hooks the EXISTING
+  // store stream (no new subscription); cleans up on unmount / symbol switch.
+  useEffect(() => {
+    const w = widgetRef.current;
+    if (!ready || !w?.activeChart) return;
+    let chart: any;
+    try { chart = w.activeChart(); } catch { return; }
+    if (!chart?.getShapeById) return;
+    const sym = (selectedSymbol || '').toUpperCase();
+    const inst = useTradingStore.getState().instruments.find(
+      (i) => String(i.symbol).toUpperCase() === sym,
+    );
+    const isCrypto = String(inst?.segment || '').toLowerCase() === 'crypto'
+      || /BTC|ETH|USDT|XRP|SOL|LTC|DOGE|BNB/.test(sym);
+    const day = new Date().getUTCDay(); // 0 Sun … 6 Sat
+    const isWeekend = day === 0 || day === 6;
+    const threshold = isCrypto
+      ? STALE_MS.crypto
+      : (isWeekend ? STALE_MS.weekendClosed : STALE_MS.normal);
+
+    // Track last-tick receive time for THIS symbol via the existing store
+    // stream. prices[sym] gets a fresh object reference on every tick.
+    let lastPrice = useTradingStore.getState().prices[sym];
+    let lastTickAt = Date.now();
+    const unsub = useTradingStore.subscribe((state) => {
+      const p = state.prices[sym];
+      if (p !== lastPrice) { lastPrice = p; lastTickAt = Date.now(); }
+    });
+
+    let stale = false;
+    const interval = setInterval(() => {
+      const isStale = Date.now() - lastTickAt > threshold;
+      if (isStale === stale) return;          // only act on a transition
+      stale = isStale;
+      if (!isStale) return;                    // recovery handled by the reconcile
+      const now = Date.now();
+      for (const [, entry] of linesRef.current) {
+        // Only position ENTRY lines carry live P&L (entry.pnl != null); SL/TP
+        // and pending-order labels are static, so leave them untouched.
+        if (!entry || entry.id == null || entry.pnl == null) continue;
+        const base = String(entry.text || '').split(' | ')[0]; // "BUY 0.01 @ 4072.38"
+        const staleText = `${base} | -- (stale)`;
+        try {
+          chart.getShapeById(entry.id)?.setProperties({
+            text: staleText, linecolor: STALE_COLOR, textcolor: STALE_COLOR,
+          });
+        } catch { /* noop */ }
+        entry.text = staleText;
+        entry.color = STALE_COLOR;
+        entry.propAt = now; // so the reconcile's throttle lets recovery through
+      }
+    }, 1000);
+
+    return () => { clearInterval(interval); try { unsub(); } catch { /* noop */ } };
+  }, [ready, selectedSymbol]);
 
   // Live BUY / SELL price lines that track the current quote (MT4/MT5 style):
   // a green BUY line at the ASK and a red SELL line at the BID, updated on every
