@@ -187,11 +187,13 @@ export default function ChartingLibraryChart() {
           setReady(true);
           // Persist the FULL layout (drawings + studies + settings + interval)
           // on every change so it survives a refresh. save() serialises the
-          // whole widget state; we stash it in localStorage.
+          // whole widget state; we stash it in localStorage. subscribe/save are
+          // runtime methods not on the TVWidget type, so go through `any`.
           try {
-            w.subscribe?.('onAutoSaveNeeded', () => {
+            const wAny = w as any;
+            wAny.subscribe?.('onAutoSaveNeeded', () => {
               try {
-                w.save?.((state: any) => {
+                wAny.save?.((state: any) => {
                   try { localStorage.setItem(CHART_SAVE_KEY, JSON.stringify(state)); } catch { /* quota */ }
                 });
               } catch { /* noop */ }
