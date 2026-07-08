@@ -124,19 +124,39 @@ async def portfolio_summary(user_id: UUID, account_id: UUID | None, db: AsyncSes
                 "symbol": symbol, "total_lots": Decimal("0"), "avg_open_price": Decimal("0"),
                 "current_price": float(cp), "unrealized_pnl": Decimal("0"),
                 "positions_count": 0, "net_side": None, "_price_sum": Decimal("0"),
+                "_notional": Decimal("0"),
             }
         h = holdings[symbol]
         h["total_lots"] += pos.lots
         h["_price_sum"] += pos.open_price * pos.lots
         h["unrealized_pnl"] += pnl
         h["positions_count"] += 1
+        h["current_price"] = float(cp)
+        # Net side for the symbol: the single position's side, or "mixed" when a
+        # user holds both a buy and a sell on the same symbol.
+        if h["net_side"] is None:
+            h["net_side"] = side_val
+        elif h["net_side"] != side_val:
+            h["net_side"] = "mixed"
+        cs = pos.instrument.contract_size if pos.instrument else None
+        if cs:
+            h["_notional"] += pos.open_price * pos.lots * Decimal(str(cs))
 
     for h in holdings.values():
         if h["total_lots"] > 0:
             h["avg_open_price"] = float(h["_price_sum"] / h["total_lots"])
         h["total_lots"] = float(h["total_lots"])
         h["unrealized_pnl"] = float(h["unrealized_pnl"])
+        notional = h.pop("_notional", Decimal("0"))
         del h["_price_sum"]
+        # Aliases the trader Portfolio page reads directly (side/lots/entry_price
+        # /pnl/pnl_pct). Without these the open-positions table showed blank
+        # Side/Lots/Entry and a $NaN P&L (field-name mismatch, client 2026-07-07).
+        h["side"] = h.get("net_side")
+        h["lots"] = h["total_lots"]
+        h["entry_price"] = h["avg_open_price"]
+        h["pnl"] = h["unrealized_pnl"]
+        h["pnl_pct"] = (h["unrealized_pnl"] / float(notional) * 100.0) if notional > 0 else 0.0
 
     now = datetime.now(timezone.utc)
     today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
