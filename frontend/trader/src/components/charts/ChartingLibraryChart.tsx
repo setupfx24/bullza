@@ -110,10 +110,11 @@ export default function ChartingLibraryChart() {
   const widgetRef = useRef<TVWidget | null>(null);
   // Map position id -> chart position-line object, so we update/remove in place.
   const linesRef = useRef<Map<string, any>>(new Map());
-  // Live BUY (ask) / SELL (bid) quote lines — kept OUT of linesRef so the
-  // positions/orders reconcile effect (which prunes lines not in its `seen`
-  // set) never removes them.
-  const liveLinesRef = useRef<{ ask: any; bid: any } | null>(null);
+  // Live BUY (ask) / SELL (bid) quote-line shape ids — kept OUT of linesRef so
+  // the positions/orders reconcile effect never prunes them. Holds null, the
+  // 'creating' sentinel while the async createShape resolves, or { ask, bid }
+  // EntityIds once created.
+  const liveLinesRef = useRef<any>(null);
   // The symbol the widget is currently displaying. Used to avoid a redundant
   // setSymbol() right after creation and to detect a real change.
   const appliedSymbolRef = useRef<string>('');
@@ -309,28 +310,37 @@ export default function ChartingLibraryChart() {
 
     const opts = (text: string, color: string, vAlign: 'top' | 'bottom') => ({
       shape: 'horizontal_line',
+      text,                                   // top-level in CreateShapeOptions
       lock: true, disableSelection: true, disableSave: true, disableUndo: true,
       overrides: {
         linecolor: color, linestyle: 0, linewidth: 1,
-        showLabel: true, text, textcolor: color, fontsize: 11, bold: true,
-        showPrice: true, horzLabelsAlign: 'right', vertLabelsAlign: vAlign,
+        showLabel: true, textcolor: color, fontsize: 11, bold: true,
+        horzLabelsAlign: 'right', vertLabelsAlign: vAlign,
       },
     });
+
+    const move = (id: any, t: number, price: number) => {
+      try { chart.getShapeById(id)?.setPoints([{ time: t, price }]); } catch { /* noop */ }
+    };
 
     const apply = (tick: { bid: number; ask: number } | undefined) => {
       if (!tick || !(tick.bid > 0) || !(tick.ask > 0)) return;
       const t = Math.floor(Date.now() / 1000);
-      try {
-        if (!liveLinesRef.current) {
-          liveLinesRef.current = {
-            ask: chart.createShape({ time: t, price: tick.ask }, opts('BUY', '#22c55e', 'bottom')),
-            bid: chart.createShape({ time: t, price: tick.bid }, opts('SELL', '#ef4444', 'top')),
-          };
-        } else {
-          try { chart.getShapeById(liveLinesRef.current.ask)?.setPoints([{ time: t, price: tick.ask }]); } catch { /* noop */ }
-          try { chart.getShapeById(liveLinesRef.current.bid)?.setPoints([{ time: t, price: tick.bid }]); } catch { /* noop */ }
-        }
-      } catch { /* noop */ }
+      const cur = liveLinesRef.current;
+      if (cur === 'creating') return;         // async create in flight — wait
+      if (cur && cur.ask != null) {
+        move(cur.ask, t, tick.ask);
+        move(cur.bid, t, tick.bid);
+        return;
+      }
+      // createShape is ASYNC (returns Promise<EntityId>) — await both, then
+      // store the ids so later ticks just move the shapes.
+      liveLinesRef.current = 'creating';
+      Promise.all([
+        chart.createShape({ time: t, price: tick.ask }, opts('BUY', '#22c55e', 'bottom')),
+        chart.createShape({ time: t, price: tick.bid }, opts('SELL', '#ef4444', 'top')),
+      ]).then(([ask, bid]: any[]) => { liveLinesRef.current = { ask, bid }; })
+        .catch(() => { liveLinesRef.current = null; });
     };
 
     apply(useTradingStore.getState().prices[sym]);
@@ -338,7 +348,11 @@ export default function ChartingLibraryChart() {
 
     return () => {
       try { unsub(); } catch { /* noop */ }
-      try { if (liveLinesRef.current) { chart.removeEntity(liveLinesRef.current.ask); chart.removeEntity(liveLinesRef.current.bid); } } catch { /* noop */ }
+      const cur = liveLinesRef.current;
+      if (cur && cur.ask != null) {
+        try { chart.removeEntity(cur.ask); } catch { /* noop */ }
+        try { chart.removeEntity(cur.bid); } catch { /* noop */ }
+      }
       liveLinesRef.current = null;
     };
   }, [ready, selectedSymbol]);
