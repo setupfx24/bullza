@@ -25,7 +25,7 @@ export function defaultContractSize(symbol: string): number {
 export function livePnlFor(
   pos: { side: string; open_price: number; lots: number; effective_lots?: number },
   tick: { bid: number; ask: number } | undefined | null,
-  instruments: Array<{ symbol: string; contract_size?: number; base_currency?: string; quote_currency?: string }>,
+  instruments: Array<{ symbol: string; contract_size?: number | null; base_currency?: string | null; quote_currency?: string | null }>,
   symbol: string,
 ): { cp: number; pnl: number } | null {
   if (!tick) return null;
