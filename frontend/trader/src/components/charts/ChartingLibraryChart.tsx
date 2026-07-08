@@ -127,7 +127,12 @@ export default function ChartingLibraryChart() {
         // Removed 'use_localstorage_for_settings' from disabled so the library
         // also persists chart style/settings per browser.
         disabled_features: ['header_symbol_search'],
-        enabled_features: ['study_templates'],
+        // NOTE: do NOT enable 'study_templates' — it needs a server
+        // charts_storage_url/client_id/user_id, which we don't run, so the
+        // library fired GET .../undefined/undefined/study_templates → 404 spam
+        // in the console. Layout persistence uses saved_data + onAutoSaveNeeded
+        // (localStorage) and does NOT need this feature.
+        enabled_features: [],
         // Faint SwisDex/symbol watermark in the chart background (restores the
         // branding the old Advanced Chart widget showed) — client 2026-06-26.
         overrides: {
