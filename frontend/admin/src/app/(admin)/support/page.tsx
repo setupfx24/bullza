@@ -132,8 +132,18 @@ export default function SupportPage() {
   const handleAssign = async (ticketId: string, adminId: string) => {
     try {
       await adminApi.put(`/support/tickets/${ticketId}/assign`, { admin_id: adminId });
-      toast.success('Ticket assigned');
+      toast.success(adminId ? 'Ticket assigned' : 'Ticket unassigned');
       fetchTickets();
+      // Reflect the change immediately in the open ticket (the dropdown binds
+      // to selectedTicket.assigned_to) instead of waiting for a re-open.
+      if (selectedTicket?.id === ticketId) {
+        const emp = employees.find((e) => e.user_id === adminId);
+        setSelectedTicket((prev) => prev ? {
+          ...prev,
+          assigned_to: adminId || undefined,
+          assigned_name: emp?.full_name,
+        } : null);
+      }
     } catch (e: any) {
       toast.error(e.message || 'Failed to assign');
     }

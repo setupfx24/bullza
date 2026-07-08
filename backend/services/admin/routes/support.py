@@ -48,7 +48,10 @@ async def get_ticket_detail(
         # An assignee can always OPEN their own assigned ticket to read it.
         # Posting a reply still requires tickets.reply (enforced on /reply),
         # so this only gates VIEW access (client 2026-06-24).
-        if str(detail.get("assigned_to") or "") != str(admin.id):
+        # detail is a TicketDetailOut (Pydantic) — assigned_to lives on
+        # detail.ticket, NOT detail.get(...) which 500'd for every assigned
+        # employee (client 2026-07-08).
+        if str(getattr(detail.ticket, "assigned_to", None) or "") != str(admin.id):
             raise HTTPException(status_code=403, detail="You can only open tickets assigned to you")
     return detail
 
