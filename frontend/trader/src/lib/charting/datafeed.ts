@@ -216,13 +216,14 @@ function ensureReconnectHook() {
 // candle series continuous with the live bar.
 
 function halfSpreadOf(tick: { bid: number; ask: number } | null | undefined): number {
-  // Client 2026-07-08: draw the chart at the LTP / last price (the raw tick
-  // MID the BarAggregator already builds candles from), NOT shifted down to the
-  // BID. Returning 0 disables the bid-shift below so historical + live bars
-  // both plot the true last price. (Re-enable the (ask-bid)/2 formula to go
-  // back to the MT4/MT5 bid-drawn convention.)
-  void tick;
-  return 0;
+  // Client 2026-07-09 (Option A): draw the chart at the BID (MT4/MT5
+  // convention), reversing the 2026-07-08 LTP request. The BarAggregator
+  // builds candles from the MID, so shifting every bar DOWN by half the live
+  // store-tick spread puts the candle close ON the BID — so it touches the red
+  // SELL line and matches the panel BID, with the green BUY line one spread
+  // above. (Return 0 here to go back to LTP/mid.)
+  if (!tick || tick.bid <= 0 || tick.ask < tick.bid) return 0;
+  return (tick.ask - tick.bid) / 2;
 }
 
 function symbolDigits(sym: string): number {
