@@ -185,6 +185,22 @@ async def seed(force: bool = False):
         logger.warning("No INFOWAY_TOKEN configured — cannot seed bars")
         return
 
+    # Free-plan REST budget (60/min): seeding ALL discovered symbols × every TF
+    # blows the cap → HTTP 429 storm that also starves history + gap-fill. Scope
+    # non-crypto seeding to the InfoWay WS symbols (the ones we serve live);
+    # crypto is left as-is (usually already-seeded fast-path, and lives on
+    # Binance). Raise INFOWAY_WS_SYMBOLS on a paid plan. (client 2026-07-09)
+    _ws_syms = {
+        s.strip().upper()
+        for s in (getattr(settings, "INFOWAY_WS_SYMBOLS", "") or "").split(",")
+        if s.strip()
+    }
+    if _ws_syms:
+        before = len(symbols)
+        symbols = {s for s in symbols if _guess_segment(s) == "crypto" or s in _ws_syms}
+        logger.info("Seed scoped to WS symbols + crypto: %d → %d (free-plan rate budget)",
+                    before, len(symbols))
+
     for sym in sorted(symbols):
         segment = _guess_segment(sym)
         logger.info("Seeding %s (segment=%s, source=infoway)", sym, segment)
@@ -225,11 +241,11 @@ async def seed(force: bool = False):
             await pipe.execute()
             logger.info("  %s:%s → %d bars seeded", sym, tf_name, len(bars))
 
-            # Small delay between requests. AllTick paid plans cap at ~10/s
-            # and the rest module already enforces concurrency + spacing,
-            # but a per-loop sleep keeps any single seed run from monopolising
-            # the rate budget while live ticks are also flowing.
-            await asyncio.sleep(0.15)
+            # Per-request spacing. On the InfoWay FREE plan the cap is 60/min
+            # (1/sec), and the reconcile loop shares it — 0.15s (~400/min) was
+            # the 429 storm. 2s keeps the seed at ~30/min, leaving room for the
+            # reconcile + on-demand getBars. (client 2026-07-09)
+            await asyncio.sleep(2.0)
 
     logger.info("Done seeding all symbols.")
 
