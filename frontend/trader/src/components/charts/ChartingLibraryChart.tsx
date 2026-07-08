@@ -318,11 +318,13 @@ export default function ChartingLibraryChart() {
       const lines = ensure();
       if (!lines) return;
       try {
-        lines.ask.setPrice(tick.ask).setText('BUY').setQuantity('')
-          .setLineColor('#3b82f6').setLineStyle(2)
-          .setBodyBackgroundColor('#3b82f6').setBodyBorderColor('#3b82f6').setBodyTextColor('#ffffff');
-        lines.bid.setPrice(tick.bid).setText('SELL').setQuantity('')
-          .setLineColor('#ef4444').setLineStyle(2)
+        // Solid, labelled lines with the live price in the tag so the two are
+        // unmistakable even though bid/ask sit within one spread of each other.
+        lines.ask.setPrice(tick.ask).setText(`BUY ${tick.ask}`).setQuantity('')
+          .setLineColor('#22c55e').setLineStyle(0)
+          .setBodyBackgroundColor('#22c55e').setBodyBorderColor('#22c55e').setBodyTextColor('#ffffff');
+        lines.bid.setPrice(tick.bid).setText(`SELL ${tick.bid}`).setQuantity('')
+          .setLineColor('#ef4444').setLineStyle(0)
           .setBodyBackgroundColor('#ef4444').setBodyBorderColor('#ef4444').setBodyTextColor('#ffffff');
       } catch { /* noop */ }
     };
