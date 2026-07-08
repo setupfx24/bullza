@@ -8,9 +8,10 @@
  */
 import { useCallback, useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
-import { Loader2, Plus, Trash2, Pencil, X, Receipt, Search } from 'lucide-react';
+import { Loader2, Plus, Trash2, Pencil, X, Receipt, Search, FileDown } from 'lucide-react';
 import { adminApi } from '@/lib/api';
 import DateField from '@/components/ui/DateField';
+import { downloadAdminReportPdf } from '@/lib/pdf/adminReportPdf';
 
 interface Expense {
   id: string;
@@ -112,6 +113,41 @@ export default function SwisDexExpensesPage() {
   const filteredTotal = filtered.reduce((s, e) => s + (e.amount || 0), 0);
   const isFiltered = !!(q || dateFrom || dateTo);
 
+  const exportPdf = async () => {
+    if (filtered.length === 0) return toast.error('Nothing to export');
+    const periodLabel = (dateFrom || dateTo)
+      ? `${dateFrom || 'start'} to ${dateTo || 'today'}`
+      : 'All time';
+    try {
+      await downloadAdminReportPdf(
+        'SwisDex Expenses',
+        [
+          { header: 'Date', align: 'left', mono: true, width: 26 },
+          { header: 'Name', align: 'left' },
+          { header: 'Amount (USD)', align: 'right', mono: true, width: 30 },
+          { header: 'Reason', align: 'left' },
+          { header: 'Result', align: 'left' },
+        ],
+        filtered.map((e) => [
+          e.expense_date || '',
+          e.name || '',
+          fmt(e.amount),
+          e.reason || '-',
+          e.result || '-',
+        ]),
+        {
+          subtitle: 'Company operating-expense ledger',
+          periodLabel,
+          summaryLines: [`Total: ${fmt(filteredTotal)}    Entries: ${filtered.length}`],
+          filename: 'swisdex-expenses',
+          landscape: false,
+        },
+      );
+    } catch (err: any) {
+      toast.error(err?.message || 'Failed to generate PDF');
+    }
+  };
+
   return (
     <div className="p-4 sm:p-6 space-y-4 max-w-6xl">
       <div className="flex items-center justify-between flex-wrap gap-2">
@@ -123,12 +159,20 @@ export default function SwisDexExpensesPage() {
             Company operating-expense ledger. Records persist like a Tally / Excel book.
           </p>
         </div>
-        <button
-          onClick={openAdd}
-          className="text-xs inline-flex items-center gap-1 rounded-md bg-accent text-white px-3 py-2 hover:opacity-90"
-        >
-          <Plus size={14} /> Add Expense
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={exportPdf}
+            className="text-xs inline-flex items-center gap-1 rounded-md border border-border-primary text-text-secondary px-3 py-2 hover:bg-bg-hover hover:text-text-primary"
+          >
+            <FileDown size={14} /> Download PDF
+          </button>
+          <button
+            onClick={openAdd}
+            className="text-xs inline-flex items-center gap-1 rounded-md bg-accent text-white px-3 py-2 hover:opacity-90"
+          >
+            <Plus size={14} /> Add Expense
+          </button>
+        </div>
       </div>
 
       {/* Filters — search by name, filter by date range */}
