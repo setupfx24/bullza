@@ -294,38 +294,42 @@ export default function ChartingLibraryChart() {
   }, [positions, pendingOrders, selectedSymbol, ready]);
 
   // Live BUY / SELL price lines that track the current quote (MT4/MT5 style):
-  // a blue BUY line at the ASK and a red SELL line at the BID, updated on every
-  // tick. Subscribes to the store imperatively so ticks don't re-render the
-  // whole component. Re-runs (and re-anchors) when the symbol changes.
+  // a green BUY line at the ASK and a red SELL line at the BID, updated on every
+  // tick. Uses createShape('horizontal_line') — the CORE Charting Library API —
+  // NOT createPositionLine, which is a Trading-Terminal-only feature that isn't
+  // present in this build (it silently drew nothing). Shapes are created once
+  // then moved with setPoints so there's no flicker.
   useEffect(() => {
     const w = widgetRef.current;
     if (!ready || !w?.activeChart) return;
     let chart: any;
     try { chart = w.activeChart(); } catch { return; }
-    if (!chart?.createPositionLine) return;
+    if (!chart?.createShape) return;
     const sym = (selectedSymbol || '').toUpperCase();
 
-    const ensure = () => {
-      if (liveLinesRef.current) return liveLinesRef.current;
-      try {
-        liveLinesRef.current = { ask: chart.createPositionLine(), bid: chart.createPositionLine() };
-      } catch { return null; }
-      return liveLinesRef.current;
-    };
+    const opts = (text: string, color: string, vAlign: 'top' | 'bottom') => ({
+      shape: 'horizontal_line',
+      lock: true, disableSelection: true, disableSave: true, disableUndo: true,
+      overrides: {
+        linecolor: color, linestyle: 0, linewidth: 1,
+        showLabel: true, text, textcolor: color, fontsize: 11, bold: true,
+        showPrice: true, horzLabelsAlign: 'right', vertLabelsAlign: vAlign,
+      },
+    });
 
     const apply = (tick: { bid: number; ask: number } | undefined) => {
       if (!tick || !(tick.bid > 0) || !(tick.ask > 0)) return;
-      const lines = ensure();
-      if (!lines) return;
+      const t = Math.floor(Date.now() / 1000);
       try {
-        // Solid, labelled lines with the live price in the tag so the two are
-        // unmistakable even though bid/ask sit within one spread of each other.
-        lines.ask.setPrice(tick.ask).setText(`BUY ${tick.ask}`).setQuantity('')
-          .setLineColor('#22c55e').setLineStyle(0)
-          .setBodyBackgroundColor('#22c55e').setBodyBorderColor('#22c55e').setBodyTextColor('#ffffff');
-        lines.bid.setPrice(tick.bid).setText(`SELL ${tick.bid}`).setQuantity('')
-          .setLineColor('#ef4444').setLineStyle(0)
-          .setBodyBackgroundColor('#ef4444').setBodyBorderColor('#ef4444').setBodyTextColor('#ffffff');
+        if (!liveLinesRef.current) {
+          liveLinesRef.current = {
+            ask: chart.createShape({ time: t, price: tick.ask }, opts('BUY', '#22c55e', 'bottom')),
+            bid: chart.createShape({ time: t, price: tick.bid }, opts('SELL', '#ef4444', 'top')),
+          };
+        } else {
+          try { chart.getShapeById(liveLinesRef.current.ask)?.setPoints([{ time: t, price: tick.ask }]); } catch { /* noop */ }
+          try { chart.getShapeById(liveLinesRef.current.bid)?.setPoints([{ time: t, price: tick.bid }]); } catch { /* noop */ }
+        }
       } catch { /* noop */ }
     };
 
@@ -334,8 +338,7 @@ export default function ChartingLibraryChart() {
 
     return () => {
       try { unsub(); } catch { /* noop */ }
-      try { liveLinesRef.current?.ask?.remove(); } catch { /* noop */ }
-      try { liveLinesRef.current?.bid?.remove(); } catch { /* noop */ }
+      try { if (liveLinesRef.current) { chart.removeEntity(liveLinesRef.current.ask); chart.removeEntity(liveLinesRef.current.bid); } } catch { /* noop */ }
       liveLinesRef.current = null;
     };
   }, [ready, selectedSymbol]);
