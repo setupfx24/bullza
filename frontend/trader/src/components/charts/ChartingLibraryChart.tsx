@@ -100,6 +100,10 @@ function _cancelOrder(orderId: string) {
 }
 
 
+// localStorage key for the persisted chart layout (drawings, studies,
+// settings, timeframe) — survives page refreshes.
+const CHART_SAVE_KEY = 'swisdex_chart_layout_v1';
+
 export default function ChartingLibraryChart() {
   const selectedSymbol = useTradingStore((s) => s.selectedSymbol);
   const positions = useTradingStore((s) => s.positions);
@@ -140,6 +144,15 @@ export default function ChartingLibraryChart() {
       // Read the latest symbol from the store at creation time (the effect does
       // not depend on it, so the closure value could be stale).
       const initialSymbol = useTradingStore.getState().selectedSymbol || 'XAUUSD';
+      // Restore the saved chart layout (drawings, indicators/studies, chart
+      // style, timeframe) so a page refresh no longer wipes the user's
+      // analysis. Persisted to localStorage via onAutoSaveNeeded below
+      // (client 2026-07-08: "on refresh all analysis disappears").
+      let savedData: any;
+      try {
+        const s = localStorage.getItem(CHART_SAVE_KEY);
+        if (s) savedData = JSON.parse(s);
+      } catch { /* corrupt / no storage → start fresh */ }
       const w = new Ctor({
         symbol: initialSymbol,
         interval: '5',
@@ -150,8 +163,14 @@ export default function ChartingLibraryChart() {
         theme: theme === 'light' ? 'Light' : 'Dark',
         autosize: true,
         timezone: 'Asia/Kolkata',
-        disabled_features: ['use_localstorage_for_settings', 'header_symbol_search'],
-        enabled_features: [],
+        // Debounced auto-save fires onAutoSaveNeeded ~2s after any change.
+        auto_save_delay: 2,
+        // Re-load the previous layout if we have one.
+        ...(savedData ? { saved_data: savedData } : {}),
+        // Removed 'use_localstorage_for_settings' from disabled so the library
+        // also persists chart style/settings per browser.
+        disabled_features: ['header_symbol_search'],
+        enabled_features: ['study_templates'],
         // Faint SwisDex/symbol watermark in the chart background (restores the
         // branding the old Advanced Chart widget showed) — client 2026-06-26.
         overrides: {
@@ -162,7 +181,24 @@ export default function ChartingLibraryChart() {
       });
       widgetRef.current = w;
       appliedSymbolRef.current = initialSymbol;
-      try { w.onChartReady?.(() => { if (!cancelled) setReady(true); }); } catch { /* noop */ }
+      try {
+        w.onChartReady?.(() => {
+          if (cancelled) return;
+          setReady(true);
+          // Persist the FULL layout (drawings + studies + settings + interval)
+          // on every change so it survives a refresh. save() serialises the
+          // whole widget state; we stash it in localStorage.
+          try {
+            w.subscribe?.('onAutoSaveNeeded', () => {
+              try {
+                w.save?.((state: any) => {
+                  try { localStorage.setItem(CHART_SAVE_KEY, JSON.stringify(state)); } catch { /* quota */ }
+                });
+              } catch { /* noop */ }
+            });
+          } catch { /* noop */ }
+        });
+      } catch { /* noop */ }
     }).catch(() => { /* library missing/unapproved */ });
 
     return () => {
