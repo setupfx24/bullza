@@ -81,17 +81,31 @@ class MarketDataService:
             self.feed = CorecenLPFeed()
             logger.info("Price feed: Corecen LP (receiving pushes on /api/lp/prices/batch)")
         elif usable_infoway_token(raw_infoway):
+            # Free plan caps WS subscriptions at 10 (error 516 rejects the WHOLE
+            # subscription if exceeded → zero ticks). Subscribe to ONLY the
+            # configured priority symbols; this also shrinks the feed's reconcile
+            # REST load, easing the 60-req/min cap (429s). Crypto is on Binance.
+            _ws_syms = [
+                s.strip().upper()
+                for s in (getattr(settings, "INFOWAY_WS_SYMBOLS", "") or "").split(",")
+                if s.strip()
+            ]
+            _ws_instruments = (
+                {k: v for k, v in INSTRUMENTS.items() if k in _ws_syms}
+                if _ws_syms else INSTRUMENTS
+            )
             self.feed = InfoWayFeed(
                 raw_infoway,
-                INSTRUMENTS,
+                _ws_instruments,
                 ws_url=getattr(settings, "INFOWAY_WS_URL", "wss://data.infoway.io/ws"),
                 business=getattr(settings, "INFOWAY_BUSINESS", "common"),
                 channel=getattr(settings, "INFOWAY_CHANNEL", "depth"),
             )
             self._infoway_watchdog_armed = True
             logger.info(
-                "Price feed: InfoWay WebSocket (channel=%s)",
+                "Price feed: InfoWay WebSocket (channel=%s, %d WS symbols: %s)",
                 getattr(settings, "INFOWAY_CHANNEL", "depth"),
+                len(_ws_instruments), ",".join(sorted(_ws_instruments.keys())) or "ALL",
             )
         elif usable_alltick_token(raw_alltick):
             self.feed = AllTickFeed(raw_alltick, INSTRUMENTS)

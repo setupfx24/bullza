@@ -172,6 +172,14 @@ class Settings(BaseSettings):
     # candle gaps. Per-symbol staleness gate makes it a no-op once a real WS
     # tick streams (e.g. after buying a paid plan). Set false to disable.
     INFOWAY_REST_BRIDGE_ENABLED: bool = False
+    # Free InfoWay plan hard-caps WS subscriptions at 10 — subscribing to more
+    # makes InfoWay REJECT the WHOLE subscription (error 516) so ZERO ticks
+    # arrive. Subscribe to ONLY these priority symbols (<=10) so the WS is
+    # accepted and streams live ticks; the rest degrade to REST/history.
+    # Crypto is served live by Binance, so keep this to forex/metals/indices.
+    # Comma-separated platform symbols; empty = all instruments (will exceed
+    # the cap on the free plan). Raise/replace this list on a paid plan.
+    INFOWAY_WS_SYMBOLS: str = "XAUUSD,XAGUSD,EURUSD,GBPUSD,USDJPY,AUDUSD,USDCAD,USDCHF,US30,US500"
 
     # ─── AllTick — market-data provider (used when InfoWay is empty) ────
     # Real-time forex / metals / crypto / indices CFD ticks via WebSocket.

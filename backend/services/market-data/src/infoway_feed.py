@@ -59,7 +59,10 @@ RECONNECT_BACKOFF_MAX = 60.0
 # (live), and it reconciles too the moment it closes. (client 2026-06-30)
 RECONCILE_TFS = ("5m", "1m", "15m", "30m", "1h")  # 5m first — most-viewed
 RECONCILE_COUNT = 6          # last few CLOSED bars to re-assert per (symbol, tf)
-RECONCILE_SPACING = 1.5      # seconds between REST calls — stay under ~60/min cap
+# Free plan caps REST at 60/min (1/sec). 1.5s was too aggressive once getBars
+# + any bridge shared the budget → HTTP 429 storm. 3s keeps the reconcile at
+# ~20/min and leaves headroom for chart history fetches. (client 2026-07-09)
+RECONCILE_SPACING = 3.0      # seconds between REST calls — stay under 60/min cap
 RECONCILE_WARMUP = 45.0      # let the feed + initial seed settle before first pass
 
 
