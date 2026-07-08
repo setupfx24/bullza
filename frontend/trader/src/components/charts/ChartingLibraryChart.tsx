@@ -13,11 +13,9 @@
  * Revert to '@/components/charts/AdvancedChart' for the public widget.
  */
 import { useEffect, useRef, useState } from 'react';
-import toast from 'react-hot-toast';
 import { useTradingStore } from '@/stores/tradingStore';
 import { useUIStore } from '@/stores/uiStore';
 import { swisDexDatafeed } from '@/lib/charting/datafeed';
-import api from '@/lib/api/client';
 
 // The licensed library attaches `TradingView` to window once the script runs.
 // Use `any` for the widget/chart — the bundled .d.ts is huge and we only touch
@@ -47,57 +45,6 @@ function loadChartingLibrary(): Promise<void> {
   return _libPromise;
 }
 
-// ── Drag / cancel handlers for the interactive chart order-lines ──────────
-// Attached once to a TradingView orderLine. `this` is the line, so we read the
-// dropped price via this.getPrice(), PUT it to the backend, then refresh the
-// store so the line snaps to the server truth. On rejection we revert the line
-// to the last-known value. Fresh data is read from the store at call time so a
-// stale closure can't send an outdated SL/TP.
-function _movePositionField(posId: string, field: 'stop_loss' | 'take_profit') {
-  return function (this: any) {
-    const line = this;
-    const price = Number(line.getPrice());
-    const st = useTradingStore.getState();
-    const pos = (st.positions || []).find((p: any) => p.id === posId);
-    const body: any = {
-      stop_loss: pos?.stop_loss ?? null,
-      take_profit: pos?.take_profit ?? null,
-    };
-    body[field] = price;
-    api.put(`/positions/${posId}`, body)
-      .then(() => { toast.success(field === 'stop_loss' ? 'Stop loss updated' : 'Take profit updated'); st.refreshPositions(); })
-      .catch((e: any) => {
-        toast.error(e?.message || 'Update failed');
-        const orig = field === 'stop_loss' ? pos?.stop_loss : pos?.take_profit;
-        if (orig) { try { line.setPrice(Number(orig)); } catch { /* noop */ } }
-      });
-  };
-}
-
-function _moveOrderField(orderId: string, field: 'price' | 'stop_loss' | 'take_profit') {
-  return function (this: any) {
-    const line = this;
-    const price = Number(line.getPrice());
-    const st = useTradingStore.getState();
-    const ord = (st.pendingOrders || []).find((o: any) => o.id === orderId);
-    api.put(`/orders/${orderId}`, { [field]: price })
-      .then(() => { toast.success('Order updated'); st.refreshPendingOrders(); })
-      .catch((e: any) => {
-        toast.error(e?.message || 'Update failed');
-        const orig = field === 'price' ? ord?.price : field === 'stop_loss' ? ord?.stop_loss : ord?.take_profit;
-        if (orig) { try { line.setPrice(Number(orig)); } catch { /* noop */ } }
-      });
-  };
-}
-
-function _cancelOrder(orderId: string) {
-  return function () {
-    const st = useTradingStore.getState();
-    api.delete(`/orders/${orderId}`)
-      .then(() => { toast.success('Order cancelled'); st.refreshPendingOrders(); })
-      .catch((e: any) => { toast.error(e?.message || 'Cancel failed'); });
-  };
-}
 
 
 // localStorage key for the persisted chart layout (drawings, studies,
@@ -225,108 +172,113 @@ export default function ChartingLibraryChart() {
     if (!w?.activeChart || appliedSymbolRef.current === sym) return;
     try {
       const chart = w.activeChart();
-      // Position lines are symbol-specific overlays; drop our refs so the
-      // reconcile effect re-creates them for the new symbol.
-      for (const [, line] of linesRef.current) { try { line.remove(); } catch { /* noop */ } }
+      // Position lines are symbol-specific overlays; remove the shapes (they're
+      // createShape entities → removeEntity, not .remove()) and drop our refs so
+      // the reconcile effect re-creates them for the new symbol.
+      for (const [, entry] of linesRef.current) {
+        try { if (entry && entry.id != null) chart?.removeEntity(entry.id); } catch { /* noop */ }
+      }
       linesRef.current.clear();
       chart?.setSymbol?.(sym, () => { /* resolved */ });
       appliedSymbolRef.current = sym;
     } catch { /* noop */ }
   }, [selectedSymbol, ready]);
 
-  // Reconcile chart lines whenever positions / pending orders change. Open
-  // positions get an entry line (P&L) plus DRAGGABLE SL/TP lines; pending
-  // orders get a draggable+cancellable entry line plus their SL/TP. Dragging an
-  // SL/TP/entry line PUTs the new price to the backend (see the _move* helpers).
+  // Reconcile chart lines whenever positions / pending orders change. Each open
+  // position gets an ENTRY line (BUY green / SELL red) plus SL (amber) / TP
+  // (teal); each pending order gets its entry (BUY blue / SELL purple) + SL/TP.
+  //
+  // Drawn with createShape('horizontal_line') — the CORE Charting Library API.
+  // createPositionLine/createOrderLine are Trading-Terminal-only and render
+  // NOTHING in this build, which is why the entry lines were invisible. Shapes
+  // span the FULL chart width and stay pinned to the price scale through
+  // zoom / scroll / timeframe changes; they're created once, moved with
+  // setPoints when a price (e.g. SL/TP) changes, and removed when the
+  // position/order closes. linesRef maps key -> { id, price, creating }.
+  //
+  // Trade-off vs the old (invisible) order lines: these aren't drag-to-modify.
+  // Since the draggable lines never rendered, visible-but-static is strictly
+  // better; SL/TP is still edited from the positions table.
   useEffect(() => {
     const w = widgetRef.current;
     if (!ready || !w?.activeChart) return;
     let chart: any;
     try { chart = w.activeChart(); } catch { return; }
-    if (!chart?.createPositionLine) return;
+    if (!chart?.createShape) return;
 
     const sym = (selectedSymbol || '').toUpperCase();
     const myPos = positions.filter((p) => (p.symbol || '').toUpperCase() === sym);
     const myPending = (pendingOrders || []).filter((o: any) => (o.symbol || '').toUpperCase() === sym);
+    const inst = useTradingStore.getState().instruments.find(
+      (i) => String(i.symbol).toUpperCase() === sym,
+    );
+    const digits = inst?.digits ?? 2;
+    const fp = (n: number) => Number(n).toFixed(digits);
 
-    type Desired = {
-      key: string; price: number; color: string; text: string; qty: string;
-      dashed: boolean;
-      // 'position' → createPositionLine (static, shows P&L). 'order' →
-      // createOrderLine (DRAGGABLE; onMove/onCancel handlers).
-      kind: 'position' | 'order';
-      onMove?: (this: any) => void;
-      onCancel?: () => void;
-    };
+    type Desired = { key: string; price: number; color: string; text: string; dashed: boolean };
     const desired: Desired[] = [];
 
-    // ── Open positions ──
+    // ── Open positions: entry (side-coloured) + SL + TP. Label is static
+    //    "SIDE price" (live P&L stays in the positions table). ──
     for (const p of myPos) {
       const entryColor = p.side === 'buy' ? '#22c55e' : '#ef4444';
-      const pnl = Number(p.profit || 0);
-      desired.push({
-        key: p.id, price: Number(p.open_price), color: entryColor,
-        text: `${p.side.toUpperCase()} ${p.lots}  ${pnl >= 0 ? '+' : ''}${pnl.toFixed(2)}`,
-        qty: String(p.lots), dashed: false, kind: 'position',
-      });
-      if (p.stop_loss && Number(p.stop_loss) > 0) {
-        desired.push({ key: `${p.id}-sl`, price: Number(p.stop_loss), color: '#f59e0b', text: 'SL', qty: '', dashed: true, kind: 'order', onMove: _movePositionField(p.id, 'stop_loss') });
-      }
-      if (p.take_profit && Number(p.take_profit) > 0) {
-        desired.push({ key: `${p.id}-tp`, price: Number(p.take_profit), color: '#14b8a6', text: 'TP', qty: '', dashed: true, kind: 'order', onMove: _movePositionField(p.id, 'take_profit') });
-      }
+      desired.push({ key: p.id, price: Number(p.open_price), color: entryColor,
+        text: `${p.side.toUpperCase()} ${fp(Number(p.open_price))}`, dashed: false });
+      if (p.stop_loss && Number(p.stop_loss) > 0)
+        desired.push({ key: `${p.id}-sl`, price: Number(p.stop_loss), color: '#f59e0b', text: `SL ${fp(Number(p.stop_loss))}`, dashed: true });
+      if (p.take_profit && Number(p.take_profit) > 0)
+        desired.push({ key: `${p.id}-tp`, price: Number(p.take_profit), color: '#14b8a6', text: `TP ${fp(Number(p.take_profit))}`, dashed: true });
     }
 
-    // ── Pending orders (limit/stop) ──
+    // ── Pending orders (limit/stop): entry + SL + TP. ──
     for (const o of myPending) {
       const pColor = o.side === 'buy' ? '#3b82f6' : '#a855f7';
-      desired.push({
-        key: `ord-${o.id}`, price: Number(o.price), color: pColor,
-        text: `${String(o.order_type || '').toUpperCase()} ${o.side.toUpperCase()}`,
-        qty: String(o.lots), dashed: false, kind: 'order',
-        onMove: _moveOrderField(o.id, 'price'), onCancel: _cancelOrder(o.id),
-      });
-      if (o.stop_loss && Number(o.stop_loss) > 0) {
-        desired.push({ key: `ord-${o.id}-sl`, price: Number(o.stop_loss), color: '#f59e0b', text: 'SL', qty: '', dashed: true, kind: 'order', onMove: _moveOrderField(o.id, 'stop_loss') });
-      }
-      if (o.take_profit && Number(o.take_profit) > 0) {
-        desired.push({ key: `ord-${o.id}-tp`, price: Number(o.take_profit), color: '#14b8a6', text: 'TP', qty: '', dashed: true, kind: 'order', onMove: _moveOrderField(o.id, 'take_profit') });
-      }
+      desired.push({ key: `ord-${o.id}`, price: Number(o.price), color: pColor,
+        text: `${String(o.order_type || '').toUpperCase()} ${o.side.toUpperCase()} ${fp(Number(o.price))}`, dashed: true });
+      if (o.stop_loss && Number(o.stop_loss) > 0)
+        desired.push({ key: `ord-${o.id}-sl`, price: Number(o.stop_loss), color: '#f59e0b', text: `SL ${fp(Number(o.stop_loss))}`, dashed: true });
+      if (o.take_profit && Number(o.take_profit) > 0)
+        desired.push({ key: `ord-${o.id}-tp`, price: Number(o.take_profit), color: '#14b8a6', text: `TP ${fp(Number(o.take_profit))}`, dashed: true });
     }
 
-    const seen = new Set<string>();
+    const shapeOpts = (text: string, color: string, dashed: boolean) => ({
+      shape: 'horizontal_line',
+      text,
+      lock: true, disableSelection: true, disableSave: true, disableUndo: true,
+      overrides: {
+        linecolor: color, linestyle: dashed ? 2 : 0, linewidth: dashed ? 1 : 2,
+        showLabel: true, textcolor: color, fontsize: 11, bold: true,
+        horzLabelsAlign: 'right', vertLabelsAlign: 'middle',
+      },
+    });
+
+    const t = Math.floor(Date.now() / 1000);
+    const wanted = new Set(desired.map((d) => d.key));
+
     for (const d of desired) {
-      seen.add(d.key);
-      let line = linesRef.current.get(d.key);
-      if (!line) {
-        try {
-          line = (d.kind === 'order' && chart.createOrderLine) ? chart.createOrderLine() : chart.createPositionLine();
-          linesRef.current.set(d.key, line);
-          // Drag / cancel handlers are attached ONCE at creation (order lines
-          // only). They close over the stable id and read fresh data at call
-          // time, so re-rendering doesn't need to re-bind them.
-          if (d.kind === 'order') {
-            try { if (d.onMove && line.onMove) line.onMove(d.onMove); } catch { /* noop */ }
-            try { if (d.onCancel && line.onCancel) line.onCancel(d.onCancel); } catch { /* noop */ }
-          }
-        } catch { continue; }
-      }
-      try {
-        line.setPrice(d.price)
-          .setText(d.text).setQuantity(d.qty)
-          .setLineColor(d.color).setLineStyle(d.dashed ? 1 : 0)
-          .setBodyBackgroundColor(d.color).setBodyBorderColor(d.color).setBodyTextColor('#ffffff')
-          .setQuantityBackgroundColor(d.color).setQuantityBorderColor(d.color);
-      } catch { /* noop */ }
-      if (d.onCancel) {
-        try { line.setCancelButtonBorderColor(d.color).setCancelButtonBackgroundColor(d.color).setCancelButtonIconColor('#ffffff'); } catch { /* noop */ }
+      const existing = linesRef.current.get(d.key);
+      if (!existing) {
+        // createShape is ASYNC (Promise<EntityId>). Reserve the key with a
+        // 'creating' entry so a re-render mid-create doesn't spawn a duplicate.
+        const entry: any = { id: null, price: d.price, creating: true };
+        linesRef.current.set(d.key, entry);
+        chart.createShape({ time: t, price: d.price }, shapeOpts(d.text, d.color, d.dashed))
+          .then((id: any) => {
+            if (linesRef.current.get(d.key) === entry) { entry.id = id; entry.creating = false; }
+            else { try { chart.removeEntity(id); } catch { /* closed mid-create */ } }
+          })
+          .catch(() => { if (linesRef.current.get(d.key) === entry) linesRef.current.delete(d.key); });
+      } else if (existing.id != null && existing.price !== d.price) {
+        // Price moved (SL/TP edited) → slide the existing line, no recreate.
+        try { chart.getShapeById(existing.id)?.setPoints([{ time: t, price: d.price }]); } catch { /* noop */ }
+        existing.price = d.price;
       }
     }
 
-    // Drop lines whose position / order / SL / TP is gone.
-    for (const [key, line] of linesRef.current) {
-      if (!seen.has(key)) {
-        try { line.remove(); } catch { /* noop */ }
+    // Remove lines whose position / order / SL / TP is gone (or symbol changed).
+    for (const [key, entry] of linesRef.current) {
+      if (!wanted.has(key)) {
+        if (entry && entry.id != null) { try { chart.removeEntity(entry.id); } catch { /* noop */ } }
         linesRef.current.delete(key);
       }
     }
