@@ -110,6 +110,10 @@ export default function ChartingLibraryChart() {
   const widgetRef = useRef<TVWidget | null>(null);
   // Map position id -> chart position-line object, so we update/remove in place.
   const linesRef = useRef<Map<string, any>>(new Map());
+  // Live BUY (ask) / SELL (bid) quote lines — kept OUT of linesRef so the
+  // positions/orders reconcile effect (which prunes lines not in its `seen`
+  // set) never removes them.
+  const liveLinesRef = useRef<{ ask: any; bid: any } | null>(null);
   // The symbol the widget is currently displaying. Used to avoid a redundant
   // setSymbol() right after creation and to detect a real change.
   const appliedSymbolRef = useRef<string>('');
@@ -288,6 +292,51 @@ export default function ChartingLibraryChart() {
       }
     }
   }, [positions, pendingOrders, selectedSymbol, ready]);
+
+  // Live BUY / SELL price lines that track the current quote (MT4/MT5 style):
+  // a blue BUY line at the ASK and a red SELL line at the BID, updated on every
+  // tick. Subscribes to the store imperatively so ticks don't re-render the
+  // whole component. Re-runs (and re-anchors) when the symbol changes.
+  useEffect(() => {
+    const w = widgetRef.current;
+    if (!ready || !w?.activeChart) return;
+    let chart: any;
+    try { chart = w.activeChart(); } catch { return; }
+    if (!chart?.createPositionLine) return;
+    const sym = (selectedSymbol || '').toUpperCase();
+
+    const ensure = () => {
+      if (liveLinesRef.current) return liveLinesRef.current;
+      try {
+        liveLinesRef.current = { ask: chart.createPositionLine(), bid: chart.createPositionLine() };
+      } catch { return null; }
+      return liveLinesRef.current;
+    };
+
+    const apply = (tick: { bid: number; ask: number } | undefined) => {
+      if (!tick || !(tick.bid > 0) || !(tick.ask > 0)) return;
+      const lines = ensure();
+      if (!lines) return;
+      try {
+        lines.ask.setPrice(tick.ask).setText('BUY').setQuantity('')
+          .setLineColor('#3b82f6').setLineStyle(2)
+          .setBodyBackgroundColor('#3b82f6').setBodyBorderColor('#3b82f6').setBodyTextColor('#ffffff');
+        lines.bid.setPrice(tick.bid).setText('SELL').setQuantity('')
+          .setLineColor('#ef4444').setLineStyle(2)
+          .setBodyBackgroundColor('#ef4444').setBodyBorderColor('#ef4444').setBodyTextColor('#ffffff');
+      } catch { /* noop */ }
+    };
+
+    apply(useTradingStore.getState().prices[sym]);
+    const unsub = useTradingStore.subscribe((state) => apply(state.prices[sym]));
+
+    return () => {
+      try { unsub(); } catch { /* noop */ }
+      try { liveLinesRef.current?.ask?.remove(); } catch { /* noop */ }
+      try { liveLinesRef.current?.bid?.remove(); } catch { /* noop */ }
+      liveLinesRef.current = null;
+    };
+  }, [ready, selectedSymbol]);
 
   return <div ref={containerRef} className="w-full h-full min-h-[320px]" />;
 }
