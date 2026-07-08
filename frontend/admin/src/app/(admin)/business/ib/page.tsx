@@ -219,7 +219,19 @@ export default function IBPage() {
           adminApi.get<{ items: UnassignedUser[] }>('/business/ib/users/unassigned', { per_page: '100' }),
           adminApi.get<{ items: IBAgent[] }>('/business/ib/agents'),
         ]);
-        setIbTree(Array.isArray(treeRes) ? treeRes : []);
+        const treeArr = Array.isArray(treeRes) ? treeRes : [];
+        setIbTree(treeArr);
+        // Auto-expand the ENTIRE hierarchy so the full tree (every sub-IB
+        // level, with each IB's user + sub-IB counts) is visible at once
+        // instead of being collapsed behind the chevrons. Admins wanted the
+        // whole downline / history in view without clicking each node open.
+        const allIds = new Set<string>();
+        const collect = (nodes: IBTreeNode[]) => nodes.forEach((n) => {
+          allIds.add(n.id);
+          if (n.children && n.children.length) collect(n.children);
+        });
+        collect(treeArr);
+        setExpandedNodes(allIds);
         setUnassignedUsers(unassignedRes.items || []);
         setAllAgents(agentsRes.items || []);
         setTreeLoading(false);
