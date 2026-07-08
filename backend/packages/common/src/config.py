@@ -161,9 +161,12 @@ class Settings(BaseSettings):
     INFOWAY_BUSINESS: str = "common"
     # Subscribe channel: "depth" uses 10003/10005 (best bid + best ask);
     # "trade" uses 10000/10002 (last trade price, mid-only — bid==ask).
-    # Depth is preferred where available; trade is the fallback that's
-    # licensed on every plan.
-    INFOWAY_CHANNEL: str = "depth"
+    # Verified on the free plan (2026-07-08): the DEPTH channel accepts the
+    # subscribe (code 10001/10004 "ok") but pushes ZERO 10005 frames, whereas
+    # the TRADE channel streams 10002 ticks fine → live bid/ask flow again.
+    # Default to "trade" so a fresh deploy stays live; on a paid plan where
+    # depth pushes, set INFOWAY_CHANNEL=depth in .env for true bid/ask.
+    INFOWAY_CHANNEL: str = "trade"
     # REST-to-tick bridge (client 2026-07-09): the free InfoWay plan's WS
     # subscribes OK but pushes NO live frames, so bid/ask + the forming candle
     # freeze while REST batch_kline keeps working. When true, market-data polls
