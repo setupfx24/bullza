@@ -13,7 +13,7 @@
  * Revert to '@/components/charts/AdvancedChart' for the public widget.
  */
 import { useEffect, useRef, useState } from 'react';
-import { useTradingStore } from '@/stores/tradingStore';
+import { useTradingStore, defaultContractSize } from '@/stores/tradingStore';
 import { useUIStore } from '@/stores/uiStore';
 import { swisDexDatafeed } from '@/lib/charting/datafeed';
 
@@ -185,8 +185,9 @@ export default function ChartingLibraryChart() {
   }, [selectedSymbol, ready]);
 
   // Reconcile chart lines whenever positions / pending orders change. Each open
-  // position gets an ENTRY line (BUY green / SELL red) plus SL (amber) / TP
-  // (teal); each pending order gets its entry (BUY blue / SELL purple) + SL/TP.
+  // position gets an ENTRY line labelled with its LIVE P&L and coloured by
+  // profit/loss (green/red/gray), throttled to 500ms; plus SL (amber) / TP
+  // (teal). Each pending order gets its entry (BUY blue / SELL purple) + SL/TP.
   //
   // Drawn with createShape('horizontal_line') — the CORE Charting Library API.
   // createPositionLine/createOrderLine are Trading-Terminal-only and render
@@ -213,17 +214,33 @@ export default function ChartingLibraryChart() {
       (i) => String(i.symbol).toUpperCase() === sym,
     );
     const digits = inst?.digits ?? 2;
+    const cs = Number(inst?.contract_size) || defaultContractSize(sym);
     const fp = (n: number) => Number(n).toFixed(digits);
 
-    type Desired = { key: string; price: number; color: string; text: string; dashed: boolean };
+    // P&L → line colour: green in profit, red in loss, gray near break-even.
+    const pnlColor = (pnl: number) =>
+      Math.abs(pnl) < 0.10 ? '#9ca3af' : pnl > 0 ? '#10b981' : '#ef4444';
+
+    type Desired = { key: string; price: number; color: string; text: string; dashed: boolean; pnl?: number };
     const desired: Desired[] = [];
 
-    // ── Open positions: entry (side-coloured) + SL + TP. Label is static
-    //    "SIDE price" (live P&L stays in the positions table). ──
+    // ── Open positions: entry line labelled with LIVE P&L, coloured by P&L
+    //    state (not side). p.profit is the SAME value the positions table and
+    //    top floating-P&L bar use (livePnlFor) → single source of truth, so the
+    //    line can never disagree with the table. SL (amber) / TP (teal) too. ──
     for (const p of myPos) {
-      const entryColor = p.side === 'buy' ? '#22c55e' : '#ef4444';
-      desired.push({ key: p.id, price: Number(p.open_price), color: entryColor,
-        text: `${p.side.toUpperCase()} ${fp(Number(p.open_price))}`, dashed: false });
+      const pnl = Number(p.profit || 0);
+      const lots = Number(p.lots || 0);
+      const entry = Number(p.open_price || 0);
+      const notional = entry * lots * cs;
+      const pct = notional > 0 ? (pnl / notional) * 100 : 0;
+      const pnlStr = `${pnl >= 0 ? '+' : '-'}$${Math.abs(pnl).toFixed(2)}`;
+      const pctStr = `${pct >= 0 ? '+' : ''}${pct.toFixed(2)}%`;
+      desired.push({
+        key: p.id, price: entry, color: pnlColor(pnl),
+        text: `${p.side.toUpperCase()} ${lots} @ ${fp(entry)} | ${pnlStr} (${pctStr})`,
+        dashed: false, pnl,
+      });
       if (p.stop_loss && Number(p.stop_loss) > 0)
         desired.push({ key: `${p.id}-sl`, price: Number(p.stop_loss), color: '#f59e0b', text: `SL ${fp(Number(p.stop_loss))}`, dashed: true });
       if (p.take_profit && Number(p.take_profit) > 0)
@@ -253,6 +270,10 @@ export default function ChartingLibraryChart() {
     });
 
     const t = Math.floor(Date.now() / 1000);
+    const now = Date.now();
+    // Throttle the live-P&L label refresh: 500ms normally, 1000ms once 10+
+    // positions are open, so streaming ticks never thrash the chart.
+    const throttleMs = myPos.length >= 10 ? 1000 : 500;
     const wanted = new Set(desired.map((d) => d.key));
 
     for (const d of desired) {
@@ -260,7 +281,7 @@ export default function ChartingLibraryChart() {
       if (!existing) {
         // createShape is ASYNC (Promise<EntityId>). Reserve the key with a
         // 'creating' entry so a re-render mid-create doesn't spawn a duplicate.
-        const entry: any = { id: null, price: d.price, creating: true };
+        const entry: any = { id: null, price: d.price, creating: true, text: d.text, color: d.color, pnl: d.pnl ?? null, propAt: now };
         linesRef.current.set(d.key, entry);
         chart.createShape({ time: t, price: d.price }, shapeOpts(d.text, d.color, d.dashed))
           .then((id: any) => {
@@ -268,10 +289,34 @@ export default function ChartingLibraryChart() {
             else { try { chart.removeEntity(id); } catch { /* closed mid-create */ } }
           })
           .catch(() => { if (linesRef.current.get(d.key) === entry) linesRef.current.delete(d.key); });
-      } else if (existing.id != null && existing.price !== d.price) {
+      } else if (existing.id != null) {
         // Price moved (SL/TP edited) → slide the existing line, no recreate.
-        try { chart.getShapeById(existing.id)?.setPoints([{ time: t, price: d.price }]); } catch { /* noop */ }
-        existing.price = d.price;
+        if (existing.price !== d.price) {
+          try { chart.getShapeById(existing.id)?.setPoints([{ time: t, price: d.price }]); } catch { /* noop */ }
+          existing.price = d.price;
+        }
+        // Live label + colour refresh. For P&L lines (entry): throttle AND
+        // only when P&L moved > $0.01 or the profit/loss colour flipped — so we
+        // don't setProperties on every micro-tick. SL/TP/order labels are
+        // static, so they update immediately when they actually change.
+        if (d.text !== existing.text || d.color !== existing.color) {
+          const isPnl = d.pnl != null;
+          const throttleOk = !isPnl || (now - (existing.propAt || 0) >= throttleMs);
+          const worthIt = !isPnl
+            || d.color !== existing.color
+            || Math.abs((d.pnl as number) - (existing.pnl ?? 0)) > 0.01;
+          if (throttleOk && worthIt) {
+            try {
+              chart.getShapeById(existing.id)?.setProperties({
+                text: d.text, linecolor: d.color, textcolor: d.color,
+              });
+            } catch { /* keep last-known label on error */ }
+            existing.text = d.text;
+            existing.color = d.color;
+            existing.pnl = d.pnl ?? existing.pnl;
+            existing.propAt = now;
+          }
+        }
       }
     }
 
