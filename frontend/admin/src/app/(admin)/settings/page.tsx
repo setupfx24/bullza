@@ -24,6 +24,8 @@ interface Settings {
   crypto_auto_withdrawal_enabled: boolean;
   crypto_auto_withdrawal_max_usd: number;
   dual_approval_threshold_usd: number;
+  deposit_dual_approval_min_usd: number;
+  withdrawal_dual_approval_min_usd: number;
   referral_commission_amount_usd: number;
   referral_qualifying_trades: number;
   // IB commission gates (mirror of the referral gates above).
@@ -71,6 +73,8 @@ const DEFAULT_SETTINGS: Settings = {
   crypto_auto_withdrawal_enabled: false,
   crypto_auto_withdrawal_max_usd: 0,
   dual_approval_threshold_usd: 1000,
+  deposit_dual_approval_min_usd: 0,
+  withdrawal_dual_approval_min_usd: 0,
   referral_commission_amount_usd: 5,
   referral_qualifying_trades: 3,
   ib_commission_requires_kyc: true,
@@ -118,6 +122,8 @@ function rowsToSettings(rows: SystemSettingRow[]): Settings {
     crypto_auto_withdrawal_enabled: bool('crypto_auto_withdrawal_enabled', DEFAULT_SETTINGS.crypto_auto_withdrawal_enabled),
     crypto_auto_withdrawal_max_usd: num('crypto_auto_withdrawal_max_usd', DEFAULT_SETTINGS.crypto_auto_withdrawal_max_usd),
     dual_approval_threshold_usd: num('dual_approval_threshold_usd', DEFAULT_SETTINGS.dual_approval_threshold_usd),
+    deposit_dual_approval_min_usd: num('deposit_dual_approval_min_usd', DEFAULT_SETTINGS.deposit_dual_approval_min_usd),
+    withdrawal_dual_approval_min_usd: num('withdrawal_dual_approval_min_usd', DEFAULT_SETTINGS.withdrawal_dual_approval_min_usd),
     referral_commission_amount_usd: num(
       'referral_commission_amount_usd',
       DEFAULT_SETTINGS.referral_commission_amount_usd as number,
@@ -165,6 +171,8 @@ function settingsToPayload(s: Settings): Record<string, unknown> {
     crypto_auto_withdrawal_enabled: s.crypto_auto_withdrawal_enabled,
     crypto_auto_withdrawal_max_usd: s.crypto_auto_withdrawal_max_usd,
     dual_approval_threshold_usd: s.dual_approval_threshold_usd,
+    deposit_dual_approval_min_usd: s.deposit_dual_approval_min_usd,
+    withdrawal_dual_approval_min_usd: s.withdrawal_dual_approval_min_usd,
     // Fallback flat USD bounty — used only when referral_tiers
     // (the by-active-referral-count ladder, editable at /config/referral-tiers,
     // independent of IB) has no matching tier for the referrer's position.
@@ -511,6 +519,47 @@ export default function SettingsPage() {
                       min="0"
                       value={settings.dual_approval_threshold_usd}
                       onChange={(e) => updateNum('dual_approval_threshold_usd', e.target.value)}
+                      className="w-28 text-xs py-1.5 px-2 bg-bg-input border border-border-primary rounded-md font-mono tabular-nums text-right"
+                    />
+                    <span className="text-xxs text-text-tertiary w-8">USD</span>
+                  </div>
+                </div>
+
+                {/* Deposit dual-approval limit (client 2026-07-08): user
+                    deposits at/above this need a second super-admin sign-off. */}
+                <div className="flex flex-wrap items-center justify-between gap-4">
+                  <div className="min-w-0 flex-1">
+                    <label className="text-xs text-text-secondary block">Deposit Dual-Approval Limit</label>
+                    <p className="text-xxs text-text-tertiary mt-0.5">A user deposit at or above this amount needs a second super-admin sign-off in Approvals before it's credited. 0 = off (no limit).</p>
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <span className="text-xxs text-text-tertiary">$</span>
+                    <input
+                      type="number"
+                      step="1"
+                      min="0"
+                      value={settings.deposit_dual_approval_min_usd}
+                      onChange={(e) => updateNum('deposit_dual_approval_min_usd', e.target.value)}
+                      className="w-28 text-xs py-1.5 px-2 bg-bg-input border border-border-primary rounded-md font-mono tabular-nums text-right"
+                    />
+                    <span className="text-xxs text-text-tertiary w-8">USD</span>
+                  </div>
+                </div>
+
+                {/* Withdrawal dual-approval limit. */}
+                <div className="flex flex-wrap items-center justify-between gap-4">
+                  <div className="min-w-0 flex-1">
+                    <label className="text-xs text-text-secondary block">Withdrawal Dual-Approval Limit</label>
+                    <p className="text-xxs text-text-tertiary mt-0.5">A user withdrawal at or above this amount needs a second super-admin sign-off in Approvals before it's paid out. 0 = off (no limit).</p>
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <span className="text-xxs text-text-tertiary">$</span>
+                    <input
+                      type="number"
+                      step="1"
+                      min="0"
+                      value={settings.withdrawal_dual_approval_min_usd}
+                      onChange={(e) => updateNum('withdrawal_dual_approval_min_usd', e.target.value)}
                       className="w-28 text-xs py-1.5 px-2 bg-bg-input border border-border-primary rounded-md font-mono tabular-nums text-right"
                     />
                     <span className="text-xxs text-text-tertiary w-8">USD</span>

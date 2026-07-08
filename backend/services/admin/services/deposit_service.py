@@ -165,7 +165,7 @@ async def approve_deposit(
     # super admin approves it in /approvals, which re-invokes this with
     # approval_request_id set to actually credit the user. ──
     from .approval_service import request_or_execute, mark_executed
-    from packages.common.src.settings_store import get_bool_setting
+    from packages.common.src.settings_store import get_bool_setting, get_float_setting
     _gate_amt = Decimal(str(verified_amount if verified_amount is not None else (deposit.amount or 0)))
     # Dual-approval for deposits is OPT-IN (client 2026-06-20). Forcing EVERY
     # deposit through a second super-admin sign-off deadlocked single-admin
@@ -175,7 +175,13 @@ async def approve_deposit(
     # "deposit approve nahi ho raha / internal server error". Default now: the
     # deposit-authority admin approves directly. Brokers who want the strict
     # two-admin flow flip on `deposit_dual_approval_required`.
+    # Dual approval fires when EITHER the strict "all deposits" flag is on, OR
+    # the amount is at/above the admin-set limit (deposit_dual_approval_min_usd;
+    # 0 = no limit). Lets a broker require a second super-admin sign-off only on
+    # large deposits (client 2026-07-08).
     _dual_required = await get_bool_setting("deposit_dual_approval_required", False)
+    _dual_min = Decimal(str(await get_float_setting("deposit_dual_approval_min_usd", 0.0)))
+    _needs_dual = _dual_required or (_dual_min > 0 and _gate_amt >= _dual_min)
     if approval_request_id is not None:
         # Second leg: a different super admin completed the request in /approvals
         # and it re-invokes here with the request id — validate then credit.
@@ -187,7 +193,7 @@ async def approve_deposit(
             raise HTTPException(status_code=409, detail="Approval not in 'approved' state")
         if _ar["action"] != "deposit_approve" or str(_ar["target_id"]) != str(deposit_id):
             raise HTTPException(status_code=409, detail="Approval does not match this deposit")
-    elif _dual_required:
+    elif _needs_dual:
         # Strict two-admin flow ON → create a pending request and stop (202).
         await request_or_execute(
             db, action="deposit_approve", target_type="deposit",
@@ -755,8 +761,14 @@ async def approve_withdrawal(
     # forced two-admin sign-off deadlocked single-admin setups, so it's now
     # off by default and toggled via withdrawal_dual_approval_required. ──
     from .approval_service import request_or_execute, mark_executed
-    from packages.common.src.settings_store import get_bool_setting
+    from packages.common.src.settings_store import get_bool_setting, get_float_setting
+    # Same as deposits: dual approval fires when the strict flag is on OR the
+    # amount is at/above the admin-set limit (withdrawal_dual_approval_min_usd;
+    # 0 = no limit). Large withdrawals get a second super-admin sign-off.
     _wd_dual_required = await get_bool_setting("withdrawal_dual_approval_required", False)
+    _wd_dual_min = Decimal(str(await get_float_setting("withdrawal_dual_approval_min_usd", 0.0)))
+    _wd_amt = Decimal(str(withdrawal.amount or 0))
+    _wd_needs_dual = _wd_dual_required or (_wd_dual_min > 0 and _wd_amt >= _wd_dual_min)
     if approval_request_id is not None:
         _ar = (await db.execute(
             text("SELECT status, action, target_id FROM admin_approval_requests WHERE id = :rid FOR UPDATE"),
@@ -766,7 +778,7 @@ async def approve_withdrawal(
             raise HTTPException(status_code=409, detail="Approval not in 'approved' state")
         if _ar["action"] != "withdrawal_approve" or str(_ar["target_id"]) != str(withdrawal_id):
             raise HTTPException(status_code=409, detail="Approval does not match this withdrawal")
-    elif _wd_dual_required:
+    elif _wd_needs_dual:
         await request_or_execute(
             db, action="withdrawal_approve", target_type="withdrawal",
             target_id=withdrawal_id, amount=Decimal(str(withdrawal.amount or 0)),
