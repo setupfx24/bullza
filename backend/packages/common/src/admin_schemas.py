@@ -698,6 +698,7 @@ class TicketOut(BaseModel):
     status: str
     priority: str
     assigned_to: Optional[str] = None
+    assigned_name: Optional[str] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
     user_email: Optional[str] = None

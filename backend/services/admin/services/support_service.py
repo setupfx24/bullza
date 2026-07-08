@@ -14,7 +14,14 @@ from packages.common.src.admin_schemas import (
 from dependencies import write_audit_log
 
 
-def _ticket_to_out(t: SupportTicket, user: User = None, msg_count: int = 0) -> TicketOut:
+def _ticket_to_out(t: SupportTicket, user: User = None, msg_count: int = 0,
+                   assignee: User = None) -> TicketOut:
+    assigned_name = None
+    if assignee:
+        assigned_name = (
+            f"{assignee.first_name or ''} {assignee.last_name or ''}".strip()
+            or assignee.email
+        )
     return TicketOut(
         id=str(t.id),
         user_id=str(t.user_id),
@@ -22,6 +29,7 @@ def _ticket_to_out(t: SupportTicket, user: User = None, msg_count: int = 0) -> T
         status=t.status,
         priority=t.priority,
         assigned_to=str(t.assigned_to) if t.assigned_to else None,
+        assigned_name=assigned_name,
         created_at=t.created_at,
         updated_at=t.updated_at,
         user_email=user.email if user else None,
@@ -59,12 +67,22 @@ async def list_tickets(
         user_q = await db.execute(select(User).where(User.id == t.user_id))
         user = user_q.scalar_one_or_none()
 
+        # Assigned employee (assigned_to is a FK to users.id) so the list can
+        # show WHO it's assigned to instead of always "—". Without this the
+        # frontend's `assigned_name` was undefined → every ticket read
+        # "not assigned" even after assignment (client 2026-07-08).
+        assignee = None
+        if t.assigned_to:
+            assignee = (await db.execute(
+                select(User).where(User.id == t.assigned_to)
+            )).scalar_one_or_none()
+
         msg_count_q = await db.execute(
             select(func.count(TicketMessage.id)).where(TicketMessage.ticket_id == t.id)
         )
         msg_count = msg_count_q.scalar() or 0
 
-        items.append(_ticket_to_out(t, user, msg_count))
+        items.append(_ticket_to_out(t, user, msg_count, assignee))
 
     return PaginatedResponse(items=items, total=total, page=page, per_page=per_page)
 
