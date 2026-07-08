@@ -394,11 +394,6 @@ export default function FixedReturnPage() {
                 = principal + cumulative interest
               </div>
             </div>
-            <p className="mt-3 text-[11px] text-text-tertiary leading-relaxed">
-              <strong className="text-amber-400">Early withdrawal:</strong>{' '}
-              <strong>{cfg.early_withdrawal_fee_pct}% penalty</strong> on principal AND all interest
-              paid so far claws back from the returned amount.
-            </p>
           </div>
         </section>
 
