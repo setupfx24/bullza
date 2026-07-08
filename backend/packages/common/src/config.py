@@ -164,6 +164,14 @@ class Settings(BaseSettings):
     # Depth is preferred where available; trade is the fallback that's
     # licensed on every plan.
     INFOWAY_CHANNEL: str = "depth"
+    # REST-to-tick bridge (client 2026-07-09): the free InfoWay plan's WS
+    # subscribes OK but pushes NO live frames, so bid/ask + the forming candle
+    # freeze while REST batch_kline keeps working. When true, market-data polls
+    # REST for each forex/metals/indices symbol's latest close (~2s) and feeds
+    # it through the normal tick pipeline — restoring live prices + filling
+    # candle gaps. Per-symbol staleness gate makes it a no-op once a real WS
+    # tick streams (e.g. after buying a paid plan). Set false to disable.
+    INFOWAY_REST_BRIDGE_ENABLED: bool = False
 
     # ─── AllTick — market-data provider (used when InfoWay is empty) ────
     # Real-time forex / metals / crypto / indices CFD ticks via WebSocket.

@@ -123,3 +123,73 @@ async def fetch_klines(
     # respList is newest-first (t descending) — TradingView needs ascending.
     out.sort(key=lambda b: b["time"])
     return out
+
+
+async def fetch_latest_close_batch(
+    symbols: list[str],
+    tf_name: str,
+    token: str = "",
+) -> dict[str, float]:
+    """Latest close per /common/ symbol (forex/metals/indices) in ONE batch
+    request. Unlike gap-fill (which needs many bars, so must be single-code),
+    the REST-to-tick BRIDGE only needs the latest price — and a multi-symbol
+    batch returns the latest ~2 bars per product, which is plenty. One request
+    covers all symbols, so it stays within InfoWay's rate budget.
+
+    Returns ``{platform_symbol: close_float}``. Crypto/stocks are skipped here
+    (crypto is live via Binance; batching mixes hosts). Returns ``{}`` on any
+    failure — the caller just keeps the last price for that symbol."""
+    kline_type = _TF_TO_KLINETYPE.get(tf_name)
+    if not kline_type or not (token or "").strip():
+        return {}
+
+    ordered_syms: list[str] = []
+    codes: list[str] = []
+    for s in symbols:
+        business, code = _route(s)
+        if business != "common":       # crypto/stocks aren't batched here
+            continue
+        ordered_syms.append(s)
+        codes.append(code)
+    if not codes:
+        return {}
+
+    body = {"klineType": kline_type, "klineNum": 2, "codes": ",".join(codes)}
+    url = f"{_BASE}/common/v2/batch_kline"
+    try:
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            resp = await client.post(url, json=body, headers={"apiKey": token.strip()})
+        if resp.status_code != 200:
+            logger.warning("InfoWay batch kline HTTP %s: %s", resp.status_code, resp.text[:200])
+            return {}
+        payload = resp.json()
+    except Exception as exc:  # noqa: BLE001 — network/JSON failure → keep last price
+        logger.warning("InfoWay batch kline fetch failed: %s", exc)
+        return {}
+
+    rows = payload.get("data") if isinstance(payload, dict) else None
+    if not rows:
+        return {}
+
+    code_to_sym = {c.upper(): s for c, s in zip(codes, ordered_syms)}
+    out: dict[str, float] = {}
+    for i, row in enumerate(rows):
+        resp_list = (row or {}).get("respList") or []
+        if not resp_list:
+            continue
+        try:
+            close = float(resp_list[0]["c"])   # respList newest-first → [0] is latest
+        except (KeyError, TypeError, ValueError, IndexError):
+            continue
+        # Map row → platform symbol: prefer an explicit code field on the row,
+        # else fall back to request order (InfoWay returns rows in code order).
+        code = str(
+            (row or {}).get("code")
+            or (row or {}).get("s")
+            or (row or {}).get("productCode")
+            or ""
+        ).upper()
+        sym = code_to_sym.get(code) or (ordered_syms[i] if i < len(ordered_syms) else None)
+        if sym and close > 0:
+            out[sym] = close
+    return out

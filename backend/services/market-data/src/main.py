@@ -161,6 +161,13 @@ class MarketDataService:
         # P&L actually move. FeedSimulator already runs its own Binance feed.
         if isinstance(self.feed, (InfoWayFeed, AllTickFeed)):
             tasks.append(asyncio.create_task(self._binance_crypto_feed()))
+        # Free-plan live-price fallback: poll REST for the latest close and
+        # publish synthetic ticks when the WS delivers no live frames. Off by
+        # default; a real WS tick auto-suppresses it per-symbol.
+        if getattr(settings, "INFOWAY_REST_BRIDGE_ENABLED", False) and isinstance(
+            self.feed, (InfoWayFeed, AllTickFeed)
+        ):
+            tasks.append(asyncio.create_task(self._infoway_rest_bridge()))
 
         await asyncio.gather(*tasks)
 
@@ -398,6 +405,59 @@ class MarketDataService:
             except Exception as e:
                 logger.warning("Binance crypto feed error: %s — reconnecting in 5s", e)
                 await asyncio.sleep(5)
+
+    async def _infoway_rest_bridge(self) -> None:
+        """FREE-plan fallback (client 2026-07-09). The InfoWay WS subscribes OK
+        but pushes NO live frames on the current plan, so bid/ask + the forming
+        candle freeze while REST batch_kline keeps working. This polls the
+        WORKING REST for each forex/metals/indices symbol's LATEST close (~2s)
+        and publishes it as a synthetic tick through the SAME path a real tick
+        takes (note_mid → widen → publish_price → insert_tick → aggregator →
+        current-bars) — restoring live prices AND filling candle gaps from one
+        source, so chart + panel stay in sync.
+
+        Per-symbol staleness gate: skip a symbol if a REAL tick (WS/Binance)
+        landed within LIVE_WINDOW — so the moment a paid WS plan streams for
+        real, this becomes a no-op automatically (no double-ticking). Like the
+        Binance feed it does NOT touch self._tick_count, so the primary-feed
+        watchdogs still judge the real feed's health. Gated by
+        INFOWAY_REST_BRIDGE_ENABLED.
+        """
+        from packages.common.src.infoway_rest import fetch_latest_close_batch
+
+        token = (getattr(settings, "INFOWAY_TOKEN", "") or "").strip()
+        syms = list(INSTRUMENTS.keys())   # batch helper filters to /common/ only
+        LIVE_WINDOW = 6.0                  # s — a real tick this recent wins
+        POLL = 2.0
+        logger.info("InfoWay REST-to-tick bridge ON (poll=%.1fs) — free-plan live-price fallback", POLL)
+        while self.running and isinstance(self.feed, (InfoWayFeed, AllTickFeed)):
+            try:
+                latest = await fetch_latest_close_batch(syms, "1m", token)
+                now_mono = time.monotonic()
+                for sym, close in latest.items():
+                    if close <= 0:
+                        continue
+                    # A genuine live tick arrived recently → let it win.
+                    last = self._last_live_mono.get(sym, 0.0)
+                    if last and (now_mono - last) < LIVE_WINDOW:
+                        continue
+                    ts = datetime.now(timezone.utc)
+                    timestamp = ts.strftime("%Y-%m-%dT%H:%M:%S.") + f"{ts.microsecond // 1000:03d}Z"
+                    mid = close
+                    # Update _last_mid (feeds the bad-tick jump guard) but NOT
+                    # _last_live_mono — that must reflect only REAL liveness.
+                    self._last_mid[sym] = mid
+                    spread_mult = self.spread_cache.note_mid(sym, mid)
+                    bid, ask = self.spread_cache.widen(sym, mid)
+                    await publish_price(sym, bid, ask, timestamp, spread_mult)
+                    await self.store.insert_tick(sym, bid, ask, timestamp)
+                    self.aggregator.update(sym, bid, ask, timestamp)
+                    await self._publish_current_bars(sym)
+            except asyncio.CancelledError:
+                raise
+            except Exception as e:
+                logger.warning("InfoWay REST bridge error: %s", e)
+            await asyncio.sleep(POLL)
 
     async def _alltick_fallback_watchdog(self) -> None:
         """If AllTick never delivers ticks (bad token, expired plan, network,
