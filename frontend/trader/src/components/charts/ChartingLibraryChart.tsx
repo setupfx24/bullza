@@ -73,6 +73,9 @@ export default function ChartingLibraryChart() {
   // 'creating' sentinel while the async createShape resolves, or { ask, bid }
   // EntityIds once created.
   const liveLinesRef = useRef<any>(null);
+  // True while the BUY/SELL quote lines are showing the STALE state, so the
+  // next fresh tick knows to restore their normal label/colour.
+  const liveStaleRef = useRef(false);
   // The symbol the widget is currently displaying. Used to avoid a redundant
   // setSymbol() right after creation and to detect a real change.
   const appliedSymbolRef = useRef<string>('');
@@ -377,9 +380,9 @@ export default function ChartingLibraryChart() {
       stale = isStale;
       if (!isStale) return;                    // recovery handled by the reconcile
       const now = Date.now();
+      // (a) Position ENTRY lines (carry live P&L; entry.pnl != null). SL/TP and
+      //     pending-order labels are static, so leave them untouched.
       for (const [, entry] of linesRef.current) {
-        // Only position ENTRY lines carry live P&L (entry.pnl != null); SL/TP
-        // and pending-order labels are static, so leave them untouched.
         if (!entry || entry.id == null || entry.pnl == null) continue;
         const base = String(entry.text || '').split(' | ')[0]; // "BUY 0.01 @ 4072.38"
         const staleText = `${base} | -- (stale)`;
@@ -391,6 +394,15 @@ export default function ChartingLibraryChart() {
         entry.text = staleText;
         entry.color = STALE_COLOR;
         entry.propAt = now; // so the reconcile's throttle lets recovery through
+      }
+      // (b) Live BUY/SELL quote lines — grey them regardless of whether any
+      //     position is open. The BUY/SELL effect restores them on the next
+      //     fresh tick (it checks liveStaleRef).
+      const live = liveLinesRef.current;
+      if (live && typeof live === 'object' && live.ask != null) {
+        try { chart.getShapeById(live.ask)?.setProperties({ text: 'BUY -- (stale)', linecolor: STALE_COLOR, textcolor: STALE_COLOR }); } catch { /* noop */ }
+        try { chart.getShapeById(live.bid)?.setProperties({ text: 'SELL -- (stale)', linecolor: STALE_COLOR, textcolor: STALE_COLOR }); } catch { /* noop */ }
+        liveStaleRef.current = true;
       }
     }, 1000);
 
@@ -434,6 +446,13 @@ export default function ChartingLibraryChart() {
       if (cur && cur.ask != null) {
         move(cur.ask, t, tick.ask);
         move(cur.bid, t, tick.bid);
+        // Recovery: a fresh tick arrived after the stale watchdog greyed these
+        // → restore the normal BUY (green) / SELL (red) labels + colour, once.
+        if (liveStaleRef.current) {
+          liveStaleRef.current = false;
+          try { chart.getShapeById(cur.ask)?.setProperties({ text: 'BUY', linecolor: '#22c55e', textcolor: '#22c55e' }); } catch { /* noop */ }
+          try { chart.getShapeById(cur.bid)?.setProperties({ text: 'SELL', linecolor: '#ef4444', textcolor: '#ef4444' }); } catch { /* noop */ }
+        }
         return;
       }
       // createShape is ASYNC (returns Promise<EntityId>) — await both, then

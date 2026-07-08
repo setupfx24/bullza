@@ -119,6 +119,25 @@ export default function OrderPanel() {
   const execPrice = tick ? (side === 'buy' ? userAsk : userBid) : 0;
   const lotsNum = parseFloat(lots) || 0;
 
+  // Stale bid/ask detection — the price stream (priceSocket) can stall
+  // "half-open" and freeze the panel at an old quote (prod incident 2026-07-09).
+  // Mirror the chart's watchdog: if `tick` (prices[selectedSymbol]) hasn't
+  // changed within the market threshold, flag it so the boxes dim + show a
+  // "stale" note. Recovers instantly on the next fresh tick.
+  const [priceStale, setPriceStale] = useState(false);
+  const lastTickAtRef = useRef(Date.now());
+  useEffect(() => { lastTickAtRef.current = Date.now(); setPriceStale(false); }, [tick]);
+  useEffect(() => {
+    const isCrypto = String(segment || '').toLowerCase() === 'crypto';
+    const day = new Date().getUTCDay();
+    const isWeekend = day === 0 || day === 6;
+    const threshold = isCrypto ? 3000 : (isWeekend ? 60000 : 5000);
+    const id = setInterval(() => {
+      setPriceStale(Date.now() - lastTickAtRef.current > threshold);
+    }, 1000);
+    return () => clearInterval(id);
+  }, [segment]);
+
   // Cent-account lot scaling (Mig 0069). The backend persists the
   // position at (typed lots × multiplier), so the margin preview +
   // the "Insufficient margin" gate must use the SAME effective lots,
@@ -470,7 +489,7 @@ export default function OrderPanel() {
                 }}
              >
                 <div className={clsx('font-bold uppercase tracking-wider', isTradingTerminal ? 'text-[10px] mb-0' : 'text-sm mb-0.5')}>Sell</div>
-                <div className={clsx('font-mono font-bold', isTradingTerminal ? 'text-[13px]' : 'text-[15px]', side === 'sell' && 'text-red-400')}>{tick ? userBid.toFixed(digits) : '---'}</div>
+                <div className={clsx('font-mono font-bold', isTradingTerminal ? 'text-[13px]' : 'text-[15px]', side === 'sell' && 'text-red-400', priceStale && 'opacity-40')}>{tick ? userBid.toFixed(digits) : '---'}</div>
                 <div className={clsx('text-text-tertiary', isTradingTerminal ? 'text-[8px] mt-0.5' : 'text-[9px] mt-1')}>Bid</div>
              </button>
              <button
@@ -484,7 +503,7 @@ export default function OrderPanel() {
                 }}
              >
                 <div className={clsx('font-bold uppercase tracking-wider', isTradingTerminal ? 'text-[10px] mb-0' : 'text-sm mb-0.5')}>Buy</div>
-                <div className={clsx('font-mono font-bold', isTradingTerminal ? 'text-[13px]' : 'text-[15px]', side === 'buy' && 'text-[#55a630]')}>{tick ? userAsk.toFixed(digits) : '---'}</div>
+                <div className={clsx('font-mono font-bold', isTradingTerminal ? 'text-[13px]' : 'text-[15px]', side === 'buy' && 'text-[#55a630]', priceStale && 'opacity-40')}>{tick ? userAsk.toFixed(digits) : '---'}</div>
                 <div className={clsx('text-text-tertiary', isTradingTerminal ? 'text-[8px] mt-0.5' : 'text-[9px] mt-1')}>Ask</div>
              </button>
           </div>
@@ -549,11 +568,15 @@ export default function OrderPanel() {
             </div>
           )}
 
-          {/* Spread */}
+          {/* Spread — or a stale warning if the price stream has stalled. */}
           {tick && (
              <div className={clsx('flex items-center justify-center', isTradingTerminal ? '-mt-1' : '-mt-2')}>
-                <span className={clsx('font-mono px-2 py-0.5 rounded-full bg-bg-secondary text-text-tertiary border border-border-primary', isTradingTerminal ? 'text-[9px]' : 'text-[10px]')}>
-                  Spread: {userSpreadPips.toFixed(1)}
+                <span className={clsx('font-mono px-2 py-0.5 rounded-full border',
+                  isTradingTerminal ? 'text-[9px]' : 'text-[10px]',
+                  priceStale
+                    ? 'bg-amber-500/10 text-amber-500 border-amber-500/25'
+                    : 'bg-bg-secondary text-text-tertiary border-border-primary')}>
+                  {priceStale ? '⚠ Price stale — reconnecting…' : `Spread: ${userSpreadPips.toFixed(1)}`}
                 </span>
              </div>
           )}
