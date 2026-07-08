@@ -111,17 +111,18 @@ async def create_ticket(
                     f"<b>Priority:</b> {escape(priority or 'normal')}<br>"
                     f"<b>Subject:</b> {escape(subject or '')}</p>"
                     f"<p><b>Message:</b><br>{escape(message or '').replace(chr(10), '<br>')}</p>"
-                    + (f"<p><b>Attachments:</b> {len(attachments)} file(s) — view them in the admin panel.</p>"
+                    + (f"<p><b>Attachments:</b> {len(attachments)} file(s) attached to this email (also in the admin panel).</p>"
                        if attachments else "")
                     + "<p>Open the Support section in the admin panel to reply.</p>"
                 ),
                 text=(
                     f"New support ticket from {who}\n"
                     f"Priority: {priority or 'normal'}\nSubject: {subject}\n\n{message}\n"
-                    + (f"\nAttachments: {len(attachments)} file(s) — view them in the admin panel.\n"
+                    + (f"\nAttachments: {len(attachments)} file(s) — attached, or view in the admin panel.\n"
                        if attachments else "")
                 ),
                 category="support",
+                attachments=attachments,
             )
     except Exception:
         import logging

@@ -183,7 +183,43 @@ def _from_address(category: str = "default") -> str:
     return f"{name} <{addr}>"
 
 
-def _send_sync(to_email: str, subject: str, html: str, text: Optional[str], category: str) -> None:
+def _attach_files(msg: EmailMessage, attachments: Optional[list]) -> None:
+    """Attach caller-supplied files (e.g. support-ticket screenshots).
+
+    Each item is a {name, type, data} dict where `data` is a base64 data URL
+    (``data:image/png;base64,...``) or a bare base64 string. Silently skips a
+    file that can't be decoded, or one over ~8 MB (SMTP servers reject huge
+    messages) — the note in the body still tells the admin to check the panel.
+    """
+    import base64 as _b64
+    for att in (attachments or []):
+        try:
+            raw = (att.get("data") or "") if isinstance(att, dict) else ""
+            if not raw:
+                continue
+            mime = (att.get("type") or "").strip() if isinstance(att, dict) else ""
+            if raw.strip().lower().startswith("data:") and "," in raw:
+                header, b64 = raw.split(",", 1)
+                if not mime and ":" in header and ";" in header:
+                    mime = header.split(":", 1)[1].split(";", 1)[0].strip()
+            else:
+                b64 = raw
+            content = _b64.b64decode(b64, validate=False)
+            if not content or len(content) > 8 * 1024 * 1024:
+                continue
+            mime = mime or "application/octet-stream"
+            maintype, _, subtype = mime.partition("/")
+            msg.add_attachment(
+                content, maintype=(maintype or "application"),
+                subtype=(subtype or "octet-stream"),
+                filename=(att.get("name") if isinstance(att, dict) else None) or "attachment",
+            )
+        except Exception:
+            logger.warning("could not attach a file to email")
+
+
+def _send_sync(to_email: str, subject: str, html: str, text: Optional[str], category: str,
+               attachments: Optional[list] = None) -> None:
     s = get_settings()
     msg = EmailMessage()
     msg["Subject"] = subject
@@ -235,6 +271,10 @@ def _send_sync(to_email: str, subject: str, html: str, text: Optional[str], cate
         except Exception:
             logger.exception("Failed to embed inline logo — mail will use remote URL fallback")
 
+    # Real file attachments last, so they sit at the top level (multipart/mixed)
+    # and don't disturb the inline-logo related part above.
+    _attach_files(msg, attachments)
+
     host = str(s.SMTP_HOST).strip()
     port = int(s.SMTP_PORT)
     with smtplib.SMTP(host, port, timeout=30) as server:
@@ -254,6 +294,7 @@ async def send_email(
     *,
     text: Optional[str] = None,
     category: str = "info",
+    attachments: Optional[list] = None,
 ) -> bool:
     """Send a transactional email. Returns True on success, False on
     misconfiguration or SMTP failure. Never raises — caller can ignore
@@ -284,7 +325,7 @@ async def send_email(
         logger.info("Skipping email — non-deliverable/demo recipient %s subj=%r", to_email, subject)
         return False
     try:
-        await asyncio.to_thread(_send_sync, to_email, subject, html, text, category)
+        await asyncio.to_thread(_send_sync, to_email, subject, html, text, category, attachments)
         logger.info("email sent to=%s cat=%s subj=%r", to_email, category, subject)
         return True
     except Exception:
