@@ -1073,20 +1073,21 @@ async def get_ib_referrals(ib_id: uuid.UUID, page: int, per_page: int, db: Async
             select(func.coalesce(func.sum(IBCommission.amount), 0))
             .where(IBCommission.ib_id == ib_id, IBCommission.source_user_id == user.id)
         )).scalar() or 0
-        # Is this referred user themselves an active IB (a sub-IB)? Lets the
-        # admin see, right in the user list, which entries have their own
-        # downline — flagged with a "sub-IB" badge on the frontend.
-        sub_ib = (await db.execute(
-            select(func.count(IBProfile.id)).where(
+        # Is this referred user themselves an active IB? If so return their
+        # level too, so the frontend can badge the correct ROLE — level 1
+        # Super IB, level 2 IB, level 3+ Sub-IB (not a blanket "sub-IB").
+        sub_profile = (await db.execute(
+            select(IBProfile).where(
                 IBProfile.user_id == user.id, IBProfile.is_active == True  # noqa: E712
             )
-        )).scalar() or 0
+        )).scalars().first()
         items.append({
             "user_id": str(user.id), "email": user.email,
             "name": f"{user.first_name or ''} {user.last_name or ''}".strip(),
             "trades": trade_count, "commission_generated": float(comm),
             "joined_at": user.created_at.isoformat() if user.created_at else None,
-            "is_ib": bool(sub_ib),
+            "is_ib": bool(sub_profile),
+            "ib_level": (sub_profile.level or 1) if sub_profile else None,
         })
     return {"referrals": items, "total": total, "page": page}
 

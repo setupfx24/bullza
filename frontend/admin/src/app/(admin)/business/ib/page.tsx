@@ -66,6 +66,7 @@ interface ReferralUser {
   commission_generated: number;
   joined_at: string | null;
   is_ib?: boolean;
+  ib_level?: number | null;
 }
 
 interface UnassignedUser {
@@ -882,10 +883,10 @@ export default function IBPage() {
                                         <button
                                           type="button"
                                           onClick={(e) => { e.stopPropagation(); drillIntoUser(u.user_id); }}
-                                          title="View this sub-IB's own users"
+                                          title="View this IB's own users"
                                           className="shrink-0 inline-flex items-center gap-0.5 text-xxs px-1.5 py-0.5 rounded-sm bg-buy/10 text-buy border border-buy/20 hover:bg-buy/20 transition-fast"
                                         >
-                                          sub-IB <ChevronRight size={9} />
+                                          {u.ib_level === 1 ? 'Super IB' : u.ib_level === 2 ? 'IB' : 'Sub-IB'} <ChevronRight size={9} />
                                         </button>
                                       )}
                                     </div>
@@ -1395,15 +1396,17 @@ function IBTreeNodeRow({
 
         <div className="flex items-center gap-2 ml-2 shrink-0">
           <span className="text-xxs text-text-tertiary font-mono">{node.referral_code}</span>
-          {/* ROLE: a root node (level 1) is an IB; anything deeper is a sub-IB.
-              This is the node's OWN role — distinct from the sub-IB COUNT below. */}
+          {/* ROLE by depth: level 1 = Super IB (top), level 2 = IB, level 3+ =
+              Sub-IB. This is the node's OWN role — distinct from the COUNT below. */}
           <span className={cn(
             'text-xxs px-1.5 py-0.5 rounded-sm border',
-            node.level > 1
-              ? 'bg-amber-500/10 text-amber-500 border-amber-500/25'
-              : 'bg-bg-tertiary border-border-primary text-text-tertiary',
+            node.level === 1
+              ? 'bg-primary/10 text-primary border-primary/25'
+              : node.level === 2
+                ? 'bg-bg-tertiary border-border-primary text-text-secondary'
+                : 'bg-amber-500/10 text-amber-500 border-amber-500/25',
           )}>
-            {node.level > 1 ? `Sub-IB · L${node.level}` : 'IB'}
+            {node.level === 1 ? 'Super IB' : node.level === 2 ? 'IB' : `Sub-IB · L${node.level}`}
           </span>
           {node.referral_count > 0 && (
             <span className="text-xxs px-1.5 py-0.5 rounded-sm bg-primary/10 text-primary border border-primary/20">
@@ -1412,7 +1415,7 @@ function IBTreeNodeRow({
           )}
           {hasChildren && (
             <span className="text-xxs px-1.5 py-0.5 rounded-sm bg-buy/10 text-buy border border-buy/20">
-              {node.children.length} sub-IB{node.children.length !== 1 ? 's' : ''} below
+              {node.children.length} below
             </span>
           )}
         </div>
