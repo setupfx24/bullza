@@ -62,6 +62,7 @@ async def list_tickets(
 
 async def create_ticket(
     user_id: UUID, subject: str, message: str, priority: str, db: AsyncSession,
+    attachments: list | None = None,
 ) -> dict:
     ticket = SupportTicket(
         user_id=user_id,
@@ -76,6 +77,7 @@ async def create_ticket(
         ticket_id=ticket.id,
         sender_id=user_id,
         message=message,
+        attachments=attachments or None,
         is_admin=False,
     )
     db.add(first_message)
@@ -109,11 +111,15 @@ async def create_ticket(
                     f"<b>Priority:</b> {escape(priority or 'normal')}<br>"
                     f"<b>Subject:</b> {escape(subject or '')}</p>"
                     f"<p><b>Message:</b><br>{escape(message or '').replace(chr(10), '<br>')}</p>"
-                    "<p>Open the Support section in the admin panel to reply.</p>"
+                    + (f"<p><b>Attachments:</b> {len(attachments)} file(s) — view them in the admin panel.</p>"
+                       if attachments else "")
+                    + "<p>Open the Support section in the admin panel to reply.</p>"
                 ),
                 text=(
                     f"New support ticket from {who}\n"
                     f"Priority: {priority or 'normal'}\nSubject: {subject}\n\n{message}\n"
+                    + (f"\nAttachments: {len(attachments)} file(s) — view them in the admin panel.\n"
+                       if attachments else "")
                 ),
                 category="support",
             )
