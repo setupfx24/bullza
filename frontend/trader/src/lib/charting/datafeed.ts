@@ -376,6 +376,11 @@ export const swisDexDatafeed: IBasicDataFeed = {
     const res = String(resolution);
     ensureReconnectHook();
 
+    // The current bar as last pushed to the chart. Updated by BOTH the barSocket
+    // (authoritative OHLC + new-bar rollover) and the price store (keeps the live
+    // close in lockstep with the bid/ask). (client 2026-07-09)
+    let lastBar: Bar | null = null;
+
     // Subscribe to the gateway's bar-update channel. The server pushes a
     // pre-aggregated OHLC snapshot on every tick (the same data the
     // BarAggregator wrote to bar:current:<SYM>:<TF> in Redis), so the
@@ -384,24 +389,48 @@ export const swisDexDatafeed: IBasicDataFeed = {
     const unsub = barSocket.subscribe(sym, res, (bar: ServerBar) => {
       const sub = subscriptions.get(listenerGuid);
       if (!sub) return;
-      // Server bars are MID-based — shift to BID from the live store tick so
-      // the in-progress candle's close tracks the panel BID exactly (see
-      // "Bid-based chart shift"). Server emits seconds — TV wants ms.
+      // halfSpreadOf() is 0 (MID) — the bar stays mid-based, matching the P&L
+      // basis. Server emits seconds — TV wants ms.
       const hs = halfSpreadOf(useTradingStore.getState().prices[sym]);
       const digits = symbolDigits(sym);
-      sub.onTick(toBidBar({
+      const b = toBidBar({
         time: bar.time * 1000,
         open: bar.open,
         high: bar.high,
         low: bar.low,
         close: bar.close,
         volume: bar.volume,
-      }, hs, digits));
+      }, hs, digits);
+      lastBar = b;
+      sub.onTick(b);
+    });
+
+    // Keep the live candle's CLOSE in lockstep with the quote: on every price
+    // tick, nudge the current bar's close to the live mid — the SAME value that
+    // drives the panel bid/ask + P&L. The bar (/ws/bars) and the quote
+    // (/ws/prices) ride separate sockets and briefly desync during a move, so
+    // the candle floated a spread away from bid/ask; this closes that gap so
+    // bid/ask always straddle the candle. (client 2026-07-09)
+    const unsubPrice = useTradingStore.subscribe((state) => {
+      const sub = subscriptions.get(listenerGuid);
+      if (!sub || !lastBar) return;
+      const t = state.prices[sym];
+      if (!t || !(t.bid > 0) || !(t.ask > 0)) return;
+      const digits = symbolDigits(sym);
+      const hs = halfSpreadOf(t);
+      const px = Number(((t.bid + t.ask) / 2 - hs).toFixed(digits));
+      if (!(px > 0)) return;
+      const high = Math.max(lastBar.high, px);
+      const low = Math.min(lastBar.low, px);
+      if (px === lastBar.close && high === lastBar.high && low === lastBar.low) return;
+      lastBar = { ...lastBar, close: px, high, low };
+      sub.onTick(lastBar);
     });
 
     subscriptions.set(listenerGuid, {
       symbol: sym, resolution: res, onTick,
-      resetCache: onResetCacheNeededCallback, unsubscribe: unsub,
+      resetCache: onResetCacheNeededCallback,
+      unsubscribe: () => { unsub(); unsubPrice(); },
     });
   },
 
