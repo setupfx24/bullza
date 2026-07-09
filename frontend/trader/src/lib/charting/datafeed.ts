@@ -376,32 +376,58 @@ export const swisDexDatafeed: IBasicDataFeed = {
     const res = String(resolution);
     ensureReconnectHook();
 
+    // Current bar as last pushed to the chart — the barSocket owns its
+    // structure (open/high/low + new-bar rollover); a fixed-rate interval below
+    // nudges its close toward the live quote so the candle tracks the bid/ask
+    // lines even when /ws/bars delivers less often than /ws/prices.
+    let lastBar: Bar | null = null;
+
     // Subscribe to the gateway's bar-update channel. The server pushes a
     // pre-aggregated OHLC snapshot on every tick (the same data the
-    // BarAggregator wrote to bar:current:<SYM>:<TF> in Redis), so the
-    // current candle on the chart matches the candle on TradingView /
-    // OANDA / Binance / etc. by construction.
+    // BarAggregator wrote to bar:current:<SYM>:<TF> in Redis).
     const unsub = barSocket.subscribe(sym, res, (bar: ServerBar) => {
       const sub = subscriptions.get(listenerGuid);
       if (!sub) return;
-      // Server bars are MID-based — shift to BID from the live store tick so
-      // the in-progress candle's close tracks the panel BID exactly (see
-      // "Bid-based chart shift"). Server emits seconds — TV wants ms.
+      // Shift to BID from the live store tick so the in-progress candle's close
+      // tracks the panel BID. Server emits seconds — TV wants ms.
       const hs = halfSpreadOf(useTradingStore.getState().prices[sym]);
       const digits = symbolDigits(sym);
-      sub.onTick(toBidBar({
+      const b = toBidBar({
         time: bar.time * 1000,
         open: bar.open,
         high: bar.high,
         low: bar.low,
         close: bar.close,
         volume: bar.volume,
-      }, hs, digits));
+      }, hs, digits);
+      lastBar = b;
+      sub.onTick(b);
     });
+
+    // Keep the live candle close in step with the bid/ask lines. A FIXED 150ms
+    // interval (NOT a store subscription — that fired per-tick and froze the
+    // chart) reads the latest quote and nudges the current bar's close/high/low
+    // to it. Predictable ~6/s rate, cleared on unsubscribe. (client 2026-07-09)
+    const closeSyncIv = setInterval(() => {
+      const sub = subscriptions.get(listenerGuid);
+      if (!sub || !lastBar) return;
+      const t = useTradingStore.getState().prices[sym];
+      if (!t || !(t.bid > 0) || !(t.ask > 0)) return;
+      const digits = symbolDigits(sym);
+      const hs = halfSpreadOf(t);
+      const px = Number(((t.bid + t.ask) / 2 - hs).toFixed(digits));
+      if (!(px > 0)) return;
+      const high = Math.max(lastBar.high, px);
+      const low = Math.min(lastBar.low, px);
+      if (px === lastBar.close && high === lastBar.high && low === lastBar.low) return;
+      lastBar = { ...lastBar, close: px, high, low };
+      sub.onTick(lastBar);
+    }, 150);
 
     subscriptions.set(listenerGuid, {
       symbol: sym, resolution: res, onTick,
-      resetCache: onResetCacheNeededCallback, unsubscribe: unsub,
+      resetCache: onResetCacheNeededCallback,
+      unsubscribe: () => { unsub(); clearInterval(closeSyncIv); },
     });
   },
 
