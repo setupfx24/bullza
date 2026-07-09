@@ -16,6 +16,8 @@ import { useEffect, useRef, useState } from 'react';
 import { useTradingStore, defaultContractSize } from '@/stores/tradingStore';
 import { useUIStore } from '@/stores/uiStore';
 import { swisDexDatafeed } from '@/lib/charting/datafeed';
+import api from '@/lib/api/client';
+import toast from 'react-hot-toast';
 
 // The licensed library attaches `TradingView` to window once the script runs.
 // Use `any` for the widget/chart — the bundled .d.ts is huge and we only touch
@@ -68,6 +70,18 @@ const PROFIT_COLOR = '#3b82f6';      // blue — entry-line P&L label when in pr
 const LOSS_COLOR = '#ef4444';        // red  — entry-line P&L label when in loss
 const BREAKEVEN_COLOR = '#9ca3af';   // gray — entry-line P&L label near break-even
 
+// Vantage-style HTML overlay pill anchoring. The pill sits just left of the
+// price axis; ~58px approximates the axis width across timeframes/symbols.
+const PRICE_AXIS_W = 58;
+// Semi-transparent tint of a hex colour for the pill's info/close background.
+function hexToTint(hex: string, alpha = 0.15): string {
+  const h = hex.replace('#', '');
+  const r = parseInt(h.slice(0, 2), 16);
+  const g = parseInt(h.slice(2, 4), 16);
+  const b = parseInt(h.slice(4, 6), 16);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
 export default function ChartingLibraryChart() {
   const selectedSymbol = useTradingStore((s) => s.selectedSymbol);
   const positions = useTradingStore((s) => s.positions);
@@ -75,6 +89,11 @@ export default function ChartingLibraryChart() {
   const theme = useUIStore((s) => s.theme);
 
   const containerRef = useRef<HTMLDivElement>(null);
+  // Overlay layer above the chart for the Vantage-style position pills.
+  const overlayRef = useRef<HTMLDivElement>(null);
+  // Pane-top offset (top toolbar height) between the pane's own y=0 and the
+  // container's y=0, calibrated from crosshair events. null until calibrated.
+  const overlayOffsetRef = useRef<number | null>(null);
   const widgetRef = useRef<TVWidget | null>(null);
   // Map position id -> chart position-line object, so we update/remove in place.
   const linesRef = useRef<Map<string, any>>(new Map());
@@ -251,7 +270,9 @@ export default function ChartingLibraryChart() {
     // entry lines they differ: the line is fixed by side (BUY blue / SELL red)
     // while the label tracks P&L (profit blue / loss red / gray). SL/TP/pending
     // omit textColor → it falls back to the line colour.
-    type Desired = { key: string; price: number; color: string; textColor?: string; text: string; dashed: boolean; pnl?: number };
+    // `label:false` suppresses the TV shape's text label — used for open-position
+    // entry lines, whose label is now the Vantage-style HTML overlay pill.
+    type Desired = { key: string; price: number; color: string; textColor?: string; text: string; dashed: boolean; pnl?: number; label?: boolean };
     const desired: Desired[] = [];
 
     // ── Open positions: entry line labelled with LIVE P&L, coloured by P&L
@@ -270,8 +291,10 @@ export default function ChartingLibraryChart() {
       const sideColor = p.side.toUpperCase() === 'BUY' ? CHART_BUY_COLOR : CHART_SELL_COLOR;
       desired.push({
         key: p.id, price: entry, color: sideColor, textColor: pnlColor(pnl),
+        // Text kept for the stale watchdog's book-keeping, but not shown on the
+        // line (label:false) — the HTML overlay pill renders the P&L instead.
         text: `${p.side.toUpperCase()} ${lots} @ ${fp(entry)} | ${pnlStr} (${pctStr})`,
-        dashed: false, pnl,
+        dashed: false, pnl, label: false,
       });
       if (p.stop_loss && Number(p.stop_loss) > 0)
         desired.push({ key: `${p.id}-sl`, price: Number(p.stop_loss), color: '#f59e0b', text: `SL ${fp(Number(p.stop_loss))}`, dashed: true });
@@ -290,13 +313,13 @@ export default function ChartingLibraryChart() {
         desired.push({ key: `ord-${o.id}-tp`, price: Number(o.take_profit), color: '#14b8a6', text: `TP ${fp(Number(o.take_profit))}`, dashed: true });
     }
 
-    const shapeOpts = (text: string, lineColor: string, textColor: string, dashed: boolean) => ({
+    const shapeOpts = (text: string, lineColor: string, textColor: string, dashed: boolean, showLabel = true) => ({
       shape: 'horizontal_line',
       text,
       lock: true, disableSelection: true, disableSave: true, disableUndo: true,
       overrides: {
         linecolor: lineColor, linestyle: dashed ? 2 : 0, linewidth: dashed ? 1 : 2,
-        showLabel: true, textcolor: textColor, fontsize: 11, bold: true,
+        showLabel, textcolor: textColor, fontsize: 11, bold: true,
         horzLabelsAlign: 'right', vertLabelsAlign: 'middle',
       },
     });
@@ -315,7 +338,7 @@ export default function ChartingLibraryChart() {
         // 'creating' entry so a re-render mid-create doesn't spawn a duplicate.
         const entry: any = { id: null, price: d.price, creating: true, text: d.text, color: d.color, textColor: d.textColor ?? d.color, pnl: d.pnl ?? null, propAt: now };
         linesRef.current.set(d.key, entry);
-        chart.createShape({ time: t, price: d.price }, shapeOpts(d.text, d.color, d.textColor ?? d.color, d.dashed))
+        chart.createShape({ time: t, price: d.price }, shapeOpts(d.text, d.color, d.textColor ?? d.color, d.dashed, d.label !== false))
           .then((id: any) => {
             if (linesRef.current.get(d.key) === entry) { entry.id = id; entry.creating = false; }
             else { try { chart.removeEntity(id); } catch { /* closed mid-create */ } }
@@ -512,5 +535,184 @@ export default function ChartingLibraryChart() {
     };
   }, [ready, selectedSymbol]);
 
-  return <div ref={containerRef} className="w-full h-full min-h-[320px]" />;
+  // Stable key of the open positions on this symbol (id/side/lots) — changes
+  // only when a position is opened/closed/resized, NOT on P&L ticks, so the
+  // overlay effect below rebuilds its pills only when the SET changes and the
+  // rAF loop owns all live updates.
+  const symU = (selectedSymbol || '').toUpperCase();
+  const positionsKey = positions
+    .filter((p) => (p.symbol || '').toUpperCase() === symU)
+    .map((p) => `${p.id}:${p.side}:${p.lots}`)
+    .join('|');
+
+  // ── Vantage-style HTML overlay labels for open-position entry lines. ────────
+  // The TV shape label is a single text string, so the 3-section pill
+  // (side badge | lots + P&L | close ✕) is rendered as absolutely-positioned
+  // HTML synced to the entry price. This build has NO priceToCoordinate, so the
+  // Y is derived from the main pane's getVisiblePriceRange + getHeight (linear
+  // scale only); a requestAnimationFrame loop keeps it pinned through
+  // scroll/zoom and refreshes the P&L text/colour (throttled to 500ms).
+  useEffect(() => {
+    const w = widgetRef.current;
+    const overlay = overlayRef.current;
+    if (!ready || !w?.activeChart || !overlay) return;
+    let chart: any;
+    try { chart = w.activeChart(); } catch { return; }
+    if (!chart?.getPanes) return;
+
+    const sym = (selectedSymbol || '').toUpperCase();
+    const myPos = useTradingStore.getState().positions.filter(
+      (p) => (p.symbol || '').toUpperCase() === sym,
+    );
+
+    // Read the main pane's linear price↔pixel geometry, or null if not mappable
+    // (no pane / non-linear scale / no visible range).
+    const geom = (): { top: number; bottom: number; h: number } | null => {
+      try {
+        const pane = chart.getPanes?.()[0];
+        const ps = pane?.getMainSourcePriceScale?.();
+        if (!ps || ps.getMode?.() !== 0) return null;   // linear (mode 0) only
+        const range = ps.getVisiblePriceRange?.();
+        const h = pane?.getHeight?.() || 0;
+        if (!range || !(h > 0) || !(range.to > range.from)) return null;
+        return { top: range.to, bottom: range.from, h };
+      } catch { return null; }
+    };
+    const yForPrice = (price: number, g: { top: number; bottom: number; h: number }) =>
+      (g.h * (g.top - price)) / (g.top - g.bottom);
+
+    // Calibrate the container-relative offset (top toolbar height) from crosshair
+    // events — offsetY is measured from the library container's top edge, so it
+    // already includes the header the pane math omits. Constant until a resize,
+    // which the next mouse move re-calibrates.
+    const onCross = (params: any) => {
+      const g = geom();
+      if (!g || typeof params?.offsetY !== 'number' || typeof params?.price !== 'number') return;
+      overlayOffsetRef.current = params.offsetY - yForPrice(params.price, g);
+    };
+    let crossSub: any = null;
+
+    type Pill = {
+      id: string; lots: number; entry: number;
+      root: HTMLDivElement; info: HTMLSpanElement; close: HTMLButtonElement;
+      lastText: string; lastColor: string; lastAt: number;
+    };
+    const pills: Pill[] = [];
+
+    for (const p of myPos) {
+      const side = String(p.side || '').toUpperCase();
+      const sideColor = side === 'BUY' ? CHART_BUY_COLOR : CHART_SELL_COLOR;
+
+      const root = document.createElement('div');
+      root.style.cssText =
+        `position:absolute;right:${PRICE_AXIS_W}px;display:flex;align-items:stretch;height:22px;`
+        + `font-size:12px;line-height:1;white-space:nowrap;transform:translateY(-50%);`
+        + `pointer-events:none;visibility:hidden;border-radius:4px;`
+        + `box-shadow:0 1px 4px rgba(0,0,0,.35);z-index:5;`;
+
+      const badge = document.createElement('span');
+      badge.textContent = side;
+      badge.style.cssText =
+        `display:flex;align-items:center;padding:0 9px;color:#fff;background:${sideColor};`
+        + `border-radius:4px 0 0 4px;font-weight:700;letter-spacing:.02em;`;
+
+      const info = document.createElement('span');
+      info.style.cssText = `display:flex;align-items:center;padding:0 11px;font-weight:600;`;
+
+      const close = document.createElement('button');
+      close.type = 'button';
+      close.textContent = '✕';
+      close.title = 'Close position';
+      close.style.cssText =
+        `display:flex;align-items:center;padding:0 9px;border:0;cursor:pointer;`
+        + `border-radius:0 4px 4px 0;font-weight:700;pointer-events:auto;`;
+      close.onmouseenter = () => { close.style.filter = 'brightness(0.82)'; };
+      close.onmouseleave = () => { close.style.filter = 'none'; };
+      close.onclick = (e) => {
+        e.stopPropagation();
+        if (!window.confirm(`Close ${side} ${Number(p.lots)} ${sym} at market?`)) return;
+        try { useTradingStore.getState().removePosition(p.id); } catch { /* noop */ }
+        root.style.visibility = 'hidden';
+        (async () => {
+          try {
+            const res = await api.post<any>(`/positions/${p.id}/close`, {}, { timeoutMs: 8000 });
+            const pnl = Number(res?.profit ?? 0);
+            toast.success(`Closed @ ${res?.close_price ?? ''} | P&L: ${pnl >= 0 ? '+' : '-'}$${Math.abs(pnl).toFixed(2)}`);
+          } catch (err) {
+            toast.error(err instanceof Error ? err.message : 'Close failed');
+          } finally {
+            Promise.all([
+              useTradingStore.getState().refreshPositions(),
+              useTradingStore.getState().refreshAccount(),
+            ]).catch(() => {});
+          }
+        })();
+      };
+
+      root.appendChild(badge);
+      root.appendChild(info);
+      root.appendChild(close);
+      overlay.appendChild(root);
+      pills.push({
+        id: p.id, lots: Number(p.lots) || 0, entry: Number(p.open_price) || 0,
+        root, info, close, lastText: '', lastColor: '', lastAt: 0,
+      });
+    }
+
+    if (pills.length === 0) return () => {};
+
+    // Subscribe only when there are pills to place (avoids a leaked handler).
+    try { crossSub = chart.crossHairMoved?.(); crossSub?.subscribe?.(null, onCross); } catch { /* noop */ }
+
+    const THROTTLE = myPos.length >= 10 ? 1000 : 500;
+    let raf = 0;
+    const sync = () => {
+      raf = requestAnimationFrame(sync);
+      const g = geom();
+      // No linear geometry (log/percent scale, or not ready) → hide, never
+      // draw a mislocated pill.
+      if (!g) { for (const pl of pills) pl.root.style.visibility = 'hidden'; return; }
+      // Container-relative Y needs the top-toolbar offset added to the pane math.
+      // Use the crosshair-calibrated value, else estimate from the height gap
+      // until the first crosshair event lands.
+      const containerH = containerRef.current?.clientHeight || g.h;
+      const offset = overlayOffsetRef.current ?? Math.max(0, containerH - g.h - 28);
+      const now = Date.now();
+      const livePos = useTradingStore.getState().positions;
+      for (const pl of pills) {
+        const y = yForPrice(pl.entry, g) + offset;
+        if (y < offset + 6 || y > offset + g.h - 6) { pl.root.style.visibility = 'hidden'; continue; }
+        pl.root.style.top = `${y}px`;
+        pl.root.style.visibility = 'visible';
+        if (now - pl.lastAt < THROTTLE) continue;
+        pl.lastAt = now;
+        const p = livePos.find((x) => x.id === pl.id);
+        const pnl = Number(p?.profit || 0);
+        const color = Math.abs(pnl) < 0.10 ? BREAKEVEN_COLOR : pnl > 0 ? PROFIT_COLOR : LOSS_COLOR;
+        const text = `${pl.lots.toFixed(2)}Lots ${pnl >= 0 ? '+' : '-'}${Math.abs(pnl).toFixed(2)}USD`;
+        if (text === pl.lastText && color === pl.lastColor) continue;
+        pl.info.textContent = text;
+        pl.info.style.color = color;
+        pl.info.style.background = hexToTint(color);
+        pl.close.style.color = color;
+        pl.close.style.background = hexToTint(color);
+        pl.lastText = text;
+        pl.lastColor = color;
+      }
+    };
+    raf = requestAnimationFrame(sync);
+
+    return () => {
+      cancelAnimationFrame(raf);
+      try { crossSub?.unsubscribe?.(null, onCross); } catch { /* noop */ }
+      for (const pl of pills) { try { overlay.removeChild(pl.root); } catch { /* noop */ } }
+    };
+  }, [ready, selectedSymbol, positionsKey]);
+
+  return (
+    <div className="relative w-full h-full min-h-[320px]">
+      <div ref={containerRef} className="w-full h-full min-h-[320px]" />
+      <div ref={overlayRef} className="pointer-events-none absolute inset-0 overflow-hidden" />
+    </div>
+  );
 }
