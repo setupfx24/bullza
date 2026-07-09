@@ -27,6 +27,7 @@ import httpx
 
 from packages.common.src.alltick_rest import fetch_klines as alltick_fetch_klines
 from packages.common.src.infoway_rest import fetch_klines as infoway_fetch_klines
+from .finage_rest import fetch_klines as finage_fetch_klines, is_supported as finage_supported
 from packages.common.src.config import get_settings
 from packages.common.src.redis_client import redis_client
 
@@ -180,10 +181,14 @@ async def seed(force: bool = False):
 
     settings = get_settings()
     infoway_token = (getattr(settings, "INFOWAY_TOKEN", "") or "").strip()
+    finage_key = (getattr(settings, "FINAGE_API_KEY", "") or "").strip()
 
-    if not infoway_token:
-        logger.warning("No INFOWAY_TOKEN configured — cannot seed bars")
+    if not infoway_token and not finage_key:
+        logger.warning("No INFOWAY_TOKEN or FINAGE_API_KEY configured — cannot seed bars")
         return
+    # When Finage is active, seed history from Finage for the symbols it prices
+    # (forex/metals/oil) so live + history share one basis (no seam). (2026-07-09)
+    use_finage = bool(finage_key)
 
     # Free-plan REST budget (60/min): seeding ALL discovered symbols × every TF
     # blows the cap → HTTP 429 storm that also starves history + gap-fill. Scope
@@ -195,7 +200,7 @@ async def seed(force: bool = False):
         for s in (getattr(settings, "INFOWAY_WS_SYMBOLS", "") or "").split(",")
         if s.strip()
     }
-    if _ws_syms:
+    if _ws_syms and not use_finage:
         before = len(symbols)
         symbols = {s for s in symbols if _guess_segment(s) == "crypto" or s in _ws_syms}
         logger.info("Seed scoped to WS symbols + crypto: %d → %d (free-plan rate budget)",
@@ -203,7 +208,12 @@ async def seed(force: bool = False):
 
     for sym in sorted(symbols):
         segment = _guess_segment(sym)
-        logger.info("Seeding %s (segment=%s, source=infoway)", sym, segment)
+        # Finage prices forex/metals/oil (real bid/ask); use it for history too
+        # when active so live + history share one basis. Indices / anything
+        # Finage can't price fall back to InfoWay. (client 2026-07-09)
+        sym_finage = use_finage and finage_supported(sym)
+        src = "finage" if sym_finage else "infoway"
+        logger.info("Seeding %s (segment=%s, source=%s)", sym, segment, src)
 
         for tf_name, _tf_seconds in TIMEFRAMES.items():
             list_key = f"bars:{sym}:{tf_name}"
@@ -214,16 +224,19 @@ async def seed(force: bool = False):
                     logger.info("  %s:%s already has %d bars, skipping", sym, tf_name, existing)
                     continue
 
-            # Real history from InfoWay REST — the SAME provider as the live feed,
-            # routed per asset class (forex/metals/indices/oil → common, crypto →
-            # crypto host + USDT, US stocks → stock host + .US). History and live
-            # therefore share one price basis (no seam). If InfoWay is down or the
-            # symbol isn't supported, return [] and skip — never simulated bars.
-            bars = await infoway_fetch_klines(
-                sym, tf_name, count=BARS_COUNT, end_ts=0, token=infoway_token,
-            )
+            # Real history from the same provider as the live feed so history +
+            # live share one price basis (no seam). Empty result → skip the
+            # symbol/TF; never write simulated bars.
+            if sym_finage:
+                bars = await finage_fetch_klines(sym, tf_name, count=BARS_COUNT, api_key=finage_key)
+            elif infoway_token:
+                bars = await infoway_fetch_klines(
+                    sym, tf_name, count=BARS_COUNT, end_ts=0, token=infoway_token,
+                )
+            else:
+                bars = []
             if not bars:
-                logger.warning("  %s:%s InfoWay fetch returned 0 bars", sym, tf_name)
+                logger.warning("  %s:%s %s fetch returned 0 bars", sym, tf_name, src)
                 continue
 
             # Clear old data and write new bars. lpush newest-first to match
