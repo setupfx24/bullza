@@ -48,8 +48,19 @@ _TF_SECONDS: Dict[str, int] = {
 }
 
 
+# Reverse: Finage wire code (slash-stripped, upper) -> platform symbol.
+FINAGE_TO_PLATFORM: Dict[str, str] = {v: k for k, v in PLATFORM_TO_FINAGE.items()}
+
+
 def finage_code(symbol: str) -> str:
     return PLATFORM_TO_FINAGE.get(symbol.upper(), symbol.upper())
+
+
+def platform_from_finage(wire_symbol: str) -> str:
+    """Map a Finage response symbol back to our platform code. The WS may return
+    slashed pairs (e.g. 'XAU/USD', 'ZAR/EUR'), so strip the slash first."""
+    norm = (wire_symbol or "").replace("/", "").replace("-", "").upper()
+    return FINAGE_TO_PLATFORM.get(norm, norm)
 
 
 def finage_segment(symbol: str) -> str:

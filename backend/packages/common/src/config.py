@@ -205,6 +205,11 @@ class Settings(BaseSettings):
     # prefix (client 2026-07-09). (client 2026-07-09)
     FINAGE_API_KEY: str = ""
     FINAGE_POLL_INTERVAL: float = 1.0  # seconds between last-quote polls per symbol
+    # Finage WebSocket (real-time streaming, denser than REST polling). The full
+    # URL — incl. subdomain, port, and token — comes from the Finage dashboard's
+    # WebSocket section: wss://<subdomain>.finage.ws:<port>/?token=<token>. When
+    # set, FinageFeed streams via WS instead of polling. (client 2026-07-09)
+    FINAGE_WS_URL: str = ""
 
     # Corecen LP (alternate primary market data source). When CORECEN_LP_ENABLED=true
     # the market-data service stops running its own AllTick / simulator feed and

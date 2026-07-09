@@ -14,21 +14,31 @@ indices (unpriced on Finage's forex path) are skipped. (client 2026-07-09)
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 from typing import Dict, List, Optional
 
 import httpx
+import websockets
 
-from .finage_rest import BASE_URL, finage_code, finage_segment, is_supported
+from .finage_rest import BASE_URL, finage_code, finage_segment, is_supported, platform_from_finage
 
 logger = logging.getLogger("market-data.finage")
 
+RECONNECT_BACKOFF_BASE = 2.0
+RECONNECT_BACKOFF_MAX = 60.0
+
 
 class FinageFeed:
-    """Polls Finage REST last-quote and feeds mid-price ticks into the queue."""
+    """Streams Finage prices as mid ticks. Uses the WebSocket when ws_url is set
+    (dense, real-time), otherwise falls back to REST last-quote polling."""
 
-    def __init__(self, api_key: str, instruments: Dict[str, dict], poll_interval: float = 1.0):
+    def __init__(
+        self, api_key: str, instruments: Dict[str, dict],
+        poll_interval: float = 1.0, ws_url: str = "",
+    ):
         self._api_key = (api_key or "").strip()
+        self._ws_url = (ws_url or "").strip()
         # Only symbols Finage can actually price on the forex last-quote path.
         self._instruments = {s: v for s, v in instruments.items() if is_supported(s)}
         self._poll_interval = max(0.25, float(poll_interval or 1.0))
@@ -44,18 +54,25 @@ class FinageFeed:
 
     async def start(self) -> None:
         self._running = True
-        if not self._api_key:
-            logger.error("Finage API key empty — refusing to start")
-            return
         syms = sorted(self._instruments.keys())
         if not syms:
             logger.error("FinageFeed: no priceable instruments")
             return
-        logger.info(
-            "Finage feed starting — REST last-quote polling %d symbols every %.2fs: %s",
-            len(syms), self._poll_interval, ",".join(syms),
-        )
-        self._tasks.append(asyncio.create_task(self._poll_loop(), name="finage-poll"))
+        if self._ws_url:
+            logger.info(
+                "Finage feed starting — WebSocket streaming %d symbols: %s",
+                len(syms), ",".join(syms),
+            )
+            self._tasks.append(asyncio.create_task(self._run_ws(), name="finage-ws"))
+        else:
+            if not self._api_key:
+                logger.error("Finage: no WS URL and no API key — refusing to start")
+                return
+            logger.info(
+                "Finage feed starting — REST last-quote polling %d symbols every %.2fs: %s",
+                len(syms), self._poll_interval, ",".join(syms),
+            )
+            self._tasks.append(asyncio.create_task(self._poll_loop(), name="finage-poll"))
         await asyncio.gather(*self._tasks, return_exceptions=True)
 
     async def stop(self) -> None:
@@ -84,6 +101,79 @@ class FinageFeed:
             except asyncio.QueueEmpty:
                 pass
             self._tick_queue.put_nowait(tick)
+
+    # ─── WebSocket path ──────────────────────────────────────────────────────
+
+    def _emit_ws(self, data: dict) -> None:
+        """Parse one Finage WS push and enqueue a mid tick. Fields (per docs):
+        s=symbol (may be slashed, e.g. 'XAU/USD'), a/ap=ask, b/bp=bid,
+        p=trade price, t=timestamp(ms)."""
+        sym = platform_from_finage(str(data.get("s") or ""))
+        info = self._instruments.get(sym)
+        if not info:
+            return  # not one of our instruments
+        ask = data.get("a", data.get("ap"))
+        bid = data.get("b", data.get("bp"))
+        mid: Optional[float] = None
+        try:
+            if ask is not None and bid is not None:
+                mid = (float(ask) + float(bid)) / 2.0
+            elif data.get("p") is not None:
+                mid = float(data.get("p"))
+        except (TypeError, ValueError):
+            return
+        if mid is None or not (mid > 0):
+            return
+        decimals = int(info["decimals"])
+        mid = round(mid, decimals)
+        ts = data.get("t")
+        self._enqueue({
+            "symbol": sym, "bid": mid, "ask": mid,
+            "timestamp": int(ts) if ts else 0, "volume": 1,
+        })
+
+    async def _run_ws(self) -> None:
+        codes = sorted({finage_code(s) for s in self._instruments.keys()})
+        sub_msg = json.dumps({"action": "subscribe", "symbols": ",".join(codes)})
+        backoff = RECONNECT_BACKOFF_BASE
+        while self._running:
+            try:
+                async with websockets.connect(
+                    self._ws_url, ping_interval=20, ping_timeout=25,
+                    close_timeout=10, max_size=4 * 1024 * 1024,
+                ) as ws:
+                    await ws.send(sub_msg)
+                    logger.info("Finage WS connected + subscribed %d symbols", len(codes))
+                    backoff = RECONNECT_BACKOFF_BASE
+                    while self._running:
+                        raw = await ws.recv()
+                        try:
+                            msg = json.loads(raw)
+                        except (ValueError, TypeError):
+                            continue
+                        # Control frames (authorizing / connected / errors) carry
+                        # status_code; price ticks carry 's'.
+                        if isinstance(msg, dict) and msg.get("s"):
+                            self._emit_ws(msg)
+                        elif isinstance(msg, list):
+                            for m in msg:
+                                if isinstance(m, dict) and m.get("s"):
+                                    self._emit_ws(m)
+                        elif isinstance(msg, dict) and msg.get("status_code") not in (None, 200):
+                            logger.warning("Finage WS status: %s", raw[:200])
+            except asyncio.CancelledError:
+                return
+            except Exception as exc:  # noqa: BLE001
+                if not self._running:
+                    return
+                logger.warning("Finage WS disconnected (%s) — reconnecting in %.0fs", exc, backoff)
+                try:
+                    await asyncio.sleep(backoff)
+                except asyncio.CancelledError:
+                    return
+                backoff = min(backoff * 2, RECONNECT_BACKOFF_MAX)
+
+    # ─── REST polling path ───────────────────────────────────────────────────
 
     async def _poll_loop(self) -> None:
         # One shared client; poll all symbols concurrently each cycle. A 429

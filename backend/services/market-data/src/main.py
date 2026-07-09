@@ -65,6 +65,7 @@ class MarketDataService:
         raw_alltick = (getattr(settings, "ALLTICK_TOKEN", "") or "").strip()
         raw_infoway = (getattr(settings, "INFOWAY_TOKEN", "") or "").strip()
         raw_finage = (getattr(settings, "FINAGE_API_KEY", "") or "").strip()
+        raw_finage_ws = (getattr(settings, "FINAGE_WS_URL", "") or "").strip()
         self._tick_count = 0
         self._alltick_watchdog_armed = False
         self._infoway_watchdog_armed = False
@@ -82,17 +83,19 @@ class MarketDataService:
                 )
             self.feed = CorecenLPFeed()
             logger.info("Price feed: Corecen LP (receiving pushes on /api/lp/prices/batch)")
-        elif raw_finage and raw_finage.lower() not in ("your-finage-key", "your-finage-api-key"):
-            # Finage takes priority when FINAGE_API_KEY is set — REST last-quote
-            # polling gives REAL bid/ask for forex + metals + oil (crypto stays
-            # on Binance; indices unsupported on the forex path). (client 2026-07-09)
+        elif (raw_finage_ws) or (raw_finage and raw_finage.lower() not in ("your-finage-key", "your-finage-api-key")):
+            # Finage takes priority when FINAGE_WS_URL or FINAGE_API_KEY is set.
+            # WS streams REAL bid/ask (dense); without a WS URL it REST-polls the
+            # last-quote. Forex + metals + oil only — crypto stays on Binance,
+            # indices are unsupported on the forex path. (client 2026-07-09)
             self.feed = FinageFeed(
                 raw_finage, INSTRUMENTS,
                 poll_interval=getattr(settings, "FINAGE_POLL_INTERVAL", 1.0),
+                ws_url=raw_finage_ws,
             )
             logger.info(
-                "Price feed: Finage REST last-quote polling (real bid/ask, %.2fs)",
-                getattr(settings, "FINAGE_POLL_INTERVAL", 1.0),
+                "Price feed: Finage %s (real bid/ask)",
+                "WebSocket streaming" if raw_finage_ws else "REST last-quote polling",
             )
         elif usable_infoway_token(raw_infoway):
             # Free plan caps WS subscriptions at 10 (error 516 rejects the WHOLE
