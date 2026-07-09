@@ -414,6 +414,7 @@ async def list_ib_agents(page: int, per_page: int, db: AsyncSession):
     result = await db.execute(query)
     profiles = result.scalars().all()
 
+    super_id = await _super_ib_profile_id(db)  # for role classification
     items = []
     for p in profiles:
         user_q = await db.execute(select(User).where(User.id == p.user_id))
@@ -441,6 +442,7 @@ async def list_ib_agents(page: int, per_page: int, db: AsyncSession):
             user_email=user.email if user else None,
             user_name=f"{user.first_name or ''} {user.last_name or ''}".strip() if user else None,
             referral_count=ref_count,
+            ib_type=_classify_ib_type(p, super_id),
         ))
 
     return PaginatedResponse(items=items, total=total, page=page, per_page=per_page)

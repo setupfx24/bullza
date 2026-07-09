@@ -484,6 +484,9 @@ class IBProfileOut(BaseModel):
     user_email: Optional[str] = None
     user_name: Optional[str] = None
     referral_count: int = 0
+    # Role by lineage: 'super_ib' (SDA05 root) | 'ib' | 'sub_ib'. Classified the
+    # same way as the IB tree, so the Active IBs table can badge/filter by role.
+    ib_type: Optional[str] = None
 
     class Config:
         from_attributes = True
