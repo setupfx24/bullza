@@ -93,14 +93,6 @@ export default function ChartingLibraryChart() {
   const widgetRef = useRef<TVWidget | null>(null);
   // Map position id -> chart position-line object, so we update/remove in place.
   const linesRef = useRef<Map<string, any>>(new Map());
-  // Live BUY (ask) / SELL (bid) quote-line shape ids — kept OUT of linesRef so
-  // the positions/orders reconcile effect never prunes them. Holds null, the
-  // 'creating' sentinel while the async createShape resolves, or { ask, bid }
-  // EntityIds once created.
-  const liveLinesRef = useRef<any>(null);
-  // True while the BUY/SELL quote lines are showing the STALE state, so the
-  // next fresh tick knows to restore their normal label/colour.
-  const liveStaleRef = useRef(false);
   // The symbol the widget is currently displaying. Used to avoid a redundant
   // setSymbol() right after creation and to detect a real change.
   const appliedSymbolRef = useRef<string>('');
@@ -471,94 +463,17 @@ export default function ChartingLibraryChart() {
         entry.textColor = STALE_COLOR;
         entry.propAt = now; // so the reconcile's throttle lets recovery through
       }
-      // (b) Live BUY/SELL quote lines — grey them regardless of whether any
-      //     position is open. The BUY/SELL effect restores them on the next
-      //     fresh tick (it checks liveStaleRef).
-      const live = liveLinesRef.current;
-      if (live && typeof live === 'object' && live.ask != null) {
-        // No text label on these lines — grey the colour (→ grey price pill) to
-        // signal stale; the BUY/SELL effect restores blue/red on the next tick.
-        try { chart.getShapeById(live.ask)?.setProperties({ linecolor: STALE_COLOR, textcolor: STALE_COLOR }); } catch { /* noop */ }
-        try { chart.getShapeById(live.bid)?.setProperties({ linecolor: STALE_COLOR, textcolor: STALE_COLOR }); } catch { /* noop */ }
-        liveStaleRef.current = true;
-      }
+      // (Live BUY/SELL quote lines removed — nothing to grey here anymore.)
     }, 1000);
 
     return () => { clearInterval(interval); try { unsub(); } catch { /* noop */ } };
   }, [ready, selectedSymbol]);
 
-  // Live BUY / SELL price lines that track the current quote (MT4/MT5 style):
-  // a blue BUY line at the ASK and a red SELL line at the BID (no text label —
-  // colour signals side; the coloured price pill stays on the axis), updated on
-  // every tick. Uses createShape('horizontal_line') — the CORE Charting Library API —
-  // NOT createPositionLine, which is a Trading-Terminal-only feature that isn't
-  // present in this build (it silently drew nothing). Shapes are created once
-  // then moved with setPoints so there's no flicker.
-  useEffect(() => {
-    const w = widgetRef.current;
-    if (!ready || !w?.activeChart) return;
-    let chart: any;
-    try { chart = w.activeChart(); } catch { return; }
-    if (!chart?.createShape) return;
-    const sym = (selectedSymbol || '').toUpperCase();
-
-    // No BUY/SELL text label — the colour alone signals side (blue=BUY/ask,
-    // red=SELL/bid), matching pro broker platforms. showPrice keeps the coloured
-    // price pill on the right axis; showLabel:false drops the word. (2026-07-09)
-    const opts = (color: string, vAlign: 'top' | 'bottom') => ({
-      shape: 'horizontal_line',
-      lock: true, disableSelection: true, disableSave: true, disableUndo: true,
-      overrides: {
-        linecolor: color, linestyle: 0, linewidth: 1,
-        showLabel: false, showPrice: true, textcolor: color, fontsize: 11, bold: true,
-        horzLabelsAlign: 'right', vertLabelsAlign: vAlign,
-      },
-    });
-
-    const move = (id: any, t: number, price: number) => {
-      try { chart.getShapeById(id)?.setPoints([{ time: t, price }]); } catch { /* noop */ }
-    };
-
-    const apply = (tick: { bid: number; ask: number } | undefined) => {
-      if (!tick || !(tick.bid > 0) || !(tick.ask > 0)) return;
-      const t = Math.floor(Date.now() / 1000);
-      const cur = liveLinesRef.current;
-      if (cur === 'creating') return;         // async create in flight — wait
-      if (cur && cur.ask != null) {
-        move(cur.ask, t, tick.ask);
-        move(cur.bid, t, tick.bid);
-        // Recovery: a fresh tick arrived after the stale watchdog greyed these
-        // → restore the BUY (blue) / SELL (red) line colour, once.
-        if (liveStaleRef.current) {
-          liveStaleRef.current = false;
-          try { chart.getShapeById(cur.ask)?.setProperties({ linecolor: CHART_BUY_COLOR, textcolor: CHART_BUY_COLOR }); } catch { /* noop */ }
-          try { chart.getShapeById(cur.bid)?.setProperties({ linecolor: CHART_SELL_COLOR, textcolor: CHART_SELL_COLOR }); } catch { /* noop */ }
-        }
-        return;
-      }
-      // createShape is ASYNC (returns Promise<EntityId>) — await both, then
-      // store the ids so later ticks just move the shapes.
-      liveLinesRef.current = 'creating';
-      Promise.all([
-        chart.createShape({ time: t, price: tick.ask }, opts(CHART_BUY_COLOR, 'bottom')),
-        chart.createShape({ time: t, price: tick.bid }, opts(CHART_SELL_COLOR, 'top')),
-      ]).then(([ask, bid]: any[]) => { liveLinesRef.current = { ask, bid }; })
-        .catch(() => { liveLinesRef.current = null; });
-    };
-
-    apply(useTradingStore.getState().prices[sym]);
-    const unsub = useTradingStore.subscribe((state) => apply(state.prices[sym]));
-
-    return () => {
-      try { unsub(); } catch { /* noop */ }
-      const cur = liveLinesRef.current;
-      if (cur && cur.ask != null) {
-        try { chart.removeEntity(cur.ask); } catch { /* noop */ }
-        try { chart.removeEntity(cur.bid); } catch { /* noop */ }
-      }
-      liveLinesRef.current = null;
-    };
-  }, [ready, selectedSymbol]);
+  // Live BUY/SELL quote lines REMOVED (client 2026-07-09): the separate blue
+  // ASK + red BID horizontal lines are gone — they rode /ws/prices and desynced
+  // from the /ws/bars candle, and cluttered the chart. MT5-style now: the chart
+  // shows only candles + the series' own last-price label (which tracks the
+  // candle), and bid/ask live in the right-hand order panel for trading.
 
   // Stable key of the open positions on this symbol (id/side/lots) — changes
   // only when a position is opened/closed/resized, NOT on P&L ticks, so the

@@ -215,15 +215,13 @@ function ensureReconnectHook() {
 // by the CURRENT half-spread (fixed-markup assumption), which keeps the
 // candle series continuous with the live bar.
 
-function halfSpreadOf(tick?: { bid: number; ask: number } | null): number {
-  // Client 2026-07-09 (Option A, restored): draw the chart at the BID — the
-  // MT4/MT5 convention. The BarAggregator builds candles from the MID, so
-  // shifting every bar DOWN by half the live store-tick spread puts the candle
-  // close ON the BID → it touches the red SELL line and matches the panel BID,
-  // with the green BUY line one spread above. (Return 0 here to go back to
-  // LTP/MID.) This is the stable setup the client had earlier today.
-  if (!tick || tick.bid <= 0 || tick.ask < tick.bid) return 0;
-  return (tick.ask - tick.bid) / 2;
+function halfSpreadOf(_tick?: { bid: number; ask: number } | null): number {
+  // Client 2026-07-09 (MT5-style): draw the candle at the MID (the single LTP
+  // price). The separate blue ASK / red BID lines were removed, so the candle's
+  // own last-price label IS the on-chart price — one price, moving with the
+  // candle, matching the floating P&L (also mid). Bid/ask live in the order
+  // panel for trading. (Return (ask-bid)/2 to shift the candle back to BID.)
+  return 0;
 }
 
 function symbolDigits(sym: string): number {
