@@ -994,19 +994,49 @@ async def move_user_to_ib(
     return {"message": "User moved", "user_id": str(user_id), "new_ib_referral_code": new_ib.referral_code}
 
 
+async def _super_ib_profile_id(db: AsyncSession) -> uuid.UUID | None:
+    """The ONE platform Super IB: the IBProfile whose referral_code matches the
+    `super_ib_code` setting (default 'SDA05'). Same source of truth the gateway
+    uses (_resolve_ib_type). The admin tree must classify roles by THIS, never
+    by tree depth/level — otherwise every parent-less root IB wrongly shows as
+    "Super IB" (client 2026-07-09). Returns None if none configured."""
+    from packages.common.src.settings_store import get_system_setting
+    code = str(await get_system_setting("super_ib_code", None) or "SDA05").strip()
+    if not code:
+        return None
+    row = (await db.execute(
+        select(IBProfile.id).where(IBProfile.referral_code == code)
+    )).first()
+    return row[0] if row else None
+
+
+def _classify_ib_type(profile, super_id: uuid.UUID | None) -> str:
+    """Mirror of the gateway's _resolve_ib_type: 'super_ib' is ONLY the SDA05
+    root; a profile directly under it (or parent-less) is a full 'ib'; anything
+    deeper is a 'sub_ib'. Role is by lineage, NOT by tree depth."""
+    if super_id is not None:
+        if profile.id == super_id:
+            return "super_ib"
+        if profile.parent_ib_id is None or profile.parent_ib_id == super_id:
+            return "ib"
+        return "sub_ib"
+    return "ib" if profile.parent_ib_id is None else "sub_ib"
+
+
 async def get_ib_tree(ib_id: uuid.UUID | None, db: AsyncSession) -> list[dict]:
     """Full IB hierarchy tree. ib_id=None returns all root IBs."""
+    super_id = await _super_ib_profile_id(db)
     if ib_id:
         root_q = await db.execute(select(IBProfile).where(IBProfile.id == ib_id))
         root = root_q.scalar_one_or_none()
-        return [await _build_ib_node(root, db)] if root else []
+        return [await _build_ib_node(root, db, super_id)] if root else []
     roots_q = await db.execute(
         select(IBProfile).where(IBProfile.parent_ib_id.is_(None), IBProfile.is_active == True)
         .order_by(IBProfile.created_at))
-    return [await _build_ib_node(r, db) for r in roots_q.scalars().all()]
+    return [await _build_ib_node(r, db, super_id) for r in roots_q.scalars().all()]
 
 
-async def _build_ib_node(ib, db: AsyncSession, depth: int = 0) -> dict:
+async def _build_ib_node(ib, db: AsyncSession, super_id: uuid.UUID | None = None, depth: int = 0) -> dict:
     if depth > 10:
         return {}
     user_q = await db.execute(select(User).where(User.id == ib.user_id))
@@ -1022,8 +1052,9 @@ async def _build_ib_node(ib, db: AsyncSession, depth: int = 0) -> dict:
         "email": user.email if user else "?",
         "name": f"{user.first_name or ''} {user.last_name or ''}".strip() if user else "?",
         "referral_code": ib.referral_code, "level": ib.level or 1,
+        "ib_type": _classify_ib_type(ib, super_id),
         "total_earned": float(ib.total_earned or 0), "referral_count": ref_count,
-        "children": [await _build_ib_node(c, db, depth + 1) for c in children],
+        "children": [await _build_ib_node(c, db, super_id, depth + 1) for c in children],
     }
 
 
@@ -1052,6 +1083,7 @@ async def get_unassigned_users(page: int, per_page: int, db: AsyncSession) -> di
 
 async def get_ib_referrals(ib_id: uuid.UUID, page: int, per_page: int, db: AsyncSession) -> dict:
     """Traders referred by a specific IB with commission data."""
+    super_id = await _super_ib_profile_id(db)
     total = (await db.execute(
         select(func.count(Referral.id)).where(Referral.ib_profile_id == ib_id)
     )).scalar() or 0
@@ -1073,9 +1105,10 @@ async def get_ib_referrals(ib_id: uuid.UUID, page: int, per_page: int, db: Async
             select(func.coalesce(func.sum(IBCommission.amount), 0))
             .where(IBCommission.ib_id == ib_id, IBCommission.source_user_id == user.id)
         )).scalar() or 0
-        # Is this referred user themselves an active IB? If so return their
-        # level too, so the frontend can badge the correct ROLE — level 1
-        # Super IB, level 2 IB, level 3+ Sub-IB (not a blanket "sub-IB").
+        # Is this referred user themselves an active IB? If so classify their
+        # ROLE by lineage (super_ib=SDA05 only / ib / sub_ib) — NOT by tree
+        # depth, which wrongly badged every root IB as "Super IB" (client
+        # 2026-07-09). `ib_level` is kept for the Sub-IB depth suffix only.
         sub_profile = (await db.execute(
             select(IBProfile).where(
                 IBProfile.user_id == user.id, IBProfile.is_active == True  # noqa: E712
@@ -1088,6 +1121,7 @@ async def get_ib_referrals(ib_id: uuid.UUID, page: int, per_page: int, db: Async
             "joined_at": user.created_at.isoformat() if user.created_at else None,
             "is_ib": bool(sub_profile),
             "ib_level": (sub_profile.level or 1) if sub_profile else None,
+            "ib_type": _classify_ib_type(sub_profile, super_id) if sub_profile else None,
         })
     return {"referrals": items, "total": total, "page": page}
 
