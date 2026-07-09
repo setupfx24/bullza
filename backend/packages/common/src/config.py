@@ -196,25 +196,6 @@ class Settings(BaseSettings):
     ALLTICK_FOREX_WS_URL: str = "wss://quote.alltick.co/quote-b-ws-api"
     ALLTICK_STOCK_WS_URL: str = "wss://quote.alltick.co/quote-stock-b-ws-api"
 
-    # Finage (finage.co.uk) — REST last-quote (real bid/ask) + aggregates
-    # (candles). When FINAGE_API_KEY is set it takes priority over InfoWay /
-    # AllTick. The feed polls the last-quote endpoint per symbol every
-    # FINAGE_POLL_INTERVAL seconds (no confirmed WS on the trial). Covers
-    # forex + metals + oil (WTIUSD); crypto stays on Binance, indices unsupported
-    # via the forex path. NOTE: the trial key literally includes the "API_KEY"
-    # prefix (client 2026-07-09). (client 2026-07-09)
-    FINAGE_API_KEY: str = ""
-    FINAGE_POLL_INTERVAL: float = 1.0  # seconds between last-quote polls per symbol
-    # Finage WebSocket (real-time streaming, denser than REST polling). The full
-    # URL — incl. subdomain, port, and token — comes from the Finage dashboard's
-    # WebSocket section: wss://<subdomain>.finage.ws:<port>/?token=<token>. When
-    # set, FinageFeed streams via WS instead of polling. (client 2026-07-09)
-    FINAGE_WS_URL: str = ""
-    # Pull crypto from Finage (/last/crypto, price-only) instead of Binance. When
-    # true the Binance crypto feed is NOT started (avoids double-feeding). Binance
-    # is generally better for crypto (real-time, free, dense), so this is opt-in.
-    FINAGE_INCLUDE_CRYPTO: bool = False
-
     # Corecen LP (alternate primary market data source). When CORECEN_LP_ENABLED=true
     # the market-data service stops running its own AllTick / simulator feed and
     # consumes ticks pushed from Corecen via POST /api/lp/prices/batch (HMAC).

@@ -19,7 +19,6 @@ from packages.common.src.redis_client import (
 from .feed_handler import FeedSimulator, INSTRUMENTS
 from .alltick_config import usable_alltick_token
 from .alltick_feed import AllTickFeed
-from .finage_feed import FinageFeed
 from .infoway_config import usable_infoway_token
 from .infoway_feed import InfoWayFeed
 from .corecen_lp_feed import CorecenLPFeed
@@ -64,13 +63,9 @@ class MarketDataService:
     def __init__(self):
         raw_alltick = (getattr(settings, "ALLTICK_TOKEN", "") or "").strip()
         raw_infoway = (getattr(settings, "INFOWAY_TOKEN", "") or "").strip()
-        raw_finage = (getattr(settings, "FINAGE_API_KEY", "") or "").strip()
-        raw_finage_ws = (getattr(settings, "FINAGE_WS_URL", "") or "").strip()
         self._tick_count = 0
         self._alltick_watchdog_armed = False
         self._infoway_watchdog_armed = False
-        # True when Finage supplies crypto too → don't also start the Binance feed.
-        self._crypto_from_finage = False
         # When true, the feed object exists but is never started → no prices are
         # published (mock disabled + no real token). Quotes freeze instead.
         self._feed_disabled = False
@@ -85,23 +80,6 @@ class MarketDataService:
                 )
             self.feed = CorecenLPFeed()
             logger.info("Price feed: Corecen LP (receiving pushes on /api/lp/prices/batch)")
-        elif (raw_finage_ws) or (raw_finage and raw_finage.lower() not in ("your-finage-key", "your-finage-api-key")):
-            # Finage takes priority when FINAGE_WS_URL or FINAGE_API_KEY is set.
-            # WS streams REAL bid/ask (dense); without a WS URL it REST-polls the
-            # last-quote. Forex + metals + oil only — crypto stays on Binance,
-            # indices are unsupported on the forex path. (client 2026-07-09)
-            self._crypto_from_finage = bool(getattr(settings, "FINAGE_INCLUDE_CRYPTO", False))
-            self.feed = FinageFeed(
-                raw_finage, INSTRUMENTS,
-                poll_interval=getattr(settings, "FINAGE_POLL_INTERVAL", 1.0),
-                ws_url=raw_finage_ws,
-                include_crypto=self._crypto_from_finage,
-            )
-            logger.info(
-                "Price feed: Finage %s (real bid/ask)%s",
-                "WebSocket streaming" if raw_finage_ws else "REST last-quote polling",
-                " + crypto (Binance off)" if self._crypto_from_finage else "",
-            )
         elif usable_infoway_token(raw_infoway):
             # Free plan caps WS subscriptions at 10 (error 516 rejects the WHOLE
             # subscription if exceeded → zero ticks). Subscribe to ONLY the
@@ -195,13 +173,13 @@ class MarketDataService:
         # InfoWay/AllTick don't reliably stream crypto (placeholder symbol
         # mapping) — pull crypto from Binance directly so BTC/ETH prices and
         # P&L actually move. FeedSimulator already runs its own Binance feed.
-        if isinstance(self.feed, (InfoWayFeed, AllTickFeed, FinageFeed)) and not self._crypto_from_finage:
+        if isinstance(self.feed, (InfoWayFeed, AllTickFeed)):
             tasks.append(asyncio.create_task(self._binance_crypto_feed()))
         # Free-plan live-price fallback: poll REST for the latest close and
         # publish synthetic ticks when the WS delivers no live frames. Off by
         # default; a real WS tick auto-suppresses it per-symbol.
         if getattr(settings, "INFOWAY_REST_BRIDGE_ENABLED", False) and isinstance(
-            self.feed, (InfoWayFeed, AllTickFeed, FinageFeed)
+            self.feed, (InfoWayFeed, AllTickFeed)
         ):
             tasks.append(asyncio.create_task(self._infoway_rest_bridge()))
 
@@ -408,13 +386,13 @@ class MarketDataService:
         url = f"{BINANCE_WS}/{'/'.join(streams)}"
         # Stop if a watchdog swaps the primary feed to FeedSimulator, which
         # runs its OWN Binance feed — else we'd double-publish crypto.
-        while self.running and isinstance(self.feed, (InfoWayFeed, AllTickFeed, FinageFeed)):
+        while self.running and isinstance(self.feed, (InfoWayFeed, AllTickFeed)):
             try:
                 logger.info("Binance crypto feed connecting (alongside primary feed)")
                 async with _ws.connect(url, ping_interval=20, ping_timeout=10) as ws:
                     logger.info("Binance crypto feed connected — live crypto prices active")
                     async for raw in ws:
-                        if not self.running or not isinstance(self.feed, (InfoWayFeed, AllTickFeed, FinageFeed)):
+                        if not self.running or not isinstance(self.feed, (InfoWayFeed, AllTickFeed)):
                             break
                         try:
                             data = _json.loads(raw)
@@ -466,7 +444,7 @@ class MarketDataService:
         LIVE_WINDOW = 6.0                  # s — a real tick this recent wins
         POLL = 2.0
         logger.info("InfoWay REST-to-tick bridge ON (poll=%.1fs) — free-plan live-price fallback", POLL)
-        while self.running and isinstance(self.feed, (InfoWayFeed, AllTickFeed, FinageFeed)):
+        while self.running and isinstance(self.feed, (InfoWayFeed, AllTickFeed)):
             try:
                 latest = await fetch_latest_close_batch(syms, "1m", token)
                 now_mono = time.monotonic()
