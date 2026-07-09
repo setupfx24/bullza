@@ -73,14 +73,10 @@ const BREAKEVEN_COLOR = '#9ca3af';   // gray — entry-line P&L label near break
 // Vantage-style HTML overlay pill anchoring. The pill sits just left of the
 // price axis; ~58px approximates the axis width across timeframes/symbols.
 const PRICE_AXIS_W = 58;
-// Semi-transparent tint of a hex colour for the pill's info/close background.
-function hexToTint(hex: string, alpha = 0.15): string {
-  const h = hex.replace('#', '');
-  const r = parseInt(h.slice(0, 2), 16);
-  const g = parseInt(h.slice(2, 4), 16);
-  const b = parseInt(h.slice(4, 6), 16);
-  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-}
+// Solid dark chip behind the P&L text/close so it's crisply readable over any
+// candles (the old translucent tint blended into the chart). Text stays the
+// P&L colour; a thin colour border defines the chip. (client 2026-07-09)
+const CHIP_BG = 'rgba(17, 21, 31, 0.95)';
 
 export default function ChartingLibraryChart() {
   const selectedSymbol = useTradingStore((s) => s.selectedSymbol);
@@ -607,10 +603,10 @@ export default function ChartingLibraryChart() {
 
       const root = document.createElement('div');
       root.style.cssText =
-        `position:absolute;right:${PRICE_AXIS_W}px;display:flex;align-items:stretch;height:22px;`
+        `position:absolute;right:${PRICE_AXIS_W}px;display:flex;align-items:stretch;height:23px;`
         + `font-size:12px;line-height:1;white-space:nowrap;transform:translateY(-50%);`
         + `pointer-events:none;visibility:hidden;border-radius:4px;`
-        + `box-shadow:0 1px 4px rgba(0,0,0,.35);z-index:5;`;
+        + `box-shadow:0 2px 6px rgba(0,0,0,.5);z-index:5;`;
 
       const badge = document.createElement('span');
       badge.textContent = side;
@@ -618,8 +614,12 @@ export default function ChartingLibraryChart() {
         `display:flex;align-items:center;padding:0 9px;color:#fff;background:${sideColor};`
         + `border-radius:4px 0 0 4px;font-weight:700;letter-spacing:.02em;`;
 
+      // Solid dark chip so the P&L reads clearly over candles; coloured text
+      // + a thin coloured border set by the sync loop.
       const info = document.createElement('span');
-      info.style.cssText = `display:flex;align-items:center;padding:0 11px;font-weight:600;`;
+      info.style.cssText =
+        `display:flex;align-items:center;padding:0 11px;font-weight:700;`
+        + `background:${CHIP_BG};border-top:1px solid transparent;border-bottom:1px solid transparent;`;
 
       const close = document.createElement('button');
       close.type = 'button';
@@ -627,9 +627,9 @@ export default function ChartingLibraryChart() {
       close.title = 'Close position';
       close.style.cssText =
         `display:flex;align-items:center;padding:0 9px;border:0;cursor:pointer;`
-        + `border-radius:0 4px 4px 0;font-weight:700;pointer-events:auto;`;
-      close.onmouseenter = () => { close.style.filter = 'brightness(0.82)'; };
-      close.onmouseleave = () => { close.style.filter = 'none'; };
+        + `border-radius:0 4px 4px 0;font-weight:700;pointer-events:auto;background:${CHIP_BG};`;
+      close.onmouseenter = () => { close.style.background = 'rgba(40,46,60,0.98)'; };
+      close.onmouseleave = () => { close.style.background = CHIP_BG; };
       close.onclick = (e) => {
         e.stopPropagation();
         if (!window.confirm(`Close ${side} ${Number(p.lots)} ${sym} at market?`)) return;
@@ -678,7 +678,11 @@ export default function ChartingLibraryChart() {
       // Use the crosshair-calibrated value, else estimate from the height gap
       // until the first crosshair event lands.
       const containerH = containerRef.current?.clientHeight || g.h;
-      const offset = overlayOffsetRef.current ?? Math.max(0, containerH - g.h - 28);
+      // Exact once a crosshair event calibrates it (offsetY is container-relative
+      // so it includes the top toolbar). Until then, estimate from the height
+      // gap — getHeight() tends to include the time axis, so the gap ≈ the top
+      // toolbar; don't over-subtract or the pill rides ABOVE the line.
+      const offset = overlayOffsetRef.current ?? Math.max(0, containerH - g.h);
       const now = Date.now();
       const livePos = useTradingStore.getState().positions;
       for (const pl of pills) {
@@ -695,9 +699,9 @@ export default function ChartingLibraryChart() {
         if (text === pl.lastText && color === pl.lastColor) continue;
         pl.info.textContent = text;
         pl.info.style.color = color;
-        pl.info.style.background = hexToTint(color);
+        pl.info.style.borderTopColor = color;
+        pl.info.style.borderBottomColor = color;
         pl.close.style.color = color;
-        pl.close.style.background = hexToTint(color);
         pl.lastText = text;
         pl.lastColor = color;
       }
