@@ -22,7 +22,9 @@ from typing import Dict, List, Optional
 import httpx
 import websockets
 
-from .finage_rest import BASE_URL, finage_code, finage_segment, is_supported, platform_from_finage
+from .finage_rest import (
+    BASE_URL, CRYPTO_SYMBOLS, finage_code, finage_segment, is_supported, platform_from_finage,
+)
 
 logger = logging.getLogger("market-data.finage")
 
@@ -46,12 +48,16 @@ class FinageFeed:
 
     def __init__(
         self, api_key: str, instruments: Dict[str, dict],
-        poll_interval: float = 1.0, ws_url: str = "",
+        poll_interval: float = 1.0, ws_url: str = "", include_crypto: bool = False,
     ):
         self._api_key = (api_key or "").strip()
         self._ws_url = (ws_url or "").strip()
-        # Only symbols Finage can actually price on the forex last-quote path.
-        self._instruments = {s: v for s, v in instruments.items() if is_supported(s)}
+        # Symbols Finage can price on the forex last-quote path, plus crypto
+        # (/last/crypto, price-only) when include_crypto is on.
+        self._instruments = {
+            s: v for s, v in instruments.items()
+            if is_supported(s) or (include_crypto and s.upper() in CRYPTO_SYMBOLS)
+        }
         self._poll_interval = max(0.25, float(poll_interval or 1.0))
         self._tick_queue: asyncio.Queue = asyncio.Queue(maxsize=50_000)
         self._running = False

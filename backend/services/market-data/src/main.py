@@ -69,6 +69,8 @@ class MarketDataService:
         self._tick_count = 0
         self._alltick_watchdog_armed = False
         self._infoway_watchdog_armed = False
+        # True when Finage supplies crypto too → don't also start the Binance feed.
+        self._crypto_from_finage = False
         # When true, the feed object exists but is never started → no prices are
         # published (mock disabled + no real token). Quotes freeze instead.
         self._feed_disabled = False
@@ -88,14 +90,17 @@ class MarketDataService:
             # WS streams REAL bid/ask (dense); without a WS URL it REST-polls the
             # last-quote. Forex + metals + oil only — crypto stays on Binance,
             # indices are unsupported on the forex path. (client 2026-07-09)
+            self._crypto_from_finage = bool(getattr(settings, "FINAGE_INCLUDE_CRYPTO", False))
             self.feed = FinageFeed(
                 raw_finage, INSTRUMENTS,
                 poll_interval=getattr(settings, "FINAGE_POLL_INTERVAL", 1.0),
                 ws_url=raw_finage_ws,
+                include_crypto=self._crypto_from_finage,
             )
             logger.info(
-                "Price feed: Finage %s (real bid/ask)",
+                "Price feed: Finage %s (real bid/ask)%s",
                 "WebSocket streaming" if raw_finage_ws else "REST last-quote polling",
+                " + crypto (Binance off)" if self._crypto_from_finage else "",
             )
         elif usable_infoway_token(raw_infoway):
             # Free plan caps WS subscriptions at 10 (error 516 rejects the WHOLE
@@ -190,7 +195,7 @@ class MarketDataService:
         # InfoWay/AllTick don't reliably stream crypto (placeholder symbol
         # mapping) — pull crypto from Binance directly so BTC/ETH prices and
         # P&L actually move. FeedSimulator already runs its own Binance feed.
-        if isinstance(self.feed, (InfoWayFeed, AllTickFeed, FinageFeed)):
+        if isinstance(self.feed, (InfoWayFeed, AllTickFeed, FinageFeed)) and not self._crypto_from_finage:
             tasks.append(asyncio.create_task(self._binance_crypto_feed()))
         # Free-plan live-price fallback: poll REST for the latest close and
         # publish synthetic ticks when the WS delivers no live frames. Off by

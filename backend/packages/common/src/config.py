@@ -210,6 +210,10 @@ class Settings(BaseSettings):
     # WebSocket section: wss://<subdomain>.finage.ws:<port>/?token=<token>. When
     # set, FinageFeed streams via WS instead of polling. (client 2026-07-09)
     FINAGE_WS_URL: str = ""
+    # Pull crypto from Finage (/last/crypto, price-only) instead of Binance. When
+    # true the Binance crypto feed is NOT started (avoids double-feeding). Binance
+    # is generally better for crypto (real-time, free, dense), so this is opt-in.
+    FINAGE_INCLUDE_CRYPTO: bool = False
 
     # Corecen LP (alternate primary market data source). When CORECEN_LP_ENABLED=true
     # the market-data service stops running its own AllTick / simulator feed and
