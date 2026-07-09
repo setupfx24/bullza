@@ -62,8 +62,20 @@ RECONCILE_COUNT = 6          # last few CLOSED bars to re-assert per (symbol, tf
 # Free plan caps REST at 60/min (1/sec). 1.5s was too aggressive once getBars
 # + any bridge shared the budget → HTTP 429 storm. 3s keeps the reconcile at
 # ~20/min and leaves headroom for chart history fetches. (client 2026-07-09)
-RECONCILE_SPACING = 3.0      # seconds between REST calls — stay under 60/min cap
+# Default spacing (free plan, 60/min cap). Overridable via INFOWAY_RECONCILE_SPACING
+# — on the paid plan (600/min) drop it to ~1.0–1.5 for near-real-time closed-bar
+# reconciliation. (client 2026-07-09)
+RECONCILE_SPACING = 3.0      # seconds between REST calls — stay under the rate cap
 RECONCILE_WARMUP = 45.0      # let the feed + initial seed settle before first pass
+
+
+def _reconcile_spacing() -> float:
+    """Seconds between reconcile REST calls — env-tunable for paid plans."""
+    try:
+        from packages.common.src.config import get_settings
+        return float(getattr(get_settings(), "INFOWAY_RECONCILE_SPACING", RECONCILE_SPACING))
+    except Exception:  # noqa: BLE001
+        return RECONCILE_SPACING
 
 
 # ─── Symbol mapping ───────────────────────────────────────────────────────
@@ -462,7 +474,7 @@ class InfoWayFeed:
                     except Exception as exc:  # noqa: BLE001
                         logger.debug("InfoWay reconcile %s %s failed: %s", plat, tf_name, exc)
                     try:
-                        await asyncio.sleep(RECONCILE_SPACING)
+                        await asyncio.sleep(_reconcile_spacing())
                     except asyncio.CancelledError:
                         return
 

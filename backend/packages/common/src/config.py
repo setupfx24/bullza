@@ -167,6 +167,10 @@ class Settings(BaseSettings):
     # Default to "trade" so a fresh deploy stays live; on a paid plan where
     # depth pushes, set INFOWAY_CHANNEL=depth in .env for true bid/ask.
     INFOWAY_CHANNEL: str = "trade"
+    # Seconds between reconcile REST calls (closed-bar re-assert vs official OHLC).
+    # 3s suits the free plan's 60/min cap; on the paid $199 plan (600/min) drop to
+    # ~1.0–1.5 for near-real-time candle reconciliation. (client 2026-07-09)
+    INFOWAY_RECONCILE_SPACING: float = 3.0
     # REST-to-tick bridge (client 2026-07-09): the free InfoWay plan's WS
     # subscribes OK but pushes NO live frames, so bid/ask + the forming candle
     # freeze while REST batch_kline keeps working. When true, market-data polls
