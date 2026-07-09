@@ -58,6 +58,16 @@ const CHART_SAVE_KEY = 'swisdex_chart_layout_v1';
 const STALE_MS = { crypto: 3000, normal: 5000, weekendClosed: 60000 };
 const STALE_COLOR = '#6b7280';
 
+// Chart line colours — blue/red industry standard (Vantage / Exness style).
+// Blue = anything BUY-related (Ask line, BUY entry, profit); Red = anything
+// SELL-related (Bid line, SELL entry, loss). Green/red was ambiguous with the
+// P&L palette, so BUY moved to blue. (client 2026-07-09)
+const CHART_BUY_COLOR = '#3b82f6';   // blue — BUY (ask) line + BUY position entry line
+const CHART_SELL_COLOR = '#ef4444';  // red  — SELL (bid) line + SELL position entry line
+const PROFIT_COLOR = '#3b82f6';      // blue — entry-line P&L label when in profit
+const LOSS_COLOR = '#ef4444';        // red  — entry-line P&L label when in loss
+const BREAKEVEN_COLOR = '#9ca3af';   // gray — entry-line P&L label near break-even
+
 export default function ChartingLibraryChart() {
   const selectedSymbol = useTradingStore((s) => s.selectedSymbol);
   const positions = useTradingStore((s) => s.positions);
@@ -200,9 +210,10 @@ export default function ChartingLibraryChart() {
   }, [selectedSymbol, ready]);
 
   // Reconcile chart lines whenever positions / pending orders change. Each open
-  // position gets an ENTRY line labelled with its LIVE P&L and coloured by
-  // profit/loss (green/red/gray), throttled to 500ms; plus SL (amber) / TP
-  // (teal). Each pending order gets its entry (BUY blue / SELL purple) + SL/TP.
+  // position gets an ENTRY line whose LINE colour is fixed by side (BUY blue /
+  // SELL red) and whose LABEL shows the LIVE P&L coloured by profit/loss
+  // (blue/red/gray), throttled to 500ms; plus SL (amber) / TP (teal). Each
+  // pending order gets its entry (BUY blue / SELL purple, dashed) + SL/TP.
   //
   // Drawn with createShape('horizontal_line') — the CORE Charting Library API.
   // createPositionLine/createOrderLine are Trading-Terminal-only and render
@@ -232,11 +243,15 @@ export default function ChartingLibraryChart() {
     const cs = Number(inst?.contract_size) || defaultContractSize(sym);
     const fp = (n: number) => Number(n).toFixed(digits);
 
-    // P&L → line colour: green in profit, red in loss, gray near break-even.
+    // P&L → LABEL colour: blue in profit, red in loss, gray near break-even.
     const pnlColor = (pnl: number) =>
-      Math.abs(pnl) < 0.10 ? '#9ca3af' : pnl > 0 ? '#10b981' : '#ef4444';
+      Math.abs(pnl) < 0.10 ? BREAKEVEN_COLOR : pnl > 0 ? PROFIT_COLOR : LOSS_COLOR;
 
-    type Desired = { key: string; price: number; color: string; text: string; dashed: boolean; pnl?: number };
+    // `color` is the LINE colour, `textColor` the LABEL colour. For position
+    // entry lines they differ: the line is fixed by side (BUY blue / SELL red)
+    // while the label tracks P&L (profit blue / loss red / gray). SL/TP/pending
+    // omit textColor → it falls back to the line colour.
+    type Desired = { key: string; price: number; color: string; textColor?: string; text: string; dashed: boolean; pnl?: number };
     const desired: Desired[] = [];
 
     // ── Open positions: entry line labelled with LIVE P&L, coloured by P&L
@@ -251,8 +266,10 @@ export default function ChartingLibraryChart() {
       const pct = notional > 0 ? (pnl / notional) * 100 : 0;
       const pnlStr = `${pnl >= 0 ? '+' : '-'}$${Math.abs(pnl).toFixed(2)}`;
       const pctStr = `${pct >= 0 ? '+' : ''}${pct.toFixed(2)}%`;
+      // Line colour by SIDE (BUY blue / SELL red); label colour by P&L.
+      const sideColor = p.side.toUpperCase() === 'BUY' ? CHART_BUY_COLOR : CHART_SELL_COLOR;
       desired.push({
-        key: p.id, price: entry, color: pnlColor(pnl),
+        key: p.id, price: entry, color: sideColor, textColor: pnlColor(pnl),
         text: `${p.side.toUpperCase()} ${lots} @ ${fp(entry)} | ${pnlStr} (${pctStr})`,
         dashed: false, pnl,
       });
@@ -273,13 +290,13 @@ export default function ChartingLibraryChart() {
         desired.push({ key: `ord-${o.id}-tp`, price: Number(o.take_profit), color: '#14b8a6', text: `TP ${fp(Number(o.take_profit))}`, dashed: true });
     }
 
-    const shapeOpts = (text: string, color: string, dashed: boolean) => ({
+    const shapeOpts = (text: string, lineColor: string, textColor: string, dashed: boolean) => ({
       shape: 'horizontal_line',
       text,
       lock: true, disableSelection: true, disableSave: true, disableUndo: true,
       overrides: {
-        linecolor: color, linestyle: dashed ? 2 : 0, linewidth: dashed ? 1 : 2,
-        showLabel: true, textcolor: color, fontsize: 11, bold: true,
+        linecolor: lineColor, linestyle: dashed ? 2 : 0, linewidth: dashed ? 1 : 2,
+        showLabel: true, textcolor: textColor, fontsize: 11, bold: true,
         horzLabelsAlign: 'right', vertLabelsAlign: 'middle',
       },
     });
@@ -296,9 +313,9 @@ export default function ChartingLibraryChart() {
       if (!existing) {
         // createShape is ASYNC (Promise<EntityId>). Reserve the key with a
         // 'creating' entry so a re-render mid-create doesn't spawn a duplicate.
-        const entry: any = { id: null, price: d.price, creating: true, text: d.text, color: d.color, pnl: d.pnl ?? null, propAt: now };
+        const entry: any = { id: null, price: d.price, creating: true, text: d.text, color: d.color, textColor: d.textColor ?? d.color, pnl: d.pnl ?? null, propAt: now };
         linesRef.current.set(d.key, entry);
-        chart.createShape({ time: t, price: d.price }, shapeOpts(d.text, d.color, d.dashed))
+        chart.createShape({ time: t, price: d.price }, shapeOpts(d.text, d.color, d.textColor ?? d.color, d.dashed))
           .then((id: any) => {
             if (linesRef.current.get(d.key) === entry) { entry.id = id; entry.creating = false; }
             else { try { chart.removeEntity(id); } catch { /* closed mid-create */ } }
@@ -314,20 +331,25 @@ export default function ChartingLibraryChart() {
         // only when P&L moved > $0.01 or the profit/loss colour flipped — so we
         // don't setProperties on every micro-tick. SL/TP/order labels are
         // static, so they update immediately when they actually change.
-        if (d.text !== existing.text || d.color !== existing.color) {
+        const nextTextColor = d.textColor ?? d.color;
+        if (d.text !== existing.text || d.color !== existing.color || nextTextColor !== existing.textColor) {
           const isPnl = d.pnl != null;
           const throttleOk = !isPnl || (now - (existing.propAt || 0) >= throttleMs);
+          // For entry lines the LINE colour is fixed by side, so the P&L flip
+          // shows up in the LABEL colour — trigger on that too.
           const worthIt = !isPnl
             || d.color !== existing.color
+            || nextTextColor !== existing.textColor
             || Math.abs((d.pnl as number) - (existing.pnl ?? 0)) > 0.01;
           if (throttleOk && worthIt) {
             try {
               chart.getShapeById(existing.id)?.setProperties({
-                text: d.text, linecolor: d.color, textcolor: d.color,
+                text: d.text, linecolor: d.color, textcolor: nextTextColor,
               });
             } catch { /* keep last-known label on error */ }
             existing.text = d.text;
             existing.color = d.color;
+            existing.textColor = nextTextColor;
             existing.pnl = d.pnl ?? existing.pnl;
             existing.propAt = now;
           }
@@ -398,6 +420,7 @@ export default function ChartingLibraryChart() {
         } catch { /* noop */ }
         entry.text = staleText;
         entry.color = STALE_COLOR;
+        entry.textColor = STALE_COLOR;
         entry.propAt = now; // so the reconcile's throttle lets recovery through
       }
       // (b) Live BUY/SELL quote lines — grey them regardless of whether any
@@ -405,8 +428,10 @@ export default function ChartingLibraryChart() {
       //     fresh tick (it checks liveStaleRef).
       const live = liveLinesRef.current;
       if (live && typeof live === 'object' && live.ask != null) {
-        try { chart.getShapeById(live.ask)?.setProperties({ text: 'BUY -- (stale)', linecolor: STALE_COLOR, textcolor: STALE_COLOR }); } catch { /* noop */ }
-        try { chart.getShapeById(live.bid)?.setProperties({ text: 'SELL -- (stale)', linecolor: STALE_COLOR, textcolor: STALE_COLOR }); } catch { /* noop */ }
+        // No text label on these lines — grey the colour (→ grey price pill) to
+        // signal stale; the BUY/SELL effect restores blue/red on the next tick.
+        try { chart.getShapeById(live.ask)?.setProperties({ linecolor: STALE_COLOR, textcolor: STALE_COLOR }); } catch { /* noop */ }
+        try { chart.getShapeById(live.bid)?.setProperties({ linecolor: STALE_COLOR, textcolor: STALE_COLOR }); } catch { /* noop */ }
         liveStaleRef.current = true;
       }
     }, 1000);
@@ -415,8 +440,9 @@ export default function ChartingLibraryChart() {
   }, [ready, selectedSymbol]);
 
   // Live BUY / SELL price lines that track the current quote (MT4/MT5 style):
-  // a green BUY line at the ASK and a red SELL line at the BID, updated on every
-  // tick. Uses createShape('horizontal_line') — the CORE Charting Library API —
+  // a blue BUY line at the ASK and a red SELL line at the BID (no text label —
+  // colour signals side; the coloured price pill stays on the axis), updated on
+  // every tick. Uses createShape('horizontal_line') — the CORE Charting Library API —
   // NOT createPositionLine, which is a Trading-Terminal-only feature that isn't
   // present in this build (it silently drew nothing). Shapes are created once
   // then moved with setPoints so there's no flicker.
@@ -428,13 +454,15 @@ export default function ChartingLibraryChart() {
     if (!chart?.createShape) return;
     const sym = (selectedSymbol || '').toUpperCase();
 
-    const opts = (text: string, color: string, vAlign: 'top' | 'bottom') => ({
+    // No BUY/SELL text label — the colour alone signals side (blue=BUY/ask,
+    // red=SELL/bid), matching pro broker platforms. showPrice keeps the coloured
+    // price pill on the right axis; showLabel:false drops the word. (2026-07-09)
+    const opts = (color: string, vAlign: 'top' | 'bottom') => ({
       shape: 'horizontal_line',
-      text,                                   // top-level in CreateShapeOptions
       lock: true, disableSelection: true, disableSave: true, disableUndo: true,
       overrides: {
         linecolor: color, linestyle: 0, linewidth: 1,
-        showLabel: true, textcolor: color, fontsize: 11, bold: true,
+        showLabel: false, showPrice: true, textcolor: color, fontsize: 11, bold: true,
         horzLabelsAlign: 'right', vertLabelsAlign: vAlign,
       },
     });
@@ -452,11 +480,11 @@ export default function ChartingLibraryChart() {
         move(cur.ask, t, tick.ask);
         move(cur.bid, t, tick.bid);
         // Recovery: a fresh tick arrived after the stale watchdog greyed these
-        // → restore the normal BUY (green) / SELL (red) labels + colour, once.
+        // → restore the BUY (blue) / SELL (red) line colour, once.
         if (liveStaleRef.current) {
           liveStaleRef.current = false;
-          try { chart.getShapeById(cur.ask)?.setProperties({ text: 'BUY', linecolor: '#22c55e', textcolor: '#22c55e' }); } catch { /* noop */ }
-          try { chart.getShapeById(cur.bid)?.setProperties({ text: 'SELL', linecolor: '#ef4444', textcolor: '#ef4444' }); } catch { /* noop */ }
+          try { chart.getShapeById(cur.ask)?.setProperties({ linecolor: CHART_BUY_COLOR, textcolor: CHART_BUY_COLOR }); } catch { /* noop */ }
+          try { chart.getShapeById(cur.bid)?.setProperties({ linecolor: CHART_SELL_COLOR, textcolor: CHART_SELL_COLOR }); } catch { /* noop */ }
         }
         return;
       }
@@ -464,8 +492,8 @@ export default function ChartingLibraryChart() {
       // store the ids so later ticks just move the shapes.
       liveLinesRef.current = 'creating';
       Promise.all([
-        chart.createShape({ time: t, price: tick.ask }, opts('BUY', '#22c55e', 'bottom')),
-        chart.createShape({ time: t, price: tick.bid }, opts('SELL', '#ef4444', 'top')),
+        chart.createShape({ time: t, price: tick.ask }, opts(CHART_BUY_COLOR, 'bottom')),
+        chart.createShape({ time: t, price: tick.bid }, opts(CHART_SELL_COLOR, 'top')),
       ]).then(([ask, bid]: any[]) => { liveLinesRef.current = { ask, bid }; })
         .catch(() => { liveLinesRef.current = null; });
     };
