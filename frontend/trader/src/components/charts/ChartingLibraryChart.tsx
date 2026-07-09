@@ -338,7 +338,7 @@ export default function ChartingLibraryChart() {
         // 'creating' entry so a re-render mid-create doesn't spawn a duplicate.
         const entry: any = { id: null, price: d.price, creating: true, text: d.text, color: d.color, textColor: d.textColor ?? d.color, pnl: d.pnl ?? null, propAt: now };
         linesRef.current.set(d.key, entry);
-        chart.createShape({ time: t, price: d.price }, shapeOpts(d.text, d.color, d.textColor ?? d.color, d.dashed, d.label !== false))
+        chart.createShape({ time: t, price: d.price }, shapeOpts(d.label === false ? '' : d.text, d.color, d.textColor ?? d.color, d.dashed, d.label !== false))
           .then((id: any) => {
             if (linesRef.current.get(d.key) === entry) { entry.id = id; entry.creating = false; }
             else { try { chart.removeEntity(id); } catch { /* closed mid-create */ } }
@@ -367,7 +367,10 @@ export default function ChartingLibraryChart() {
           if (throttleOk && worthIt) {
             try {
               chart.getShapeById(existing.id)?.setProperties({
-                text: d.text, linecolor: d.color, textcolor: nextTextColor,
+                // Entry lines carry NO visible text — the HTML overlay pill is
+                // their label (showLabel:false alone didn't suppress it in this
+                // build, so keep the shape text empty too). (client 2026-07-09)
+                text: d.label === false ? '' : d.text, linecolor: d.color, textcolor: nextTextColor,
               });
             } catch { /* keep last-known label on error */ }
             existing.text = d.text;
@@ -434,14 +437,13 @@ export default function ChartingLibraryChart() {
       //     pending-order labels are static, so leave them untouched.
       for (const [, entry] of linesRef.current) {
         if (!entry || entry.id == null || entry.pnl == null) continue;
-        const base = String(entry.text || '').split(' | ')[0]; // "BUY 0.01 @ 4072.38"
-        const staleText = `${base} | -- (stale)`;
+        // Entry lines have NO shape text (the overlay pill is the label); just
+        // grey the LINE to signal stale — never write visible text back on it.
         try {
           chart.getShapeById(entry.id)?.setProperties({
-            text: staleText, linecolor: STALE_COLOR, textcolor: STALE_COLOR,
+            text: '', linecolor: STALE_COLOR, textcolor: STALE_COLOR,
           });
         } catch { /* noop */ }
-        entry.text = staleText;
         entry.color = STALE_COLOR;
         entry.textColor = STALE_COLOR;
         entry.propAt = now; // so the reconcile's throttle lets recovery through
