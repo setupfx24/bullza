@@ -29,7 +29,9 @@ import TerminalLeftRail, { type TerminalSpaceId } from '@/components/trading/Ter
 // datafeed in src/lib/charting/datafeed.ts. Revert to
 // '@/components/charts/AdvancedChart' for the public OANDA widget.
 const LiveChart = dynamic(() => import('@/components/charts/ChartingLibraryChart'), { ssr: false });
-const TradingViewNewsTimeline = dynamic(() => import('@/components/charts/TradingViewNewsTimeline'), {
+// In-house news panel (ForexFactory economic events + live forex headlines),
+// replacing the previous TradingView news timeline embed. (client 2026-07-09)
+const MarketNewsPanel = dynamic(() => import('@/components/charts/MarketNewsPanel'), {
   ssr: false,
 });
 
@@ -365,7 +367,7 @@ export default function TradingTerminalPage() {
                 <span className="w-14" aria-hidden />
               </div>
               <div className="flex-1 min-h-0">
-                <TradingViewNewsTimeline />
+                <MarketNewsPanel className="h-full" />
               </div>
             </div>
           )}
@@ -694,7 +696,7 @@ export default function TradingTerminalPage() {
                   </button>
                 </div>
                 <div className="flex-1 min-h-0">
-                  <TradingViewNewsTimeline />
+                  <MarketNewsPanel className="h-full" />
                 </div>
               </div>
             ) : terminalMarketsOpen ? (
