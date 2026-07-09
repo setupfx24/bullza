@@ -16,6 +16,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+from datetime import datetime, timezone
 from typing import Dict, List, Optional
 
 import httpx
@@ -24,6 +25,16 @@ import websockets
 from .finage_rest import BASE_URL, finage_code, finage_segment, is_supported, platform_from_finage
 
 logger = logging.getLogger("market-data.finage")
+
+
+def _ms_to_iso(ms) -> str:
+    """Finage timestamps are epoch-milliseconds ints; the tick store's
+    _parse_tick_time expects an ISO STRING (it calls .strip()). Convert, and on
+    any bad value return "" so the store falls back to now()."""
+    try:
+        return datetime.fromtimestamp(int(ms) / 1000.0, tz=timezone.utc).isoformat()
+    except (TypeError, ValueError, OSError, OverflowError):
+        return ""
 
 RECONNECT_BACKOFF_BASE = 2.0
 RECONNECT_BACKOFF_MAX = 60.0
@@ -129,7 +140,7 @@ class FinageFeed:
         ts = data.get("t")
         self._enqueue({
             "symbol": sym, "bid": mid, "ask": mid,
-            "timestamp": int(ts) if ts else 0, "volume": 1,
+            "timestamp": _ms_to_iso(ts), "volume": 1,
         })
 
     async def _run_ws(self) -> None:
@@ -237,7 +248,7 @@ class FinageFeed:
             "symbol": symbol,
             "bid": mid,
             "ask": mid,
-            "timestamp": int(ts) if ts else 0,
+            "timestamp": _ms_to_iso(ts),
             "volume": 1,
         })
         return None
