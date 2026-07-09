@@ -135,6 +135,26 @@ export default function ChartingLibraryChart() {
         const s = localStorage.getItem(CHART_SAVE_KEY);
         if (s) savedData = JSON.parse(s);
       } catch { /* corrupt / no storage → start fresh */ }
+      // Explicit background / grid / text colours per app theme. Passed to the
+      // widget AND re-applied on ready so a restored (dark) saved_data layout
+      // can't leave the chart dark in light mode. (client 2026-07-09)
+      const themeOverrides: Record<string, string> = theme === 'light'
+        ? {
+            'paneProperties.background': '#ffffff',
+            'paneProperties.backgroundType': 'solid',
+            'paneProperties.vertGridProperties.color': '#ececec',
+            'paneProperties.horzGridProperties.color': '#ececec',
+            'scalesProperties.textColor': '#131722',
+            'scalesProperties.lineColor': '#e0e3eb',
+          }
+        : {
+            'paneProperties.background': '#0c0e12',
+            'paneProperties.backgroundType': 'solid',
+            'paneProperties.vertGridProperties.color': '#1c1f26',
+            'paneProperties.horzGridProperties.color': '#1c1f26',
+            'scalesProperties.textColor': '#b2b5be',
+            'scalesProperties.lineColor': '#2a2e39',
+          };
       const w = new Ctor({
         symbol: initialSymbol,
         interval: '5',
@@ -164,6 +184,10 @@ export default function ChartingLibraryChart() {
           'symbolWatermarkProperties.transparency': 84,
           'symbolWatermarkProperties.color': theme === 'light'
             ? 'rgba(40,40,40,0.10)' : 'rgba(200,200,200,0.10)',
+          // Theme colours here AND re-applied in onChartReady — a restored
+          // saved_data layout carries its own (often dark) background/grid and
+          // overrides `theme:'Light'`, which left a dark chart in light mode.
+          ...themeOverrides,
         },
       });
       widgetRef.current = w;
@@ -172,6 +196,9 @@ export default function ChartingLibraryChart() {
         w.onChartReady?.(() => {
           if (cancelled) return;
           setReady(true);
+          // Force the theme colours AFTER saved_data has loaded — its stored
+          // (possibly dark) background/grid would otherwise win over theme:'Light'.
+          try { (w as any).applyOverrides?.(themeOverrides); } catch { /* noop */ }
           // Persist the FULL layout (drawings + studies + settings + interval)
           // on every change so it survives a refresh. save() serialises the
           // whole widget state; we stash it in localStorage. subscribe/save are
