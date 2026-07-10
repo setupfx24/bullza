@@ -11,7 +11,7 @@ import {
   UserCog, ChevronDown, ChevronRight, Network, Share2,
   DollarSign, Percent, ArrowLeftRight, PanelLeftClose, PanelLeft,
   Receipt, Layers, ShieldCheck, ScrollText, BookOpen, Sparkles, Package, Megaphone,
-  UserCheck, HandCoins, ClipboardList, KeyRound,
+  UserCheck, HandCoins, ClipboardList, KeyRound, Gauge,
 } from 'lucide-react';
 
 interface NavItem {
@@ -35,6 +35,7 @@ const NAV_ITEMS: NavItem[] = [
     perm: 'kyc.view',
   },
   { label: 'Trades', href: '/trades', icon: CandlestickChart, perm: 'trades.view' },
+  { label: 'Risk Management', href: '/risk', icon: Gauge, perm: 'trades.view' },
   { label: 'Book Management', href: '/book', icon: BookOpen, perm: 'trades.view' },
   { label: 'Deposits', href: '/deposits', icon: Wallet, perm: 'deposits.view' },
   { label: 'Deposit Requests', href: '/deposit-requests', icon: Wallet, perm: 'deposits.view' },

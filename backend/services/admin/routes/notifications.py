@@ -149,10 +149,30 @@ async def notifications_summary(
         rm_manual_deposit = 0
         rm_manual_withdraw = 0
 
+    # Tasks assigned to THIS admin/employee that are still pending — their
+    # personal work queue (client 2026-07-10: employees weren't pinged when a
+    # manager assigned them a task). perm=None → shown to every role; the
+    # count is scoped to the signed-in user so nobody sees anyone else's.
+    my_tasks = 0
+    try:
+        async with db.begin_nested():
+            my_tasks_q = await db.execute(
+                text(
+                    "SELECT COUNT(*) FROM employee_tasks "
+                    "WHERE assigned_to = :me AND status = 'pending'"
+                ),
+                {"me": str(admin.id)},
+            )
+            my_tasks = int(my_tasks_q.scalar() or 0)
+    except Exception:
+        my_tasks = 0
+
     # `link` values are admin-frontend route paths. Withdrawals share the
     # /deposits page (tab=withdrawals); approvals get their own page; the
     # rest map 1:1 to existing routes.
     items = [
+        {"kind": "my_tasks", "count": my_tasks, "perm": None,
+         "label": "Tasks assigned to you", "link": "/tasks", "severity": "critical"},
         {"kind": "withdrawals", "count": pending_withdrawals, "perm": "withdrawals.view",
          "label": "Pending withdrawals", "link": "/deposits?tab=withdrawals", "severity": "critical"},
         {"kind": "approvals",   "count": pending_approvals, "perm": "funds.approve",
@@ -183,7 +203,8 @@ async def notifications_summary(
     # platform. super_admin ("*") keeps the full board.
     perms = await resolve_employee_permissions(admin, db)
     if "*" not in perms:
-        items = [i for i in items if i["perm"] in perms]
+        # perm=None marks personal items (e.g. my_tasks) every role keeps.
+        items = [i for i in items if i["perm"] is None or i["perm"] in perms]
 
     # Strip the internal `perm` key from the response (frontend doesn't need it).
     for i in items:
