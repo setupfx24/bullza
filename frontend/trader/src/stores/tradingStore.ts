@@ -30,6 +30,10 @@ export function livePnlFor(
 ): { cp: number; pnl: number } | null {
   if (!tick) return null;
   const sym = (symbol || '').trim().toUpperCase();
+  // Value P&L at the tick MID (bid+ask)/2 — the calc validated as correct. The
+  // profit→negative→profit "flicker" was NOT this math; it was the 1.5s REST
+  // price poll clobbering the fresh WS bid with a round-trip-stale value (fixed
+  // by the tick freshness guard in updatePrice — see lastAppliedTickTs below).
   const cp = (tick.bid > 0 && tick.ask > 0)
     ? (tick.bid + tick.ask) / 2
     : (pos.side === 'buy' ? tick.bid : tick.ask);
@@ -49,6 +53,21 @@ export function livePnlFor(
   }
   return { cp, pnl };
 }
+
+// ─── Live-price freshness guard (fixes the P&L flicker WITHOUT freezing it) ───
+// Two sources write prices: the live WS (/ws/prices, bursty — gaps up to ~2.5s)
+// and the 1.5s REST poll (/instruments/prices/all). The poll's value is
+// round-trip-stale, so applying it right after a fresher WS tick snapped the P&L
+// backward for one frame — the reported profit→negative→profit flicker. Ticks
+// carry a millisecond server timestamp; we ignore one whose ts is older/equal to
+// the last APPLIED tick for that symbol (also drops duplicate re-publishes, which
+// carry the same value). We never freeze: if nothing fresh arrived for
+// STALE_TICK_GRACE_MS we let even a stale value through, so a dead WS falls back
+// to the poll. Centralised here so every caller (trading layout + trade panel,
+// each WS + poll) is covered. (client 2026-07-10)
+const lastAppliedTickTs = new Map<string, number>();   // last applied server ts (epoch ms)
+const lastAppliedTickWall = new Map<string, number>(); // wall-clock of last apply (epoch ms)
+const STALE_TICK_GRACE_MS = 3000;
 
 export interface TickData {
   symbol: string;
@@ -358,6 +377,24 @@ export const useTradingStore = create<TradingState>()((set, get) => ({
     const sym = String(tick.symbol || '').trim().toUpperCase();
     if (!sym) return state;
     const normalized: TickData = { ...tick, symbol: sym };
+
+    // Freshness guard (see lastAppliedTickTs above): drop the round-trip-stale
+    // REST-poll value (or a duplicate re-publish) that flashed the P&L backward,
+    // but only while a fresher tick is recent — after STALE_TICK_GRACE_MS of
+    // silence, let it through so a dead socket falls back to the poll (no freeze).
+    const nowWall = Date.now();
+    const ts = Date.parse(normalized.timestamp);
+    const prevTs = lastAppliedTickTs.get(sym);
+    const prevWall = lastAppliedTickWall.get(sym) ?? 0;
+    if (Number.isFinite(ts) && prevTs !== undefined && ts <= prevTs
+        && nowWall - prevWall < STALE_TICK_GRACE_MS) {
+      return state; // stale/duplicate while a fresher value is live — ignore
+    }
+    lastAppliedTickWall.set(sym, nowWall);
+    if (Number.isFinite(ts) && (prevTs === undefined || ts > prevTs)) {
+      lastAppliedTickTs.set(sym, ts);
+    }
+
     const prev = state.prices[sym];
     return {
       prevPrices: prev
