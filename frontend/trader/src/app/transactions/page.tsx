@@ -398,7 +398,7 @@ export default function TransactionsPage() {
                     ['deposit', 'Deposits'],
                     ['withdrawal', 'Withdrawals'],
                     ['transfer', 'Transfers'],
-                    ['fixed_return', 'Fixed Return'],
+                    ['fixed_return', 'AI Powered Setting'],
                     ['commission', 'IB Commissions'],
                   ] as const
                 ).map(([t, label]) => (

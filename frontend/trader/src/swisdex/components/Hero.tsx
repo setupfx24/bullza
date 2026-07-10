@@ -69,7 +69,7 @@ export function Hero() {
             <span aria-hidden className="text-primary">:</span>
             <span>Insured Trades</span>
             <span aria-hidden className="text-primary">:</span>
-            <span>Fixed Return Program</span>
+            <span>AI Powered Setting</span>
           </motion.h3>
 
           <TypewriterText
