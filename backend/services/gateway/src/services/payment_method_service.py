@@ -125,6 +125,7 @@ async def withdrawal_quote(usd_amount, db: AsyncSession) -> dict:
 
 async def create_method_deposit(
     user_id: UUID, method_id: UUID, pay_amount, utr: str | None, db: AsyncSession,
+    bonus_code: str | None = None,
 ) -> dict:
     """Confirm-Payment submit: convert the local amount to USD at the latest
     rate and create a PENDING manual deposit (admin verifies the UTR + credits).
@@ -163,6 +164,10 @@ async def create_method_deposit(
     if usd is None or usd <= 0:
         raise HTTPException(status_code=503, detail="Currency rate unavailable — try again shortly.")
 
+    # Optional promo/bonus code — same convention as wallet_service deposits:
+    # stored uppercase; bonus_status='pending' so the approval flow matches it
+    # against BonusOffer.promo_code and grants the bonus on credit.
+    _bonus_code_clean = (bonus_code or "").strip().upper() or None
     deposit = Deposit(
         user_id=user_id,
         amount=usd,                       # settles in USD
@@ -171,6 +176,8 @@ async def create_method_deposit(
         transaction_id=(utr or "")[:100] or None,
         pay_amount=amt,
         pay_currency=(method.pay_currency or "INR")[:20],
+        bonus_code=_bonus_code_clean,
+        bonus_status=("pending" if _bonus_code_clean else None),
     )
     db.add(deposit)
     await db.flush()

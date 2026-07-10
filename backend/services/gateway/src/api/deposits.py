@@ -587,6 +587,7 @@ class MethodDepositRequest(BaseModel):
     method_id: UUID
     pay_amount: Decimal
     utr: str | None = None
+    bonus_code: str | None = None
 
 
 @router.post("/deposit/method")
@@ -600,6 +601,7 @@ async def create_method_deposit(
     from ..services import payment_method_service
     return await payment_method_service.create_method_deposit(
         current_user["user_id"], body.method_id, body.pay_amount, body.utr, db,
+        bonus_code=body.bonus_code,
     )
 
 
