@@ -41,6 +41,7 @@ export default function DepositMethodsPage() {
   const [amount, setAmount] = useState('');
   const [usd, setUsd] = useState<number | null>(null);
   const [agreed, setAgreed] = useState(false);
+  const [promo, setPromo] = useState('');
   const [utr, setUtr] = useState('');
   const [reference] = useState(() => 'SWD-' + Math.random().toString(36).slice(2, 8).toUpperCase());
   const [submitting, setSubmitting] = useState(false);
@@ -68,7 +69,7 @@ export default function DepositMethodsPage() {
     return () => clearTimeout(t);
   }, [amount, sel, step, refreshUsd]);
 
-  const pickMethod = (m: Method) => { setSel(m); setAmount(''); setUsd(null); setAgreed(false); setNoticeOpen(true); };
+  const pickMethod = (m: Method) => { setSel(m); setAmount(''); setUsd(null); setAgreed(false); setPromo(''); setNoticeOpen(true); };
   const cur = sel?.pay_currency || 'INR';
 
   const confirmPayment = async () => {
@@ -77,6 +78,7 @@ export default function DepositMethodsPage() {
     try {
       await api.post('/wallet/deposit/method', {
         method_id: sel.id, pay_amount: parseFloat(amount), utr: utr.trim() || null,
+        bonus_code: promo.trim() || null,
       });
       toast.success('Deposit submitted — admin will verify and credit your wallet.');
       router.push('/wallet');
@@ -141,6 +143,22 @@ export default function DepositMethodsPage() {
                   return <p className="text-[11px] text-red-400">Maximum deposit is {sel.max_amount} {cur}.</p>;
                 return null;
               })()}
+            </div>
+
+            {/* Promo / bonus code (optional) — stored on the deposit; the
+                matching BonusOffer is granted when admin credits it. */}
+            <div className="space-y-1">
+              <label className="text-xs text-text-secondary">Promo code <span className="text-text-tertiary">(optional)</span></label>
+              <input
+                value={promo}
+                onChange={(e) => setPromo(e.target.value.toUpperCase())}
+                placeholder="e.g. WELCOME50"
+                maxLength={40}
+                className="w-full px-4 py-3 rounded-xl border border-border-primary bg-bg-secondary font-mono uppercase tracking-wide outline-none focus:border-accent/50 placeholder:normal-case placeholder:tracking-normal"
+              />
+              {promo.trim() && (
+                <p className="text-[11px] text-text-tertiary">Code <span className="font-mono font-bold text-accent">{promo.trim()}</span> will apply when your deposit is credited.</p>
+              )}
             </div>
 
             {sel.upi_id ? <p className="text-[11px] text-text-tertiary">Pay to UPI: <span className="font-mono text-text-primary">{sel.upi_id}</span></p> : null}

@@ -25,7 +25,7 @@ from .corecen_lp_feed import CorecenLPFeed
 from .bar_aggregator import BarAggregator
 from .seed_bars import seed as seed_bars, flush_non_crypto_keys
 from .spread_cache import StreamSpreadCache, RELOAD_INTERVAL_SEC
-from .store import TickStore
+from .store import TickStore, OHLCStore
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)-5s [%(name)s] %(message)s")
 logger = logging.getLogger("market-data")
@@ -134,6 +134,7 @@ class MarketDataService:
                 )
         self.aggregator = BarAggregator()
         self.store = TickStore()
+        self.ohlc_store = OHLCStore()
         self.spread_cache = StreamSpreadCache()
         self.running = True
         self._last_mid: dict[str, float] = {}
@@ -151,6 +152,10 @@ class MarketDataService:
         signal.signal(signal.SIGTERM, lambda *_: setattr(self, "running", False))
 
         await self.store.init()
+        await self.ohlc_store.init()
+        # Every CLOSED bar the aggregator produces is now persisted to the
+        # durable OHLC store (ohlcv_<tf>) for deep, restart-proof chart history.
+        self.aggregator.ohlc_store = self.ohlc_store
 
         await self.spread_cache.reload_if_stale(force=True)
         await self._seed_last_mid_from_redis()
@@ -613,7 +618,7 @@ class MarketDataService:
         else:
             logger.info("Auto-seeding historical bars (first run or bars missing)...")
         try:
-            await seed_bars()
+            await seed_bars(ohlc_store=self.ohlc_store)
         except Exception as exc:
             logger.warning("Auto-seed bars failed: %s", exc)
 

@@ -42,6 +42,10 @@ class BarAggregator:
     def __init__(self):
         self._bars: dict[str, dict[str, BarData]] = defaultdict(dict)
         self._bar_timestamps: dict[str, dict[str, int]] = defaultdict(dict)
+        # Optional durable OHLC store (set by MarketDataService). When present,
+        # every CLOSED bar is persisted to the marketdata DB (ohlcv_<tf>) so chart
+        # history is deep + restart-proof. None → Redis-only (backward compatible).
+        self.ohlc_store = None
 
     def update(self, symbol: str, bid: float, ask: float, timestamp: str):
         mid = (bid + ask) / 2
@@ -91,6 +95,16 @@ class BarAggregator:
         list_key = f"bars:{symbol}:{timeframe}"
         await redis_client.lpush(list_key, json.dumps(bar_data))
         await redis_client.ltrim(list_key, 0, 999)
+
+        # Persist the CLOSED bar to the durable OHLC store (marketdata DB) so chart
+        # history survives restarts and isn't capped at 1000 Redis bars. Only
+        # closed bars reach _store_bar; the live/forming candle stays in Redis.
+        if self.ohlc_store is not None:
+            await self.ohlc_store.upsert(
+                symbol, timeframe, bar_start,
+                bar.open, bar.high, bar.low, bar.close,
+                volume=bar.tick_count, tick_count=bar.tick_count,
+            )
 
         # ATR(14) — used by trade insurance pricing. Computed only on 1m bars
         # because that's the timeframe insurance quotes care about.
