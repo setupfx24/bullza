@@ -734,10 +734,14 @@ export default function ChartingLibraryChart() {
           if (val !== null && !(val > 0)) { toast.error('Invalid price'); return; }
           (async () => {
             try {
-              await api.put(`/positions/${p.id}`, {
-                stop_loss: kind === 'sl' ? val : (p.stop_loss ?? null),
-                take_profit: kind === 'tp' ? val : (p.take_profit ?? null),
-              });
+              // Send ONLY the bracket being changed. The backend does a partial
+              // update (an omitted field is left untouched), so the OTHER bracket
+              // is never affected. Re-sending it from the button's captured `p`
+              // was the bug: `p` is a stale closure — the buttons only rebuild on
+              // id/side/lots change (positionsKey), NOT on SL/TP change — so its
+              // copy of the other bracket was old and reverted it. (client 2026-07-10)
+              await api.put(`/positions/${p.id}`,
+                kind === 'sl' ? { stop_loss: val } : { take_profit: val });
               toast.success(val === null ? `${label} removed` : `${label} set @ ${val}`);
               await useTradingStore.getState().refreshPositions();
             } catch (err) {
@@ -835,10 +839,11 @@ export default function ChartingLibraryChart() {
           const projTxt = proj ? ` → ${proj.pnl >= 0 ? 'profit' : 'loss'} ${proj.pnl >= 0 ? '+' : '−'}$${Math.abs(proj.pnl).toFixed(2)}` : '';
           const applyBracket = async () => {
             try {
-              await api.put(`/positions/${p.id}`, {
-                stop_loss: kind === 'sl' ? price : (p.stop_loss ?? null),
-                take_profit: kind === 'tp' ? price : (p.take_profit ?? null),
-              });
+              // Only the dragged bracket — the backend partial-update keeps the
+              // other intact (see setBracket note; `p` is a stale closure, so
+              // re-sending its copy of the other bracket reverted it). (client 2026-07-10)
+              await api.put(`/positions/${p.id}`,
+                kind === 'sl' ? { stop_loss: price } : { take_profit: price });
               toast.success(`${label} set @ ${price.toFixed(digits)}`);
               await useTradingStore.getState().refreshPositions();
             } catch (err) {
