@@ -235,6 +235,19 @@ async def _pay_fr_referral(
         if not referred_row:
             return
         referrer_id, _rf, _rl, _re = referred_row
+        if not referrer_id:
+            # Fallback: users who joined via an IB code before 2026-06-23 have
+            # no personal referral link (referred_by_user_id was never set) —
+            # only a Referral row in the IB tree. Resolve the referrer from
+            # there so their staking still pays the IB. Migration 0094
+            # backfills the column; this guard covers any row it misses.
+            from packages.common.src.models import Referral
+            referrer_id = (await db.execute(
+                select(Referral.referrer_id)
+                .where(Referral.referred_id == referred_user_id)
+                .order_by(Referral.created_at.asc())
+                .limit(1)
+            )).scalar_one_or_none()
         if not referrer_id or referrer_id == referred_user_id:
             return
         referred_display = " ".join(filter(None, [_rf, _rl])).strip() or (_re or "a referral")
