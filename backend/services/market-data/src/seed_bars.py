@@ -137,7 +137,7 @@ async def _fetch_binance_klines(symbol: str, tf_name: str, count: int = 500) -> 
     return bars
 
 
-async def seed(force: bool = False):
+async def seed(force: bool = False, ohlc_store=None):
     """Read current prices from Redis and seed historical bars.
 
     For crypto symbols, fetches real bars from Binance public API.
@@ -212,6 +212,15 @@ async def seed(force: bool = False):
                 existing = await redis_client.llen(list_key)
                 if existing >= 100:
                     logger.info("  %s:%s already has %d bars, skipping", sym, tf_name, existing)
+                    # Still backfill the DURABLE store from the Redis bars we
+                    # already have (no extra InfoWay call), so the DB isn't empty
+                    # on the first run of the persistent-bars code.
+                    if ohlc_store is not None:
+                        try:
+                            raw = await redis_client.lrange(list_key, 0, 999)
+                            await ohlc_store.upsert_many(sym, tf_name, [json.loads(r) for r in raw])
+                        except Exception:
+                            pass
                     continue
 
             # Real history from InfoWay REST — the SAME provider as the live feed,
@@ -239,6 +248,9 @@ async def seed(force: bool = False):
                 pipe.lpush(list_key, json.dumps(bar))
             pipe.ltrim(list_key, 0, 999)
             await pipe.execute()
+            # Also persist the backfill to the durable OHLC store (marketdata DB).
+            if ohlc_store is not None:
+                await ohlc_store.upsert_many(sym, tf_name, bars)
             logger.info("  %s:%s → %d bars seeded", sym, tf_name, len(bars))
 
             # Per-request spacing. On the InfoWay FREE plan the cap is 60/min

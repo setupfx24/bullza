@@ -5,7 +5,7 @@ import time as _time
 from decimal import Decimal
 from uuid import UUID
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import func, select
+from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from packages.common.src.alltick_rest import fetch_klines as alltick_fetch_klines
@@ -363,6 +363,42 @@ async def get_my_spread(
     }
 
 
+_OHLC_TABLES = {"1m", "5m", "15m", "30m", "1h", "4h", "1d"}
+
+
+async def _fetch_ohlc_db(sym: str, tf: str, from_time: int, to_time: int) -> list[dict]:
+    """Read CLOSED bars from the durable OHLC store (marketdata DB, ohlcv_<tf>).
+
+    This is the deep, restart-proof source written by market-data. Returns [] on
+    any error or unknown timeframe, so the caller cleanly falls back to Redis.
+    """
+    if tf not in _OHLC_TABLES:
+        return []
+    from packages.common.src.database import TimescaleSessionLocal
+    conds = ["symbol = :sym"]
+    params: dict = {"sym": sym}
+    if from_time:
+        conds.append("time >= to_timestamp(:from_t)")
+        params["from_t"] = int(from_time)
+    if to_time:
+        conds.append("time <= to_timestamp(:to_t)")
+        params["to_t"] = int(to_time)
+    # tf is whitelisted above → safe to interpolate the table name.
+    q = text(
+        f"SELECT extract(epoch FROM time)::bigint AS t, open, high, low, close, volume "
+        f"FROM ohlcv_{tf} WHERE {' AND '.join(conds)} ORDER BY time ASC LIMIT 5000"
+    )
+    out: list[dict] = []
+    async with TimescaleSessionLocal() as session:
+        res = await session.execute(q, params)
+        for row in res:
+            out.append({
+                "time": int(row.t), "open": float(row.open), "high": float(row.high),
+                "low": float(row.low), "close": float(row.close), "volume": float(row.volume or 0),
+            })
+    return out
+
+
 @router.get("/{symbol}/bars")
 @_limiter.exempt
 async def get_bars(
@@ -401,27 +437,39 @@ async def get_bars(
             return False
         return True
 
-    # --- 1. Completed bars from Redis (lpush → newest first) ---
-    raw_list: list[bytes] = await redis_client.lrange(f"bars:{sym}:{tf}", 0, 999)
+    # --- 1. Closed bars: durable OHLC store (marketdata DB) FIRST, Redis fallback ---
+    # The DB (ohlcv_<tf>, written by market-data on every bar close) is the deep,
+    # restart-proof source. Redis is a fast fallback for a cold DB; InfoWay REST
+    # (below) still backfills gaps; the live/forming candle is appended in step 4.
     bars: list[dict] = []
-    for raw in raw_list:
-        try:
-            b = _json.loads(raw)
-            if not _filter_window(b):
+    try:
+        db_bars = await _fetch_ohlc_db(sym, tf, from_time, to_time)
+    except Exception:
+        db_bars = []
+    if len(db_bars) >= 20:
+        bars = db_bars
+    else:
+        raw_list: list[bytes] = await redis_client.lrange(f"bars:{sym}:{tf}", 0, 999)
+        for raw in raw_list:
+            try:
+                b = _json.loads(raw)
+                if not _filter_window(b):
+                    continue
+                bars.append({
+                    "time": int(b.get("time", 0)),
+                    "open": float(b["open"]),
+                    "high": float(b["high"]),
+                    "low": float(b["low"]),
+                    "close": float(b["close"]),
+                    "volume": float(b.get("volume", 0.0)),
+                })
+            except Exception:
                 continue
-            bars.append({
-                "time": int(b.get("time", 0)),
-                "open": float(b["open"]),
-                "high": float(b["high"]),
-                "low": float(b["low"]),
-                "close": float(b["close"]),
-                "volume": float(b.get("volume", 0.0)),
-            })
-        except Exception:
-            continue
-
-    # Sort oldest → newest (TradingView requires ascending order)
-    bars.sort(key=lambda x: x["time"])
+        # Sort oldest → newest (TradingView requires ascending order)
+        bars.sort(key=lambda x: x["time"])
+        # If the DB had some (but <20) bars and more than Redis, prefer the DB.
+        if len(db_bars) > len(bars):
+            bars = db_bars
 
     now_epoch = int(_time.time())
     has_recent = bars and (now_epoch - bars[-1]["time"]) < bar_sec * 3
