@@ -215,13 +215,15 @@ function ensureReconnectHook() {
 // by the CURRENT half-spread (fixed-markup assumption), which keeps the
 // candle series continuous with the live bar.
 
-function halfSpreadOf(_tick?: { bid: number; ask: number } | null): number {
-  // Client 2026-07-09 (MT5-style): draw the candle at the MID (the single LTP
-  // price). The separate blue ASK / red BID lines were removed, so the candle's
-  // own last-price label IS the on-chart price — one price, moving with the
-  // candle, matching the floating P&L (also mid). Bid/ask live in the order
-  // panel for trading. (Return (ask-bid)/2 to shift the candle back to BID.)
-  return 0;
+function halfSpreadOf(tick?: { bid: number; ask: number } | null): number {
+  // Client 2026-07-10 (true MT5): draw the candle at the BID. The candle's own
+  // last-price line IS the LTP (bid), matching the panel BID and a buy
+  // position's "current" price by construction. A single blue ASK line is
+  // drawn half a spread above it (ChartingLibraryChart) as the spread line.
+  // Shift = half the LIVE spread from the same store tick the panels render,
+  // so the candle close == bid exactly and never drifts from the ask line.
+  if (!tick || !(tick.bid > 0) || !(tick.ask > 0)) return 0;
+  return (tick.ask - tick.bid) / 2;
 }
 
 function symbolDigits(sym: string): number {
@@ -374,20 +376,23 @@ export const swisDexDatafeed: IBasicDataFeed = {
     const res = String(resolution);
     ensureReconnectHook();
 
-    // Current bar as last pushed to the chart — the barSocket owns its
-    // structure (open/high/low + new-bar rollover); a fixed-rate interval below
-    // nudges its close toward the live quote so the candle tracks the bid/ask
-    // lines even when /ws/bars delivers less often than /ws/prices.
-    let lastBar: Bar | null = null;
-
-    // Subscribe to the gateway's bar-update channel. The server pushes a
-    // pre-aggregated OHLC snapshot on every tick (the same data the
-    // BarAggregator wrote to bar:current:<SYM>:<TF> in Redis).
+    // Subscribe to the gateway's bar-update channel — the SOLE source for the
+    // live candle. market-data publishes bar:current:<SYM>:<TF> to /ws/bars on
+    // EVERY tick (plus a 1s heartbeat), so this alone keeps the candle live and
+    // it always equals the server aggregation (hence the running P&L too).
+    //
+    // The old fixed-150ms "nudge" that ALSO pushed the /ws/prices store mid into
+    // the candle close was REMOVED (2026-07-10). With the real InfoWay feed the
+    // last-trade price bounces tick-to-tick, and /ws/bars (bar close) and
+    // /ws/prices (store mid) arrive on SEPARATE sockets — at any instant they
+    // hold DIFFERENT recent ticks. Driving the candle from BOTH made its close
+    // flip between the two values ~10×/s: the visible "candle blinking". One
+    // source ⇒ the candle moves once per real tick, no flicker.
     const unsub = barSocket.subscribe(sym, res, (bar: ServerBar) => {
       const sub = subscriptions.get(listenerGuid);
       if (!sub) return;
-      // Shift to BID from the live store tick so the in-progress candle's close
-      // tracks the panel BID. Server emits seconds — TV wants ms.
+      // Shift the mid bar to BID using the live spread (0 until admin sets one).
+      // Server emits seconds — TV wants ms.
       const hs = halfSpreadOf(useTradingStore.getState().prices[sym]);
       const digits = symbolDigits(sym);
       const b = toBidBar({
@@ -398,34 +403,13 @@ export const swisDexDatafeed: IBasicDataFeed = {
         close: bar.close,
         volume: bar.volume,
       }, hs, digits);
-      lastBar = b;
       sub.onTick(b);
     });
-
-    // Keep the live candle close in step with the bid/ask lines. A FIXED 150ms
-    // interval (NOT a store subscription — that fired per-tick and froze the
-    // chart) reads the latest quote and nudges the current bar's close/high/low
-    // to it. Predictable ~6/s rate, cleared on unsubscribe. (client 2026-07-09)
-    const closeSyncIv = setInterval(() => {
-      const sub = subscriptions.get(listenerGuid);
-      if (!sub || !lastBar) return;
-      const t = useTradingStore.getState().prices[sym];
-      if (!t || !(t.bid > 0) || !(t.ask > 0)) return;
-      const digits = symbolDigits(sym);
-      const hs = halfSpreadOf(t);
-      const px = Number(((t.bid + t.ask) / 2 - hs).toFixed(digits));
-      if (!(px > 0)) return;
-      const high = Math.max(lastBar.high, px);
-      const low = Math.min(lastBar.low, px);
-      if (px === lastBar.close && high === lastBar.high && low === lastBar.low) return;
-      lastBar = { ...lastBar, close: px, high, low };
-      sub.onTick(lastBar);
-    }, 150);
 
     subscriptions.set(listenerGuid, {
       symbol: sym, resolution: res, onTick,
       resetCache: onResetCacheNeededCallback,
-      unsubscribe: () => { unsub(); clearInterval(closeSyncIv); },
+      unsubscribe: () => { unsub(); },
     });
   },
 

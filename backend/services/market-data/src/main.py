@@ -164,6 +164,7 @@ class MarketDataService:
             asyncio.create_task(self._spread_config_subscriber()),
             asyncio.create_task(self._stale_quote_refresher()),
             asyncio.create_task(self.aggregator.run_aggregation_loop()),
+            asyncio.create_task(self._current_bar_heartbeat()),
             asyncio.create_task(self._auto_seed_bars()),
         ]
         if self._alltick_watchdog_armed:
@@ -365,6 +366,37 @@ class MarketDataService:
                 # if Redis briefly hiccups. The gateway will catch up on
                 # the next tick anyway.
                 logger.debug("publish_bar_update %s %s failed: %s", symbol, tf_name, exc)
+
+    async def _current_bar_heartbeat(self) -> None:
+        """Publish every symbol's current in-progress bar once a second,
+        independent of incoming ticks.
+
+        Bar OPEN/CLOSE at a window boundary was previously streamed only from
+        _process_ticks (per tick): the 1s aggregation loop rolls the finished
+        bar and opens the next one in Redis, but never published that rollover
+        to BAR_UPDATES_CHANNEL. So on a quiet symbol (weekend forex, low
+        liquidity) the live chart's candle sat open past its window until the
+        NEXT tick arrived — the new candle didn't open on time, and any missed
+        rollover only showed up on a manual refresh (REST get_bars).
+
+        This heartbeat guarantees a per-second bar_update for every
+        (symbol, timeframe) — so the current window's bar is always live and
+        the next window's bar opens within ~1s of the boundary even with zero
+        ticks. It reuses _publish_current_bars, which reads the aggregator's
+        in-memory snapshot AFTER run_aggregation_loop has rolled it forward.
+        Redundant with the per-tick publish while ticks flow (same value → the
+        client just refreshes the current bar, no visual change), essential
+        when they don't.
+        """
+        while self.running:
+            await asyncio.sleep(1)
+            if not self.running:
+                break
+            try:
+                for symbol in list(self.aggregator._bars.keys()):
+                    await self._publish_current_bars(symbol)
+            except Exception as exc:
+                logger.debug("current-bar heartbeat failed: %s", exc)
 
     async def _binance_crypto_feed(self) -> None:
         """Live crypto ticks from Binance, run ALONGSIDE the primary feed.
