@@ -12,7 +12,9 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import selectinload
 
 from packages.common.src.database import AsyncSessionLocal
-from packages.common.src.instrument_pricing import resolve_spread_config, symmetric_quote_from_mid
+from packages.common.src.instrument_pricing import (
+    resolve_spread_config, spread_boost_multiplier, symmetric_quote_from_mid,
+)
 from packages.common.src.models import Instrument, SpreadConfig
 
 logger = logging.getLogger("market-data.spread-cache")
@@ -84,9 +86,12 @@ class StreamSpreadCache:
                         .limit(1)
                     )
                     drow = dr.first()
+                    # Same global boost resolve_spread_config applies — this
+                    # fallback row is read directly, so boost it here too.
+                    _boost = await spread_boost_multiplier()
                     if drow:
                         self._default_spread = (
-                            Decimal(str(drow[0] or 0)),
+                            Decimal(str(drow[0] or 0)) * _boost,
                             (drow[1] or "pips").lower(),
                         )
                     else:

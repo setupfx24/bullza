@@ -933,23 +933,12 @@ export default function AccountsPage() {
                     />
                   </div>
 
-                  {/* ── Credit-forfeit warning (info only; the acknowledgement is
-                      a proper confirmation popup shown on Transfer) ── */}
-                  {uniWouldForfeit && (
-                    <div className="mb-3 rounded-xl border border-red-500/40 bg-red-500/10 px-3 py-2.5 text-[11px] leading-relaxed text-red-300">
-                      <p className="font-semibold">
-                        ⚠️ This transfer drops this account below its {fmt(uniFromCredit)} bonus credit —
-                        your entire {fmt(uniFromCredit)} credit will be forfeited (insurance payouts are kept).
-                        You&apos;ll be asked to confirm.
-                      </p>
-                    </div>
-                  )}
-
-                  {/* ── SUBMIT ── */}
+                  {/* ── SUBMIT ── (credit-forfeit case opens the agreement
+                      modal below; the inline red banner was replaced by it) */}
                   <button
                     type="button"
                     onClick={() => {
-                      if (uniWouldForfeit) { setForfeitConfirmOpen(true); }
+                      if (uniWouldForfeit) { setTransferAgree(false); setForfeitConfirmOpen(true); }
                       else { void submitUnifiedTransfer(); }
                     }}
                     disabled={
@@ -984,19 +973,32 @@ export default function AccountsPage() {
               <span className="font-bold text-red-400">entire {fmt(uniFromCredit)} credit</span> will be forfeited
               (insurance payouts are kept). This can&apos;t be undone.
             </p>
+            <label className="flex items-start gap-2.5 rounded-xl border border-border-primary bg-bg-base px-3 py-2.5 text-left cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={transferAgree}
+                onChange={(e) => setTransferAgree(e.target.checked)}
+                className="mt-0.5 h-4 w-4 shrink-0 accent-red-500 cursor-pointer"
+              />
+              <span className="text-xs text-text-secondary leading-relaxed">
+                I agree — I understand my{' '}
+                <span className="font-bold text-red-400">{fmt(uniFromCredit)} bonus credit will be permanently forfeited</span>{' '}
+                by this transfer.
+              </span>
+            </label>
             <div className="flex gap-2 pt-1">
               <button
                 type="button"
-                onClick={() => setForfeitConfirmOpen(false)}
+                onClick={() => { setForfeitConfirmOpen(false); setTransferAgree(false); }}
                 className="flex-1 py-2.5 rounded-xl border border-border-primary text-text-secondary hover:bg-bg-hover text-sm font-medium"
               >
                 Cancel
               </button>
               <button
                 type="button"
-                disabled={transferSubmitting}
+                disabled={transferSubmitting || !transferAgree}
                 onClick={() => { setForfeitConfirmOpen(false); void submitUnifiedTransfer(); }}
-                className="flex-1 py-2.5 rounded-xl bg-red-500 text-white hover:bg-red-600 text-sm font-bold disabled:opacity-50"
+                className="flex-1 py-2.5 rounded-xl bg-red-500 text-white hover:bg-red-600 text-sm font-bold disabled:opacity-45 disabled:pointer-events-none"
               >
                 Yes, forfeit &amp; transfer
               </button>

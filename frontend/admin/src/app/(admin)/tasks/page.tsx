@@ -82,12 +82,23 @@ export default function TasksPage() {
   );
 }
 
+// Local YYYY-MM-DD of an ISO timestamp — for the assigned-date range filter.
+function localYmd(iso?: string | null): string {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
 function MyTasks() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
   const [reasonFor, setReasonFor] = useState<string | null>(null);
   const [reason, setReason] = useState('');
   const [busy, setBusy] = useState<string | null>(null);
+  // Custom date-range filter on the ASSIGNED date (created_at).
+  const [fromDate, setFromDate] = useState('');
+  const [toDate, setToDate] = useState('');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -117,9 +128,18 @@ function MyTasks() {
   if (loading) return <div className="flex justify-center py-10"><Loader2 className="animate-spin text-text-tertiary" /></div>;
   if (!tasks.length) return <p className="text-sm text-text-tertiary py-8 text-center">No tasks assigned to you yet.</p>;
 
-  return (
-    <div className="space-y-2">
-      {tasks.map((t) => (
+  const inRange = (t: Task) => {
+    const ymd = localYmd(t.created_at);
+    if (!ymd) return true;
+    if (fromDate && ymd < fromDate) return false;
+    if (toDate && ymd > toDate) return false;
+    return true;
+  };
+  const visible = tasks.filter(inRange);
+  const pendingTasks = visible.filter((t) => t.status === 'pending');
+  const doneTasks = visible.filter((t) => t.status !== 'pending');
+
+  const renderTask = (t: Task) => (
         <div key={t.id} className="rounded-lg border border-border-primary bg-bg-secondary p-3.5">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
@@ -184,7 +204,49 @@ function MyTasks() {
             </div>
           )}
         </div>
-      ))}
+  );
+
+  return (
+    <div className="space-y-4">
+      {/* Custom date filter — assigned date range */}
+      <div className="flex flex-wrap items-end gap-2">
+        <div>
+          <label className="block text-xxs text-text-tertiary mb-1">From date</label>
+          <DateField value={fromDate} onChange={setFromDate} />
+        </div>
+        <div>
+          <label className="block text-xxs text-text-tertiary mb-1">To date</label>
+          <DateField value={toDate} onChange={setToDate} />
+        </div>
+        {(fromDate || toDate) && (
+          <button
+            onClick={() => { setFromDate(''); setToDate(''); }}
+            className="text-xxs text-text-tertiary hover:text-text-primary underline pb-2"
+          >
+            Clear filter
+          </button>
+        )}
+      </div>
+
+      {/* Pending section */}
+      <div className="space-y-2">
+        <h3 className="text-xs font-semibold uppercase tracking-wide text-warning flex items-center gap-1.5">
+          Pending <span className="text-text-tertiary font-normal normal-case">({pendingTasks.length})</span>
+        </h3>
+        {pendingTasks.length
+          ? pendingTasks.map(renderTask)
+          : <p className="text-xs text-text-tertiary py-3 text-center rounded-lg border border-dashed border-border-primary">No pending tasks{fromDate || toDate ? ' in this date range' : ''}.</p>}
+      </div>
+
+      {/* Done / reported section */}
+      <div className="space-y-2">
+        <h3 className="text-xs font-semibold uppercase tracking-wide text-success flex items-center gap-1.5">
+          Done / Reported <span className="text-text-tertiary font-normal normal-case">({doneTasks.length})</span>
+        </h3>
+        {doneTasks.length
+          ? doneTasks.map(renderTask)
+          : <p className="text-xs text-text-tertiary py-3 text-center rounded-lg border border-dashed border-border-primary">No completed tasks{fromDate || toDate ? ' in this date range' : ''}.</p>}
+      </div>
     </div>
   );
 }
