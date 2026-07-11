@@ -1,4 +1,4 @@
-"""Fixed Return API — config (rates + fee), user locks, withdrawals."""
+"""AI-POWERED STAKING PROGRAM API — config (rates + fee), user locks, withdrawals."""
 from __future__ import annotations
 
 from decimal import Decimal

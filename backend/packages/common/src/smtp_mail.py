@@ -305,7 +305,7 @@ async def send_email(
       - insure      — insured-trade payouts / reminders
       - affiliates  — IB, PAMM, MAM
       - voucher     — bonus, referral
-      - stacking    — fixed return, staking
+      - stacking    — AI-POWERED STAKING PROGRAM, staking
       - info        — generic / website / default (the default)
       - support     — auth, KYC, password reset
 

@@ -109,7 +109,7 @@ __all__ = [
     "BiddingRound", "Bid",
     # staking
     "StakingPlan", "StakingPosition", "StakingRewardAccrual",
-    # fixed return
+    # AI-POWERED STAKING PROGRAM
     "FixedReturnLock",
     # vip
     "VipPass",

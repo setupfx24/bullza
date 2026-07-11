@@ -13,6 +13,7 @@
  * Revert to '@/components/charts/AdvancedChart' for the public widget.
  */
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useTradingStore, defaultContractSize, livePnlFor } from '@/stores/tradingStore';
 import { useUIStore } from '@/stores/uiStore';
 import { swisDexDatafeed } from '@/lib/charting/datafeed';
@@ -121,6 +122,19 @@ const BROKER_CONFIG = {
 };
 
 
+// In-app dialog replacing window.confirm / window.prompt for the on-chart
+// trade buttons (close ✕, SL/TP drag + type-a-price). Native browser popups
+// broke the platform look (client 2026-07-10) — this renders the same styled
+// modal the positions panel uses. `input` switches it to prompt mode.
+type ChartDialog = {
+  title: string;
+  body: string;
+  confirmLabel: string;
+  danger?: boolean;
+  input?: { defaultValue: string; placeholder: string };
+  onConfirm: (value?: string) => void;
+} | null;
+
 export default function ChartingLibraryChart() {
   const selectedSymbol = useTradingStore((s) => s.selectedSymbol);
   const positions = useTradingStore((s) => s.positions);
@@ -137,6 +151,77 @@ export default function ChartingLibraryChart() {
   // setSymbol() right after creation and to detect a real change.
   const appliedSymbolRef = useRef<string>('');
   const [ready, setReady] = useState(false);
+  const [dialog, setDialog] = useState<ChartDialog>(null);
+  const [dialogValue, setDialogValue] = useState('');
+  const openDialog = (d: NonNullable<ChartDialog>) => {
+    setDialogValue(d.input?.defaultValue ?? '');
+    setDialog(d);
+  };
+
+  // The TradingView charting library throws "Value is null" from its right-click
+  // context-menu builder (_customActions → _showContextMenu) when the menu targets
+  // one of our locked programmatic shapes (SL/TP/entry/ask lines). It's a benign,
+  // non-fatal library-internal bug — the app is unaffected. Swallow ONLY that exact
+  // rejection (message + charting-library stack) so it doesn't surface as an
+  // uncaught console error; anything else propagates normally. (client 2026-07-11)
+  useEffect(() => {
+    const onRej = (e: PromiseRejectionEvent) => {
+      const reason: any = e.reason;
+      const msg = typeof reason === 'string' ? reason : reason?.message;
+      const stack: string = (reason && reason.stack) || '';
+      if (msg === 'Value is null' && stack.includes('charting_library')) {
+        e.preventDefault();
+      }
+    };
+    window.addEventListener('unhandledrejection', onRej);
+    return () => window.removeEventListener('unhandledrejection', onRej);
+  }, []);
+
+  // The chart runs in a same-origin iframe; its dialogs (Indicators, chart
+  // settings, etc.) render INSIDE it, while our SL/TP/close overlay sits OVER the
+  // iframe — so the buttons cover the dialog. Watch the iframe document and hide
+  // our overlay while any TradingView dialog ([data-dialog-name]) is open, then
+  // restore it when the dialog closes. (client 2026-07-11)
+  useEffect(() => {
+    const overlay = overlayRef.current;
+    const container = containerRef.current;
+    if (!overlay || !container) return;
+    const observers: MutationObserver[] = [];
+    const watched = new Set<Document>();
+    let raf = 0;
+    const dialogOpen = () => {
+      for (const d of watched) {
+        try { if (d.querySelector('[data-dialog-name]')) return true; } catch { /* cross-origin */ }
+      }
+      return false;
+    };
+    const check = () => {
+      if (raf) return;
+      raf = requestAnimationFrame(() => {
+        raf = 0;
+        // MUST be display:none, not visibility — the SL/TP/close buttons set their
+        // own visibility:visible, which would override an ancestor's hidden.
+        overlay.style.display = dialogOpen() ? 'none' : '';
+      });
+    };
+    const watch = (d: Document | null | undefined) => {
+      if (!d || watched.has(d)) return;
+      watched.add(d);
+      const o = new MutationObserver(check);
+      try { o.observe(d.documentElement, { childList: true, subtree: true }); observers.push(o); } catch { /* noop */ }
+    };
+    watch(document); // dialogs may render in the host page…
+    const attachIframe = () => watch(container.querySelector('iframe')?.contentDocument); // …or inside the iframe
+    attachIframe();
+    const iv = setInterval(() => { attachIframe(); check(); }, 800);
+    const to = setTimeout(() => clearInterval(iv), 20000);
+    check();
+    return () => {
+      clearInterval(iv); clearTimeout(to);
+      observers.forEach((o) => o.disconnect());
+      if (raf) cancelAnimationFrame(raf);
+    };
+  }, []);
 
   // Create the widget once (and recreate ONLY on theme change — that needs a
   // full rebuild). The symbol is intentionally NOT a dependency here: changing
@@ -703,26 +788,33 @@ export default function ChartingLibraryChart() {
       const t = useTradingStore.getState().prices[sym];
       const cur = kind === 'sl' ? p.stop_loss : p.take_profit;
       const dflt = Number(cur) || (t ? (p.side === 'buy' ? t.bid : t.ask) : Number(p.open_price)) || 0;
-      const input = window.prompt(
-        `${label} price — ${String(p.side).toUpperCase()} ${p.lots} ${sym}  (blank = remove)`,
-        dflt ? dflt.toFixed(digits) : '',
-      );
-      if (input === null) return; // cancelled
-      const trimmed = input.trim();
-      const val = trimmed === '' ? null : parseFloat(trimmed);
-      if (val !== null && !(val > 0)) { toast.error('Invalid price'); return; }
-      (async () => {
-        try {
-          await api.put(`/positions/${p.id}`, {
-            stop_loss: kind === 'sl' ? val : (p.stop_loss ?? null),
-            take_profit: kind === 'tp' ? val : (p.take_profit ?? null),
-          });
-          toast.success(val === null ? `${label} removed` : `${label} set @ ${val}`);
-          await useTradingStore.getState().refreshPositions();
-        } catch (err) {
-          toast.error(err instanceof Error ? err.message : `Failed to set ${label}`);
-        }
-      })();
+      openDialog({
+        title: `${label} — ${String(p.side).toUpperCase()} ${p.lots} ${sym}`,
+        body: 'Enter the price. Leave blank to remove.',
+        confirmLabel: 'Save',
+        input: { defaultValue: dflt ? dflt.toFixed(digits) : '', placeholder: 'Price' },
+        onConfirm: (raw) => {
+          const trimmed = (raw ?? '').trim();
+          const val = trimmed === '' ? null : parseFloat(trimmed);
+          if (val !== null && !(val > 0)) { toast.error('Invalid price'); return; }
+          (async () => {
+            try {
+              // Send ONLY the bracket being changed. The backend does a partial
+              // update (an omitted field is left untouched), so the OTHER bracket
+              // is never affected. Re-sending it from the button's captured `p`
+              // was the bug: `p` is a stale closure — the buttons only rebuild on
+              // id/side/lots change (positionsKey), NOT on SL/TP change — so its
+              // copy of the other bracket was old and reverted it. (client 2026-07-10)
+              await api.put(`/positions/${p.id}`,
+                kind === 'sl' ? { stop_loss: val } : { take_profit: val });
+              toast.success(val === null ? `${label} removed` : `${label} set @ ${val}`);
+              await useTradingStore.getState().refreshPositions();
+            } catch (err) {
+              toast.error(err instanceof Error ? err.message : `Failed to set ${label}`);
+            }
+          })();
+        },
+      });
     };
 
     const mkBtn = (txt: string, bg: string, title: string, onClick: () => void): HTMLButtonElement => {
@@ -810,19 +902,25 @@ export default function ChartingLibraryChart() {
           const label = kind === 'sl' ? 'Stop Loss' : 'Take Profit';
           const proj = livePnlFor(p, { bid: price, ask: price }, useTradingStore.getState().instruments, sym);
           const projTxt = proj ? ` → ${proj.pnl >= 0 ? 'profit' : 'loss'} ${proj.pnl >= 0 ? '+' : '−'}$${Math.abs(proj.pnl).toFixed(2)}` : '';
-          if (!window.confirm(`Set ${label} @ ${price.toFixed(digits)}${projTxt}\n${String(p.side).toUpperCase()} ${p.lots} ${sym}?`)) return;
-          (async () => {
+          const applyBracket = async () => {
             try {
-              await api.put(`/positions/${p.id}`, {
-                stop_loss: kind === 'sl' ? price : (p.stop_loss ?? null),
-                take_profit: kind === 'tp' ? price : (p.take_profit ?? null),
-              });
+              // Only the dragged bracket — the backend partial-update keeps the
+              // other intact (see setBracket note; `p` is a stale closure, so
+              // re-sending its copy of the other bracket reverted it). (client 2026-07-10)
+              await api.put(`/positions/${p.id}`,
+                kind === 'sl' ? { stop_loss: price } : { take_profit: price });
               toast.success(`${label} set @ ${price.toFixed(digits)}`);
               await useTradingStore.getState().refreshPositions();
             } catch (err) {
               toast.error(err instanceof Error ? err.message : `Failed to set ${label}`);
             }
-          })();
+          };
+          openDialog({
+            title: `Set ${label} @ ${price.toFixed(digits)}`,
+            body: `${String(p.side).toUpperCase()} ${p.lots} ${sym}${projTxt}`,
+            confirmLabel: `Set ${kind.toUpperCase()}`,
+            onConfirm: () => { void applyBracket(); },
+          });
         };
       };
       return b;
@@ -843,25 +941,32 @@ export default function ChartingLibraryChart() {
       root.appendChild(mkDragBtn('SL', 'rgba(245,158,11,0.97)', `Stop loss ${side} ${p.lots} ${sym}`, p, 'sl'));
       root.appendChild(mkDragBtn('TP', 'rgba(20,184,166,0.97)', `Take profit ${side} ${p.lots} ${sym}`, p, 'tp'));
       root.appendChild(mkBtn('✕', sideColor, `Close ${side} ${p.lots} ${sym} at market`, () => {
-        if (!window.confirm(`Close ${side} ${Number(p.lots)} ${sym} at market?`)) return;
-        root.style.visibility = 'hidden';
-        try { useTradingStore.getState().removePosition(p.id); } catch { /* noop */ }
-        (async () => {
-          try {
-            const res = await api.post<{ profit?: number; close_price?: number }>(
-              `/positions/${p.id}/close`, {}, { timeoutMs: 8000 },
-            );
-            const pnl = Number(res?.profit ?? 0);
-            toast.success(`Closed @ ${res?.close_price ?? ''} | ${pnl >= 0 ? '+' : '-'}$${Math.abs(pnl).toFixed(2)}`);
-          } catch (err) {
-            toast.error(err instanceof Error ? err.message : 'Close failed');
-          } finally {
-            Promise.all([
-              useTradingStore.getState().refreshPositions(),
-              useTradingStore.getState().refreshAccount(),
-            ]).catch(() => {});
-          }
-        })();
+        openDialog({
+          title: 'Close position',
+          body: `Close ${side} ${Number(p.lots)} ${sym} at market?`,
+          confirmLabel: 'Close position',
+          danger: true,
+          onConfirm: () => {
+            root.style.visibility = 'hidden';
+            try { useTradingStore.getState().removePosition(p.id); } catch { /* noop */ }
+            (async () => {
+              try {
+                const res = await api.post<{ profit?: number; close_price?: number }>(
+                  `/positions/${p.id}/close`, {}, { timeoutMs: 8000 },
+                );
+                const pnl = Number(res?.profit ?? 0);
+                toast.success(`Closed @ ${res?.close_price ?? ''} | ${pnl >= 0 ? '+' : '-'}$${Math.abs(pnl).toFixed(2)}`);
+              } catch (err) {
+                toast.error(err instanceof Error ? err.message : 'Close failed');
+              } finally {
+                Promise.all([
+                  useTradingStore.getState().refreshPositions(),
+                  useTradingStore.getState().refreshAccount(),
+                ]).catch(() => {});
+              }
+            })();
+          },
+        });
       }));
       // Persistent shaded zones (entry → SL red, entry → TP green), positioned in
       // the sync loop from the LIVE bracket prices. Below the buttons/lines (z 4).
@@ -920,7 +1025,92 @@ export default function ChartingLibraryChart() {
   return (
     <div className="relative w-full h-full min-h-[320px]">
       <div ref={containerRef} className="w-full h-full min-h-[320px]" />
+      {/* SwisDex logo watermark — faint, centered, non-interactive. Sits over the
+          chart canvas but under the SL/TP overlay (DOM order). Theme-aware. */}
+      <div className="pointer-events-none absolute inset-0 flex items-center justify-center overflow-hidden">
+        <img
+          src="/images/swisdex_png5.png"
+          alt=""
+          aria-hidden
+          draggable={false}
+          className="w-40 h-40 md:w-56 md:h-56 object-contain opacity-[0.06] select-none hidden dark:block"
+        />
+        <img
+          src="/images/swisdex_png.png"
+          alt=""
+          aria-hidden
+          draggable={false}
+          className="w-40 h-40 md:w-56 md:h-56 object-contain opacity-[0.06] select-none dark:hidden"
+        />
+      </div>
       <div ref={overlayRef} className="pointer-events-none absolute inset-0 overflow-hidden" />
+      {dialog &&
+        typeof document !== 'undefined' &&
+        createPortal(
+          <div className="fixed inset-0 p-0" style={{ zIndex: 2147483646, isolation: 'isolate' }}>
+            <button
+              type="button"
+              tabIndex={-1}
+              aria-label="Dismiss"
+              className="absolute inset-0 z-0 m-0 h-full w-full cursor-default border-0 bg-black/60 p-0 backdrop-blur-sm"
+              onClick={() => setDialog(null)}
+            />
+            <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center p-4">
+              <div
+                role="dialog"
+                aria-modal="true"
+                className="relative w-full max-w-[300px] rounded-xl border p-3.5 shadow-2xl overflow-hidden pointer-events-auto bg-card border-border-primary"
+                onMouseDown={(e) => e.stopPropagation()}
+              >
+                <div className="flex items-start justify-between gap-2 mb-2">
+                  <h3 className="text-sm font-bold pr-2 text-text-primary">{dialog.title}</h3>
+                  <button
+                    type="button"
+                    onClick={() => setDialog(null)}
+                    className="shrink-0 w-7 h-7 flex items-center justify-center rounded-lg transition-colors bg-bg-hover text-text-tertiary hover:text-text-primary"
+                    aria-label="Close"
+                  >
+                    ✕
+                  </button>
+                </div>
+                <p className="text-xs text-text-secondary mb-3">{dialog.body}</p>
+                {dialog.input && (
+                  <input
+                    autoFocus
+                    type="number"
+                    step="any"
+                    value={dialogValue}
+                    onChange={(e) => setDialogValue(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        const d = dialog; setDialog(null); d.onConfirm(dialogValue);
+                      } else if (e.key === 'Escape') { setDialog(null); }
+                    }}
+                    placeholder={dialog.input.placeholder}
+                    className="w-full mb-3 px-3 py-2 rounded-lg border border-border-primary bg-bg-input font-mono text-sm text-text-primary outline-none focus:border-accent/50"
+                  />
+                )}
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setDialog(null)}
+                    className="flex-1 py-2.5 font-bold rounded-lg text-sm active:scale-[0.98] transition-all bg-bg-hover text-text-primary"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { const d = dialog; setDialog(null); d.onConfirm(dialogValue); }}
+                    className={`flex-1 py-2.5 text-white font-bold rounded-lg shadow-lg active:scale-[0.98] transition-all text-sm ${dialog.danger ? 'bg-sell shadow-sell/20' : 'bg-buy shadow-buy/20'}`}
+                  >
+                    {dialog.confirmLabel}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }

@@ -388,14 +388,37 @@ async def _fetch_ohlc_db(sym: str, tf: str, from_time: int, to_time: int) -> lis
         f"SELECT extract(epoch FROM time)::bigint AS t, open, high, low, close, volume "
         f"FROM ohlcv_{tf} WHERE {' AND '.join(conds)} ORDER BY time ASC LIMIT 5000"
     )
+
+    def _row(row) -> dict:
+        return {
+            "time": int(row.t), "open": float(row.open), "high": float(row.high),
+            "low": float(row.low), "close": float(row.close), "volume": float(row.volume or 0),
+        }
+
     out: list[dict] = []
     async with TimescaleSessionLocal() as session:
         res = await session.execute(q, params)
-        for row in res:
-            out.append({
-                "time": int(row.t), "open": float(row.open), "high": float(row.high),
-                "low": float(row.low), "close": float(row.close), "volume": float(row.volume or 0),
-            })
+        out = [_row(r) for r in res]
+        # Weekend / closed-market fallback: the chart asks for a RECENT window,
+        # which is empty when the market is shut (e.g. gold on Saturday). Rather
+        # than a blank chart, return the most recent bars up to `to` — the last
+        # real (Friday) candles. Only triggers when the strict window is thin
+        # (< 20), so normal weekday requests are untouched. (client 2026-07-11)
+        if len(out) < 20:
+            fb_conds = ["symbol = :sym"]
+            fb_params: dict = {"sym": sym}
+            if to_time:
+                fb_conds.append("time <= to_timestamp(:to_t)")
+                fb_params["to_t"] = int(to_time)
+            fb_q = text(
+                f"SELECT extract(epoch FROM time)::bigint AS t, open, high, low, close, volume "
+                f"FROM ohlcv_{tf} WHERE {' AND '.join(fb_conds)} ORDER BY time DESC LIMIT 500"
+            )
+            fb_res = await session.execute(fb_q, fb_params)
+            fb = [_row(r) for r in fb_res]
+            fb.reverse()  # newest-first → chronological
+            if len(fb) > len(out):
+                out = fb
     return out
 
 
@@ -430,9 +453,12 @@ async def get_bars(
     is_crypto = sym in _BINANCE_PAIRS
 
     def _filter_window(b: dict) -> bool:
+        # Only enforce the UPPER bound (never return bars after `to`). Do NOT use
+        # `from` as a hard floor: TradingView wants the most recent bars ENDING at
+        # `to`, and on a closed market (weekend) the latest real bars — e.g.
+        # Friday's gold — sit BEFORE the requested `from`. Dropping the floor lets
+        # them through instead of a blank chart. (client 2026-07-11)
         t = int(b.get("time", 0))
-        if from_time and t < from_time:
-            return False
         if to_time and t > to_time:
             return False
         return True

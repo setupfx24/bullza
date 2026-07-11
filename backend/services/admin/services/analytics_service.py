@@ -265,7 +265,7 @@ async def finance_overview(db: AsyncSession, start_date=None, end_date=None) -> 
         + insurance fees
         − user trading PROFIT, − insurance payouts, − IB commission,
         − referral commission
-    Fixed Return is reported separately (NOT part of Net P&L).
+    AI-POWERED STAKING PROGRAM is reported separately (NOT part of Net P&L).
 
     start_date/end_date (optional UTC datetimes) restrict the FLOW figures
     (P&L sources, deposits, withdrawals, pending, fixed-return collected) to
@@ -412,7 +412,7 @@ async def finance_overview(db: AsyncSession, start_date=None, end_date=None) -> 
         ), Transaction.account_id)
     )).scalar() or 0))
 
-    # ── Fixed Return (separate from P&L) ──────────────────────────────
+    # ── AI-POWERED STAKING PROGRAM (separate from P&L) ──────────────────────────────
     # When a date window is given, scope to locks OPENED in that window
     # ("collected in this period"); otherwise all currently-active locks.
     active_locks = (await db.execute(
@@ -538,9 +538,9 @@ async def finance_overview(db: AsyncSession, start_date=None, end_date=None) -> 
     # the full commissions/bonuses (those are normal business cost, not
     # promotional). These are deliberate expense records → summed as-is.
     _PE_LABELS = {
-        "fr_referral_extra": "Fixed Return referral — extra %",
-        "extra_fr_interest": "Extra Fixed Return interest",
-        "fr_referral_bonus": "Fixed Return referral bonus",
+        "fr_referral_extra": "AI-POWERED STAKING PROGRAM referral — extra %",
+        "extra_fr_interest": "Extra AI-POWERED STAKING PROGRAM interest",
+        "fr_referral_bonus": "AI-POWERED STAKING PROGRAM referral bonus",
         "custom_benefit": "Custom promotional benefit",
         "manual": "Manual entries",
     }
