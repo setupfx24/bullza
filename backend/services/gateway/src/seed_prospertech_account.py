@@ -245,6 +245,12 @@ async def run(execute: bool):
             main.email_verified = True
             main.first_name = main.first_name or FIRST
             main.last_name = main.last_name or LAST
+            # If a password is provided, (re)set it so the client can log in
+            # with the shared credentials even for a pre-existing account.
+            pw = os.getenv("SEED_USER_PASSWORD")
+            if pw:
+                main.password_hash = hash_password(pw)
+                logger.info("%s(re)set password for existing user", tag)
             if not main.referral_code:
                 main.referral_code = gen_code()
             if main.created_at is None or main.created_at > period_start:
