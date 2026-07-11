@@ -328,6 +328,11 @@ def _send_verify_email(user: User, request: Request | None = None) -> bool:
                 "verify-email NOT sent for %s: SMTP is not configured "
                 "(SMTP_HOST is empty in this service's environment)", user.email,
             )
+            # Dev-only escape hatch: sign-in is blocked until the link is
+            # clicked, so without SMTP a local signup could never log in.
+            # Print the link in the gateway log so devs can click it there.
+            if get_settings().ENVIRONMENT == "development":
+                logger.warning("DEV verify link for %s: %s", user.email, _build_verify_url(user))
             return False
         from packages.common.src.email_templates.verify_email import render_verify_email
         verify_url = _build_verify_url(user)
@@ -708,12 +713,13 @@ async def register_user(
         role="user",
         status="active",
         kyc_status="pending",
-        # Client 2026-06-16: AUTO-VERIFY on register so users can sign in
-        # immediately (no more 403 "email_unverified"). The verification email
-        # is still sent below (welcome + confirm link) but it no longer BLOCKS
-        # sign-in. Clicking the link later is idempotent (already verified).
-        email_verified=True,
-        email_verified_at=datetime.now(timezone.utc),
+        # Client 2026-07-10: email verification is MANDATORY again (reverses
+        # the 2026-06-16 auto-verify). login_user 403s with email_unverified
+        # until the user clicks the link; confirm_email_verification is the
+        # only path that flips this and grants the first session. Google
+        # sign-ups stay exempt — Google already asserts email_verified.
+        email_verified=False,
+        email_verified_at=None,
     )
     db.add(user)
     await db.flush()
@@ -759,14 +765,13 @@ async def register_user(
 
     await db.commit()
 
-    # Still send the verification/welcome email (client 2026-06-16 wants the
-    # email to go out), but the account is already verified so it does NOT
-    # block sign-in — the user can log in right away.
+    # Verification email is now the gate: sign-in stays blocked (403
+    # email_unverified) until the link is clicked.
     verification_sent = _send_verify_email(user, request)
     return {
         "email": user.email,
         "verification_sent": verification_sent,
-        "message": "Account created. You can sign in now.",
+        "message": "Account created. Check your email to verify and sign in.",
     }
 
 
