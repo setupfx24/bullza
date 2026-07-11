@@ -745,7 +745,15 @@ export default function UsersPage() {
                       <td className="px-3 py-3 text-text-tertiary whitespace-nowrap">—</td>
                       <td className="px-3 py-3 text-text-tertiary whitespace-nowrap">—</td>
                       <td className="px-3 py-3 text-text-tertiary whitespace-nowrap">—</td>
-                      <td className="px-2 py-3 text-center whitespace-nowrap"></td>
+                      <td className="px-2 py-3 text-center whitespace-nowrap" data-actions-menu>
+                        <button
+                          type="button"
+                          onClick={(e) => toggleActions(u.id, e)}
+                          className="inline-flex items-center justify-center w-8 h-8 rounded-lg border border-border-primary text-text-secondary transition-fast hover:bg-bg-hover hover:text-text-primary hover:border-border-secondary"
+                        >
+                          <MoreHorizontal size={15} />
+                        </button>
+                      </td>
                     </tr>
                   ) : (
                   <tr key={u.id} className="border-b border-border-primary/40 transition-fast hover:bg-bg-hover/60 group/row">
