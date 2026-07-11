@@ -38,11 +38,13 @@ class RejectRequest(BaseModel):
 
 @router.get("/pending")
 async def list_pending(
+    kind: str = "early",
     _admin: dict = Depends(require_permission("fixed_return.view")),
     db: AsyncSession = Depends(get_db),
 ) -> list[dict[str, Any]]:
-    """Locks currently parked in ``early_pending`` — admin queue."""
-    return await fixed_return_service.list_pending(db)
+    """Approval queue. kind='early' → early-withdrawal requests;
+    kind='principal' → matured principal-withdrawal claims."""
+    return await fixed_return_service.list_pending(db, kind=kind)
 
 
 @router.post("/{lock_id}/approve")

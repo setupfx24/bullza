@@ -6,6 +6,51 @@ import { Loader2, Save, Plus, Trash2, Check, X, Clock } from 'lucide-react';
 import { adminApi } from '@/lib/api';
 import { cn } from '@/lib/utils';
 
+// Shared in-app approve/reject confirmation modal (replaces window.confirm /
+// window.prompt on the withdrawal-approval queues — client 2026-07-11).
+function ApprovalModal({
+  open, title, body, action, reason, onReason, onConfirm, onClose,
+}: {
+  open: boolean; title: string; body: React.ReactNode;
+  action: 'approve' | 'reject'; reason: string;
+  onReason: (v: string) => void; onConfirm: () => void; onClose: () => void;
+}) {
+  if (!open) return null;
+  return (
+    <div className="fixed inset-0 z-[130] flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative w-full max-w-sm rounded-xl border border-border-primary bg-bg-secondary p-5 shadow-modal space-y-3">
+        <div className="flex items-start justify-between gap-2">
+          <h3 className="text-sm font-bold text-text-primary">{title}</h3>
+          <button onClick={onClose} className="p-1 -m-1 text-text-tertiary hover:text-text-primary"><X size={16} /></button>
+        </div>
+        <div className="text-xs text-text-secondary leading-relaxed">{body}</div>
+        {action === 'reject' && (
+          <input
+            autoFocus
+            value={reason}
+            onChange={(e) => onReason(e.target.value)}
+            placeholder="Reason (optional — shown to the user)"
+            className="w-full text-xs py-2 px-2 bg-bg-input border border-border-primary rounded-md text-text-primary placeholder:text-text-tertiary"
+          />
+        )}
+        <div className="flex justify-end gap-2 pt-1">
+          <button onClick={onClose} className="px-4 py-2 text-xs font-medium rounded-md border border-border-primary text-text-secondary hover:bg-bg-hover">Cancel</button>
+          <button
+            onClick={onConfirm}
+            className={cn(
+              'px-4 py-2 text-xs font-bold rounded-md text-white',
+              action === 'approve' ? 'bg-buy hover:bg-buy-light' : 'bg-danger hover:bg-danger/90',
+            )}
+          >
+            {action === 'approve' ? 'Approve' : 'Reject'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 interface Tier { label: string; min_amount: number }
 interface Tenure { label: string; days: number }
 interface RateConfig {
@@ -503,7 +548,125 @@ export default function FixedReturnConfigPage() {
       </div>
 
       <PendingEarlyWithdrawals />
+      <PendingPrincipalWithdrawals />
     </div>
+  );
+}
+
+
+// ─── Principal-withdrawal approval queue (matured claims) ────────────
+
+function PendingPrincipalWithdrawals() {
+  const [rows, setRows] = useState<PendingRow[] | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [modal, setModal] = useState<{ row: PendingRow; action: 'approve' | 'reject' } | null>(null);
+  const [reason, setReason] = useState('');
+
+  const load = useCallback(async () => {
+    try {
+      const data = await adminApi.get<PendingRow[]>('/fixed-return/pending', { kind: 'principal' });
+      setRows(Array.isArray(data) ? data : []);
+    } catch (e: any) {
+      toast.error(e?.message || 'Failed to load principal-withdrawal queue');
+      setRows([]);
+    }
+  }, []);
+  useEffect(() => { load(); }, [load]);
+
+  const runAction = async () => {
+    if (!modal) return;
+    const { row, action } = modal;
+    setBusyId(row.id);
+    setModal(null);
+    try {
+      if (action === 'approve') {
+        await adminApi.post(`/fixed-return/${row.id}/approve`, {});
+        toast.success('Approved — principal credited to user\'s main wallet');
+      } else {
+        await adminApi.post(`/fixed-return/${row.id}/reject`, { reason: reason.trim() || null });
+        toast.success('Rejected — plan stays matured (user can claim again)');
+      }
+      load();
+    } catch (e: any) {
+      toast.error(e?.message || `${action} failed`);
+    } finally { setBusyId(null); }
+  };
+  const approve = (r: PendingRow) => { setReason(''); setModal({ row: r, action: 'approve' }); };
+  const reject = (r: PendingRow) => { setReason(''); setModal({ row: r, action: 'reject' }); };
+
+  return (
+    <>
+    <ApprovalModal
+      open={!!modal}
+      action={modal?.action ?? 'approve'}
+      reason={reason}
+      onReason={setReason}
+      onClose={() => setModal(null)}
+      onConfirm={runAction}
+      title={modal?.action === 'approve' ? 'Approve principal withdrawal' : 'Reject principal withdrawal'}
+      body={modal && (
+        modal.action === 'approve'
+          ? <>User <strong className="text-text-primary">{modal.row.user_email}</strong> will receive their full principal of <strong className="text-text-primary">${modal.row.principal.toFixed(2)}</strong> in their main wallet.</>
+          : <>Reject the principal-withdrawal request for <strong className="text-text-primary">{modal.row.user_email}</strong>? The plan stays matured and the user can claim again.</>
+      )}
+    />
+    <div className="bg-bg-secondary border border-border-primary rounded-md">
+      <div className="px-4 py-3 border-b border-border-primary flex items-center gap-2">
+        <Clock size={14} className="text-buy" />
+        <h2 className="text-sm font-semibold text-text-primary">Principal-withdrawal approvals</h2>
+        <span className="text-xxs text-text-tertiary ml-2">
+          {rows == null ? '…' : `${rows.length} pending`}
+        </span>
+        <button onClick={load} className="ml-auto text-xxs text-text-secondary hover:text-text-primary">Refresh</button>
+      </div>
+      <div className="overflow-x-auto">
+        {rows == null ? (
+          <div className="px-4 py-6 text-center"><Loader2 size={16} className="animate-spin text-text-tertiary inline-block" /></div>
+        ) : rows.length === 0 ? (
+          <div className="px-4 py-8 text-center text-xs text-text-tertiary">No principal-withdrawal requests waiting.</div>
+        ) : (
+          <table className="w-full min-w-[640px]">
+            <thead>
+              <tr className="border-b border-border-primary bg-bg-tertiary/40">
+                <th className="text-left px-4 py-2.5 text-xxs font-medium text-text-tertiary uppercase tracking-wide">User</th>
+                <th className="text-left px-4 py-2.5 text-xxs font-medium text-text-tertiary uppercase tracking-wide">Plan</th>
+                <th className="text-right px-4 py-2.5 text-xxs font-medium text-text-tertiary uppercase tracking-wide">Principal payout</th>
+                <th className="text-left px-4 py-2.5 text-xxs font-medium text-text-tertiary uppercase tracking-wide">Requested</th>
+                <th className="text-right px-4 py-2.5 text-xxs font-medium text-text-tertiary uppercase tracking-wide">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r) => (
+                <tr key={r.id} className="border-b border-border-primary/50 last:border-0 hover:bg-bg-hover/30">
+                  <td className="px-4 py-2.5">
+                    <div className="text-xs text-text-primary truncate max-w-[220px]">{r.user_name || '—'}</div>
+                    <div className="text-xxs text-text-tertiary truncate max-w-[220px]">{r.user_email}</div>
+                  </td>
+                  <td className="px-4 py-2.5 text-xxs text-text-secondary">{r.tenure_label} · {r.rate_pct}%/mo</td>
+                  <td className="px-4 py-2.5 text-right text-xs font-mono tabular-nums text-text-primary font-semibold">${r.projected_payout.toFixed(2)}</td>
+                  <td className="px-4 py-2.5 text-xxs text-text-secondary whitespace-nowrap">
+                    {r.early_requested_at ? new Date(r.early_requested_at).toLocaleString() : '—'}
+                  </td>
+                  <td className="px-4 py-2.5 text-right">
+                    <div className="inline-flex items-center gap-1">
+                      <button onClick={() => approve(r)} disabled={busyId === r.id}
+                        className="inline-flex items-center gap-1 px-2.5 py-1 text-xxs text-white bg-buy rounded hover:bg-buy-light disabled:opacity-50">
+                        <Check size={12} /> Approve
+                      </button>
+                      <button onClick={() => reject(r)} disabled={busyId === r.id}
+                        className="inline-flex items-center gap-1 px-2.5 py-1 text-xxs text-text-secondary border border-border-primary rounded hover:bg-bg-hover disabled:opacity-50">
+                        <X size={12} /> Reject
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+    </div>
+    </>
   );
 }
 
@@ -529,6 +692,8 @@ interface PendingRow {
 function PendingEarlyWithdrawals() {
   const [rows, setRows] = useState<PendingRow[] | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [modal, setModal] = useState<{ row: PendingRow; action: 'approve' | 'reject' } | null>(null);
+  const [reason, setReason] = useState('');
 
   const load = useCallback(async () => {
     try {
@@ -542,41 +707,47 @@ function PendingEarlyWithdrawals() {
 
   useEffect(() => { load(); }, [load]);
 
-  const approve = async (r: PendingRow) => {
-    if (!window.confirm(
-      `Approve early withdrawal for ${r.user_email}?\n\nUser will receive $${r.projected_payout.toFixed(2)} (principal $${r.principal.toFixed(2)} − fee $${r.projected_fee.toFixed(2)} − interest claw-back $${r.total_interest_paid.toFixed(2)}).`,
-    )) return;
-    setBusyId(r.id);
-    try {
-      await adminApi.post(`/fixed-return/${r.id}/approve`, {});
-      toast.success('Approved — funds credited to user\'s main wallet');
-      load();
-    } catch (e: any) {
-      toast.error(e?.message || 'Approve failed');
-    } finally {
-      setBusyId(null);
-    }
-  };
+  const openModal = (row: PendingRow, action: 'approve' | 'reject') => { setReason(''); setModal({ row, action }); };
 
-  const reject = async (r: PendingRow) => {
-    const reason = window.prompt(
-      `Reject early withdrawal for ${r.user_email}?\nOptional reason (shown on the user's transaction log):`,
-      '',
-    );
-    if (reason === null) return;
-    setBusyId(r.id);
+  const runAction = async () => {
+    if (!modal) return;
+    const { row, action } = modal;
+    setBusyId(row.id);
+    setModal(null);
     try {
-      await adminApi.post(`/fixed-return/${r.id}/reject`, { reason: reason || null });
-      toast.success('Rejected — lock reverted to active');
+      if (action === 'approve') {
+        await adminApi.post(`/fixed-return/${row.id}/approve`, {});
+        toast.success('Approved — funds credited to user\'s main wallet');
+      } else {
+        await adminApi.post(`/fixed-return/${row.id}/reject`, { reason: reason.trim() || null });
+        toast.success('Rejected — lock reverted to active');
+      }
       load();
     } catch (e: any) {
-      toast.error(e?.message || 'Reject failed');
+      toast.error(e?.message || `${action} failed`);
     } finally {
       setBusyId(null);
     }
   };
+  const approve = (r: PendingRow) => openModal(r, 'approve');
+  const reject = (r: PendingRow) => openModal(r, 'reject');
 
   return (
+    <>
+    <ApprovalModal
+      open={!!modal}
+      action={modal?.action ?? 'approve'}
+      reason={reason}
+      onReason={setReason}
+      onClose={() => setModal(null)}
+      onConfirm={runAction}
+      title={modal?.action === 'approve' ? 'Approve early withdrawal' : 'Reject early withdrawal'}
+      body={modal && (
+        modal.action === 'approve'
+          ? <>User <strong className="text-text-primary">{modal.row.user_email}</strong> will receive <strong className="text-text-primary">${modal.row.projected_payout.toFixed(2)}</strong> (principal ${modal.row.principal.toFixed(2)} − fee ${modal.row.projected_fee.toFixed(2)} − interest claw-back ${modal.row.total_interest_paid.toFixed(2)}).</>
+          : <>Reject the early-withdrawal request for <strong className="text-text-primary">{modal.row.user_email}</strong>? The lock reverts to active.</>
+      )}
+    />
     <div className="bg-bg-secondary border border-border-primary rounded-md">
       <div className="px-4 py-3 border-b border-border-primary flex items-center gap-2">
         <Clock size={14} className="text-amber-400" />
@@ -658,5 +829,6 @@ function PendingEarlyWithdrawals() {
         )}
       </div>
     </div>
+    </>
   );
 }

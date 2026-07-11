@@ -466,10 +466,11 @@ async def create_lock(
 DEFAULT_UPGRADE_TOPUP_PCT = 25.0
 
 
-async def _elapsed_unpaid_interest(lock: FixedReturnLock, now: datetime) -> Decimal:
-    """Prorated interest earned since the last payout (or lock start) that
-    hasn't been credited yet: principal × rate_pct% × days_since / 30."""
-    anchor = None
+def _accrual_anchor(lock: FixedReturnLock) -> datetime:
+    """The datetime interest starts accruing FROM for the current unpaid
+    stretch: the later of (a) the last scheduled payout / lock start and
+    (b) last_interest_at (set by an on-demand interest withdrawal). Anchoring
+    at the max prevents double-paying interest a user already pulled out."""
     if lock.payouts_count and lock.next_payout_at:
         nxt = lock.next_payout_at
         if nxt.tzinfo is None:
@@ -480,6 +481,19 @@ async def _elapsed_unpaid_interest(lock: FixedReturnLock, now: datetime) -> Deci
         anchor = lock.locked_at
     if anchor and anchor.tzinfo is None:
         anchor = anchor.replace(tzinfo=timezone.utc)
+    li = lock.last_interest_at
+    if li is not None:
+        if li.tzinfo is None:
+            li = li.replace(tzinfo=timezone.utc)
+        if anchor is None or li > anchor:
+            anchor = li
+    return anchor
+
+
+async def _elapsed_unpaid_interest(lock: FixedReturnLock, now: datetime) -> Decimal:
+    """Prorated interest earned since the accrual anchor that hasn't been
+    credited yet: principal × rate_pct% × days_since / 30."""
+    anchor = _accrual_anchor(lock)
     days = max(0, (now.date() - anchor.date()).days) if anchor else 0
     if days <= 0:
         return Decimal("0")
@@ -490,6 +504,52 @@ async def _elapsed_unpaid_interest(lock: FixedReturnLock, now: datetime) -> Deci
         / Decimal("100")
         / Decimal("30")
     ).quantize(Decimal("0.01"))
+
+
+async def withdraw_interest(lock_id: UUID, user_id: UUID, db: AsyncSession) -> dict:
+    """On-demand interest withdrawal (client 2026-07-11): credit the accrued
+    unpaid interest straight to the main wallet — NO admin approval (it's the
+    user's already-earned interest). Only the interest moves; principal stays
+    locked and keeps running. Resets the accrual floor to now."""
+    lock = (await db.execute(
+        select(FixedReturnLock).where(FixedReturnLock.id == lock_id).with_for_update()
+    )).scalar_one_or_none()
+    if lock is None or lock.user_id != user_id:
+        raise HTTPException(status_code=404, detail="Plan not found")
+    if lock.state != "active":
+        raise HTTPException(status_code=400, detail=f"Interest can only be withdrawn from an active plan (this is {lock.state}).")
+
+    now = datetime.now(timezone.utc)
+    interest = await _elapsed_unpaid_interest(lock, now)
+    if interest <= 0:
+        raise HTTPException(status_code=400, detail="No interest has accrued yet to withdraw.")
+
+    user = (await db.execute(
+        select(User).where(User.id == user_id).with_for_update()
+    )).scalar_one_or_none()
+    if user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    user.main_wallet_balance = Decimal(str(user.main_wallet_balance or 0)) + interest
+    lock.total_interest_paid = Decimal(str(lock.total_interest_paid or 0)) + interest
+    lock.payouts_count = int(lock.payouts_count or 0) + 1
+    lock.last_interest_at = now
+    db.add(Transaction(
+        user_id=user_id,
+        type="fixed_return_interest",
+        amount=interest,
+        balance_after=user.main_wallet_balance,
+        description=f"AI Powered Staking — interest withdrawn ({lock.tenure_label} plan)",
+    ))
+    # Referral: interest-mode commission on this payout, if configured.
+    await _pay_fr_referral(db, user_id, interest, "interest")
+    await db.commit()
+    await db.refresh(lock)
+    return {
+        "interest_withdrawn": float(interest),
+        "new_wallet_balance": float(user.main_wallet_balance),
+        "lock": _serialize_lock(lock),
+    }
 
 
 async def upgrade_lock(
@@ -848,25 +908,24 @@ async def withdraw_lock(
         matures_at = matures_at.replace(tzinfo=timezone.utc)
 
     if matures_at and matures_at <= now:
-        # Matured — interest was already paid in cycles; user gets the
-        # principal back, period. Fires immediately; no admin review.
-        payout = principal
-        fee = Decimal("0")
-        user.main_wallet_balance = Decimal(str(user.main_wallet_balance or 0)) + payout
-        lock.state = "matured"
-        lock.payout = payout
-        lock.fee_paid = fee
-        lock.settled_at = now
+        # Matured — principal claim now routes through ADMIN APPROVAL (client
+        # 2026-07-11) instead of an instant credit. Park in principal_pending
+        # so it surfaces on the admin AI-Powered Staking approval queue + bell;
+        # admin approve() credits the principal and flips to matured.
+        if lock.state == "principal_pending":
+            raise HTTPException(
+                status_code=409,
+                detail="A principal-withdrawal request is already pending admin approval",
+            )
+        lock.state = "principal_pending"
+        lock.early_requested_at = now   # reuse the request-timestamp column
         lock.next_payout_at = None
         db.add(Transaction(
             user_id=user_id,
-            type="fixed_return_matured",
-            amount=payout,
+            type="fixed_return_principal_request",
+            amount=Decimal("0"),
             balance_after=user.main_wallet_balance,
-            description=(
-                f"AI-POWERED STAKING PROGRAM matured — principal returned "
-                f"(interest paid in {lock.payouts_count} cycles: ${total_interest:,.2f})"
-            ),
+            description=f"AI Powered Staking — principal withdrawal requested (${principal:,.2f}), awaiting admin approval",
         ))
         await db.commit()
         await db.refresh(lock)
@@ -1104,35 +1163,22 @@ async def accrue_due_payouts(db: AsyncSession) -> int:
                 lock.next_payout_at = None
                 continue
 
-            # Rate matrix cell is a PER-MONTH percentage. Tenure decides
-            # cadence; each cycle bundles `months_per_cycle` months of
-            # accrual into one credit.
+            # Rate matrix cell is a PER-MONTH percentage. Interest is credited
+            # for the days between the accrual anchor and now — the anchor is
+            # the later of the last scheduled cycle / lock start and
+            # last_interest_at (an on-demand interest withdrawal). This one
+            # formula prorates the first cycle AND avoids double-paying any
+            # interest the user already pulled out on demand.
             months_per_cycle = _tenure_to_months(int(lock.tenure_days or 0))
-
-            # Client spec 2026-06-08 (revised): the FIRST cycle is
-            # PRORATED by the actual days between lock_at and now. So a
-            # user who invests on the 8th and gets paid on the 25th
-            # receives 17/30 of one month's interest, not a full month.
-            # Subsequent cycles credit the full `months_per_cycle × rate`.
-            if int(lock.payouts_count or 0) == 0:
-                locked_at = lock.locked_at
-                if locked_at and locked_at.tzinfo is None:
-                    locked_at = locked_at.replace(tzinfo=timezone.utc)
-                days_locked = max(1, (now.date() - locked_at.date()).days) if locked_at else 30
-                interest = (
-                    Decimal(str(lock.principal or 0))
-                    * Decimal(str(lock.rate_pct or 0))
-                    * Decimal(str(days_locked))
-                    / Decimal("100")
-                    / Decimal("30")
-                ).quantize(Decimal("0.01"))
-            else:
-                interest = (
-                    Decimal(str(lock.principal or 0))
-                    * Decimal(str(lock.rate_pct or 0))
-                    * Decimal(str(months_per_cycle))
-                    / Decimal("100")
-                ).quantize(Decimal("0.01"))
+            anchor = _accrual_anchor(lock)
+            days_accrued = max(0, (now.date() - anchor.date()).days) if anchor else 0
+            interest = (
+                Decimal(str(lock.principal or 0))
+                * Decimal(str(lock.rate_pct or 0))
+                * Decimal(str(days_accrued))
+                / Decimal("100")
+                / Decimal("30")
+            ).quantize(Decimal("0.01"))
             if interest <= 0:
                 lock.next_payout_at = None
                 continue
@@ -1144,6 +1190,9 @@ async def accrue_due_payouts(db: AsyncSession) -> int:
                 Decimal(str(lock.total_interest_paid or 0)) + interest
             )
             lock.payouts_count = int(lock.payouts_count or 0) + 1
+            # Reset the accrual floor to this credit moment so the next stretch
+            # (scheduled or on-demand) starts fresh from here.
+            lock.last_interest_at = now
 
             # Advance the schedule by exactly one calendar cycle. Per
             # client spec 2026-06-08, the cycle day-of-month locks to
@@ -1232,18 +1281,10 @@ def _serialize_lock(r: FixedReturnLock) -> dict:
     # if no payout has fired yet), so the figure resets cleanly to 0
     # the moment a cycle credits.
     now = datetime.now(timezone.utc)
-    anchor = None
-    if r.payouts_count and r.next_payout_at:
-        # last_credit ≈ next_payout - cycle_months
-        nxt = r.next_payout_at
-        if nxt.tzinfo is None:
-            nxt = nxt.replace(tzinfo=timezone.utc)
-        cycle_months = _tenure_to_months(int(r.tenure_days or 0))
-        anchor = _add_months(nxt, -cycle_months)
-    if anchor is None:
-        anchor = r.locked_at
-        if anchor and anchor.tzinfo is None:
-            anchor = anchor.replace(tzinfo=timezone.utc)
+    # Accrual floor: later of the scheduled anchor and last_interest_at (set
+    # by an on-demand interest withdrawal) so the accrued figure resets to 0
+    # right after the user pulls interest out.
+    anchor = _accrual_anchor(r)
     # Count WHOLE CALENDAR DAYS in IST (UTC+5:30), not rolling 24h periods, so
     # the displayed accrued interest ticks up at local 12:00 AM each day rather
     # than at the lock's time-of-day (client 2026-06-30: "jo interest show ho

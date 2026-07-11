@@ -32,7 +32,7 @@ interface LockRow {
   next_payout_at: string | null;
   settled_at: string | null;
   early_requested_at: string | null;
-  state: 'active' | 'early_pending' | 'matured' | 'withdrawn_early';
+  state: 'active' | 'early_pending' | 'principal_pending' | 'matured' | 'withdrawn_early';
   payouts_count: number;
   total_interest_paid: number;
   // Pro-rata interest since the last cycle credit (or lock open if no
@@ -209,12 +209,12 @@ export default function FixedReturnPage() {
     const now = Date.now();
     const matured = !!(l.matures_at && new Date(l.matures_at).getTime() <= now);
     const message = matured
-      ? `You'll receive your principal of ${fmtUsd(l.principal)} back. Interest (${fmtUsd(l.total_interest_paid)} so far) was already paid in cycles.`
+      ? `Request to withdraw your principal of ${fmtUsd(l.principal)}. The request goes to admin for approval — the principal is credited to your wallet once approved. Interest (${fmtUsd(l.total_interest_paid)} so far) was already paid in cycles.`
       : `Early withdrawal request:\n• ${cfg.early_withdrawal_fee_pct}% penalty on principal\n• ALL interest paid to date (${fmtUsd(l.total_interest_paid)}) claws back\n\nThe request goes to admin for approval — funds are NOT credited until approved. Projected return after approval: ${fmtUsd(Math.max(0, l.principal * (1 - cfg.early_withdrawal_fee_pct / 100) - l.total_interest_paid))}.`;
     setConfirmDialog({
-      title: matured ? 'Claim your principal' : 'Request early withdrawal',
+      title: matured ? 'Withdraw principal' : 'Request early withdrawal',
       message,
-      confirmLabel: matured ? 'Claim principal' : 'Submit request',
+      confirmLabel: matured ? 'Submit request' : 'Submit request',
       danger: !matured,
       onConfirm: () => doWithdraw(l, matured),
     });
@@ -226,7 +226,7 @@ export default function FixedReturnPage() {
       await api.post(`/fixed-return/locks/${l.id}/withdraw`, {});
       toast.success(
         matured
-          ? 'Principal returned'
+          ? 'Principal-withdrawal request submitted — awaiting admin approval'
           : 'Early-withdrawal request submitted — awaiting admin approval',
       );
       await load();
@@ -248,6 +248,20 @@ export default function FixedReturnPage() {
     } catch (e: any) {
       toast.error(e?.message || 'Could not load upgrade options');
       setUpgradeFor(null);
+    }
+  };
+
+  const [withdrawingInterest, setWithdrawingInterest] = useState<string | null>(null);
+  const withdrawInterest = async (l: LockRow) => {
+    setWithdrawingInterest(l.id);
+    try {
+      const r = await api.post<{ interest_withdrawn: number }>(`/fixed-return/locks/${l.id}/withdraw-interest`, {});
+      toast.success(`${fmtUsd(r.interest_withdrawn)} interest credited to your wallet.`);
+      await load();
+    } catch (e: any) {
+      toast.error(e?.message || 'Interest withdrawal failed');
+    } finally {
+      setWithdrawingInterest(null);
     }
   };
 
@@ -284,7 +298,7 @@ export default function FixedReturnPage() {
     <DashboardShell>
       <div className="px-4 sm:px-6 py-6 space-y-6 max-w-[1200px] mx-auto">
         <header>
-          <h1 className="text-2xl font-bold text-text-primary">AI-POWERED STAKING PROGRAM Program</h1>
+          <h1 className="text-2xl font-bold text-text-primary">AI-POWERED STAKING PROGRAM </h1>
           <p className="mt-1 text-sm text-text-secondary max-w-2xl">
             Lock your principal for{' '}
             <strong className="text-text-primary">{cfg.lock_months} months</strong>.
@@ -449,7 +463,8 @@ export default function FixedReturnPage() {
                 const now = new Date();
                 const matured = l.matures_at && new Date(l.matures_at) <= now;
                 const isActive = l.state === 'active';
-                const isPending = l.state === 'early_pending';
+                const isPending = l.state === 'early_pending' || l.state === 'principal_pending';
+                const isPrincipalPending = l.state === 'principal_pending';
                 return (
                   <div
                     key={l.id}
@@ -527,15 +542,51 @@ export default function FixedReturnPage() {
                       </div>
                     </div>
 
+                    {/* Start date + per-day / per-month interest + payouts taken.
+                        rate_pct is a PER-MONTH %, so month = principal×rate%,
+                        day = month/30. (client 2026-07-11) */}
+                    {(() => {
+                      const perMonth = l.principal * (l.rate_pct / 100);
+                      const perDay = perMonth / 30;
+                      return (
+                        <div className="flex flex-wrap gap-x-6 gap-y-1.5 pt-2 border-t border-border-primary/40 text-[11px]">
+                          <div>
+                            <span className="text-text-tertiary">Started: </span>
+                            <span className="text-text-primary font-medium">{fmtDate(l.locked_at)}</span>
+                          </div>
+                          <div>
+                            <span className="text-text-tertiary">Interest / day: </span>
+                            <span className="text-buy font-mono font-medium">{fmtUsd(perDay)}</span>
+                          </div>
+                          <div>
+                            <span className="text-text-tertiary">Interest / month: </span>
+                            <span className="text-buy font-mono font-medium">{fmtUsd(perMonth)}</span>
+                          </div>
+                          <div>
+                            <span className="text-text-tertiary">Payouts received: </span>
+                            <span className="text-text-primary font-medium">
+                              {l.payouts_count} time{l.payouts_count === 1 ? '' : 's'} ({fmtUsd(l.total_interest_paid)})
+                            </span>
+                          </div>
+                          <div>
+                            <span className="text-text-tertiary">Current interest (not yet paid): </span>
+                            <span className="text-amber-400 font-mono font-medium">{fmtUsd(l.accrued_since_last_payout)}</span>
+                          </div>
+                        </div>
+                      );
+                    })()}
+
                     {/* Pending-approval banner — moved out of the action row so
                         it never overlaps the status pill on narrow widths. */}
                     {isPending && (
                       <div className="rounded-md border border-amber-400/40 bg-amber-500/5 px-3 py-2 text-[11px] text-amber-300 flex items-start gap-2">
                         <AlertTriangle size={12} className="mt-0.5 shrink-0" />
                         <span>
-                          Early-withdrawal request submitted
+                          {isPrincipalPending ? 'Principal-withdrawal request submitted' : 'Early-withdrawal request submitted'}
                           {l.early_requested_at ? ` on ${fmtDate(l.early_requested_at)}` : ''}.
-                          Funds stay locked until an admin approves; interest pauses meanwhile.
+                          {isPrincipalPending
+                            ? ' Your principal will be credited to your wallet once an admin approves.'
+                            : ' Funds stay locked until an admin approves; interest pauses meanwhile.'}
                         </span>
                       </div>
                     )}
@@ -552,6 +603,18 @@ export default function FixedReturnPage() {
                             <ChevronsUp size={13} /> Upgrade plan
                           </button>
                         )}
+                        {/* Withdraw interest — direct to wallet, no approval.
+                            Shown when there is accrued interest to pull. */}
+                        {isActive && l.accrued_since_last_payout > 0 && (
+                          <button
+                            onClick={() => void withdrawInterest(l)}
+                            disabled={withdrawingInterest === l.id}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-fast border border-buy/40 text-buy hover:bg-buy/10 disabled:opacity-50"
+                          >
+                            {withdrawingInterest === l.id && <Loader2 size={11} className="animate-spin" />}
+                            Withdraw interest ({fmtUsd(l.accrued_since_last_payout)})
+                          </button>
+                        )}
                         {isActive && (
                           <button
                             onClick={() => withdraw(l)}
@@ -564,7 +627,7 @@ export default function FixedReturnPage() {
                             )}
                           >
                             {withdrawing === l.id && <Loader2 size={11} className="animate-spin" />}
-                            {matured ? 'Claim principal' : 'Request early withdrawal'}
+                            {matured ? 'Withdraw principal' : 'Request early withdrawal'}
                           </button>
                         )}
                       </div>

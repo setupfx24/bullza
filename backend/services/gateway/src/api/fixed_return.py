@@ -81,6 +81,19 @@ async def withdraw_lock(
     )
 
 
+@router.post("/locks/{lock_id}/withdraw-interest")
+async def withdraw_interest(
+    lock_id: UUID,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    """Withdraw only the accrued interest to the main wallet — no admin
+    approval (it's the user's already-earned interest). Principal stays locked."""
+    return await fixed_return_service.withdraw_interest(
+        lock_id, current_user["user_id"], db,
+    )
+
+
 class UpgradeLockRequest(BaseModel):
     new_tenure_label: str
 
