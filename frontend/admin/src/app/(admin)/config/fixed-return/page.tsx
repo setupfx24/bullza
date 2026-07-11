@@ -86,7 +86,7 @@ export default function FixedReturnConfigPage() {
       if (refPrin != null) { const n = Number(refPrin); if (Number.isFinite(n) && n >= 0) setRefPrincipalPct(n); }
       if (refInt != null) { const n = Number(refInt); if (Number.isFinite(n) && n >= 0) setRefInterestPct(n); }
     } catch (e: any) {
-      toast.error(e?.message || 'Failed to load AI Powered Staking config');
+      toast.error(e?.message || 'Failed to load AI-POWERED STAKING PROGRAM config');
     } finally {
       setLoading(false);
     }
@@ -215,7 +215,7 @@ export default function FixedReturnConfigPage() {
           fr_referral_interest_pct: refInterestPct,
         },
       });
-      toast.success('AI Powered Staking config saved');
+      toast.success('AI-POWERED STAKING PROGRAM config saved');
     } catch (e: any) {
       toast.error(e?.message || 'Save failed');
     } finally {
@@ -235,7 +235,7 @@ export default function FixedReturnConfigPage() {
     <div className="p-6 space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-lg font-semibold text-text-primary">AI Powered Staking — Rate Matrix</h1>
+          <h1 className="text-lg font-semibold text-text-primary">AI-POWERED STAKING PROGRAM — Rate Matrix</h1>
           <p className="text-xxs text-text-tertiary mt-0.5 max-w-3xl">
             Every lock runs for the full <strong>Lock period</strong> below. <strong>Tenure</strong> is the
             payout cadence — the user receives <em>principal × rate%</em> every cycle (Month / Quarter / etc.)

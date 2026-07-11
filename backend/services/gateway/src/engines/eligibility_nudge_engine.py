@@ -1,6 +1,6 @@
 """Eligibility-nudge engine.
 
-Watches for users who are funded enough to benefit from Fixed Return /
+Watches for users who are funded enough to benefit from AI-POWERED STAKING PROGRAM /
 Trade Insurance but haven't been emailed about either product. Picks
 the right flavor based on activity:
 

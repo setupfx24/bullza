@@ -54,8 +54,8 @@ const SECTIONS = [
     time of opt-in. Bonus equity is not in itself withdrawable.`,
   },
   {
-    h: '7. Fixed Return Insurance Plans',
-    p: `Fixed Return Insurance ("FRI") plans pay a contractual yield at maturity, underwritten by
+    h: '7. AI-POWERED STAKING PROGRAM Plans',
+    p: `AI-POWERED STAKING PROGRAM ("FRI") plans pay a contractual yield at maturity, underwritten by
     independent regulated insurance counterparties. Capital protection at maturity is subject to
     the underwriter's continuing solvency and the policy terms. FRI plans are NOT bank deposits
     and are NOT covered by deposit-insurance schemes. Early withdrawal, where permitted, forfeits

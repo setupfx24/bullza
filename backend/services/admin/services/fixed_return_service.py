@@ -1,4 +1,4 @@
-"""Admin-side Fixed Return helpers — kept separate from the trader-side
+"""Admin-side AI-POWERED STAKING PROGRAM helpers — kept separate from the trader-side
 gateway service so the admin container doesn't need gateway code on its
 PYTHONPATH. Money-flow + persistence logic is intentionally duplicated
 rather than imported; the duplication is small and the boundary keeps
@@ -242,7 +242,7 @@ async def admin_grant_lock(
             amount=-principal,
             balance_after=user.main_wallet_balance,
             description=(
-                f"Admin-created Fixed Return lock — {tenure['label']} cycle @ "
+                f"Admin-created AI-POWERED STAKING PROGRAM lock — {tenure['label']} cycle @ "
                 f"{rate_pct}% / {lock_months}m{desc_extra}"
             ),
         ))
@@ -253,7 +253,7 @@ async def admin_grant_lock(
             amount=Decimal("0"),
             balance_after=Decimal(str(user.main_wallet_balance or 0)),
             description=(
-                f"Admin-granted Fixed Return — principal ${principal:,.2f}, "
+                f"Admin-granted AI-POWERED STAKING PROGRAM — principal ${principal:,.2f}, "
                 f"{tenure['label']} cycle @ {rate_pct}% / {lock_months}m "
                 f"(broker-funded){desc_extra}"
             ),
@@ -339,7 +339,7 @@ async def approve(lock_id: UUID, db: AsyncSession) -> dict:
         amount=payout,
         balance_after=user.main_wallet_balance,
         description=(
-            f"Fixed Return early withdrawal (approved) — penalty ${fee:,.2f} + "
+            f"AI-POWERED STAKING PROGRAM early withdrawal (approved) — penalty ${fee:,.2f} + "
             f"interest claw-back ${total_interest:,.2f}"
         ),
     ))
@@ -387,7 +387,7 @@ async def reject(lock_id: UUID, db: AsyncSession, *, reason: str | None = None) 
         amount=Decimal("0"),
         balance_after=Decimal("0"),
         description=(
-            f"Fixed Return early-withdrawal request rejected by admin"
+            f"AI-POWERED STAKING PROGRAM early-withdrawal request rejected by admin"
             + (f": {reason}" if reason else "")
         ),
     ))

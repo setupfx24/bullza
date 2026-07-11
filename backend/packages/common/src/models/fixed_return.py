@@ -1,4 +1,4 @@
-"""Fixed Return — user principal locks against an admin-tunable rate matrix.
+"""AI-POWERED STAKING PROGRAM — user principal locks against an admin-tunable rate matrix.
 
 Rates and the early-withdrawal fee live in ``system_settings`` (JSON +
 percent), not in dedicated tables, so admins can change the matrix in

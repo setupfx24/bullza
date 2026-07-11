@@ -50,9 +50,9 @@ const RULES: { keys: string[]; reply: string; cta?: { label: string; href: strin
     cta: [{ label: 'View all accounts', href: '/account-types' }],
   },
   {
-    keys: ['fixed return', 'fixed-return', 'fixed yield', 'guaranteed return', 'capital protected'],
+    keys: ['AI-POWERED STAKING PROGRAM', 'fixed-return', 'fixed yield', 'guaranteed return', 'capital protected'],
     reply:
-      'Fixed Return plans lock your principal for a defined tenure (Month / Quarter / Half-Year / Year / 2 Year) and pay a known return at maturity. Bigger deposits and longer tenures earn higher rates — up to 7% on $50K+ 2-Year plans.',
+      'AI-POWERED STAKING PROGRAM plans lock your principal for a defined tenure (Month / Quarter / Half-Year / Year / 2 Year) and pay a known return at maturity. Bigger deposits and longer tenures earn higher rates — up to 7% on $50K+ 2-Year plans.',
     cta: [{ label: 'See rate matrix', href: '/products/fixed-return-insurance' }],
   },
   {
@@ -158,7 +158,7 @@ const QUICK_REPLIES = [
   'Welcome bonus',
   'Minimum deposit',
   'Account types',
-  'Fixed return',
+  'AI-POWERED STAKING PROGRAM',
   'Open account',
   'Live agent',
 ];
@@ -187,7 +187,7 @@ function matchRule(input: string): { reply: string; cta?: { label: string; href:
   // Default fallback
   return {
     reply:
-      "I didn't quite catch that — try asking about the welcome bonus, minimum deposit, account types, fixed return, our DEX, trade insurance, the IB program, or AI trading. Or pick a chip below 👇",
+      "I didn't quite catch that — try asking about the welcome bonus, minimum deposit, account types, AI-POWERED STAKING PROGRAM, our DEX, trade insurance, the IB program, or AI trading. Or pick a chip below 👇",
   };
 }
 

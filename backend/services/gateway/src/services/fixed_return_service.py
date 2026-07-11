@@ -1,4 +1,4 @@
-"""Fixed Return v2 — periodic interest payouts, fixed lock months.
+"""AI-POWERED STAKING PROGRAM v2 — periodic interest payouts, fixed lock months.
 
 Tenure controls the PAYOUT CADENCE; the full lock duration is a single
 admin setting (``fixed_return_lock_months``, default 24). Interest is
@@ -135,7 +135,7 @@ def _tenure_to_months(tenure_days: int) -> int:
     """Map the configured tenure_days bucket to whole calendar months so
     payouts always land on the same day-of-month (the configured payout
     day-of-month gate, 25 by default). The buckets follow the admin
-    Fixed Return matrix: 30 → 1, 90 → 3, 180 → 6, 365 → 12, 730 → 24."""
+    AI-POWERED STAKING PROGRAM matrix: 30 → 1, 90 → 3, 180 → 6, 365 → 12, 730 → 24."""
     if tenure_days >= 700:
         return 24
     if tenure_days >= 350:
@@ -290,7 +290,7 @@ async def _pay_fr_referral(
             amount=commission,
             balance_after=None,
             description=(
-                f"AI Powered Staking referral from {referred_display} — {pct}% of "
+                f"AI-POWERED STAKING PROGRAM referral from {referred_display} — {pct}% of "
                 f"{'principal' if kind == 'principal' else 'interest payout'}"
             ),
         ))
@@ -307,7 +307,7 @@ async def _pay_fr_referral(
                     amount=extra,
                     category="fr_referral_extra",
                     note=(
-                        f"AI Powered Staking referral — extra {extra_pct}% "
+                        f"AI-POWERED STAKING PROGRAM referral — extra {extra_pct}% "
                         f"(paid {pct}% vs standard {global_pct}%) on "
                         f"{'principal' if kind == 'principal' else 'interest payout'} "
                         f"from {referred_display}"
@@ -399,7 +399,7 @@ async def create_lock(
             type="bonus_forfeit",
             amount=-bonus,
             balance_after=user.main_wallet_balance,
-            description=f"Bonus forfeited — locked ${principal:,.2f} into AI Powered Staking",
+            description=f"Bonus forfeited — locked ${principal:,.2f} into AI-POWERED STAKING PROGRAM",
         ))
     # Maturity = anniversary − 1 day (Mig 0067 / client spec 2026-06-08)
     # so users can withdraw on the eve of their lock anniversary.
@@ -439,7 +439,7 @@ async def create_lock(
         type="fixed_return_lock",
         amount=-principal,
         balance_after=user.main_wallet_balance,
-        description=f"Fixed Return lock — {tenure['label']} cycle @ {rate_pct}% / {lock_months}m",
+        description=f"AI-POWERED STAKING PROGRAM lock — {tenure['label']} cycle @ {rate_pct}% / {lock_months}m",
     ))
 
     # AI-Staking referral: pay the referrer their principal-% commission now
@@ -565,7 +565,7 @@ async def admin_grant_lock(
             amount=-principal,
             balance_after=user.main_wallet_balance,
             description=(
-                f"Admin-created Fixed Return lock — {tenure['label']} cycle @ "
+                f"Admin-created AI-POWERED STAKING PROGRAM lock — {tenure['label']} cycle @ "
                 f"{rate_pct}% / {lock_months}m{desc_extra}"
             ),
         ))
@@ -579,7 +579,7 @@ async def admin_grant_lock(
             amount=Decimal("0"),
             balance_after=Decimal(str(user.main_wallet_balance or 0)),
             description=(
-                f"Admin-granted Fixed Return — principal ${principal:,.2f}, "
+                f"Admin-granted AI-POWERED STAKING PROGRAM — principal ${principal:,.2f}, "
                 f"{tenure['label']} cycle @ {rate_pct}% / {lock_months}m"
                 f" (broker-funded){desc_extra}"
             ),
@@ -644,7 +644,7 @@ async def withdraw_lock(
             amount=payout,
             balance_after=user.main_wallet_balance,
             description=(
-                f"Fixed Return matured — principal returned "
+                f"AI-POWERED STAKING PROGRAM matured — principal returned "
                 f"(interest paid in {lock.payouts_count} cycles: ${total_interest:,.2f})"
             ),
         ))
@@ -672,7 +672,7 @@ async def withdraw_lock(
         amount=Decimal("0"),
         balance_after=Decimal(str(user.main_wallet_balance or 0)),
         description=(
-            f"Fixed Return early-withdrawal request filed — awaiting admin "
+            f"AI-POWERED STAKING PROGRAM early-withdrawal request filed — awaiting admin "
             f"approval (principal ${principal:,.2f}, "
             f"interest-to-date ${total_interest:,.2f})"
         ),
@@ -734,7 +734,7 @@ async def admin_approve_early_withdrawal(
         amount=payout,
         balance_after=user.main_wallet_balance,
         description=(
-            f"Fixed Return early withdrawal (approved) — penalty ${fee:,.2f} + "
+            f"AI-POWERED STAKING PROGRAM early withdrawal (approved) — penalty ${fee:,.2f} + "
             f"interest claw-back ${total_interest:,.2f}"
         ),
     ))
@@ -789,7 +789,7 @@ async def admin_reject_early_withdrawal(
         amount=Decimal("0"),
         balance_after=Decimal("0"),  # no balance change, informational
         description=(
-            f"Fixed Return early-withdrawal request rejected by admin"
+            f"AI-POWERED STAKING PROGRAM early-withdrawal request rejected by admin"
             + (f": {reason}" if reason else "")
         ),
     ))
@@ -951,7 +951,7 @@ async def accrue_due_payouts(db: AsyncSession) -> int:
                 amount=interest,
                 balance_after=user.main_wallet_balance,
                 description=(
-                    f"Fixed Return interest — {lock.tenure_label} cycle "
+                    f"AI-POWERED STAKING PROGRAM interest — {lock.tenure_label} cycle "
                     f"#{lock.payouts_count} ({lock.rate_pct}%)"
                 ),
             ))
@@ -971,9 +971,9 @@ async def accrue_due_payouts(db: AsyncSession) -> int:
                 )
                 db.add(Notification(
                     user_id=lock.user_id,
-                    title="Fixed Return payout received",
+                    title="AI-POWERED STAKING PROGRAM payout received",
                     message=(
-                        f"${float(interest):,.2f} Fixed Return interest credited to your "
+                        f"${float(interest):,.2f} AI-POWERED STAKING PROGRAM interest credited to your "
                         f"main wallet. You can withdraw it any time. Next cycle: {next_iso}."
                     ),
                     type="fixed_return_interest",
@@ -982,7 +982,7 @@ async def accrue_due_payouts(db: AsyncSession) -> int:
                 logger.warning("FR interest notification failed: %s", _ne)
             paid += 1
         except Exception as exc:
-            logger.error("Fixed Return payout failed for lock %s: %s", lock.id, exc)
+            logger.error("AI-POWERED STAKING PROGRAM payout failed for lock %s: %s", lock.id, exc)
 
     if paid:
         await db.commit()

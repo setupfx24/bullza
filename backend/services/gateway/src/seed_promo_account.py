@@ -1,11 +1,11 @@
 """One-off seeder: fully populate ONE promotional demo account so it showcases
-every feature (trades, Fixed Return, insurance, referral, IB).
+every feature (trades, AI-POWERED STAKING PROGRAM, insurance, referral, IB).
 
 Target user (client 2026-07-04): amardeepsonar2001@gmail.com
   - Flagged promotional (is_promotional=True) so ALL its activity is excluded
     from the broker's real company financials, but shows live on the user's
     own dashboard.
-  - $1000 locked in Fixed Return ("AI Powered Staking"), tenure "Year".
+  - $1000 locked in AI-POWERED STAKING PROGRAM ("AI-POWERED STAKING PROGRAM"), tenure "Year".
   - A standard USD trading account funded with $1800 capital, carrying a mix
     of OPEN positions (live floating P&L) and CLOSED trades (realized history).
   - One insured trade (active InsurancePolicy).
@@ -194,7 +194,7 @@ async def run(execute: bool):
         else:
             logger.info("%smain wallet already funded (FR + account exist)", tag)
 
-        # ── 4. Fixed Return lock $1000 ────────────────────────────────────
+        # ── 4. AI-POWERED STAKING PROGRAM lock $1000 ────────────────────────────────────
         if has_fr:
             logger.info("%sFR lock already exists — skipping", tag)
         elif execute:
