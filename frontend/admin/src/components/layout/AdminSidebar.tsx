@@ -51,7 +51,6 @@ const NAV_ITEMS: NavItem[] = [
       { label: 'Charges', href: '/config/charges' },
       { label: 'Spreads', href: '/config/spreads' },
       { label: 'Swaps', href: '/config/swaps' },
-      { label: 'AI-POWERED STAKING PROGRAM', href: '/config/fixed-return' },
       { label: 'PAMM', href: '/config/pamm' },
       { label: 'IB Tiers', href: '/config/ib-tiers' },
       { label: 'Referral Tiers', href: '/config/referral-tiers' },

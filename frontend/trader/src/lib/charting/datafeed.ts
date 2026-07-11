@@ -64,6 +64,20 @@ function getSymbolCategory(symbol: string): string {
   return 'forex';
 }
 
+// Drop Saturday/Sunday candles from a NON-crypto symbol's history (client
+// 2026-07-11). Forex / metals / indices / commodities markets are closed on
+// weekends, so weekend bars are dashed "no-trade" fillers that just clutter the
+// chart. New bars already exclude weekends; this strips the OLD ones from the
+// history the chart renders. Crypto (24/7) is left untouched. Weekday is read
+// in UTC — bar.time is bar-open in ms UTC.
+function dropWeekendBars(bars: Bar[], symbol: string): Bar[] {
+  if (getSymbolCategory(symbol) === 'crypto') return bars;
+  return bars.filter((b) => {
+    const day = new Date(b.time).getUTCDay(); // 0 = Sun, 6 = Sat
+    return day !== 0 && day !== 6;
+  });
+}
+
 function generateSyntheticBars(
   symbol: string, mid: number, spread: number,
   resolution: string, from: number, to: number,
@@ -337,7 +351,7 @@ export const swisDexDatafeed: IBasicDataFeed = {
               time: b.time * 1000, open: b.open, high: b.high,
               low: b.low, close: b.close, volume: b.volume,
             }, hs, digits));
-            onResult(bars, { noData: false });
+            onResult(dropWeekendBars(bars, sym), { noData: false });
             return;
           }
         }
@@ -356,7 +370,7 @@ export const swisDexDatafeed: IBasicDataFeed = {
         const spread = Math.abs(tick.ask - tick.bid);
         const bars = generateSyntheticBars(sym, tick.bid, spread, String(resolution), from, to);
         if (bars.length > 0) {
-          onResult(bars, { noData: false });
+          onResult(dropWeekendBars(bars, sym), { noData: false });
           return;
         }
       }
