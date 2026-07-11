@@ -171,12 +171,22 @@ async def list_users(
             raise HTTPException(status_code=400, detail=f"Invalid date '{value}', expected YYYY-MM-DD")
         return datetime.combine(d, time.max if end_of_day else time.min, tzinfo=timezone.utc)
 
-    # Promotional demo accounts DO appear in the Users list (client 2026-07-11)
-    # but only as an email + a "Promotional" badge — every other field is
-    # blanked below and their data is hidden from the rest of the admin panel.
+    # Promotional accounts in the Users list (client 2026-07-11):
+    #   - The ROOT showcase accounts (their referrer is NOT itself promotional,
+    #     e.g. the two Super-IB demo accounts) appear as email + a "Promotional"
+    #     badge, every other field blanked below.
+    #   - Their promotional DOWNLINE (referrer is also promotional) are hidden
+    #     entirely — they exist only to pad referral counts on the trader side.
+    # Everything else about promo accounts stays hidden from the rest of admin.
+    promo_ids_sq = select(User.id).where(User.is_promotional == True)  # noqa: E712
     query = select(User).where(
         User.role.notin_(["admin", "super_admin"]),
         User.is_demo == False,
+        or_(
+            User.is_promotional.isnot(True),
+            User.referred_by_user_id.is_(None),
+            User.referred_by_user_id.not_in(promo_ids_sq),
+        ),
     )
 
     if search:
