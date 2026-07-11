@@ -171,7 +171,15 @@ async def list_users(
             raise HTTPException(status_code=400, detail=f"Invalid date '{value}', expected YYYY-MM-DD")
         return datetime.combine(d, time.max if end_of_day else time.min, tzinfo=timezone.utc)
 
-    query = select(User).where(User.role.notin_(["admin", "super_admin"]), User.is_demo == False)
+    # Promotional demo accounts (is_promotional) are excluded from the admin
+    # panel entirely — they exist only to showcase features on the trader side
+    # and must never appear as real customers here. isnot(True) keeps
+    # NULL/false rows visible.
+    query = select(User).where(
+        User.role.notin_(["admin", "super_admin"]),
+        User.is_demo == False,
+        User.is_promotional.isnot(True),
+    )
 
     if search:
         term = f"%{search}%"

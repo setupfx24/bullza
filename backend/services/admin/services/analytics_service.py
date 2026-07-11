@@ -105,25 +105,38 @@ async def analytics_dashboard(
     if start_date is not None:
         custom_range = await _revenue_stats(db, start_date, end_date)
 
+    # Promotional demo accounts are excluded from every admin analytics number.
+    promo_ids = select(User.id).where(User.is_promotional == True)  # noqa: E712
+
     dep_q = await db.execute(
         select(func.coalesce(func.sum(Deposit.amount), 0)).where(
-            Deposit.status.in_(["approved", "auto_approved"])
+            Deposit.status.in_(["approved", "auto_approved"]),
+            Deposit.user_id.notin_(promo_ids),
         )
     )
     total_deposits = float(dep_q.scalar() or 0)
 
     wd_q = await db.execute(
         select(func.coalesce(func.sum(Withdrawal.amount), 0)).where(
-            Withdrawal.status.in_(["approved", "completed"])
+            Withdrawal.status.in_(["approved", "completed"]),
+            Withdrawal.user_id.notin_(promo_ids),
         )
     )
     total_withdrawals = float(wd_q.scalar() or 0)
 
     open_pos_q = await db.execute(
-        select(func.count(Position.id)).where(Position.status == PositionStatus.OPEN.value)
+        select(func.count(Position.id))
+        .select_from(Position)
+        .join(TradingAccount, TradingAccount.id == Position.account_id)
+        .where(Position.status == PositionStatus.OPEN.value, TradingAccount.is_promotional.isnot(True))
     )
 
-    closed_trades_q = await db.execute(select(func.count(TradeHistory.id)))
+    closed_trades_q = await db.execute(
+        select(func.count(TradeHistory.id))
+        .select_from(TradeHistory)
+        .join(TradingAccount, TradingAccount.id == TradeHistory.account_id)
+        .where(TradingAccount.is_promotional.isnot(True))
+    )
 
     # Admin commission earned from all sources (PAMM performance fee, copy-trade, etc.)
     admin_comm_all_q = await db.execute(
@@ -155,23 +168,34 @@ async def analytics_dashboard(
         select(func.count(MasterAccount.id)).where(MasterAccount.status.in_(["approved", "active"]))
     )
 
+    promo_ib_ids = select(IBProfile.id).where(IBProfile.user_id.in_(promo_ids))
+
     ib_count_q = await db.execute(
-        select(func.count(IBProfile.id)).where(IBProfile.is_active == True)
+        select(func.count(IBProfile.id)).where(
+            IBProfile.is_active == True,  # noqa: E712
+            IBProfile.user_id.notin_(promo_ids),
+        )
     )
     total_ibs = ib_count_q.scalar() or 0
 
     sub_broker_q = await db.execute(
-        select(func.count(User.id)).where(User.role == "sub_broker", User.status == "active")
+        select(func.count(User.id)).where(
+            User.role == "sub_broker", User.status == "active", User.is_promotional.isnot(True),
+        )
     )
     total_sub_brokers = sub_broker_q.scalar() or 0
 
     ib_commission_q = await db.execute(
-        select(func.coalesce(func.sum(IBCommission.amount), 0))
+        select(func.coalesce(func.sum(IBCommission.amount), 0)).where(
+            IBCommission.ib_id.notin_(promo_ib_ids)
+        )
     )
     total_ib_commission = float(ib_commission_q.scalar() or 0)
 
     ib_pending_q = await db.execute(
-        select(func.coalesce(func.sum(IBCommission.amount), 0)).where(IBCommission.status == "pending")
+        select(func.coalesce(func.sum(IBCommission.amount), 0)).where(
+            IBCommission.status == "pending", IBCommission.ib_id.notin_(promo_ib_ids),
+        )
     )
     ib_pending_commission = float(ib_pending_q.scalar() or 0)
 
