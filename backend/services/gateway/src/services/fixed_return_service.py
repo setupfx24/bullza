@@ -451,6 +451,226 @@ async def create_lock(
     return _serialize_lock(lock)
 
 
+# ─── Plan upgrade (client 2026-07-11) ────────────────────────────────
+# A holder can UPGRADE an active lock to a HIGHER tenure (Month < Quarter
+# < Half-Year < Year < 2-Year — never same or lower). On upgrade:
+#   1. the elapsed (un-paid) interest of the current plan is prorated for
+#      the days since the last payout (or lock) and CREDITED to the wallet,
+#   2. the current lock is closed (state='upgraded'),
+#   3. a top-up = principal × topup_pct% (admin setting, default 25) is
+#      AUTO-DEBITED from the wallet,
+#   4. a NEW lock opens with new_principal = old principal + top-up at the
+#      chosen higher tenure, fresh lock months. Everything else (rate matrix,
+#      payout cadence, referral) behaves exactly like a normal lock.
+
+DEFAULT_UPGRADE_TOPUP_PCT = 25.0
+
+
+async def _elapsed_unpaid_interest(lock: FixedReturnLock, now: datetime) -> Decimal:
+    """Prorated interest earned since the last payout (or lock start) that
+    hasn't been credited yet: principal × rate_pct% × days_since / 30."""
+    anchor = None
+    if lock.payouts_count and lock.next_payout_at:
+        nxt = lock.next_payout_at
+        if nxt.tzinfo is None:
+            nxt = nxt.replace(tzinfo=timezone.utc)
+        cycle_months = _tenure_to_months(int(lock.tenure_days or 0))
+        anchor = _add_months(nxt, -cycle_months)
+    else:
+        anchor = lock.locked_at
+    if anchor and anchor.tzinfo is None:
+        anchor = anchor.replace(tzinfo=timezone.utc)
+    days = max(0, (now.date() - anchor.date()).days) if anchor else 0
+    if days <= 0:
+        return Decimal("0")
+    return (
+        Decimal(str(lock.principal or 0))
+        * Decimal(str(lock.rate_pct or 0))
+        * Decimal(str(days))
+        / Decimal("100")
+        / Decimal("30")
+    ).quantize(Decimal("0.01"))
+
+
+async def upgrade_lock(
+    lock_id: UUID,
+    user_id: UUID,
+    new_tenure_label: str,
+    db: AsyncSession,
+) -> dict:
+    lock = (await db.execute(
+        select(FixedReturnLock).where(FixedReturnLock.id == lock_id).with_for_update()
+    )).scalar_one_or_none()
+    if lock is None or lock.user_id != user_id:
+        raise HTTPException(status_code=404, detail="Plan not found")
+    if lock.state != "active":
+        raise HTTPException(status_code=400, detail=f"Only an active plan can be upgraded (this is {lock.state}).")
+
+    cfg = await get_config(user_id=user_id, db=db)
+    tiers = cfg["tiers"]
+    tenures = cfg["tenures"]
+    matrix = cfg["rate_matrix_pct"]
+    lock_months = int(cfg.get("lock_months") or DEFAULT_LOCK_MONTHS)
+
+    cur_tenure_idx = _resolve_tenure_index(lock.tenure_label, tenures)
+    new_tenure_idx = _resolve_tenure_index(new_tenure_label, tenures)
+    if new_tenure_idx < 0:
+        raise HTTPException(status_code=400, detail=f"Unknown plan '{new_tenure_label}'")
+    if new_tenure_idx <= cur_tenure_idx:
+        raise HTTPException(
+            status_code=400,
+            detail="You can only upgrade to a higher plan than your current one.",
+        )
+
+    topup_pct = Decimal(str(await get_float_setting(
+        "fixed_return_upgrade_topup_pct", DEFAULT_UPGRADE_TOPUP_PCT,
+    )))
+    old_principal = Decimal(str(lock.principal or 0))
+    top_up = (old_principal * topup_pct / Decimal("100")).quantize(Decimal("0.01"))
+    new_principal = (old_principal + top_up).quantize(Decimal("0.01"))
+
+    user = (await db.execute(
+        select(User).where(User.id == user_id).with_for_update()
+    )).scalar_one_or_none()
+    if user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    balance = Decimal(str(user.main_wallet_balance or 0))
+    if balance < top_up:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"Upgrade needs a ${top_up:,.2f} top-up ({topup_pct}% of your "
+                f"${old_principal:,.2f} principal) but your wallet has ${balance:,.2f}."
+            ),
+        )
+
+    now = datetime.now(timezone.utc)
+
+    # 1) Credit elapsed unpaid interest of the current plan to the wallet.
+    elapsed_interest = await _elapsed_unpaid_interest(lock, now)
+    if elapsed_interest > 0:
+        user.main_wallet_balance = Decimal(str(user.main_wallet_balance or 0)) + elapsed_interest
+        lock.total_interest_paid = Decimal(str(lock.total_interest_paid or 0)) + elapsed_interest
+        db.add(Transaction(
+            user_id=user_id,
+            type="fixed_return_interest",
+            amount=elapsed_interest,
+            balance_after=user.main_wallet_balance,
+            description=f"AI Powered Staking upgrade — elapsed interest of {lock.tenure_label} plan",
+        ))
+
+    # 2) Close the old plan.
+    lock.state = "upgraded"
+    lock.settled_at = now
+    lock.next_payout_at = None
+
+    # 3) Auto-debit the top-up from the wallet.
+    user.main_wallet_balance = Decimal(str(user.main_wallet_balance or 0)) - top_up
+    db.add(Transaction(
+        user_id=user_id,
+        type="fixed_return_upgrade_topup",
+        amount=-top_up,
+        balance_after=user.main_wallet_balance,
+        description=f"AI Powered Staking upgrade top-up ({topup_pct}% of ${old_principal:,.2f})",
+    ))
+
+    # 4) Open the new higher-tenure plan with new_principal (old + top-up).
+    new_tier_idx = _resolve_tier_index(new_principal, tiers)
+    if new_tier_idx < 0:
+        new_tier_idx = 0
+    rate_pct = Decimal(str(matrix[new_tenure_idx][new_tier_idx]))
+    tenure = tenures[new_tenure_idx]
+    tenure_days = int(tenure["days"])
+    matures_at = _add_months(now, lock_months) - timedelta(days=1)
+    payout_dom = await get_int_setting("fixed_return_payout_day_of_month", 25)
+    cycle_months = _tenure_to_months(tenure_days)
+    next_payout_at = _first_payout_date(now, cycle_months, payout_day=payout_dom)
+    if next_payout_at > matures_at:
+        next_payout_at = matures_at
+
+    new_lock = FixedReturnLock(
+        user_id=user_id,
+        principal=new_principal,
+        tier_label=tiers[new_tier_idx]["label"],
+        tenure_label=tenure["label"],
+        tenure_days=tenure_days,
+        rate_pct=rate_pct,
+        locked_at=now,
+        matures_at=matures_at,
+        next_payout_at=next_payout_at,
+        lock_months_at_creation=lock_months,
+        state="active",
+    )
+    db.add(new_lock)
+    db.add(Transaction(
+        user_id=user_id,
+        type="fixed_return_lock",
+        amount=Decimal("0"),
+        balance_after=user.main_wallet_balance,
+        description=(
+            f"AI Powered Staking upgraded to {tenure['label']} @ {rate_pct}% / {lock_months}m "
+            f"(new principal ${new_principal:,.2f})"
+        ),
+    ))
+    # Upgrade grows the principal — pay the referrer their principal-% on the
+    # top-up only (the original principal already paid at the first lock).
+    await _pay_fr_referral(db, user_id, top_up, "principal")
+
+    await db.commit()
+    await db.refresh(new_lock)
+    return {
+        "message": "Plan upgraded",
+        "elapsed_interest_credited": float(elapsed_interest),
+        "topup_debited": float(top_up),
+        "topup_pct": float(topup_pct),
+        "new_lock": _serialize_lock(new_lock),
+    }
+
+
+async def upgrade_options(lock_id: UUID, user_id: UUID, db: AsyncSession) -> dict:
+    """Preview: which higher tenures a lock can upgrade to + the top-up cost
+    and elapsed interest, so the trader UI can render the upgrade modal."""
+    lock = (await db.execute(
+        select(FixedReturnLock).where(FixedReturnLock.id == lock_id)
+    )).scalar_one_or_none()
+    if lock is None or lock.user_id != user_id:
+        raise HTTPException(status_code=404, detail="Plan not found")
+    cfg = await get_config(user_id=user_id, db=db)
+    tenures = cfg["tenures"]
+    tiers = cfg["tiers"]
+    matrix = cfg["rate_matrix_pct"]
+    cur_idx = _resolve_tenure_index(lock.tenure_label, tenures)
+    topup_pct = Decimal(str(await get_float_setting(
+        "fixed_return_upgrade_topup_pct", DEFAULT_UPGRADE_TOPUP_PCT,
+    )))
+    old_principal = Decimal(str(lock.principal or 0))
+    top_up = (old_principal * topup_pct / Decimal("100")).quantize(Decimal("0.01"))
+    new_principal = old_principal + top_up
+    now = datetime.now(timezone.utc)
+    elapsed = await _elapsed_unpaid_interest(lock, now)
+    new_tier_idx = max(0, _resolve_tier_index(new_principal, tiers))
+    options = []
+    for i, t in enumerate(tenures):
+        if i <= cur_idx:
+            continue
+        options.append({
+            "tenure_label": t["label"],
+            "new_rate_pct": float(matrix[i][new_tier_idx]),
+        })
+    return {
+        "lock_id": str(lock.id),
+        "current_tenure": lock.tenure_label,
+        "current_principal": float(old_principal),
+        "topup_pct": float(topup_pct),
+        "topup_amount": float(top_up),
+        "new_principal": float(new_principal),
+        "elapsed_interest": float(elapsed),
+        "can_upgrade": len(options) > 0,
+        "options": options,
+    }
+
+
 async def admin_grant_lock(
     user_id: UUID,
     principal: Decimal,

@@ -79,3 +79,34 @@ async def withdraw_lock(
     return await fixed_return_service.withdraw_lock(
         lock_id, current_user["user_id"], db,
     )
+
+
+class UpgradeLockRequest(BaseModel):
+    new_tenure_label: str
+
+
+@router.get("/locks/{lock_id}/upgrade-options")
+async def upgrade_options(
+    lock_id: UUID,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    """Higher tenures this plan can upgrade to + the top-up cost and the
+    elapsed interest that will be credited (powers the upgrade modal)."""
+    return await fixed_return_service.upgrade_options(
+        lock_id, current_user["user_id"], db,
+    )
+
+
+@router.post("/locks/{lock_id}/upgrade")
+async def upgrade_lock(
+    lock_id: UUID,
+    req: UpgradeLockRequest,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    """Upgrade an active plan to a higher tenure: credit elapsed interest,
+    close the plan, auto-debit the top-up, open the new bigger plan."""
+    return await fixed_return_service.upgrade_lock(
+        lock_id, current_user["user_id"], req.new_tenure_label, db,
+    )

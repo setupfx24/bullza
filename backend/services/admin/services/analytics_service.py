@@ -396,6 +396,15 @@ async def finance_overview(db: AsyncSession, start_date=None, end_date=None) -> 
     pdep_methods, pdep_total = await _by_method(Deposit, ["pending"])
     pwd_methods, pwd_total = await _by_method(Withdrawal, ["pending"])
 
+    # ── Total withdrawable across all users (client 2026-07-11) ───────
+    # The real cash sitting in every user's main wallet — what the whole
+    # user base could withdraw right now (bonus + account credit are NOT
+    # withdrawable, so they're excluded). Not date-filtered: it's a live
+    # balance snapshot, not a period flow. Promo + demo users excluded.
+    total_withdrawable = float((await db.execute(
+        _xu(select(func.coalesce(func.sum(User.main_wallet_balance), 0)), User.id)
+    )).scalar() or 0)
+
     # ── Net credit (non-withdrawable tradable funds) ──────────────────
     bonus_wallet = float((await db.execute(
         _xu(select(func.coalesce(func.sum(User.main_wallet_bonus), 0)), User.id)
@@ -588,6 +597,7 @@ async def finance_overview(db: AsyncSession, start_date=None, end_date=None) -> 
         },
         "pending_deposits": {"total": pdep_total, "by_method": pdep_methods},
         "pending_withdrawals": {"total": pwd_total, "by_method": pwd_methods},
+        "total_withdrawable": {"total": round(total_withdrawable, 2)},
     }
 
 
@@ -683,6 +693,23 @@ async def finance_overview_drill(
                 "email": info.get("email"),
                 "amount": round(float(amt or 0), 2),
                 "count": int(cnt or 0),
+            })
+
+    elif section == "total_withdrawable":
+        # Per-user main-wallet balance (the withdrawable cash). Biggest first.
+        rows = (await db.execute(
+            _xu(select(User.id, func.coalesce(User.main_wallet_balance, 0))
+                .where(func.coalesce(User.main_wallet_balance, 0) != 0), User.id)
+        )).all()
+        umap = await _user_label_map(db, [r[0] for r in rows])
+        for uid, bal in rows:
+            info = umap.get(uid, {})
+            users.append({
+                "user_id": str(uid) if uid else None,
+                "name": info.get("name", "—"),
+                "email": info.get("email"),
+                "amount": round(float(bal or 0), 2),
+                "count": 1,
             })
 
     elif section == "net_credit":

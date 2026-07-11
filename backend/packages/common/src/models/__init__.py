@@ -59,6 +59,7 @@ from .insurance import (
 from .rewards import (
     RewardsUserState, RewardsMission, RewardsUserMissionProgress,
     RewardStoreItem, RewardsTransaction, LifestyleFulfillment,
+    RewardCampaign, RewardCampaignTier, RewardCampaignClaim,
 )
 from .play_zone import (
     SpinWheelPrize, SpinResult,
@@ -103,6 +104,7 @@ __all__ = [
     # rewards
     "RewardsUserState", "RewardsMission", "RewardsUserMissionProgress",
     "RewardStoreItem", "RewardsTransaction", "LifestyleFulfillment",
+    "RewardCampaign", "RewardCampaignTier", "RewardCampaignClaim",
     # play zone
     "SpinWheelPrize", "SpinResult",
     "LotteryRound", "LotteryTicket",

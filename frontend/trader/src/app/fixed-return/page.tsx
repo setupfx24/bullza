@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { clsx } from 'clsx';
 import toast from 'react-hot-toast';
-import { Loader2, Lock, AlertTriangle, CheckCircle2, Clock, Calendar } from 'lucide-react';
+import { Loader2, Lock, AlertTriangle, CheckCircle2, Clock, Calendar, ChevronsUp } from 'lucide-react';
 
 import DashboardShell from '@/components/layout/DashboardShell';
 import Modal from '@/components/ui/Modal';
@@ -67,6 +67,12 @@ export default function FixedReturnPage() {
   const [withdrawing, setWithdrawing] = useState<string | null>(null);
   const [amount, setAmount] = useState<string>('1000');
   const [tenureLabel, setTenureLabel] = useState<string>('');
+  // Plan upgrade (client 2026-07-11): opens a modal with higher tenures,
+  // top-up cost, and the elapsed interest that will be credited.
+  const [upgradeFor, setUpgradeFor] = useState<LockRow | null>(null);
+  const [upgradeOpts, setUpgradeOpts] = useState<any | null>(null);
+  const [upgradePick, setUpgradePick] = useState<string>('');
+  const [upgrading, setUpgrading] = useState(false);
   // Custom in-app confirmation dialog (replaces native window.confirm).
   const [confirmDialog, setConfirmDialog] = useState<{
     title: string;
@@ -228,6 +234,39 @@ export default function FixedReturnPage() {
       toast.error(e?.message || 'Withdrawal failed');
     } finally {
       setWithdrawing(null);
+    }
+  };
+
+  const openUpgrade = async (l: LockRow) => {
+    setUpgradeFor(l);
+    setUpgradeOpts(null);
+    setUpgradePick('');
+    try {
+      const o = await api.get<any>(`/fixed-return/locks/${l.id}/upgrade-options`);
+      setUpgradeOpts(o);
+      if (o?.options?.length) setUpgradePick(o.options[0].tenure_label);
+    } catch (e: any) {
+      toast.error(e?.message || 'Could not load upgrade options');
+      setUpgradeFor(null);
+    }
+  };
+
+  const doUpgrade = async () => {
+    if (!upgradeFor || !upgradePick) return;
+    setUpgrading(true);
+    try {
+      const r = await api.post<any>(`/fixed-return/locks/${upgradeFor.id}/upgrade`, {
+        new_tenure_label: upgradePick,
+      });
+      toast.success(
+        `Upgraded to ${upgradePick}! ${r.elapsed_interest_credited > 0 ? fmtUsd(r.elapsed_interest_credited) + ' interest credited. ' : ''}New principal ${fmtUsd(r.new_lock.principal)}.`,
+      );
+      setUpgradeFor(null);
+      await load();
+    } catch (e: any) {
+      toast.error(e?.message || 'Upgrade failed');
+    } finally {
+      setUpgrading(false);
     }
   };
 
@@ -505,6 +544,14 @@ export default function FixedReturnPage() {
                         button never sits beside dense text. */}
                     {(isActive || isPending) && (
                       <div className="flex flex-wrap items-center justify-end gap-2 pt-1 border-t border-border-primary/40">
+                        {isActive && !matured && (
+                          <button
+                            onClick={() => openUpgrade(l)}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-fast border border-buy/40 text-buy hover:bg-buy/10"
+                          >
+                            <ChevronsUp size={13} /> Upgrade plan
+                          </button>
+                        )}
                         {isActive && (
                           <button
                             onClick={() => withdraw(l)}
@@ -562,6 +609,92 @@ export default function FixedReturnPage() {
                 {confirmDialog.confirmLabel}
               </button>
             </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* Upgrade plan modal */}
+      <Modal
+        open={!!upgradeFor}
+        onClose={() => setUpgradeFor(null)}
+        title="Upgrade your plan"
+        width="sm"
+      >
+        {upgradeFor && (
+          <div className="space-y-4">
+            {!upgradeOpts ? (
+              <div className="flex justify-center py-8"><Loader2 className="animate-spin text-text-tertiary" /></div>
+            ) : !upgradeOpts.can_upgrade ? (
+              <p className="text-sm text-text-secondary">
+                This is already the highest plan — nothing higher to upgrade to.
+              </p>
+            ) : (
+              <>
+                <p className="text-sm text-text-secondary leading-relaxed">
+                  Move from <strong className="text-text-primary">{upgradeFor.tenure_label}</strong> to a
+                  higher plan. Your elapsed interest is credited to your wallet, a top-up is debited, and a
+                  new bigger plan starts.
+                </p>
+
+                {/* Choose new plan */}
+                <div>
+                  <label className="block text-xs font-medium text-text-secondary mb-1.5">New plan</label>
+                  <div className="flex flex-wrap gap-1.5">
+                    {upgradeOpts.options.map((o: any) => (
+                      <button
+                        key={o.tenure_label}
+                        onClick={() => setUpgradePick(o.tenure_label)}
+                        className={clsx(
+                          'px-3 py-1.5 rounded-md text-xs font-semibold border transition-fast',
+                          upgradePick === o.tenure_label
+                            ? 'bg-accent/15 text-accent border-accent/50'
+                            : 'border-border-primary text-text-secondary hover:bg-bg-hover',
+                        )}
+                      >
+                        {o.tenure_label} · {o.new_rate_pct}%/mo
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Breakdown */}
+                <div className="rounded-lg border border-border-primary bg-bg-base p-3 space-y-1.5 text-xs">
+                  <div className="flex justify-between">
+                    <span className="text-text-tertiary">Elapsed interest → wallet</span>
+                    <span className="font-mono font-semibold text-buy">+{fmtUsd(upgradeOpts.elapsed_interest)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-text-tertiary">Top-up debited ({upgradeOpts.topup_pct}% of {fmtUsd(upgradeOpts.current_principal)})</span>
+                    <span className="font-mono font-semibold text-red-400">−{fmtUsd(upgradeOpts.topup_amount)}</span>
+                  </div>
+                  <div className="flex justify-between border-t border-border-primary/50 pt-1.5">
+                    <span className="text-text-secondary font-medium">New principal</span>
+                    <span className="font-mono font-bold text-text-primary">{fmtUsd(upgradeOpts.new_principal)}</span>
+                  </div>
+                </div>
+                <p className="text-[11px] text-text-tertiary">
+                  The {fmtUsd(upgradeOpts.topup_amount)} top-up is auto-debited from your main wallet.
+                  Make sure you have enough balance.
+                </p>
+
+                <div className="flex justify-end gap-2">
+                  <button
+                    onClick={() => setUpgradeFor(null)}
+                    className="px-4 py-2 text-sm font-medium rounded-md border border-border-primary text-text-secondary hover:bg-bg-hover transition-fast"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => void doUpgrade()}
+                    disabled={upgrading || !upgradePick}
+                    className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-semibold rounded-md text-white bg-accent hover:bg-accent/90 transition-fast disabled:opacity-50"
+                  >
+                    {upgrading && <Loader2 size={13} className="animate-spin" />}
+                    Upgrade to {upgradePick || '…'}
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         )}
       </Modal>

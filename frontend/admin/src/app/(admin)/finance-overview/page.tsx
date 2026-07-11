@@ -12,7 +12,7 @@
  */
 import { useCallback, useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
-import { Loader2, X, TrendingUp, ArrowDownCircle, ArrowUpCircle, Gift, Lock, Clock, ChevronRight, Megaphone, Plus } from 'lucide-react';
+import { Loader2, X, TrendingUp, ArrowDownCircle, ArrowUpCircle, Gift, Lock, Clock, ChevronRight, Megaphone, Plus, Wallet } from 'lucide-react';
 import { adminApi } from '@/lib/api';
 import DateField from '@/components/ui/DateField';
 
@@ -31,6 +31,7 @@ interface Overview {
   };
   pending_deposits: { total: number; by_method: Row[] };
   pending_withdrawals: { total: number; by_method: Row[] };
+  total_withdrawable?: { total: number };
 }
 
 const fmt = (n: number | undefined) =>
@@ -460,6 +461,28 @@ export default function FinanceOverviewPage() {
     {
       title: 'Pending Withdrawals', value: data.pending_withdrawals.total, icon: Clock,
       drill: { title: 'Pending withdrawals — by method (click for per-user)', render: () => methodTable(data.pending_withdrawals.by_method, 'amount', 'pending_withdrawals') },
+    },
+    {
+      title: 'Total Withdrawable (all users)', value: data.total_withdrawable?.total ?? 0, icon: Wallet,
+      sub: 'Sum of every user main-wallet balance — max the whole base could withdraw now',
+      drill: {
+        title: 'Total Withdrawable — details',
+        render: () => (
+          <div className="space-y-3">
+            <p className="text-xs text-text-secondary">
+              This is the live sum of every user&apos;s main-wallet balance — the withdrawable cash across the whole
+              user base (bonus, insurance grants and account credit are excluded because they can&apos;t be withdrawn).
+            </p>
+            <button
+              type="button"
+              onClick={() => setUserDrill({ title: 'Total Withdrawable — by user', section: 'total_withdrawable' })}
+              className="text-xs text-accent hover:underline inline-flex items-center gap-0.5"
+            >
+              View by user <ChevronRight size={11} />
+            </button>
+          </div>
+        ),
+      },
     },
   ];
 

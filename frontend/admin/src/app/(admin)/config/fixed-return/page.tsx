@@ -42,6 +42,10 @@ export default function FixedReturnConfigPage() {
   const [cfg, setCfg] = useState<RateConfig>(FALLBACK);
   const [feePct, setFeePct] = useState<number>(5);
   const [lockMonths, setLockMonths] = useState<number>(24);
+  // Upgrade top-up % (client 2026-07-11): when a holder upgrades to a
+  // higher plan, this % of the current principal is auto-debited from their
+  // wallet and added to the new (bigger) principal.
+  const [upgradeTopupPct, setUpgradeTopupPct] = useState<number>(25);
   // Day-of-month payout window. Defaults match the client's banking
   // cycle (25th → 30th). Setting both to 1/31 disables the gate.
   const [payoutDayStart, setPayoutDayStart] = useState<number>(25);
@@ -64,6 +68,7 @@ export default function FixedReturnConfigPage() {
       const dayEnd = list.find((s) => s.key === 'fixed_return_payout_day_end')?.value;
       const refPrin = list.find((s) => s.key === 'fr_referral_principal_pct')?.value;
       const refInt = list.find((s) => s.key === 'fr_referral_interest_pct')?.value;
+      const upTopup = list.find((s) => s.key === 'fixed_return_upgrade_topup_pct')?.value;
       if (rates && Array.isArray(rates.tiers)) {
         setCfg(normalize(rates));
       }
@@ -85,6 +90,7 @@ export default function FixedReturnConfigPage() {
       }
       if (refPrin != null) { const n = Number(refPrin); if (Number.isFinite(n) && n >= 0) setRefPrincipalPct(n); }
       if (refInt != null) { const n = Number(refInt); if (Number.isFinite(n) && n >= 0) setRefInterestPct(n); }
+      if (upTopup != null) { const n = Number(upTopup); if (Number.isFinite(n) && n >= 0) setUpgradeTopupPct(n); }
     } catch (e: any) {
       toast.error(e?.message || 'Failed to load AI-POWERED STAKING PROGRAM config');
     } finally {
@@ -213,6 +219,7 @@ export default function FixedReturnConfigPage() {
           fixed_return_payout_day_end: payoutDayEnd,
           fr_referral_principal_pct: refPrincipalPct,
           fr_referral_interest_pct: refInterestPct,
+          fixed_return_upgrade_topup_pct: upgradeTopupPct,
         },
       });
       toast.success('AI-POWERED STAKING PROGRAM config saved');
@@ -293,6 +300,29 @@ export default function FixedReturnConfigPage() {
           <p className="text-[10px] text-text-tertiary max-w-xs">
             On early withdrawal: <strong>principal × (1 − fee%) − interest paid so far</strong>.
             Interest payments to date claw back from the returned principal.
+          </p>
+        </div>
+
+        <div className="flex flex-col gap-1">
+          <label className="text-xs font-medium text-text-secondary">
+            Upgrade top-up (% of current principal)
+          </label>
+          <div className="flex items-center gap-2">
+            <input
+              type="number"
+              min={0}
+              max={100}
+              step="0.01"
+              value={upgradeTopupPct}
+              onChange={(e) => setUpgradeTopupPct(parseFloat(e.target.value) || 0)}
+              className="w-24 px-2 py-1 text-xs bg-bg-input border border-border-primary rounded font-mono tabular-nums text-text-primary"
+            />
+            <span className="text-xxs text-text-tertiary">%</span>
+          </div>
+          <p className="text-[10px] text-text-tertiary max-w-xs">
+            When a holder upgrades to a higher plan: this % of their current principal is
+            <strong> auto-debited from their wallet</strong> and added to the new (bigger) principal.
+            Their elapsed interest so far is credited to the wallet first.
           </p>
         </div>
 
