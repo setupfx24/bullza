@@ -171,14 +171,12 @@ async def list_users(
             raise HTTPException(status_code=400, detail=f"Invalid date '{value}', expected YYYY-MM-DD")
         return datetime.combine(d, time.max if end_of_day else time.min, tzinfo=timezone.utc)
 
-    # Promotional demo accounts (is_promotional) are excluded from the admin
-    # panel entirely — they exist only to showcase features on the trader side
-    # and must never appear as real customers here. isnot(True) keeps
-    # NULL/false rows visible.
+    # Promotional demo accounts DO appear in the Users list (client 2026-07-11)
+    # but only as an email + a "Promotional" badge — every other field is
+    # blanked below and their data is hidden from the rest of the admin panel.
     query = select(User).where(
         User.role.notin_(["admin", "super_admin"]),
         User.is_demo == False,
-        User.is_promotional.isnot(True),
     )
 
     if search:
@@ -232,6 +230,25 @@ async def list_users(
 
     user_list = []
     for u in users:
+        # Promotional accounts: show ONLY the email + the promotional flag.
+        # Everything else (name, balances, KYC, status) is blanked so no
+        # fabricated showcase data leaks into the admin panel.
+        if bool(getattr(u, "is_promotional", False)):
+            user_list.append({
+                "id": str(u.id),
+                "name": "",
+                "email": u.email,
+                "main_wallet_balance": None,
+                "trading_balance": None,
+                "trading_equity": None,
+                "balance": None,
+                "equity": None,
+                "group": "",
+                "kyc_status": "",
+                "status": "",
+                "is_promotional": True,
+            })
+            continue
         name = " ".join(filter(None, [u.first_name, u.last_name])) or u.email.split("@")[0]
         bals = balance_map.get(u.id, {"balance": 0.0, "equity": 0.0})
         main_wallet = float(u.main_wallet_balance or 0)
@@ -249,6 +266,7 @@ async def list_users(
             "group": u.role or "user",
             "kyc_status": u.kyc_status or "pending",
             "status": u.status or "active",
+            "is_promotional": False,
         })
 
     pages = max(1, (total + per_page - 1) // per_page)
@@ -265,6 +283,26 @@ async def get_user_detail(user_id: uuid.UUID, db: AsyncSession):
     user = result.scalar_one_or_none()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
+
+    # Promotional accounts expose ONLY their email + the promotional flag —
+    # no accounts, balances, deposits, trades, referrals or profile data
+    # (client 2026-07-11). Blank the optional PII fields and return zeros.
+    if bool(getattr(user, "is_promotional", False)):
+        blank = _user_to_out(user)
+        for field in ("phone", "first_name", "last_name", "date_of_birth",
+                      "country", "address", "language", "theme",
+                      "trading_blocked_until", "updated_at"):
+            blank[field] = None
+        return UserDetailOut(
+            user=UserOut(**blank),
+            accounts=[],
+            total_deposit=0.0,
+            total_withdrawal=0.0,
+            total_trades=0,
+            open_positions=0,
+            assigned_rm_id=None,
+            assigned_rm_name=None,
+        )
 
     accounts_q = await db.execute(
         select(TradingAccount).where(
