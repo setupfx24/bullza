@@ -254,6 +254,22 @@ async def _backfill_infoway_bars(
     if not bars:
         return []
 
+    # Snap provider times to the timeframe grid — InfoWay sometimes serves a
+    # range on an OFFSET grid (e.g. 1h bars at :30), which would double every
+    # candle when merged with the aligned series (verified live 2026-07-13).
+    tf_sec = {"1m": 60, "5m": 300, "15m": 900, "30m": 1800, "1h": 3600, "4h": 14400, "1d": 86400}.get(tf, 300)
+    by_slot: dict[int, dict] = {}
+    slot_aligned: set = set()
+    for b in sorted(bars, key=lambda x: int(x["time"])):
+        t = int(b["time"])
+        slot = (t // tf_sec) * tf_sec
+        if t == slot:
+            by_slot[slot] = b
+            slot_aligned.add(slot)
+        elif slot not in slot_aligned and slot not in by_slot:
+            by_slot[slot] = {**b, "time": slot}
+    bars = [by_slot[k] for k in sorted(by_slot)]
+
     list_key = f"bars:{sym}:{tf}"
     existing_raw = await redis_client.lrange(list_key, 0, 999)
     seen_ts: set = set()

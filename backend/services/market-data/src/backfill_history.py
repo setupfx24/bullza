@@ -159,6 +159,25 @@ async def _repair_gaps(
             end_ts = oldest - 1
 
 
+def _normalize_grid(bars_map: dict[int, dict], tf_sec: int) -> dict[int, dict]:
+    """Snap bar times to the timeframe grid. InfoWay sometimes serves the same
+    history range on an OFFSET grid (verified live: AUDUSD 1h came back at :30
+    for ~9.5k bars alongside the :00 series) — stored raw, that doubles every
+    candle. One bar per slot: a grid-aligned original always wins; an off-grid
+    bar is snapped into its slot only when nothing aligned exists there."""
+    out: dict[int, dict] = {}
+    aligned: set[int] = set()
+    for t in sorted(bars_map):
+        b = bars_map[t]
+        slot = (t // tf_sec) * tf_sec
+        if t == slot:
+            out[slot] = b
+            aligned.add(slot)
+        elif slot not in aligned and slot not in out:
+            out[slot] = {**b, "time": slot}
+    return out
+
+
 async def _write_db(
     sym: str, tf: str, bars: list[dict], replace: bool,
 ) -> None:
@@ -195,13 +214,19 @@ async def _write_db(
 async def _refresh_redis(sym: str, tf: str, official: list[dict]) -> None:
     """Overlay official bars onto the Redis list (official wins on collision;
     live bars newer than the fetch survive). Same conventions as the
-    aggregator: newest at index 0, capped at 1000."""
+    aggregator: newest at index 0, capped at 1000. Off-grid existing entries
+    are dropped — the aggregator only ever writes grid-aligned bars, so any
+    off-grid time is provider pollution from an earlier unnormalized run."""
+    tf_sec = TF_SECONDS[tf]
     list_key = f"bars:{sym}:{tf}"
     by_time: dict[int, dict] = {}
     for raw in await redis_client.lrange(list_key, 0, 999):
         try:
             b = json.loads(raw)
-            by_time[int(b["time"])] = b
+            t = int(b["time"])
+            if t % tf_sec != 0:
+                continue
+            by_time[t] = b
         except (json.JSONDecodeError, KeyError, TypeError, ValueError):
             continue
     for b in official:
@@ -251,6 +276,7 @@ async def backfill(
                 continue
 
             await _repair_gaps(sym, tf, bars_map, token, spacing, crypto)
+            bars_map = _normalize_grid(bars_map, tf_sec)
 
             # Closed bars only — the forming candle belongs to the aggregator.
             cutoff = (now // tf_sec) * tf_sec
