@@ -1,4 +1,5 @@
 """Instruments API — List instruments, get current prices."""
+import asyncio
 import json as _json
 import logging
 import time as _time
@@ -293,7 +294,41 @@ async def _backfill_infoway_bars(
     except Exception as exc:
         _logger.warning("infoway cache writeback failed for %s %s: %s", sym, tf, exc)
 
+    # Persist the fetched bars to the durable OHLC store too (fire-and-forget).
+    # Redis is capped at 1000 entries, so without this every deep pan is
+    # re-fetched forever and old history evaporates; with it, panning back
+    # permanently deepens ohlcv_<tf> (client 2026-07-13 "gaps in all TFs").
+    asyncio.create_task(_persist_ohlc_db(sym, tf, bars))
+
     return merged
+
+
+async def _persist_ohlc_db(sym: str, tf: str, bars: list[dict]) -> None:
+    """Upsert provider bars into ohlcv_<tf> (marketdata DB). Best-effort: the
+    table is created by market-data's OHLCStore.init(); if it doesn't exist
+    yet the upsert just logs at debug and the chart still works off Redis."""
+    if tf not in _OHLC_TABLES or not bars:
+        return
+    from packages.common.src.database import TimescaleSessionLocal
+    stmt = text(
+        f"INSERT INTO ohlcv_{tf} (time, symbol, open, high, low, close, volume, tick_count) "
+        "VALUES (to_timestamp(:t), :sym, :o, :h, :l, :c, :v, 0) "
+        "ON CONFLICT (symbol, time) DO UPDATE SET "
+        "open=EXCLUDED.open, high=EXCLUDED.high, low=EXCLUDED.low, "
+        "close=EXCLUDED.close, volume=EXCLUDED.volume"
+    )
+    try:
+        async with TimescaleSessionLocal() as session:
+            for b in bars:
+                await session.execute(stmt, {
+                    "t": int(b["time"]), "sym": sym,
+                    "o": float(b["open"]), "h": float(b["high"]),
+                    "l": float(b["low"]), "c": float(b["close"]),
+                    "v": float(b.get("volume", 0) or 0),
+                })
+            await session.commit()
+    except Exception as exc:
+        _logger.debug("ohlcv persist failed for %s %s: %s", sym, tf, exc)
 
 
 @router.get("/{symbol}/my-spread")
