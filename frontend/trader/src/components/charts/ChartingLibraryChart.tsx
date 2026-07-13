@@ -300,6 +300,14 @@ export default function ChartingLibraryChart() {
         // in the console. Layout persistence uses saved_data + onAutoSaveNeeded
         // (localStorage) and does NOT need this feature.
         enabled_features: [],
+        // Pin the full timeframe set to the toolbar (client 2026-07-13:
+        // 3m/10m/45m/2h/3h + W/M; 3M/6M/12M stay in the interval menu).
+        favorites: {
+          intervals: [
+            '1', '3', '5', '10', '15', '30', '45',
+            '60', '120', '180', '240', '1D', '1W', '1M',
+          ] as any,
+        },
         // Native Trading-Terminal broker → the library draws each position's line
         // with P&L + close (✕) + draggable TP/SL (see broker.ts). Gated by the flag.
         ...(USE_NATIVE_BROKER ? {
