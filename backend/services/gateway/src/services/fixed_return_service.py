@@ -37,6 +37,22 @@ DAYS_PER_MONTH_APPROX = Decimal("30.4375")
 
 # ─── Config ──────────────────────────────────────────────────────────
 
+async def _payout_window_days() -> tuple[int, int]:
+    """Admin-set day-of-month range (inclusive, default 25–30) during which
+    interest payouts happen — BOTH the scheduled engine credit and the
+    on-demand "Withdraw interest" button (client 2026-07-13: outside the
+    window the button is disabled and the API refuses)."""
+    window_start = await get_int_setting("fixed_return_payout_day_start", 25)
+    window_end = await get_int_setting("fixed_return_payout_day_end", 30)
+    if window_start < 1:
+        window_start = 1
+    if window_end > 31:
+        window_end = 31
+    if window_start > window_end:
+        window_start, window_end = window_end, window_start
+    return window_start, window_end
+
+
 async def get_config(
     *, user_id: UUID | None = None, db: AsyncSession | None = None,
 ) -> dict:
@@ -71,11 +87,19 @@ async def get_config(
                     rates = {**rates, "rate_matrix_pct": ov_matrix}
                     has_override = True
 
+    window_start, window_end = await _payout_window_days()
     return {
         **rates,
         "early_withdrawal_fee_pct": fee_pct,
         "lock_months": lock_months,
         "has_personal_override": has_override,
+        # Interest-payout window: scheduled payouts and the on-demand
+        # "Withdraw interest" action only work on these days of the month.
+        # The open/closed flag is computed server-side (UTC) so the UI and
+        # the API gate can never disagree.
+        "payout_day_start": window_start,
+        "payout_day_end": window_end,
+        "payout_window_open": window_start <= datetime.now(timezone.utc).day <= window_end,
     }
 
 
@@ -520,6 +544,19 @@ async def withdraw_interest(lock_id: UUID, user_id: UUID, db: AsyncSession) -> d
         raise HTTPException(status_code=400, detail=f"Interest can only be withdrawn from an active plan (this is {lock.state}).")
 
     now = datetime.now(timezone.utc)
+    # Same admin-set day-of-month window as the scheduled payout engine
+    # (client 2026-07-13): outside it the withdrawal is refused — the UI
+    # shows the button disabled, this is the server-side backstop.
+    window_start, window_end = await _payout_window_days()
+    if not (window_start <= now.day <= window_end):
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"Interest withdrawal is only available from day {window_start} "
+                f"to {window_end} of each month. Your interest keeps accruing "
+                f"until then."
+            ),
+        )
     interest = await _elapsed_unpaid_interest(lock, now)
     if interest <= 0:
         raise HTTPException(status_code=400, detail="No interest has accrued yet to withdraw.")
@@ -1134,14 +1171,7 @@ async def accrue_due_payouts(db: AsyncSession) -> int:
     """
     now = datetime.now(timezone.utc)
 
-    window_start = await get_int_setting("fixed_return_payout_day_start", 25)
-    window_end = await get_int_setting("fixed_return_payout_day_end", 30)
-    if window_start < 1:
-        window_start = 1
-    if window_end > 31:
-        window_end = 31
-    if window_start > window_end:
-        window_start, window_end = window_end, window_start
+    window_start, window_end = await _payout_window_days()
     if not (window_start <= now.day <= window_end):
         return 0
 

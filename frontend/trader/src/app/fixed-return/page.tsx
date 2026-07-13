@@ -17,6 +17,12 @@ interface RateConfig {
   rate_matrix_pct: number[][];
   early_withdrawal_fee_pct: number;
   lock_months: number;
+  // Interest-payout window (admin-set, default 25–30): "Withdraw interest"
+  // only works on these days of the month. The open flag is computed
+  // server-side (UTC) so it always matches the API's own gate.
+  payout_day_start: number;
+  payout_day_end: number;
+  payout_window_open: boolean;
 }
 
 interface LockRow {
@@ -293,6 +299,10 @@ export default function FixedReturnPage() {
       </DashboardShell>
     );
   }
+
+  // Server-computed flag (UTC) — falls back to open if an older backend
+  // doesn't send it yet; the API enforces the window regardless.
+  const payoutWindowOpen = cfg.payout_window_open !== false;
 
   return (
     <DashboardShell>
@@ -604,16 +614,27 @@ export default function FixedReturnPage() {
                           </button>
                         )}
                         {/* Withdraw interest — direct to wallet, no approval.
-                            Shown when there is accrued interest to pull. */}
+                            Shown when there is accrued interest to pull, but only
+                            clickable inside the admin payout window (default day
+                            25–30 of each month); outside it the button is greyed
+                            out and the backend refuses anyway. */}
                         {isActive && l.accrued_since_last_payout > 0 && (
-                          <button
-                            onClick={() => void withdrawInterest(l)}
-                            disabled={withdrawingInterest === l.id}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-fast border border-buy/40 text-buy hover:bg-buy/10 disabled:opacity-50"
-                          >
-                            {withdrawingInterest === l.id && <Loader2 size={11} className="animate-spin" />}
-                            Withdraw interest ({fmtUsd(l.accrued_since_last_payout)})
-                          </button>
+                          <div className="flex flex-col items-end gap-0.5">
+                            <button
+                              onClick={() => void withdrawInterest(l)}
+                              disabled={withdrawingInterest === l.id || !payoutWindowOpen}
+                              title={payoutWindowOpen ? undefined : `Available only from day ${cfg.payout_day_start} to ${cfg.payout_day_end} of each month`}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-fast border border-buy/40 text-buy hover:bg-buy/10 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+                            >
+                              {withdrawingInterest === l.id && <Loader2 size={11} className="animate-spin" />}
+                              Withdraw interest ({fmtUsd(l.accrued_since_last_payout)})
+                            </button>
+                            {!payoutWindowOpen && (
+                              <span className="text-[10px] text-text-tertiary">
+                                Available {cfg.payout_day_start}–{cfg.payout_day_end} of every month
+                              </span>
+                            )}
+                          </div>
                         )}
                         {isActive && (
                           <button
