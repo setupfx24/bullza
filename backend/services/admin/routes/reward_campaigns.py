@@ -30,7 +30,10 @@ router = APIRouter(prefix="/reward-campaigns", tags=["Reward Campaigns"])
 class TierIn(BaseModel):
     min_amount: float = Field(..., ge=0)
     max_amount: Optional[float] = Field(None, gt=0)
-    reward_pct: float = Field(..., gt=0, le=100)
+    # Exactly ONE of the two (client 2026-07-13): percent of the whole
+    # qualifying volume, or a flat USD amount.
+    reward_pct: Optional[float] = Field(None, gt=0, le=100)
+    reward_amount: Optional[float] = Field(None, gt=0)
 
 
 class CampaignIn(BaseModel):
@@ -45,6 +48,11 @@ def _validate_tiers(tiers: list[TierIn]) -> None:
     for t in tiers:
         if t.max_amount is not None and t.max_amount <= t.min_amount:
             raise HTTPException(status_code=400, detail="Tier max must be greater than min")
+        if (t.reward_pct is None) == (t.reward_amount is None):
+            raise HTTPException(
+                status_code=400,
+                detail="Each tier needs either a percent OR a fixed amount (not both, not neither)",
+            )
 
 
 async def _campaign_out(db: AsyncSession, c: RewardCampaign) -> dict:
@@ -89,7 +97,8 @@ async def _campaign_out(db: AsyncSession, c: RewardCampaign) -> dict:
             {
                 "min_amount": float(t.min_amount),
                 "max_amount": float(t.max_amount) if t.max_amount is not None else None,
-                "reward_pct": float(t.reward_pct),
+                "reward_pct": float(t.reward_pct) if t.reward_pct is not None else None,
+                "reward_amount": float(t.reward_amount) if t.reward_amount is not None else None,
             } for t in tiers
         ],
         "stats": {
@@ -137,7 +146,8 @@ async def create_campaign(
             campaign_id=c.id,
             min_amount=Decimal(str(t.min_amount)),
             max_amount=Decimal(str(t.max_amount)) if t.max_amount is not None else None,
-            reward_pct=Decimal(str(t.reward_pct)),
+            reward_pct=Decimal(str(t.reward_pct)) if t.reward_pct is not None else None,
+            reward_amount=Decimal(str(t.reward_amount)) if t.reward_amount is not None else None,
         ))
     await write_audit_log(
         db, admin.id, "create_reward_campaign", "reward_campaign", c.id,

@@ -37,10 +37,20 @@ def _tiers_out(tiers: list[RewardCampaignTier]) -> list[dict]:
         {
             "min_amount": float(t.min_amount),
             "max_amount": float(t.max_amount) if t.max_amount is not None else None,
-            "reward_pct": float(t.reward_pct),
+            "reward_pct": float(t.reward_pct) if t.reward_pct is not None else None,
+            "reward_amount": float(t.reward_amount) if getattr(t, "reward_amount", None) is not None else None,
         }
         for t in sorted(tiers, key=lambda x: Decimal(str(x.min_amount)))
     ]
+
+
+def _tier_reward(tier: RewardCampaignTier, total: Decimal) -> Decimal:
+    """A tier pays EITHER a fixed USD amount OR a percent of the whole
+    qualifying total (client 2026-07-13)."""
+    fixed = getattr(tier, "reward_amount", None)
+    if fixed is not None:
+        return Decimal(str(fixed)).quantize(Decimal("0.01"))
+    return (total * Decimal(str(tier.reward_pct or 0)) / Decimal("100")).quantize(Decimal("0.01"))
 
 
 def _tier_for(tiers: list[RewardCampaignTier], total: Decimal) -> RewardCampaignTier | None:
@@ -111,7 +121,7 @@ async def my_campaigns(db: AsyncSession, user_id) -> list[dict]:
         tiers = tiers_by_c.get(c.id, [])
         total = await _qualifying_total(db, c, user_id)
         tier = _tier_for(tiers, total)
-        projected = (total * Decimal(str(tier.reward_pct)) / Decimal("100")).quantize(Decimal("0.01")) if tier else Decimal("0")
+        projected = _tier_reward(tier, total) if tier else Decimal("0")
         claim = claim_by_c.get(c.id)
         ended = now >= (c.ends_at if c.ends_at.tzinfo else c.ends_at.replace(tzinfo=timezone.utc))
         started = now >= (c.starts_at if c.starts_at.tzinfo else c.starts_at.replace(tzinfo=timezone.utc))
@@ -126,7 +136,11 @@ async def my_campaigns(db: AsyncSession, user_id) -> list[dict]:
             "status": "upcoming" if not started else ("ended" if ended else "running"),
             "tiers": _tiers_out(tiers),
             "my_staked_total": float(total),
-            "current_pct": float(tier.reward_pct) if tier else 0.0,
+            "current_pct": float(tier.reward_pct) if tier and tier.reward_pct is not None else 0.0,
+            "current_reward_amount": (
+                float(tier.reward_amount)
+                if tier and getattr(tier, "reward_amount", None) is not None else None
+            ),
             "projected_reward": float(projected),
             "claimable": bool(ended and tier and projected > 0 and claim is None),
             "claimed": claim is not None,
@@ -164,9 +178,13 @@ async def claim(db: AsyncSession, user_id, campaign_id: UUID) -> dict:
     tier = _tier_for(tiers, total)
     if tier is None:
         raise HTTPException(status_code=409, detail="Target not reached for this offer")
-    reward = (total * Decimal(str(tier.reward_pct)) / Decimal("100")).quantize(Decimal("0.01"))
+    reward = _tier_reward(tier, total)
     if reward <= 0:
         raise HTTPException(status_code=409, detail="Nothing to claim")
+    reward_label = (
+        f"${reward} flat" if getattr(tier, "reward_amount", None) is not None
+        else f"{tier.reward_pct}% of ${total}"
+    )
 
     user = (await db.execute(
         select(User).where(User.id == user_id).with_for_update()
@@ -177,7 +195,9 @@ async def claim(db: AsyncSession, user_id, campaign_id: UUID) -> dict:
     user.main_wallet_balance = Decimal(str(user.main_wallet_balance or 0)) + reward
     db.add(RewardCampaignClaim(
         campaign_id=campaign.id, user_id=user_id,
-        staked_total=total, reward_pct=Decimal(str(tier.reward_pct)), reward_amount=reward,
+        staked_total=total,
+        reward_pct=Decimal(str(tier.reward_pct)) if tier.reward_pct is not None else None,
+        reward_amount=reward,
     ))
     db.add(Transaction(
         user_id=user_id,
@@ -185,20 +205,20 @@ async def claim(db: AsyncSession, user_id, campaign_id: UUID) -> dict:
         amount=reward,
         balance_after=user.main_wallet_balance,
         reference_id=campaign.id,
-        description=f"Reward offer '{campaign.title}' — {tier.reward_pct}% of ${total} referred staking",
+        description=f"Reward offer '{campaign.title}' — {reward_label} referred staking",
     ))
     # Finance visibility: campaign payouts are promotional spend.
     db.add(PromotionalExpense(
         user_id=user_id,
         amount=reward,
         category="reward_campaign",
-        note=f"Referral staking offer '{campaign.title}': {tier.reward_pct}% of ${total}",
+        note=f"Referral staking offer '{campaign.title}': {reward_label}",
     ))
     await db.commit()
     logger.info("reward campaign %s claimed by %s: $%s", campaign.id, user_id, reward)
     return {
         "reward_amount": float(reward),
         "staked_total": float(total),
-        "reward_pct": float(tier.reward_pct),
+        "reward_pct": float(tier.reward_pct) if tier.reward_pct is not None else None,
         "new_wallet_balance": float(user.main_wallet_balance),
     }

@@ -12,7 +12,9 @@ import toast from 'react-hot-toast';
 import DashboardShell from '@/components/layout/DashboardShell';
 import api from '@/lib/api/client';
 
-type Tier = { min_amount: number; max_amount: number | null; reward_pct: number };
+// A tier pays EITHER reward_pct (% of the whole volume) OR reward_amount
+// (flat USD) — exactly one is set (client 2026-07-13).
+type Tier = { min_amount: number; max_amount: number | null; reward_pct: number | null; reward_amount: number | null };
 type Campaign = {
   id: string;
   title: string;
@@ -23,6 +25,7 @@ type Campaign = {
   tiers: Tier[];
   my_staked_total: number;
   current_pct: number;
+  current_reward_amount: number | null;
   projected_reward: number;
   claimable: boolean;
   claimed: boolean;
@@ -39,6 +42,14 @@ function tierLabel(t: Tier) {
   return t.max_amount != null
     ? `${fmtUsd(t.min_amount)} – ${fmtUsd(t.max_amount)}`
     : `${fmtUsd(t.min_amount)}+`;
+}
+
+function tierReward(t: Tier) {
+  return t.reward_amount != null ? `${fmtUsd(t.reward_amount)} flat` : `${t.reward_pct}% of volume`;
+}
+
+function inTier(t: Tier, total: number) {
+  return total >= t.min_amount && (t.max_amount == null || total < t.max_amount);
 }
 
 export default function EarnRewardsPage() {
@@ -155,14 +166,14 @@ function Inner() {
                     </thead>
                     <tbody>
                       {c.tiers.map((t, i) => {
-                        const active = c.current_pct === t.reward_pct && c.my_staked_total >= t.min_amount;
+                        const active = inTier(t, c.my_staked_total);
                         return (
                           <tr key={i} className={'border-t border-border-primary/40 text-xs ' + (active ? 'bg-[#55a630]/8' : '')}>
                             <td className="px-3 py-1.5 font-mono text-text-primary">
                               {tierLabel(t)}
                               {active && <span className="ml-2 text-[9px] font-bold text-[#55a630] uppercase">← you are here</span>}
                             </td>
-                            <td className="px-3 py-1.5 text-right font-bold text-[#55a630]">{t.reward_pct}% of volume</td>
+                            <td className="px-3 py-1.5 text-right font-bold text-[#55a630]">{tierReward(t)}</td>
                           </tr>
                         );
                       })}
@@ -184,12 +195,12 @@ function Inner() {
                   <div className="flex items-center justify-between text-[11px] mt-1.5">
                     <span className="text-text-tertiary">
                       {nextTier
-                        ? `${fmtUsd(nextTier.min_amount - c.my_staked_total)} more to reach ${nextTier.reward_pct}%`
-                        : c.current_pct > 0 ? 'Top tier reached 🎉' : ''}
+                        ? `${fmtUsd(nextTier.min_amount - c.my_staked_total)} more to reach ${nextTier.reward_amount != null ? fmtUsd(nextTier.reward_amount) : `${nextTier.reward_pct}%`}`
+                        : c.projected_reward > 0 ? 'Top tier reached 🎉' : ''}
                     </span>
                     <span className={c.projected_reward > 0 ? 'font-bold text-[#55a630]' : 'text-text-tertiary'}>
                       {c.projected_reward > 0
-                        ? `Projected reward: ${fmtUsd(c.projected_reward)} (${c.current_pct}%)`
+                        ? `Projected reward: ${fmtUsd(c.projected_reward)}${c.current_reward_amount == null && c.current_pct > 0 ? ` (${c.current_pct}%)` : ''}`
                         : c.tiers.length ? `Reach ${fmtUsd(c.tiers[0].min_amount)} to start earning` : ''}
                     </span>
                   </div>

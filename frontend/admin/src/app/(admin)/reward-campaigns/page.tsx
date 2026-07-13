@@ -12,12 +12,14 @@ import { adminApi } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import DateField from '@/components/ui/DateField';
 
-interface Tier { min_amount: number | string; max_amount: number | string | null; reward_pct: number | string }
+// reward_type picks what the single value input means: percent of the whole
+// qualifying volume, or a flat USD amount (client 2026-07-13).
+interface Tier { min_amount: number | string; max_amount: number | string | null; reward_type: 'pct' | 'fixed'; reward_value: number | string }
 interface Campaign {
   id: string; title: string; description: string | null;
   starts_at: string; ends_at: string; is_active: boolean;
   status: 'upcoming' | 'running' | 'ended';
-  tiers: { min_amount: number; max_amount: number | null; reward_pct: number }[];
+  tiers: { min_amount: number; max_amount: number | null; reward_pct: number | null; reward_amount: number | null }[];
   stats: { qualifying_volume: number; referrers: number; claims_paid: number; claims_paid_amount: number };
 }
 interface LeaderRow {
@@ -41,7 +43,7 @@ export default function RewardCampaignsPage() {
   const [description, setDescription] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
-  const [tiers, setTiers] = useState<Tier[]>([{ min_amount: 1000, max_amount: 2000, reward_pct: 5 }]);
+  const [tiers, setTiers] = useState<Tier[]>([{ min_amount: 1000, max_amount: 2000, reward_type: 'pct', reward_value: 5 }]);
   const [saving, setSaving] = useState(false);
 
   const load = useCallback(async () => {
@@ -75,13 +77,17 @@ export default function RewardCampaignsPage() {
     if (!title.trim()) { toast.error('Title required'); return; }
     if (!startDate || !endDate) { toast.error('Start and end dates required'); return; }
     const cleanTiers = tiers
-      .map((t) => ({
-        min_amount: parseFloat(String(t.min_amount)) || 0,
-        max_amount: t.max_amount === null || String(t.max_amount).trim() === '' ? null : parseFloat(String(t.max_amount)),
-        reward_pct: parseFloat(String(t.reward_pct)) || 0,
-      }))
-      .filter((t) => t.reward_pct > 0);
-    if (!cleanTiers.length) { toast.error('Add at least one tier with a percent'); return; }
+      .map((t) => {
+        const value = parseFloat(String(t.reward_value)) || 0;
+        return {
+          min_amount: parseFloat(String(t.min_amount)) || 0,
+          max_amount: t.max_amount === null || String(t.max_amount).trim() === '' ? null : parseFloat(String(t.max_amount)),
+          reward_pct: t.reward_type === 'pct' && value > 0 ? value : null,
+          reward_amount: t.reward_type === 'fixed' && value > 0 ? value : null,
+        };
+      })
+      .filter((t) => (t.reward_pct ?? 0) > 0 || (t.reward_amount ?? 0) > 0);
+    if (!cleanTiers.length) { toast.error('Add at least one tier with a percent or fixed amount'); return; }
     setSaving(true);
     try {
       await adminApi.post('/reward-campaigns', {
@@ -94,7 +100,7 @@ export default function RewardCampaignsPage() {
       toast.success('Offer created');
       setShowCreate(false);
       setTitle(''); setDescription(''); setStartDate(''); setEndDate('');
-      setTiers([{ min_amount: 1000, max_amount: 2000, reward_pct: 5 }]);
+      setTiers([{ min_amount: 1000, max_amount: 2000, reward_type: 'pct', reward_value: 5 }]);
       await load();
     } catch (e: any) { toast.error(e?.message || 'Create failed'); }
     finally { setSaving(false); }
@@ -168,7 +174,9 @@ export default function RewardCampaignsPage() {
                 {c.tiers.map((t, i) => (
                   <span key={i} className="text-[10px] font-mono px-2 py-1 rounded-md bg-bg-input border border-border-primary text-text-secondary">
                     {t.max_amount != null ? `${fmtUsd(t.min_amount)}–${fmtUsd(t.max_amount)}` : `${fmtUsd(t.min_amount)}+`}
-                    <span className="text-buy font-bold"> → {t.reward_pct}%</span>
+                    <span className="text-buy font-bold">
+                      {' '}→ {t.reward_amount != null ? `${fmtUsd(t.reward_amount)} flat` : `${t.reward_pct}%`}
+                    </span>
                   </span>
                 ))}
               </div>
@@ -222,7 +230,8 @@ export default function RewardCampaignsPage() {
             </div>
             <div className="space-y-2">
               <label className="block text-xxs text-text-tertiary">
-                Reward tiers — referred staking volume range → % of the whole volume paid to the referrer
+                Reward tiers — referred staking volume range → reward paid to the referrer
+                (percent of the whole volume, or a fixed $ amount)
               </label>
               {tiers.map((t, i) => (
                 <div key={i} className="flex items-center gap-1.5">
@@ -232,15 +241,23 @@ export default function RewardCampaignsPage() {
                   <input type="number" min="0" value={t.max_amount ?? ''} onChange={(e) => setTiers((p) => p.map((x, xi) => xi === i ? { ...x, max_amount: e.target.value } : x))}
                     placeholder="Max $ (blank = ∞)" className="w-28 text-xs py-1.5 px-2 bg-bg-input border border-border-primary rounded-md font-mono text-text-primary" />
                   <span className="text-xxs text-text-tertiary">→</span>
-                  <input type="number" min="0" step="0.1" value={t.reward_pct ?? ''} onChange={(e) => setTiers((p) => p.map((x, xi) => xi === i ? { ...x, reward_pct: e.target.value } : x))}
-                    placeholder="%" className="w-16 text-xs py-1.5 px-2 bg-bg-input border border-border-primary rounded-md font-mono text-text-primary" />
-                  <span className="text-xxs text-text-tertiary">%</span>
+                  <input type="number" min="0" step="0.1" value={t.reward_value ?? ''} onChange={(e) => setTiers((p) => p.map((x, xi) => xi === i ? { ...x, reward_value: e.target.value } : x))}
+                    placeholder={t.reward_type === 'pct' ? '%' : '$'} className="w-20 text-xs py-1.5 px-2 bg-bg-input border border-border-primary rounded-md font-mono text-text-primary" />
+                  <select
+                    value={t.reward_type}
+                    onChange={(e) => setTiers((p) => p.map((x, xi) => xi === i ? { ...x, reward_type: e.target.value as 'pct' | 'fixed' } : x))}
+                    className="text-xs py-1.5 px-1.5 bg-bg-input border border-border-primary rounded-md text-text-primary"
+                    title="Percent of the whole referred volume, or a fixed $ payout"
+                  >
+                    <option value="pct">% of volume</option>
+                    <option value="fixed">$ fixed</option>
+                  </select>
                   {tiers.length > 1 && (
                     <button onClick={() => setTiers((p) => p.filter((_, xi) => xi !== i))} className="p-1 text-danger/70 hover:text-danger"><Trash2 size={13} /></button>
                   )}
                 </div>
               ))}
-              <button onClick={() => setTiers((p) => [...p, { min_amount: '', max_amount: '', reward_pct: '' }])}
+              <button onClick={() => setTiers((p) => [...p, { min_amount: '', max_amount: '', reward_type: 'pct', reward_value: '' }])}
                 className="inline-flex items-center gap-1 text-xxs font-medium text-buy hover:underline">
                 <Plus size={12} /> Add tier
               </button>
