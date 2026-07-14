@@ -43,6 +43,29 @@ logger = logging.getLogger("change-lock-cycle")
 PAYOUT_DAY = 25  # matches prod fixed_return_payout_day_of_month
 
 
+def _arg_email(value: str) -> str:
+    """Reject placeholder text pasted from examples with a friendly message."""
+    if "@" not in value or "." not in value.split("@")[-1]:
+        raise argparse.ArgumentTypeError(
+            f"'{value}' is not an email address — replace it with the user's "
+            "real email, e.g. --email prospertech.pro@gmail.com"
+        )
+    return value.strip().lower()
+
+
+def _arg_amount(value: str) -> Decimal:
+    try:
+        amt = Decimal(value)
+    except Exception:
+        raise argparse.ArgumentTypeError(
+            f"'{value}' is not a number — replace it with the lock's principal "
+            "in USD, e.g. --principal 30000"
+        )
+    if amt <= 0:
+        raise argparse.ArgumentTypeError("--principal must be a positive amount")
+    return amt
+
+
 def _next_payout(locked_at: datetime, matures_at: datetime | None, cycle_months: int, now: datetime):
     if locked_at.tzinfo is None:
         locked_at = locked_at.replace(tzinfo=timezone.utc)
@@ -60,9 +83,9 @@ def _next_payout(locked_at: datetime, matures_at: datetime | None, cycle_months:
 
 async def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--email", required=True)
+    parser.add_argument("--email", required=True, type=_arg_email)
     parser.add_argument("--tenure", required=True, help="Target cycle label, e.g. Month / Quarter / Year")
-    parser.add_argument("--principal", type=Decimal, default=None,
+    parser.add_argument("--principal", type=_arg_amount, default=None,
                         help="Match the active lock with this principal")
     parser.add_argument("--lock-id", type=UUID, default=None,
                         help="Target exactly one lock by id (overrides --principal)")
