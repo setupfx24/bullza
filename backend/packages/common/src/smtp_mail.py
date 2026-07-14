@@ -97,8 +97,24 @@ _UNDELIVERABLE_SUFFIXES = (
 )
 
 
+def _suppressed_addresses() -> set:
+    """Exact addresses ops has blacklisted (comma-separated env
+    EMAIL_SUPPRESSION_LIST). For team test accounts whose mailbox doesn't
+    exist (e.g. ib1@gmail.com) — every lifecycle email to them hard-bounces
+    back to the sender inbox and, in volume, hurts sender reputation
+    (client 2026-07-14)."""
+    try:
+        from packages.common.src.config import get_settings
+        raw = (getattr(get_settings(), "EMAIL_SUPPRESSION_LIST", "") or "")
+    except Exception:  # noqa: BLE001 — never let config issues break sending
+        raw = ""
+    return {a.strip().lower() for a in raw.split(",") if a.strip()}
+
+
 def _is_undeliverable(to_email: str) -> bool:
     addr = (to_email or "").strip().lower()
+    if addr in _suppressed_addresses():
+        return True
     return any(addr.endswith(sfx) for sfx in _UNDELIVERABLE_SUFFIXES)
 
 
