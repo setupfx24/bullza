@@ -571,17 +571,37 @@ async def get_bars(
     # the host + code per market (forex/metals/indices/oil, crypto, stocks).
     # Triggers when Redis returned fewer bars than the window needs, or the user
     # is panning older than what's cached.
+    # "Not recent" must only trigger a backfill when the request actually wants
+    # the LIVE edge. A HISTORICAL window (TradingView paging back, e.g. April
+    # on the 1h chart) is never "recent" by definition — treating that as a
+    # cache miss fetched the LATEST 500 bars and REPLACED the DB's perfectly
+    # good old bars with them, so the old window came back empty and the chart
+    # showed a fake gap/cliff (client 2026-07-14).
+    wants_live_edge = not to_time or int(to_time) >= now_epoch - bar_sec * 3
     needs_backfill = (
-        not has_recent or len(bars) < 50 or (from_time and (not bars or from_time < bars[0]["time"]))
+        (wants_live_edge and not has_recent)
+        or len(bars) < 50
+        or (from_time and (not bars or from_time < bars[0]["time"]))
     )
     if needs_backfill:
         # Walk back from the oldest bar we already have so we extend rather than
-        # refetch what's in cache. end_ts=0 means "latest" (cold-cache case).
-        end_ts = bars[0]["time"] if bars and from_time and from_time < bars[0]["time"] else 0
+        # refetch what's in cache. end_ts=0 means "latest" (cold-cache case);
+        # for a historical window with no bars at all, anchor at the window end.
+        if bars and from_time and from_time < bars[0]["time"]:
+            end_ts = bars[0]["time"]
+        elif wants_live_edge:
+            end_ts = 0
+        else:
+            end_ts = int(to_time)
         merged = await _backfill_infoway_bars(sym, tf, end_ts=end_ts)
         if merged:
-            bars = [b for b in merged if _filter_window(b)]
-            bars.sort(key=lambda x: x["time"])
+            # MERGE with what we already have — the provider fetch covers ~500
+            # bars around end_ts and must never clobber DB bars elsewhere in
+            # the requested window.
+            by_t = {int(b["time"]): b for b in merged if _filter_window(b)}
+            for b in bars:
+                by_t.setdefault(int(b["time"]), b)
+            bars = sorted(by_t.values(), key=lambda x: x["time"])
 
     # --- 4. Append current in-progress bar ---
     current_raw = await redis_client.get(f"bar:current:{sym}:{tf}")
