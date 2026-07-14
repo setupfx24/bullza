@@ -189,7 +189,7 @@ async def run(execute: bool):
             db.add(Transaction(
                 user_id=main.id, account_id=None, type="deposit",
                 amount=need, balance_after=main.main_wallet_balance,
-                description="Promotional account funding (seed)",
+                description="Deposit via Bank transfer",
             ))
         else:
             logger.info("%smain wallet already funded (FR + account exist)", tag)
@@ -234,12 +234,12 @@ async def run(execute: bool):
             db.add(Transaction(
                 user_id=main.id, account_id=acct.id, type="transfer",
                 amount=-TRADE_CAPITAL, balance_after=main.main_wallet_balance,
-                description=f"Transfer to trading account {acct_number} (seed)",
+                description=f"Transfer to trading account {acct_number}",
             ))
             db.add(Transaction(
                 user_id=main.id, account_id=acct.id, type="transfer",
                 amount=TRADE_CAPITAL, balance_after=acct.balance,
-                description="Trading capital (seed)",
+                description="Trading capital",
             ))
 
             # ── 6. CLOSED trades (realized history) ───────────────────────
@@ -319,7 +319,7 @@ async def run(execute: bool):
                 db.add(Transaction(
                     user_id=main.id, account_id=acct.id, type="insurance_fee",
                     amount=-fee, balance_after=acct.balance,
-                    description=f"Trade insurance fee — {inst.symbol} (seed)",
+                    description=f"Trade insurance fee — {inst.symbol}",
                 ))
                 logger.info("%s  insured %s open position, fee $%s", tag, inst.symbol, fee)
 
