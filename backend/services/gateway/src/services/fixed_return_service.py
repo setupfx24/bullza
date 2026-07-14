@@ -58,6 +58,9 @@ async def get_config(
 ) -> dict:
     raw = await get_system_setting("fixed_return_rates", None)
     rates = raw if isinstance(raw, dict) and raw.get("tiers") else _fallback_rates()
+    # Standard (post-launch) ladder — kept as-is for the UI's comparison sheet
+    # even when the pre-launch matrix below becomes the effective one.
+    base_matrix = rates.get("rate_matrix_pct")
     fee_pct = await get_float_setting(
         "fixed_return_early_withdrawal_fee_pct", DEFAULT_FEE_PCT,
     )
@@ -87,12 +90,34 @@ async def get_config(
                     rates = {**rates, "rate_matrix_pct": ov_matrix}
                     has_override = True
 
+    # Pre-launch offer (client 2026-07-14): admin-managed alternate rate matrix
+    # shown behind the "Pre launch" button on the trader page. While ENABLED it
+    # is also the EFFECTIVE matrix for new locks — the sheet users see is the
+    # rate they get. A per-user override (personal deal) still wins over it.
+    prelaunch_out = None
+    pre_raw = await get_system_setting("fixed_return_prelaunch", None)
+    if isinstance(pre_raw, dict) and pre_raw.get("enabled"):
+        pm = pre_raw.get("rate_matrix_pct")
+        if (
+            isinstance(pm, list) and len(pm) == len(rates["tenures"])
+            and all(isinstance(r, list) and len(r) == len(rates["tiers"]) for r in pm)
+        ):
+            prelaunch_out = {
+                "enabled": True,
+                "headline": str(pre_raw.get("headline") or "Pre-launch offer"),
+                "rate_matrix_pct": pm,
+            }
+            if not has_override:
+                rates = {**rates, "rate_matrix_pct": pm}
+
     window_start, window_end = await _payout_window_days()
     return {
         **rates,
         "early_withdrawal_fee_pct": fee_pct,
         "lock_months": lock_months,
         "has_personal_override": has_override,
+        "base_rate_matrix_pct": base_matrix,
+        "prelaunch": prelaunch_out,
         # Interest-payout window: scheduled payouts and the on-demand
         # "Withdraw interest" action only work on these days of the month.
         # The open/closed flag is computed server-side (UTC) so the UI and

@@ -23,6 +23,13 @@ interface RateConfig {
   payout_day_start: number;
   payout_day_end: number;
   payout_window_open: boolean;
+  // Standard (post-launch) ladder, always present; equals rate_matrix_pct
+  // unless a pre-launch offer (below) or personal override is active.
+  base_rate_matrix_pct?: number[][];
+  // Pre-launch offer (client 2026-07-14): when enabled, rate_matrix_pct above
+  // IS this matrix (what users see is what they get); the standard sheet is
+  // shown for comparison behind a toggle.
+  prelaunch?: { enabled: boolean; headline: string; rate_matrix_pct: number[][] } | null;
 }
 
 interface LockRow {
@@ -79,6 +86,9 @@ export default function FixedReturnPage() {
   const [upgradeOpts, setUpgradeOpts] = useState<any | null>(null);
   const [upgradePick, setUpgradePick] = useState<string>('');
   const [upgrading, setUpgrading] = useState(false);
+  // Pre-launch sheet toggle (client 2026-07-14): 'live' = the pre-launch
+  // rates currently in force, 'standard' = the post-launch ladder preview.
+  const [sheetView, setSheetView] = useState<'live' | 'standard'>('live');
   // Custom in-app confirmation dialog (replaces native window.confirm).
   const [confirmDialog, setConfirmDialog] = useState<{
     title: string;
@@ -304,6 +314,15 @@ export default function FixedReturnPage() {
   // doesn't send it yet; the API enforces the window regardless.
   const payoutWindowOpen = cfg.payout_window_open !== false;
 
+  const prelaunchOn = !!cfg.prelaunch?.enabled;
+  // Which sheet the table shows: the live (pre-launch) rates or the standard
+  // post-launch ladder for comparison. Locks are ALWAYS priced off
+  // cfg.rate_matrix_pct — the standard view is informational only.
+  const showStandardSheet = prelaunchOn && sheetView === 'standard';
+  const displayMatrix = showStandardSheet
+    ? (cfg.base_rate_matrix_pct ?? cfg.rate_matrix_pct)
+    : cfg.rate_matrix_pct;
+
   return (
     <DashboardShell>
       <div className="px-4 sm:px-6 py-6 space-y-6 max-w-[1200px] mx-auto">
@@ -316,6 +335,39 @@ export default function FixedReturnPage() {
             principal back at maturity.
           </p>
         </header>
+
+        {/* Pre-launch offer switch (client 2026-07-14): while the offer runs,
+            the pre-launch sheet IS the live rate; the standard ladder stays
+            viewable for comparison. */}
+        {prelaunchOn && (
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              onClick={() => setSheetView('live')}
+              className={clsx(
+                'inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full text-xs font-bold transition-fast border',
+                sheetView === 'live'
+                  ? 'bg-accent text-white border-accent'
+                  : 'border-border-primary text-text-secondary hover:bg-bg-hover',
+              )}
+            >
+              🚀 Pre launch
+            </button>
+            <button
+              onClick={() => setSheetView('standard')}
+              className={clsx(
+                'inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full text-xs font-semibold transition-fast border',
+                sheetView === 'standard'
+                  ? 'bg-bg-hover text-text-primary border-border-primary'
+                  : 'border-border-primary text-text-tertiary hover:bg-bg-hover',
+              )}
+            >
+              Standard rates
+            </button>
+            <span className="text-[11px] font-semibold text-accent">
+              {cfg.prelaunch?.headline}
+            </span>
+          </div>
+        )}
 
         {/* Rate matrix */}
         <section className="rounded-xl border border-border-primary bg-bg-secondary overflow-x-auto">
@@ -353,7 +405,7 @@ export default function FixedReturnPage() {
                     <div className="text-[10px] font-normal text-text-tertiary mt-0.5">every {tn.days} days</div>
                   </th>
                   {cfg.tiers.map((_, ci) => {
-                    const highlight = ti === tenureIdx && ci === tierIdx;
+                    const highlight = !showStandardSheet && ti === tenureIdx && ci === tierIdx;
                     return (
                       <td
                         key={ci}
@@ -364,7 +416,7 @@ export default function FixedReturnPage() {
                             : 'text-text-secondary',
                         )}
                       >
-                        {(cfg.rate_matrix_pct[ti]?.[ci] ?? 0).toFixed(2)}%
+                        {(displayMatrix[ti]?.[ci] ?? 0).toFixed(2)}%
                       </td>
                     );
                   })}
@@ -373,7 +425,9 @@ export default function FixedReturnPage() {
             </tbody>
           </table>
           <p className="text-[11px] text-text-tertiary px-4 py-2">
-            Each cell is the % paid <strong>per cycle</strong>. Your lock runs for {cfg.lock_months} months total.
+            {showStandardSheet
+              ? 'Standard rates — these apply after the pre-launch offer ends. New locks today get the Pre launch rates.'
+              : <>Each cell is the % paid <strong>per cycle</strong>. Your lock runs for {cfg.lock_months} months total.</>}
           </p>
         </section>
 

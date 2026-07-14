@@ -98,6 +98,12 @@ export default function FixedReturnConfigPage() {
   // AI-Staking referral commission % (referrer chooses which one applies).
   const [refPrincipalPct, setRefPrincipalPct] = useState<number>(0);
   const [refInterestPct, setRefInterestPct] = useState<number>(0);
+  // Pre-launch offer (client 2026-07-14): an alternate matrix shown behind a
+  // "Pre launch" button on the trader page. While enabled it is ALSO the
+  // effective rate for new locks (what users see is what they get).
+  const [preEnabled, setPreEnabled] = useState(false);
+  const [preHeadline, setPreHeadline] = useState('Pre-launch offer — first 100 clients');
+  const [preMatrix, setPreMatrix] = useState<number[][]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -136,6 +142,12 @@ export default function FixedReturnConfigPage() {
       if (refPrin != null) { const n = Number(refPrin); if (Number.isFinite(n) && n >= 0) setRefPrincipalPct(n); }
       if (refInt != null) { const n = Number(refInt); if (Number.isFinite(n) && n >= 0) setRefInterestPct(n); }
       if (upTopup != null) { const n = Number(upTopup); if (Number.isFinite(n) && n >= 0) setUpgradeTopupPct(n); }
+      const pre = list.find((s) => s.key === 'fixed_return_prelaunch')?.value;
+      if (pre && typeof pre === 'object') {
+        setPreEnabled(!!pre.enabled);
+        if (typeof pre.headline === 'string' && pre.headline.trim()) setPreHeadline(pre.headline);
+        if (Array.isArray(pre.rate_matrix_pct)) setPreMatrix(pre.rate_matrix_pct);
+      }
     } catch (e: any) {
       toast.error(e?.message || 'Failed to load AI-POWERED STAKING PROGRAM config');
     } finally {
@@ -164,6 +176,22 @@ export default function FixedReturnConfigPage() {
       m[ti][ci] = value;
       return { ...prev, rate_matrix_pct: m };
     });
+  };
+
+  const updatePreCell = (ti: number, ci: number, value: number) => {
+    setPreMatrix((prev) => {
+      const m = prev.map((row) => (Array.isArray(row) ? row.slice() : []));
+      while (m.length <= ti) m.push([]);
+      m[ti][ci] = value;
+      return m;
+    });
+  };
+
+  // Pre-launch matrix normalized to the CURRENT tier/tenure grid (cells the
+  // admin hasn't typed yet default to 0 and render empty-ish).
+  const preCell = (ti: number, ci: number): number => {
+    const v = Number(preMatrix[ti]?.[ci]);
+    return Number.isFinite(v) ? v : 0;
   };
 
   const updateTier = (ci: number, field: keyof Tier, value: string) => {
@@ -253,6 +281,10 @@ export default function FixedReturnConfigPage() {
       toast.error('Payout window start day must be ≤ end day');
       return;
     }
+    if (preEnabled && !cfg.tenures.some((_, ti) => cfg.tiers.some((_, ci) => preCell(ti, ci) > 0))) {
+      toast.error('Pre-launch offer is enabled but its matrix is all zeros — fill the rates first');
+      return;
+    }
     setSaving(true);
     try {
       await adminApi.put('/settings', {
@@ -265,6 +297,13 @@ export default function FixedReturnConfigPage() {
           fr_referral_principal_pct: refPrincipalPct,
           fr_referral_interest_pct: refInterestPct,
           fixed_return_upgrade_topup_pct: upgradeTopupPct,
+          fixed_return_prelaunch: {
+            enabled: preEnabled,
+            headline: preHeadline.trim() || 'Pre-launch offer',
+            // Saved normalized to the CURRENT tier/tenure grid so the gateway's
+            // dimension check always passes.
+            rate_matrix_pct: cfg.tenures.map((_, ti) => cfg.tiers.map((_, ci) => preCell(ti, ci))),
+          },
         },
       });
       toast.success('AI-POWERED STAKING PROGRAM config saved');
@@ -545,6 +584,73 @@ export default function FixedReturnConfigPage() {
             </tr>
           </tbody>
         </table>
+      </div>
+
+      {/* Pre-launch offer (client 2026-07-14): alternate matrix shown behind a
+          "Pre launch" button on the trader page. While ENABLED it is also the
+          EFFECTIVE rate for new locks; per-user overrides still win. */}
+      <div className="bg-bg-secondary border border-border-primary rounded-md p-4 space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="text-sm font-semibold text-text-primary">Pre-Launch Offer</h2>
+            <p className="text-[10px] text-text-tertiary max-w-2xl mt-0.5">
+              While enabled, traders see a <strong>Pre launch</strong> button on the AI-Staking page
+              with this sheet, and <strong>new locks are priced off THESE rates</strong> (the standard
+              matrix above stays visible as the &quot;after launch&quot; comparison). Disable to end the offer.
+            </p>
+          </div>
+          <label className="inline-flex items-center gap-2 text-xs text-text-secondary cursor-pointer">
+            <input
+              type="checkbox"
+              checked={preEnabled}
+              onChange={(e) => setPreEnabled(e.target.checked)}
+              className="accent-buy w-4 h-4"
+            />
+            Enabled
+          </label>
+        </div>
+        <div className="flex flex-col gap-1 max-w-md">
+          <label className="text-xs font-medium text-text-secondary">Headline (shown to traders)</label>
+          <input
+            value={preHeadline}
+            onChange={(e) => setPreHeadline(e.target.value)}
+            className="px-2 py-1 text-xs bg-bg-input border border-border-primary rounded text-text-primary"
+            placeholder="Pre-launch offer — first 100 clients"
+          />
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[720px]">
+            <thead>
+              <tr className="border-b border-border-primary bg-bg-tertiary/40">
+                <th className="text-left px-3 py-2 text-xxs font-medium text-text-tertiary uppercase tracking-wide">Tenure</th>
+                {cfg.tiers.map((t, ci) => (
+                  <th key={ci} className="px-3 py-2 text-xxs font-medium text-text-tertiary uppercase tracking-wide text-center">
+                    {t.label}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {cfg.tenures.map((tn, ti) => (
+                <tr key={ti} className="border-b border-border-primary/50 hover:bg-bg-hover/30">
+                  <td className="px-3 py-2 text-xs text-text-primary">{tn.label}</td>
+                  {cfg.tiers.map((_, ci) => (
+                    <td key={ci} className="px-3 py-2 text-center">
+                      <input
+                        type="number"
+                        step="0.1"
+                        min={0}
+                        value={preCell(ti, ci)}
+                        onChange={(e) => updatePreCell(ti, ci, parseFloat(e.target.value) || 0)}
+                        className="w-16 px-2 py-1 text-xs bg-bg-input border border-border-primary rounded font-mono tabular-nums text-text-primary text-center"
+                      />
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       <PendingEarlyWithdrawals />
