@@ -1037,15 +1037,22 @@ def _classify_ib_type(profile, super_id: uuid.UUID | None) -> str:
 
 
 async def get_ib_tree(ib_id: uuid.UUID | None, db: AsyncSession) -> list[dict]:
-    """Full IB hierarchy tree. ib_id=None returns all root IBs."""
+    """Full IB hierarchy tree. ib_id=None returns all root IBs.
+
+    Promotional accounts (and their referral downline) are hidden from the
+    admin panel entirely (client 2026-07-15) — they only show on the trader
+    side when that promo account logs in. So promo-owned IB profiles are
+    excluded as roots and as children, and promo referred users don't count."""
     super_id = await _super_ib_profile_id(db)
     if ib_id:
         root_q = await db.execute(select(IBProfile).where(IBProfile.id == ib_id))
         root = root_q.scalar_one_or_none()
         return [await _build_ib_node(root, db, super_id)] if root else []
     roots_q = await db.execute(
-        select(IBProfile).where(IBProfile.parent_ib_id.is_(None), IBProfile.is_active == True)
-        .order_by(IBProfile.created_at))
+        select(IBProfile).where(
+            IBProfile.parent_ib_id.is_(None), IBProfile.is_active == True,
+            IBProfile.user_id.notin_(_promo_ids()),
+        ).order_by(IBProfile.created_at))
     return [await _build_ib_node(r, db, super_id) for r in roots_q.scalars().all()]
 
 
@@ -1054,11 +1061,19 @@ async def _build_ib_node(ib, db: AsyncSession, super_id: uuid.UUID | None = None
         return {}
     user_q = await db.execute(select(User).where(User.id == ib.user_id))
     user = user_q.scalar_one_or_none()
+    # Count only NON-promo referred users, so the badge matches the (promo-
+    # hidden) drill-down list.
     ref_count = (await db.execute(
-        select(func.count(Referral.id)).where(Referral.ib_profile_id == ib.id)
+        select(func.count(Referral.id)).where(
+            Referral.ib_profile_id == ib.id,
+            Referral.referred_id.notin_(_promo_ids()),
+        )
     )).scalar() or 0
     children_q = await db.execute(
-        select(IBProfile).where(IBProfile.parent_ib_id == ib.id, IBProfile.is_active == True))
+        select(IBProfile).where(
+            IBProfile.parent_ib_id == ib.id, IBProfile.is_active == True,
+            IBProfile.user_id.notin_(_promo_ids()),
+        ))
     children = children_q.scalars().all()
     return {
         "id": str(ib.id), "user_id": str(ib.user_id),
@@ -1098,19 +1113,21 @@ async def get_unassigned_users(page: int, per_page: int, db: AsyncSession) -> di
 async def get_ib_referrals(ib_id: uuid.UUID, page: int, per_page: int, db: AsyncSession) -> dict:
     """Traders referred by a specific IB with commission data.
 
-    Promotional downline is INCLUDED here (client 2026-07-15): the IB Tree
-    count badge (`referral_count`) already counts every referral, so hiding
-    promo users from this list made the count and the list disagree — an IB
-    showed "12 users" but "No users under this IB". The admin wants to see who
-    is actually under each IB in the tree, so we list everyone the count
-    covers. (Promo hiding stays in effect on the general Users list / unassigned
-    section, not the IB drill-down.)"""
+    Promotional downline is EXCLUDED (client 2026-07-15): promo accounts and
+    their referrals must not appear anywhere in the admin panel — only on the
+    trader side when that promo account logs in. This matches the tree's
+    referral_count, which now also excludes promo users, so the badge and the
+    list agree."""
     super_id = await _super_ib_profile_id(db)
     total = (await db.execute(
-        select(func.count(Referral.id)).where(Referral.ib_profile_id == ib_id)
+        select(func.count(Referral.id)).where(
+            Referral.ib_profile_id == ib_id, Referral.referred_id.notin_(_promo_ids())
+        )
     )).scalar() or 0
     refs = await db.execute(
-        select(Referral).where(Referral.ib_profile_id == ib_id)
+        select(Referral).where(
+            Referral.ib_profile_id == ib_id, Referral.referred_id.notin_(_promo_ids())
+        )
         .order_by(Referral.created_at.desc()).offset((page - 1) * per_page).limit(per_page))
     items = []
     for r in refs.scalars().all():
