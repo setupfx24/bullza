@@ -214,16 +214,25 @@ async def analytics_dashboard(
     )
     total_sub_brokers = sub_broker_q.scalar() or 0
 
+    # Exclude commission EARNED BY a promo IB, and commission GENERATED FROM a
+    # promo/demo trader's trades (client 2026-07-15 — the real Super IB was
+    # showing $85.90 earned entirely from the promo showcase downline).
+    promo_demo_user_ids = select(User.id).where(
+        or_(User.is_promotional == True, User.is_demo == True)  # noqa: E712
+    )
     ib_commission_q = await db.execute(
         select(func.coalesce(func.sum(IBCommission.amount), 0)).where(
-            IBCommission.ib_id.notin_(promo_ib_ids)
+            IBCommission.ib_id.notin_(promo_ib_ids),
+            IBCommission.source_user_id.notin_(promo_demo_user_ids),
         )
     )
     total_ib_commission = float(ib_commission_q.scalar() or 0)
 
     ib_pending_q = await db.execute(
         select(func.coalesce(func.sum(IBCommission.amount), 0)).where(
-            IBCommission.status == "pending", IBCommission.ib_id.notin_(promo_ib_ids),
+            IBCommission.status == "pending",
+            IBCommission.ib_id.notin_(promo_ib_ids),
+            IBCommission.source_user_id.notin_(promo_demo_user_ids),
         )
     )
     ib_pending_commission = float(ib_pending_q.scalar() or 0)
