@@ -79,6 +79,17 @@ EMPLOYEE_ROLE_PERMISSIONS = {
         # assigned to them, which the /rm endpoints scope by assigned_rm_id.
         "rm.view", "rm.request",
     },
+    # IB Manager (client 2026-07-15) — runs the partner/IB program end to end:
+    # the whole Business section (IB program + applications, sub-broker, copy
+    # masters, MAM, MLM, user referrals) plus read access to users so they can
+    # see who sits under each IB. Deliberately NOT given global config
+    # (spreads/charges/swaps) or funds — super_admin can grant those per person
+    # via extra_permissions if a particular IB manager needs them.
+    "ib_manager": {
+        "ib.view", "ib.manage",
+        "users.view",
+        "social.view", "social.manage",
+    },
     # Split finance duties — an employee can be given ONLY deposits or ONLY
     # withdrawals (the combined "finance" role still exists for both).
     "deposit_manager": {

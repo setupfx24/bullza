@@ -206,6 +206,7 @@ export default function EmployeesPage() {
       case 'rm': return 'bg-accent/15 text-accent';
       case 'risk_manager': return 'bg-sell/15 text-sell';
       case 'marketing': return 'bg-success/15 text-success';
+      case 'ib_manager': return 'bg-accent/15 text-accent';
       case 'support': return 'bg-buy/15 text-buy';
       default: return 'bg-text-tertiary/15 text-text-tertiary';
     }
@@ -397,6 +398,7 @@ export default function EmployeesPage() {
                   <option value="withdrawal_manager">Withdrawal Manager</option>
                   <option value="risk_manager">Risk Manager</option>
                   <option value="marketing">Marketing</option>
+                  <option value="ib_manager">IB Manager</option>
                   <option value="rm">Relationship Manager (RM)</option>
                   <option value="super_admin">Super Admin</option>
                   {customRoles.length > 0 && (
