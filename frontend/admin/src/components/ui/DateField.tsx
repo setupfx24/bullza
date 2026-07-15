@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Calendar as CalendarIcon, ChevronLeft, ChevronRight } from 'lucide-react';
 import {
   addDays, addMonths, endOfMonth, endOfWeek, format, isAfter, isBefore,
@@ -53,6 +54,30 @@ export default function DateField({
   const [open, setOpen] = useState(false);
   const [viewMonth, setViewMonth] = useState<Date>(selected || new Date());
   const ref = useRef<HTMLDivElement>(null);
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const popRef = useRef<HTMLDivElement>(null);
+  // Portal the popup to <body> at a fixed position so a scrolling/overflow-
+  // hidden ancestor (e.g. a modal with overflow-y-auto) can't clip the
+  // calendar — the "calendar not fully visible" bug (client 2026-07-15).
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
+
+  const POP_W = 256; // w-64
+  const POP_H = 320; // approx popup height
+
+  const place = () => {
+    const b = btnRef.current?.getBoundingClientRect();
+    if (!b) return;
+    // Prefer below the trigger; flip above if it would overflow the viewport.
+    const below = b.bottom + 4;
+    const top = below + POP_H > window.innerHeight && b.top - POP_H - 4 > 0
+      ? b.top - POP_H - 4
+      : below;
+    // Right-align to the trigger, clamped into the viewport.
+    let left = b.right - POP_W;
+    if (left < 8) left = 8;
+    if (left + POP_W > window.innerWidth - 8) left = window.innerWidth - 8 - POP_W;
+    setPos({ top, left });
+  };
 
   // Re-sync the visible month when the value changes from outside.
   useEffect(() => {
@@ -60,11 +85,28 @@ export default function DateField({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [value]);
 
-  // Close on outside click.
+  // Position on open + keep it pinned while the page scrolls/resizes.
+  useEffect(() => {
+    if (!open) return;
+    place();
+    const onMove = () => place();
+    window.addEventListener('scroll', onMove, true);
+    window.addEventListener('resize', onMove);
+    return () => {
+      window.removeEventListener('scroll', onMove, true);
+      window.removeEventListener('resize', onMove);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+
+  // Close on outside click (trigger AND the portalled popup are "inside").
   useEffect(() => {
     if (!open) return;
     const onDown = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+      const t = e.target as Node;
+      if (ref.current?.contains(t)) return;
+      if (popRef.current?.contains(t)) return;
+      setOpen(false);
     };
     document.addEventListener('mousedown', onDown);
     return () => document.removeEventListener('mousedown', onDown);
@@ -99,6 +141,7 @@ export default function DateField({
   return (
     <div className="relative" ref={ref}>
       <button
+        ref={btnRef}
         type="button"
         onClick={() => setOpen((o) => !o)}
         className={cn(
@@ -112,8 +155,11 @@ export default function DateField({
         <CalendarIcon size={13} className="text-text-tertiary ml-auto" />
       </button>
 
-      {open && (
-        <div className="absolute z-50 mt-1 right-0 w-64 p-3 rounded-lg border border-border-primary bg-bg-secondary shadow-modal">
+      {open && pos && createPortal(
+        <div
+          ref={popRef}
+          style={{ position: 'fixed', top: pos.top, left: pos.left, width: POP_W }}
+          className="z-[9999] p-3 rounded-lg border border-border-primary bg-bg-secondary shadow-modal">
           {/* Month navigation */}
           <div className="flex items-center justify-between mb-2">
             <button
@@ -195,7 +241,8 @@ export default function DateField({
               Today
             </button>
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   );

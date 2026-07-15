@@ -183,6 +183,89 @@ async def toggle_campaign(
     return {"message": "Updated", "is_active": bool(c.is_active)}
 
 
+@router.put("/{campaign_id}")
+async def edit_campaign(
+    campaign_id: uuid.UUID,
+    body: CampaignIn,
+    request: Request,
+    admin: User = Depends(require_permission("bonus.update")),
+    db: AsyncSession = Depends(get_db),
+):
+    """Full edit (client 2026-07-15): title/description/window + tier list.
+    Tiers are REPLACED wholesale with the submitted set (simplest correct
+    model — the UI always sends the complete list)."""
+    c = (await db.execute(
+        select(RewardCampaign).where(RewardCampaign.id == campaign_id)
+    )).scalar_one_or_none()
+    if c is None:
+        raise HTTPException(status_code=404, detail="Offer not found")
+    if body.ends_at <= body.starts_at:
+        raise HTTPException(status_code=400, detail="End must be after start")
+    _validate_tiers(body.tiers)
+
+    c.title = body.title.strip()
+    c.description = (body.description or "").strip() or None
+    c.starts_at = body.starts_at
+    c.ends_at = body.ends_at
+
+    # Replace tiers.
+    old_tiers = (await db.execute(
+        select(RewardCampaignTier).where(RewardCampaignTier.campaign_id == c.id)
+    )).scalars().all()
+    for t in old_tiers:
+        await db.delete(t)
+    for t in body.tiers:
+        db.add(RewardCampaignTier(
+            campaign_id=c.id,
+            min_amount=Decimal(str(t.min_amount)),
+            max_amount=Decimal(str(t.max_amount)) if t.max_amount is not None else None,
+            reward_pct=Decimal(str(t.reward_pct)) if t.reward_pct is not None else None,
+            reward_amount=Decimal(str(t.reward_amount)) if t.reward_amount is not None else None,
+        ))
+    await write_audit_log(
+        db, admin.id, "edit_reward_campaign", "reward_campaign", c.id,
+        new_values={"title": c.title, "starts_at": str(body.starts_at), "ends_at": str(body.ends_at), "tiers": len(body.tiers)},
+        ip_address=request.client.host if request.client else None,
+    )
+    await db.commit()
+    return {"message": "Offer updated", "id": str(c.id)}
+
+
+@router.delete("/{campaign_id}")
+async def delete_campaign(
+    campaign_id: uuid.UUID,
+    request: Request,
+    admin: User = Depends(require_permission("bonus.update")),
+    db: AsyncSession = Depends(get_db),
+):
+    """Delete an offer (client 2026-07-15). Blocked once anyone has CLAIMED —
+    deleting would erase the payout audit trail; pause it instead. Tiers
+    cascade-delete with the campaign row."""
+    c = (await db.execute(
+        select(RewardCampaign).where(RewardCampaign.id == campaign_id)
+    )).scalar_one_or_none()
+    if c is None:
+        raise HTTPException(status_code=404, detail="Offer not found")
+    claims = (await db.execute(
+        select(func.count(RewardCampaignClaim.id)).where(
+            RewardCampaignClaim.campaign_id == campaign_id
+        )
+    )).scalar() or 0
+    if claims > 0:
+        raise HTTPException(
+            status_code=409,
+            detail=f"This offer already has {claims} paid claim(s) — pause it instead of deleting (the payout history must stay).",
+        )
+    await write_audit_log(
+        db, admin.id, "delete_reward_campaign", "reward_campaign", c.id,
+        new_values={"title": c.title},
+        ip_address=request.client.host if request.client else None,
+    )
+    await db.delete(c)   # tiers cascade via FK ON DELETE CASCADE
+    await db.commit()
+    return {"message": "Offer deleted"}
+
+
 @router.get("/{campaign_id}/leaderboard")
 async def campaign_leaderboard(
     campaign_id: uuid.UUID,

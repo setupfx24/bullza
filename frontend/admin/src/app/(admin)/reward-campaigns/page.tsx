@@ -7,7 +7,7 @@
  */
 import { useCallback, useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
-import { Gift, Loader2, Plus, Trash2, Trophy, X } from 'lucide-react';
+import { Gift, Loader2, Pencil, Plus, Trash2, Trophy, X } from 'lucide-react';
 import { adminApi } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import DateField from '@/components/ui/DateField';
@@ -45,6 +45,9 @@ export default function RewardCampaignsPage() {
   const [endDate, setEndDate] = useState('');
   const [tiers, setTiers] = useState<Tier[]>([{ min_amount: 1000, max_amount: 2000, reward_type: 'pct', reward_value: 5 }]);
   const [saving, setSaving] = useState(false);
+  // When set, the modal is editing this offer (PUT) rather than creating (POST).
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -73,6 +76,43 @@ export default function RewardCampaignsPage() {
     } catch (e: any) { toast.error(e?.message || 'Failed'); }
   };
 
+  const resetForm = () => {
+    setTitle(''); setDescription(''); setStartDate(''); setEndDate('');
+    setTiers([{ min_amount: 1000, max_amount: 2000, reward_type: 'pct', reward_value: 5 }]);
+    setEditingId(null);
+  };
+
+  const openCreate = () => { resetForm(); setShowCreate(true); };
+
+  const openEdit = (c: Campaign) => {
+    setEditingId(c.id);
+    setTitle(c.title);
+    setDescription(c.description || '');
+    // ISO → YYYY-MM-DD for the date fields.
+    setStartDate(c.starts_at.slice(0, 10));
+    setEndDate(c.ends_at.slice(0, 10));
+    setTiers(
+      (c.tiers || []).map((t) => ({
+        min_amount: t.min_amount,
+        max_amount: t.max_amount,
+        reward_type: t.reward_amount != null ? 'fixed' : 'pct',
+        reward_value: t.reward_amount != null ? t.reward_amount : (t.reward_pct ?? 0),
+      })),
+    );
+    setShowCreate(true);
+  };
+
+  const deleteCampaign = async (c: Campaign) => {
+    if (!window.confirm(`Delete the offer "${c.title}"? This cannot be undone.`)) return;
+    setDeletingId(c.id);
+    try {
+      await adminApi.delete(`/reward-campaigns/${c.id}`);
+      toast.success('Offer deleted');
+      await load();
+    } catch (e: any) { toast.error(e?.message || 'Delete failed'); }
+    finally { setDeletingId(null); }
+  };
+
   const submit = async () => {
     if (!title.trim()) { toast.error('Title required'); return; }
     if (!startDate || !endDate) { toast.error('Start and end dates required'); return; }
@@ -88,21 +128,26 @@ export default function RewardCampaignsPage() {
       })
       .filter((t) => (t.reward_pct ?? 0) > 0 || (t.reward_amount ?? 0) > 0);
     if (!cleanTiers.length) { toast.error('Add at least one tier with a percent or fixed amount'); return; }
+    const payload = {
+      title: title.trim(),
+      description: description.trim() || null,
+      starts_at: `${startDate}T00:00:00Z`,
+      ends_at: `${endDate}T23:59:59Z`,
+      tiers: cleanTiers,
+    };
     setSaving(true);
     try {
-      await adminApi.post('/reward-campaigns', {
-        title: title.trim(),
-        description: description.trim() || null,
-        starts_at: `${startDate}T00:00:00Z`,
-        ends_at: `${endDate}T23:59:59Z`,
-        tiers: cleanTiers,
-      });
-      toast.success('Offer created');
+      if (editingId) {
+        await adminApi.put(`/reward-campaigns/${editingId}`, payload);
+        toast.success('Offer updated');
+      } else {
+        await adminApi.post('/reward-campaigns', payload);
+        toast.success('Offer created');
+      }
       setShowCreate(false);
-      setTitle(''); setDescription(''); setStartDate(''); setEndDate('');
-      setTiers([{ min_amount: 1000, max_amount: 2000, reward_type: 'pct', reward_value: 5 }]);
+      resetForm();
       await load();
-    } catch (e: any) { toast.error(e?.message || 'Create failed'); }
+    } catch (e: any) { toast.error(e?.message || (editingId ? 'Update failed' : 'Create failed')); }
     finally { setSaving(false); }
   };
 
@@ -120,7 +165,7 @@ export default function RewardCampaignsPage() {
           </div>
         </div>
         <button
-          onClick={() => setShowCreate(true)}
+          onClick={openCreate}
           className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-buy rounded-md hover:bg-buy-light transition-fast"
         >
           <Plus size={13} /> New Offer
@@ -158,6 +203,12 @@ export default function RewardCampaignsPage() {
                     <Trophy size={12} /> Leaderboard
                   </button>
                   <button
+                    onClick={() => openEdit(c)}
+                    className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xxs font-medium text-text-secondary border border-border-primary hover:bg-bg-hover"
+                  >
+                    <Pencil size={12} /> Edit
+                  </button>
+                  <button
                     onClick={() => void toggleActive(c)}
                     className={cn(
                       'px-2.5 py-1.5 rounded-md text-xxs font-medium border transition-fast',
@@ -167,6 +218,13 @@ export default function RewardCampaignsPage() {
                     )}
                   >
                     {c.is_active ? 'Pause' : 'Resume'}
+                  </button>
+                  <button
+                    onClick={() => void deleteCampaign(c)}
+                    disabled={deletingId === c.id}
+                    className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xxs font-medium text-danger border border-danger/40 hover:bg-danger/10 disabled:opacity-50"
+                  >
+                    {deletingId === c.id ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />} Delete
                   </button>
                 </div>
               </div>
@@ -198,14 +256,14 @@ export default function RewardCampaignsPage() {
         </div>
       )}
 
-      {/* Create modal */}
+      {/* Create / edit modal */}
       {showCreate && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/60" onClick={() => setShowCreate(false)} />
+          <div className="absolute inset-0 bg-black/60" onClick={() => { setShowCreate(false); resetForm(); }} />
           <div className="relative w-full max-w-lg rounded-xl border border-border-primary bg-bg-secondary p-5 space-y-3 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between">
-              <h2 className="text-sm font-bold text-text-primary">New Reward Offer</h2>
-              <button onClick={() => setShowCreate(false)} className="p-1 text-text-tertiary hover:text-text-primary"><X size={16} /></button>
+              <h2 className="text-sm font-bold text-text-primary">{editingId ? 'Edit Reward Offer' : 'New Reward Offer'}</h2>
+              <button onClick={() => { setShowCreate(false); resetForm(); }} className="p-1 text-text-tertiary hover:text-text-primary"><X size={16} /></button>
             </div>
             <div>
               <label className="block text-xxs text-text-tertiary mb-1">Title</label>
@@ -264,7 +322,7 @@ export default function RewardCampaignsPage() {
             </div>
             <button onClick={() => void submit()} disabled={saving}
               className="w-full py-2.5 rounded-md text-xs font-bold text-white bg-buy hover:bg-buy-light disabled:opacity-50">
-              {saving ? 'Creating…' : 'Create Offer'}
+              {saving ? (editingId ? 'Saving…' : 'Creating…') : (editingId ? 'Save Changes' : 'Create Offer')}
             </button>
           </div>
         </div>
