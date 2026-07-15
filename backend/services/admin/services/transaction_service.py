@@ -43,12 +43,22 @@ async def list_transactions(
     exclude_types: list[str] | None = None,
     include_types: list[str] | None = None,
 ) -> PaginatedResponse:
-    # Hide promotional demo accounts from the admin ledger.
-    query = select(Transaction).where(
+    # Hide promotional AND demo accounts from the admin ledger (client
+    # 2026-07-15 — the shared demo user's trades were showing here). Exclude by
+    # both the owning user and the account (a demo trade attributes to the demo
+    # account even if the user link is null).
+    _pd_users = select(User.id).where(
+        or_(User.is_promotional == True, User.is_demo == True)  # noqa: E712
+    )
+    _pd_accts = select(TradingAccount.id).where(
         or_(
-            Transaction.user_id.is_(None),
-            Transaction.user_id.notin_(select(User.id).where(User.is_promotional == True)),  # noqa: E712
+            TradingAccount.is_demo == True,  # noqa: E712
+            TradingAccount.user_id.in_(_pd_users),
         )
+    )
+    query = select(Transaction).where(
+        or_(Transaction.user_id.is_(None), Transaction.user_id.notin_(_pd_users)),
+        or_(Transaction.account_id.is_(None), Transaction.account_id.notin_(_pd_accts)),
     )
 
     if type_filter and type_filter != "all":
@@ -142,11 +152,28 @@ async def list_transactions(
 
 
 async def get_transaction_summary(db: AsyncSession) -> dict:
-    total_q = await db.execute(select(func.count(Transaction.id)))
+    # Exclude promotional + demo accounts from the summary cards too, so they
+    # match the (now promo/demo-filtered) ledger below (client 2026-07-15).
+    _pd_users = select(User.id).where(
+        or_(User.is_promotional == True, User.is_demo == True)  # noqa: E712
+    )
+    _pd_accts = select(TradingAccount.id).where(
+        or_(
+            TradingAccount.is_demo == True,  # noqa: E712
+            TradingAccount.user_id.in_(_pd_users),
+        )
+    )
+    _excl = (
+        or_(Transaction.user_id.is_(None), Transaction.user_id.notin_(_pd_users)),
+        or_(Transaction.account_id.is_(None), Transaction.account_id.notin_(_pd_accts)),
+    )
+
+    total_q = await db.execute(select(func.count(Transaction.id)).where(*_excl))
     total_count = total_q.scalar() or 0
 
     type_counts_q = await db.execute(
         select(Transaction.type, func.count(Transaction.id), func.coalesce(func.sum(Transaction.amount), 0))
+        .where(*_excl)
         .group_by(Transaction.type)
     )
     type_breakdown = {}
