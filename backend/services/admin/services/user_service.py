@@ -1141,6 +1141,28 @@ async def delete_user(
     if master_ids:
         await db.execute(sql_delete(MasterAccount).where(MasterAccount.id.in_(master_ids)))
 
+    # ── 3b. Insurance FIRST — before positions & transactions ──
+    # insurance_claims.transaction_id -> transactions.id and
+    # insurance_policies.position_id -> positions.id are RESTRICT FKs. If we
+    # delete the user's transactions/positions first, those deletes raise a
+    # ForeignKeyViolation (client 2026-07-15: "insurance_claims_transaction_id
+    # _fkey" blocked the whole delete). Claims reference policies, so claims
+    # before policies. Savepoint-wrapped: the insurance tables don't exist on
+    # every deployment. (These also appear in the step-9b sweep as idempotent
+    # no-ops — belt and suspenders.)
+    from sqlalchemy import text as _sql_text
+    for _ins_sql in (
+        "DELETE FROM insurance_claims WHERE user_id = :uid",
+        "DELETE FROM insurance_claims WHERE transaction_id IN "
+        "(SELECT id FROM transactions WHERE user_id = :uid)",
+        "DELETE FROM insurance_policies WHERE user_id = :uid",
+    ):
+        try:
+            async with db.begin_nested():
+                await db.execute(_sql_text(_ins_sql), {"uid": str(user_id)})
+        except Exception:  # noqa: BLE001 — missing table / no rows → skip
+            pass
+
     # ── 4. Positions, Orders, TradeHistory on user's trading accounts ──
     if acc_ids:
         # IBCommission.source_trade_id -> orders.id
