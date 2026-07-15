@@ -321,11 +321,18 @@ async def finance_overview(db: AsyncSession, start_date=None, end_date=None) -> 
 
     # Demo accounts/users are practice money — like promo, they must NEVER count
     # in the real company figures. Excluded the same way (client 2026-07-03).
-    demo_acct_ids = [r[0] for r in (await db.execute(
-        select(TradingAccount.id).where(TradingAccount.is_demo == True)
-    )).all()]
+    # Fix (client 2026-07-15): exclude EVERY account a demo user owns, not only
+    # accounts flagged is_demo — the shared demo user has a non-demo-flagged
+    # account whose trades were leaking into the Net P&L drill ("Demo Trader"
+    # showing up).
     demo_user_ids = [r[0] for r in (await db.execute(
         select(User.id).where(User.is_demo == True)
+    )).all()]
+    demo_acct_ids = [r[0] for r in (await db.execute(
+        select(TradingAccount.id).where(or_(
+            TradingAccount.is_demo == True,
+            TradingAccount.user_id.in_(demo_user_ids) if demo_user_ids else False,
+        ))
     )).all()]
 
     # Combined promo + demo exclusion sets used by the helpers below.
@@ -676,11 +683,17 @@ async def finance_overview_drill(
     promo_acct_ids = [r[0] for r in (await db.execute(
         select(TradingAccount.id).where(TradingAccount.user_id.in_(promo_user_ids))
     )).all()] if promo_user_ids else []
-    demo_acct_ids = [r[0] for r in (await db.execute(
-        select(TradingAccount.id).where(TradingAccount.is_demo == True)
-    )).all()]
+    # Exclude EVERY account a demo user owns, not only is_demo-flagged accounts
+    # (client 2026-07-15 — the shared demo user's non-demo account leaked
+    # "Demo Trader" into the Net P&L drill).
     demo_user_ids = [r[0] for r in (await db.execute(
         select(User.id).where(User.is_demo == True)
+    )).all()]
+    demo_acct_ids = [r[0] for r in (await db.execute(
+        select(TradingAccount.id).where(or_(
+            TradingAccount.is_demo == True,
+            TradingAccount.user_id.in_(demo_user_ids) if demo_user_ids else False,
+        ))
     )).all()]
     excl_acct_ids = list(set(promo_acct_ids) | set(demo_acct_ids))
     excl_user_ids = list(set(promo_user_ids) | set(demo_user_ids))
