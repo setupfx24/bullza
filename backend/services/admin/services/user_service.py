@@ -39,6 +39,7 @@ PROTECTED_EMAILS = {
     "sdasia.01@gmail.com",          # Lukas Keller (the Super IB, code SDA05)
     "amardeepsonar2001@gmail.com",  # Amardeep Sonar (promo showcase)
     "amardeeptrade25@gmail.com",    # Amardeep Sonar
+    "sahunami843525@gmail.com",     # Kamni Sahu (also promotional)
 }
 
 
