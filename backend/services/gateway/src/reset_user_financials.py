@@ -114,6 +114,8 @@ async def main() -> None:
             "(SELECT id FROM staking_positions WHERE user_id = :uid)",
             "DELETE FROM staking_positions WHERE user_id = :uid",
             "DELETE FROM reward_campaign_claims WHERE user_id = :uid",
+            # rm_funding_requests FK deposits.id — must go before deposits.
+            "DELETE FROM rm_funding_requests WHERE rm_id = :uid OR user_id = :uid",
             "DELETE FROM deposit_requests WHERE user_id = :uid",
             "DELETE FROM user_bonuses WHERE user_id = :uid",
         ], {"uid": str(uid)})
