@@ -125,6 +125,7 @@ async def list_kyc_approved(page: int, per_page: int, db: AsyncSession,
                     "document_type": doc.document_type,
                     "file_url": doc.file_url,
                     "status": doc.status,
+                    "created_at": doc.created_at.isoformat() if doc.created_at else None,
                     "reviewed_at": doc.reviewed_at.isoformat() if doc.reviewed_at else None,
                 }
                 for doc in docs
@@ -170,6 +171,7 @@ async def list_kyc_rejected(page: int, per_page: int, db: AsyncSession,
                     "file_url": doc.file_url,
                     "status": doc.status,
                     "rejection_reason": doc.rejection_reason,
+                    "created_at": doc.created_at.isoformat() if doc.created_at else None,
                     "reviewed_at": doc.reviewed_at.isoformat() if doc.reviewed_at else None,
                 }
                 for doc in docs

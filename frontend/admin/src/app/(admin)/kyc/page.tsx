@@ -53,23 +53,42 @@ export default function KYCPage() {
   const [rejectReason, setRejectReason] = useState('');
   const [openingDocId, setOpeningDocId] = useState<string | null>(null);
 
-  /** KYC files are behind admin auth — fetch with Bearer token and open as blob URL. */
-  const openKycDocument = async (docId: string) => {
-    setOpeningDocId(docId);
+  /** KYC files are behind admin auth. Admin auth is a httpOnly cookie, so the
+   *  fetch MUST send credentials — a Bearer token alone is empty for cookie
+   *  sessions (this was the "View Document opens a blank tab" bug). The API
+   *  returns the file as octet-stream (attachment) for safety; we re-type the
+   *  blob to a WHITELISTED image/pdf mime so the reviewer sees it inline
+   *  instead of it silently downloading. */
+  const openKycDocument = async (doc: KYCDocument) => {
+    setOpeningDocId(doc.id);
     // Open the window synchronously inside the click so popup blockers allow it.
     const win = window.open('about:blank', '_blank');
     try {
       const token = adminApi.getToken();
-      const res = await fetch(`${getAdminApiBase()}/kyc/file/${docId}`, {
+      const res = await fetch(`${getAdminApiBase()}/kyc/file/${doc.id}`, {
+        credentials: 'include',
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
-      if (!res.ok) throw new Error(res.status === 404 ? 'File not found' : `Error ${res.status}`);
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
+      if (!res.ok) {
+        throw new Error(
+          res.status === 404 ? 'File not found on server'
+            : res.status === 401 || res.status === 403 ? 'Not authorised — re-login and try again'
+            : `Error ${res.status}`,
+        );
+      }
+      const raw = await res.blob();
+      // Infer a safe display type from the file extension (whitelist only).
+      const ext = (doc.file_url.split('.').pop() || '').toLowerCase();
+      const MIME: Record<string, string> = {
+        jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png',
+        webp: 'image/webp', gif: 'image/gif', pdf: 'application/pdf',
+      };
+      const typed = MIME[ext] ? new Blob([raw], { type: MIME[ext] }) : raw;
+      const url = URL.createObjectURL(typed);
       if (win && !win.closed) {
         win.location.href = url;
       } else {
-        window.location.href = url;
+        window.open(url, '_blank');
       }
       // Revoke after a short delay so the tab has time to load it.
       setTimeout(() => URL.revokeObjectURL(url), 60_000);
@@ -354,7 +373,7 @@ export default function KYCPage() {
                       </div>
                       <button
                         type="button"
-                        onClick={() => void openKycDocument(doc.id)}
+                        onClick={() => void openKycDocument(doc)}
                         disabled={openingDocId === doc.id}
                         className="text-xxs text-buy hover:underline inline-flex items-center gap-1 disabled:opacity-50"
                       >
