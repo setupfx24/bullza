@@ -30,6 +30,31 @@ from dependencies import write_audit_log
 
 settings = get_settings()
 
+# Accounts that must NEVER be deleted (client 2026-07-15) — showcase/anchor
+# users the platform relies on. Matched by email (case-insensitive). This is
+# IN ADDITION to the rule-based protections in _assert_deletable
+# (super_admin role + any promotional account).
+PROTECTED_EMAILS = {
+    "p.v.mehta25@gmail.com",        # Param Mehta
+    "sdasia.01@gmail.com",          # Lukas Keller (the Super IB, code SDA05)
+    "amardeepsonar2001@gmail.com",  # Amardeep Sonar (promo showcase)
+    "amardeeptrade25@gmail.com",    # Amardeep Sonar
+}
+
+
+def _assert_deletable(user: User) -> None:
+    """Raise 403 if this user is protected from deletion (hard or soft):
+    super_admin, any promotional account, or a named anchor account."""
+    if user.role == "super_admin":
+        raise HTTPException(status_code=403, detail="Cannot delete a super_admin account")
+    if getattr(user, "is_promotional", False):
+        raise HTTPException(status_code=403, detail="Promotional accounts cannot be deleted")
+    if (user.email or "").strip().lower() in PROTECTED_EMAILS:
+        raise HTTPException(
+            status_code=403,
+            detail=f"{user.first_name or user.email} is a protected account and cannot be deleted",
+        )
+
 
 def _user_to_out(u: User) -> dict:
     return {
@@ -946,6 +971,10 @@ async def terminate_user(user_id, admin_id, ip_address, db):
 async def soft_delete_user(user_id, admin_id, ip_address, db):
     """Soft delete — user can never log in again, but every record (ledger,
     deposits, trades) stays with the broker for audit/compliance."""
+    user = (await db.execute(select(User).where(User.id == user_id))).scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    _assert_deletable(user)
     return await _set_user_status(user_id, "deleted", "soft_delete_user",
                                   "User soft-deleted (records retained)", admin_id, ip_address, db)
 
@@ -1067,8 +1096,7 @@ async def delete_user(
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    if user.role in ("super_admin",):
-        raise HTTPException(status_code=403, detail="Cannot delete super_admin user")
+    _assert_deletable(user)   # super_admin + promotional + named anchor accounts
     if user.id == admin_id:
         raise HTTPException(status_code=400, detail="Cannot delete your own account")
 
