@@ -29,14 +29,37 @@ def _start_of_month():
     return today.replace(day=1)
 
 
-async def _revenue_stats(db: AsyncSession, since=None, until=None):
+async def _excluded_account_ids(db: AsyncSession) -> list:
+    """Trading-account ids that must NEVER count in admin analytics/revenue:
+    every account owned by a promotional OR demo user, plus any is_demo-flagged
+    account. (client 2026-07-15 — the promo showcase + demo trades were
+    inflating the Analytics revenue cards even though Finance Overview already
+    excluded them.) The showcase data still shows on the trader side; it just
+    doesn't count as real company revenue."""
+    excl_user_ids = [r[0] for r in (await db.execute(
+        select(User.id).where(or_(User.is_promotional == True, User.is_demo == True))  # noqa: E712
+    )).all()]
+    q = select(TradingAccount.id).where(or_(
+        TradingAccount.is_demo == True,  # noqa: E712
+        TradingAccount.user_id.in_(excl_user_ids) if excl_user_ids else False,
+    ))
+    return [r[0] for r in (await db.execute(q)).all()]
+
+
+async def _revenue_stats(db: AsyncSession, since=None, until=None, excl_acct_ids=None):
     """Aggregate revenue between [since, until). Either bound may be None.
     `since=None` ⇒ all time. `until=None` ⇒ now (open-ended). The `today /
     this_week / this_month / all_time` cards pass only `since`; the
-    custom-range filter on the analytics page passes both."""
+    custom-range filter on the analytics page passes both. `excl_acct_ids`
+    (promo + demo accounts) is excluded from every figure."""
+    excl_acct_ids = excl_acct_ids or []
     commission_filter = [Position.commission != 0]
     swap_filter = [Position.swap != 0]
     pnl_filter = []
+    if excl_acct_ids:
+        commission_filter.append(Position.account_id.notin_(excl_acct_ids))
+        swap_filter.append(Position.account_id.notin_(excl_acct_ids))
+        pnl_filter.append(TradeHistory.account_id.notin_(excl_acct_ids))
 
     if since:
         commission_filter.append(Position.created_at >= since)
@@ -62,6 +85,8 @@ async def _revenue_stats(db: AsyncSession, since=None, until=None):
     # Order.spread_revenue (mig 0078); summed over the same window here. It was
     # previously hard-coded to 0 so spread never showed as a distinct figure.
     spread_filter = [Order.spread_revenue != 0]
+    if excl_acct_ids:
+        spread_filter.append(Order.account_id.notin_(excl_acct_ids))
     if since:
         spread_filter.append(Order.created_at >= since)
     if until:
@@ -97,13 +122,17 @@ async def analytics_dashboard(
     `custom_range` bucket alongside the always-on today / this_week /
     this_month / all_time buckets. The frontend's date-range filter sends
     both bounds for ranges like 'yesterday' or 'last 7 days'."""
-    today = await _revenue_stats(db, _start_of_today())
-    week = await _revenue_stats(db, _start_of_week())
-    month = await _revenue_stats(db, _start_of_month())
-    all_time = await _revenue_stats(db)
+    # Promo + demo accounts never count as real company revenue — compute the
+    # excluded-account set ONCE and thread it through every revenue figure.
+    excl_acct_ids = await _excluded_account_ids(db)
+
+    today = await _revenue_stats(db, _start_of_today(), excl_acct_ids=excl_acct_ids)
+    week = await _revenue_stats(db, _start_of_week(), excl_acct_ids=excl_acct_ids)
+    month = await _revenue_stats(db, _start_of_month(), excl_acct_ids=excl_acct_ids)
+    all_time = await _revenue_stats(db, excl_acct_ids=excl_acct_ids)
     custom_range = None
     if start_date is not None:
-        custom_range = await _revenue_stats(db, start_date, end_date)
+        custom_range = await _revenue_stats(db, start_date, end_date, excl_acct_ids=excl_acct_ids)
 
     # Promotional demo accounts are excluded from every admin analytics number.
     promo_ids = select(User.id).where(User.is_promotional == True)  # noqa: E712
@@ -124,18 +153,18 @@ async def analytics_dashboard(
     )
     total_withdrawals = float(wd_q.scalar() or 0)
 
+    _excl = excl_acct_ids or []
     open_pos_q = await db.execute(
         select(func.count(Position.id))
-        .select_from(Position)
-        .join(TradingAccount, TradingAccount.id == Position.account_id)
-        .where(Position.status == PositionStatus.OPEN.value, TradingAccount.is_promotional.isnot(True))
+        .where(
+            Position.status == PositionStatus.OPEN.value,
+            Position.account_id.notin_(_excl) if _excl else True,
+        )
     )
 
     closed_trades_q = await db.execute(
         select(func.count(TradeHistory.id))
-        .select_from(TradeHistory)
-        .join(TradingAccount, TradingAccount.id == TradeHistory.account_id)
-        .where(TradingAccount.is_promotional.isnot(True))
+        .where(TradeHistory.account_id.notin_(_excl) if _excl else True)
     )
 
     # Admin commission earned from all sources (PAMM performance fee, copy-trade, etc.)
