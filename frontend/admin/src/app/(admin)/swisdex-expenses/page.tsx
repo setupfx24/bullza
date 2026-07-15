@@ -23,8 +23,13 @@ interface Expense {
   created_at: string | null;
 }
 
+// Company expenses are tracked in Indian Rupees (client 2026-07-15). ₹ renders
+// fine on screen; the PDF's Latin-1-only font would strip ₹, so the PDF uses
+// an ASCII "Rs." prefix instead (see pdfFmt).
 const fmt = (n: number) =>
-  `$${(n ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  `₹${(n ?? 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+const pdfFmt = (n: number) =>
+  `Rs. ${(n ?? 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const today = () => new Date().toISOString().slice(0, 10);
 const emptyForm = () => ({ expense_date: today(), name: '', amount: '', reason: '', result: '' });
 
@@ -124,21 +129,21 @@ export default function SwisDexExpensesPage() {
         [
           { header: 'Date', align: 'left', mono: true, width: 26 },
           { header: 'Name', align: 'left' },
-          { header: 'Amount (USD)', align: 'right', mono: true, width: 30 },
+          { header: 'Amount (INR)', align: 'right', mono: true, width: 30 },
           { header: 'Reason', align: 'left' },
           { header: 'Result', align: 'left' },
         ],
         filtered.map((e) => [
           e.expense_date || '',
           e.name || '',
-          fmt(e.amount),
+          pdfFmt(e.amount),
           e.reason || '-',
           e.result || '-',
         ]),
         {
           subtitle: 'Company operating-expense ledger',
           periodLabel,
-          summaryLines: [`Total: ${fmt(filteredTotal)}    Entries: ${filtered.length}`],
+          summaryLines: [`Total: ${pdfFmt(filteredTotal)}    Entries: ${filtered.length}`],
           filename: 'swisdex-expenses',
           landscape: false,
         },
@@ -269,7 +274,7 @@ export default function SwisDexExpensesPage() {
                   placeholder="e.g. Office rent, Google Ads, Salary — John" />
               </div>
               <div>
-                <label className="block text-xxs text-text-tertiary uppercase tracking-wide">Amount (USD) *</label>
+                <label className="block text-xxs text-text-tertiary uppercase tracking-wide">Amount (INR) *</label>
                 <input type="number" min="0" step="0.01" value={form.amount}
                   onChange={(e) => setForm({ ...form, amount: e.target.value })}
                   className="w-full mt-1 rounded-md bg-bg-tertiary border border-border-primary px-3 py-2 text-sm text-text-primary font-mono"
