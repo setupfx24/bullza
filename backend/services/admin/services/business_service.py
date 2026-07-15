@@ -1096,17 +1096,21 @@ async def get_unassigned_users(page: int, per_page: int, db: AsyncSession) -> di
 
 
 async def get_ib_referrals(ib_id: uuid.UUID, page: int, per_page: int, db: AsyncSession) -> dict:
-    """Traders referred by a specific IB with commission data."""
+    """Traders referred by a specific IB with commission data.
+
+    Promotional downline is INCLUDED here (client 2026-07-15): the IB Tree
+    count badge (`referral_count`) already counts every referral, so hiding
+    promo users from this list made the count and the list disagree — an IB
+    showed "12 users" but "No users under this IB". The admin wants to see who
+    is actually under each IB in the tree, so we list everyone the count
+    covers. (Promo hiding stays in effect on the general Users list / unassigned
+    section, not the IB drill-down.)"""
     super_id = await _super_ib_profile_id(db)
     total = (await db.execute(
-        select(func.count(Referral.id)).where(
-            Referral.ib_profile_id == ib_id, Referral.referred_id.notin_(_promo_ids())
-        )
+        select(func.count(Referral.id)).where(Referral.ib_profile_id == ib_id)
     )).scalar() or 0
     refs = await db.execute(
-        select(Referral).where(
-            Referral.ib_profile_id == ib_id, Referral.referred_id.notin_(_promo_ids())
-        )
+        select(Referral).where(Referral.ib_profile_id == ib_id)
         .order_by(Referral.created_at.desc()).offset((page - 1) * per_page).limit(per_page))
     items = []
     for r in refs.scalars().all():
