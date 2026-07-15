@@ -45,7 +45,9 @@ function tierLabel(t: Tier) {
 }
 
 function tierReward(t: Tier) {
-  return t.reward_amount != null ? `${fmtUsd(t.reward_amount)} flat` : `${t.reward_pct}% of volume`;
+  // Show a plain dollar reward for fixed-value tiers (client 2026-07-15:
+  // "reward me percentage nahi, only value"); percent tiers still read "% of volume".
+  return t.reward_amount != null ? fmtUsd(t.reward_amount) : `${t.reward_pct}% of volume`;
 }
 
 function inTier(t: Tier, total: number) {
@@ -97,10 +99,10 @@ function Inner() {
           <Gift className="text-[#55a630]" size={24} /> Rewards
         </h1>
         <p className="mt-1 text-sm text-text-secondary max-w-2xl">
-          Limited-time offers: invite new users with your referral link — when they join and lock{' '}
-          <strong className="text-text-primary">AI Powered Staking</strong> during the offer period,
-          you earn a percentage of everything they stake. Claim your reward to your wallet once the
-          offer ends.
+          Limited-time offers: stake yourself or invite new users with your referral link — as the{' '}
+          combined <strong className="text-text-primary">AI Powered Staking</strong> volume you and your
+          direct team lock during the offer period reaches each milestone, you unlock that milestone&apos;s
+          reward. Claim it to your wallet once the offer ends.
         </p>
       </header>
 

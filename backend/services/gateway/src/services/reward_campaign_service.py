@@ -21,7 +21,7 @@ from decimal import Decimal
 from uuid import UUID
 
 from fastapi import HTTPException
-from sqlalchemy import func, select
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from packages.common.src.models import (
@@ -66,17 +66,26 @@ def _tier_for(tiers: list[RewardCampaignTier], total: Decimal) -> RewardCampaign
 
 
 async def _qualifying_total(db: AsyncSession, campaign: RewardCampaign, referrer_id) -> Decimal:
-    """SUM of staking principal locked in-window by in-window signups referred
-    by `referrer_id`."""
+    """Qualifying staking volume toward the milestone reward: in-window locks
+    made BY THE USER THEMSELF **or** by their DIRECT team — i.e. users they
+    referred who signed up during the window (client 2026-07-15: "when the user
+    achieves value by himself or his direct team"). Deep (2nd-level+) referrals
+    do not count."""
     total = (await db.execute(
         select(func.coalesce(func.sum(FixedReturnLock.principal), 0))
         .select_from(FixedReturnLock)
         .join(User, User.id == FixedReturnLock.user_id)
         .where(
-            User.referred_by_user_id == referrer_id,
-            User.id != referrer_id,
-            User.created_at >= campaign.starts_at,
-            User.created_at <= campaign.ends_at,
+            or_(
+                # The referrer's own staking.
+                User.id == referrer_id,
+                # Their direct referrals who joined during the window.
+                and_(
+                    User.referred_by_user_id == referrer_id,
+                    User.created_at >= campaign.starts_at,
+                    User.created_at <= campaign.ends_at,
+                ),
+            ),
             FixedReturnLock.locked_at >= campaign.starts_at,
             FixedReturnLock.locked_at <= campaign.ends_at,
         )

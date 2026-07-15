@@ -233,7 +233,7 @@ export default function RewardCampaignsPage() {
                   <span key={i} className="text-[10px] font-mono px-2 py-1 rounded-md bg-bg-input border border-border-primary text-text-secondary">
                     {t.max_amount != null ? `${fmtUsd(t.min_amount)}–${fmtUsd(t.max_amount)}` : `${fmtUsd(t.min_amount)}+`}
                     <span className="text-buy font-bold">
-                      {' '}→ {t.reward_amount != null ? `${fmtUsd(t.reward_amount)} flat` : `${t.reward_pct}%`}
+                      {' '}→ {t.reward_amount != null ? fmtUsd(t.reward_amount) : `${t.reward_pct}%`}
                     </span>
                   </span>
                 ))}
