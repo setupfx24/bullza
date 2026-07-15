@@ -33,6 +33,21 @@ function tvCtor(): TVWidgetCtor | undefined {
   return (window as unknown as { TradingView?: { widget?: TVWidgetCtor } }).TradingView?.widget;
 }
 
+// Small fixed right margin (in bars) so the latest candle hugs the right edge
+// like MT5 — instead of the library's default wide future whitespace that read
+// as a "candle gap" (client 2026-07-15).
+const RIGHT_OFFSET_BARS = 3;
+function applyRightOffset(w: TVWidget): void {
+  try {
+    const ts = (w as any).activeChart?.().getTimeScale?.();
+    if (!ts) return;
+    // Use a FIXED bar offset, not the percentage margin.
+    ts.usePercentageRightOffset?.().setValue(false);
+    ts.defaultRightOffset?.().setValue(RIGHT_OFFSET_BARS);
+    ts.setRightOffset?.(RIGHT_OFFSET_BARS);
+  } catch { /* API shape varies by library version — best-effort */ }
+}
+
 let _libPromise: Promise<void> | null = null;
 function loadChartingLibrary(): Promise<void> {
   if (typeof window === 'undefined') return Promise.resolve();
@@ -339,6 +354,12 @@ export default function ChartingLibraryChart() {
           try { (w as any).applyOverrides?.(themeOverrides); } catch { /* noop */ }
           // Ensure the bid LTP line is on even if a saved layout turned it off.
           try { (w as any).applyOverrides?.(LTP_LINE_OVERRIDES); } catch { /* noop */ }
+          // Keep the newest candle close to the right edge (client 2026-07-15):
+          // the library's default right margin left a large future whitespace
+          // that read as a "candle gap". Pin a small fixed offset (~3 bars),
+          // MT5/TradingView-default style, overriding any wide scroll saved in
+          // the restored layout.
+          applyRightOffset(w);
           // Persist the FULL layout (drawings + studies + settings + interval)
           // on every change so it survives a refresh. save() serialises the
           // whole widget state; we stash it in localStorage. subscribe/save are
@@ -386,7 +407,10 @@ export default function ChartingLibraryChart() {
         try { if (entry && entry.id != null) chart?.removeEntity(entry.id); } catch { /* noop */ }
       }
       linesRef.current.clear();
-      chart?.setSymbol?.(sym, () => { /* resolved */ });
+      chart?.setSymbol?.(sym, () => {
+        // Re-pin the tight right margin after the new symbol's data fits.
+        applyRightOffset(w);
+      });
       appliedSymbolRef.current = sym;
     } catch { /* noop */ }
   }, [selectedSymbol, ready]);
