@@ -205,8 +205,14 @@ async def list_users(
     #     entirely — they exist only to pad referral counts on the trader side.
     # Everything else about promo accounts stays hidden from the rest of admin.
     promo_ids_sq = select(User.id).where(User.is_promotional == True)  # noqa: E712
+    # Staff accounts are not customers. Active employees have role=admin
+    # (already excluded), but a SOFT-DELETED employee is demoted to role=user +
+    # terminated and was leaking into the customer Users list (client
+    # 2026-07-16). Exclude anyone who has an Employee row, active or not.
+    employee_ids_sq = select(Employee.user_id)
     query = select(User).where(
         User.role.notin_(["admin", "super_admin"]),
+        User.id.notin_(employee_ids_sq),
         User.is_demo == False,
         or_(
             User.is_promotional.isnot(True),
