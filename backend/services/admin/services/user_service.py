@@ -233,6 +233,12 @@ async def list_users(
         )
     if status_filter:
         query = query.where(User.status == status_filter)
+    else:
+        # Hide terminated/closed accounts from the DEFAULT customer list
+        # (client 2026-07-16 — soft-deleted staff accounts, demoted to
+        # role=user + terminated, were cluttering it). Still reachable by
+        # explicitly filtering status="terminated".
+        query = query.where(User.status != "terminated")
     if kyc_filter:
         query = query.where(User.kyc_status == kyc_filter)
     # Created-at range — used by the admin Users page's date-range filter
