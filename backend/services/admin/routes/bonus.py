@@ -47,6 +47,19 @@ async def update_bonus_offer(
     )
 
 
+@router.delete("/offers/{offer_id}")
+async def delete_bonus_offer(
+    offer_id: uuid.UUID,
+    request: Request,
+    admin: User = Depends(require_permission("bonus.update")),
+    db: AsyncSession = Depends(get_db),
+):
+    return await bonus_service.delete_bonus_offer(
+        offer_id=offer_id, admin_id=admin.id,
+        ip_address=request.client.host if request.client else None, db=db,
+    )
+
+
 @router.get("/allocations")
 async def list_bonus_allocations(
     page: int = Query(1, ge=1),

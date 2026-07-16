@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { adminApi } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import DateField from '@/components/ui/DateField';
-import { Loader2, Plus, Pencil, RefreshCw, Gift } from 'lucide-react';
+import { Loader2, Plus, Pencil, Trash2, RefreshCw, Gift } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 interface BonusOffer {
@@ -128,6 +128,7 @@ export default function BonusPage() {
   const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState({ ...EMPTY_FORM });
   const [submitting, setSubmitting] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   /** Pull welcome-bonus state from /admin/settings.
    *
@@ -264,6 +265,20 @@ export default function BonusPage() {
     setEditId(null);
     setForm({ ...EMPTY_FORM });
     setShowModal(true);
+  };
+
+  const deleteOffer = async (offer: BonusOffer) => {
+    if (!window.confirm(`Delete the bonus offer "${offer.name}"? This cannot be undone.`)) return;
+    setDeletingId(offer.id);
+    try {
+      await adminApi.delete(`/bonus/offers/${offer.id}`);
+      toast.success('Bonus offer deleted');
+      await fetchData();
+    } catch (e: any) {
+      toast.error(e?.message || 'Delete failed');
+    } finally {
+      setDeletingId(null);
+    }
   };
 
   const openEdit = (offer: BonusOffer) => {
@@ -613,9 +628,15 @@ export default function BonusPage() {
                                 </span>
                               </td>
                               <td className="px-4 py-2.5 text-right">
-                                <button onClick={() => openEdit(offer)} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xxs font-medium text-text-secondary border border-border-primary hover:bg-bg-hover transition-fast">
-                                  <Pencil size={12} /> Edit
-                                </button>
+                                <div className="inline-flex items-center gap-1.5">
+                                  <button onClick={() => openEdit(offer)} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xxs font-medium text-text-secondary border border-border-primary hover:bg-bg-hover transition-fast">
+                                    <Pencil size={12} /> Edit
+                                  </button>
+                                  <button onClick={() => void deleteOffer(offer)} disabled={deletingId === offer.id}
+                                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xxs font-medium text-danger border border-danger/40 hover:bg-danger/10 disabled:opacity-50 transition-fast">
+                                    {deletingId === offer.id ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />} Delete
+                                  </button>
+                                </div>
                               </td>
                             </tr>
                           );

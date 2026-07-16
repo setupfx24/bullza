@@ -122,6 +122,38 @@ async def update_bonus_offer(
     return {"message": "Bonus offer updated"}
 
 
+async def delete_bonus_offer(
+    offer_id: uuid.UUID,
+    admin_id: uuid.UUID,
+    ip_address: str | None,
+    db: AsyncSession,
+) -> dict:
+    """Delete a bonus offer (client 2026-07-15). Blocked once it has been
+    allocated to users — UserBonus.offer_id references it, and deleting would
+    orphan those grants; deactivate it instead."""
+    offer = (await db.execute(
+        select(BonusOffer).where(BonusOffer.id == offer_id)
+    )).scalar_one_or_none()
+    if not offer:
+        raise HTTPException(status_code=404, detail="Bonus offer not found")
+    allocations = (await db.execute(
+        select(func.count(UserBonus.id)).where(UserBonus.offer_id == offer_id)
+    )).scalar() or 0
+    if allocations > 0:
+        raise HTTPException(
+            status_code=409,
+            detail=f"This offer has {allocations} allocation(s) already — deactivate it instead of deleting (the grant history must stay).",
+        )
+    await write_audit_log(
+        db, admin_id, "delete_bonus_offer", "bonus_offer", offer_id,
+        old_values={"name": offer.name},
+        ip_address=ip_address,
+    )
+    await db.delete(offer)
+    await db.commit()
+    return {"message": "Bonus offer deleted"}
+
+
 async def list_user_bonuses(
     page: int,
     per_page: int,
