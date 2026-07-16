@@ -46,7 +46,14 @@ async def list_positions(
     query = (
         select(Position)
         .join(TradingAccount, Position.account_id == TradingAccount.id)
-        .where(TradingAccount.is_demo == False, TradingAccount.is_promotional.isnot(True))
+        .join(User, TradingAccount.user_id == User.id)
+        .where(
+            TradingAccount.is_demo == False, TradingAccount.is_promotional.isnot(True),
+            # Also exclude by the OWNING USER — the shared demo user has a
+            # non-demo-flagged account whose trades were leaking here
+            # (client 2026-07-16).
+            User.is_demo == False, User.is_promotional.isnot(True),
+        )
     )
     if status_filter == "open":
         query = query.where(Position.status == PositionStatus.OPEN.value)
@@ -146,7 +153,11 @@ async def list_orders(
     query = (
         select(Order)
         .join(TradingAccount, Order.account_id == TradingAccount.id)
-        .where(TradingAccount.is_demo == False, TradingAccount.is_promotional.isnot(True))
+        .join(User, TradingAccount.user_id == User.id)
+        .where(
+            TradingAccount.is_demo == False, TradingAccount.is_promotional.isnot(True),
+            User.is_demo == False, User.is_promotional.isnot(True),
+        )
     )
     if status_filter == "pending":
         query = query.where(Order.status == OrderStatus.PENDING)
@@ -207,7 +218,11 @@ async def list_trade_history(
     query = (
         select(TradeHistory)
         .join(TradingAccount, TradeHistory.account_id == TradingAccount.id)
-        .where(TradingAccount.is_demo == False, TradingAccount.is_promotional.isnot(True))
+        .join(User, TradingAccount.user_id == User.id)
+        .where(
+            TradingAccount.is_demo == False, TradingAccount.is_promotional.isnot(True),
+            User.is_demo == False, User.is_promotional.isnot(True),
+        )
     )
     if start_date is not None:
         query = query.where(TradeHistory.closed_at >= start_date)
