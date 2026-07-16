@@ -1,7 +1,7 @@
 """Admin Dashboard Service — stats and revenue series."""
 from datetime import datetime, timedelta, date
 
-from sqlalchemy import select, func
+from sqlalchemy import select, func, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from packages.common.src.models import (
@@ -27,7 +27,18 @@ async def get_dashboard_stats(db: AsyncSession) -> DashboardStats:
         )
     )
     total_users = total_users_q.scalar() or 0
-    promo_ids = select(User.id).where(User.is_promotional == True)  # noqa: E712
+    # Exclude BOTH promotional and demo accounts from every dashboard figure —
+    # by the owning user AND by account id (the shared demo user owns a
+    # non-demo-flagged account that was leaking into Platform P&L; client
+    # 2026-07-16). Account-scoped rows (trades, positions) filter on
+    # excl_acct_ids; user-scoped rows (deposits, withdrawals) on excl_user_ids.
+    excl_user_ids = select(User.id).where(
+        or_(User.is_promotional == True, User.is_demo == True)  # noqa: E712
+    )
+    excl_acct_ids = select(TradingAccount.id).where(
+        or_(TradingAccount.is_demo == True, TradingAccount.user_id.in_(excl_user_ids))  # noqa: E712
+    )
+    promo_ids = excl_user_ids  # backwards-compat alias for the deposit/withdrawal filters below
 
     # Active Traders: distinct users who traded in the last 30 days
     # (opened a position OR closed a trade). Broader than "has open position now".
@@ -39,14 +50,14 @@ async def get_dashboard_stats(db: AsyncSession) -> DashboardStats:
         select(TradingAccount.user_id)
         .select_from(Position)
         .join(TradingAccount, TradingAccount.id == Position.account_id)
-        .where(Position.created_at >= thirty_days_ago, TradingAccount.is_promotional.isnot(True))
+        .where(Position.created_at >= thirty_days_ago, TradingAccount.id.notin_(excl_acct_ids))
     )
     # Users with trades closed in last 30 days
     closed_users_q = (
         select(TradingAccount.user_id)
         .select_from(TradeHistory)
         .join(TradingAccount, TradingAccount.id == TradeHistory.account_id)
-        .where(TradeHistory.closed_at >= thirty_days_ago, TradingAccount.is_promotional.isnot(True))
+        .where(TradeHistory.closed_at >= thirty_days_ago, TradingAccount.id.notin_(excl_acct_ids))
     )
     combined = open_users_q.union(closed_users_q).subquery()
     active_traders_q = await db.execute(
@@ -83,7 +94,7 @@ async def get_dashboard_stats(db: AsyncSession) -> DashboardStats:
         .join(TradingAccount, TradingAccount.id == Position.account_id)
         .where(
             Position.status == PositionStatus.CLOSED.value,
-            TradingAccount.is_promotional.isnot(True),
+            TradingAccount.id.notin_(excl_acct_ids),
         )
     )
     user_pnl = float(pnl_q.scalar() or 0)
@@ -91,6 +102,7 @@ async def get_dashboard_stats(db: AsyncSession) -> DashboardStats:
     commission_all_q = await db.execute(
         select(func.coalesce(func.sum(Transaction.amount), 0)).where(
             Transaction.type == "commission",
+            or_(Transaction.user_id.is_(None), Transaction.user_id.notin_(excl_user_ids)),
         )
     )
     total_commission = float(commission_all_q.scalar() or 0)
@@ -102,6 +114,7 @@ async def get_dashboard_stats(db: AsyncSession) -> DashboardStats:
         select(func.coalesce(func.sum(Transaction.amount), 0)).where(
             Transaction.type == "commission",
             Transaction.created_at >= today_start,
+            or_(Transaction.user_id.is_(None), Transaction.user_id.notin_(excl_user_ids)),
         )
     )
     commission_paid = float(commission_q.scalar() or 0)
@@ -138,7 +151,10 @@ async def dashboard_revenue_series(days: int, db: AsyncSession) -> DashboardReve
     end_d: date = datetime.utcnow().date()
     start_d: date = end_d - timedelta(days=days - 1)
     cutoff = datetime.combine(start_d, datetime.min.time())
-    promo_ids = select(User.id).where(User.is_promotional == True)  # noqa: E712
+    # Exclude promotional AND demo accounts from the revenue chart too.
+    promo_ids = select(User.id).where(
+        or_(User.is_promotional == True, User.is_demo == True)  # noqa: E712
+    )
 
     day_bucket = func.date_trunc("day", Deposit.created_at)
     dep_rows = (
