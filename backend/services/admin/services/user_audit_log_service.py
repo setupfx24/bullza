@@ -4,7 +4,7 @@ import uuid
 from datetime import date, datetime, time, timezone
 
 from fastapi import HTTPException
-from sqlalchemy import select, func
+from sqlalchemy import select, func, or_
 from sqlalchemy.exc import ProgrammingError, DBAPIError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -33,6 +33,15 @@ def _apply_filters(
     date_from: date | None,
     date_to: date | None,
 ):
+    # Hide promotional + demo accounts' activity from the admin audit log
+    # (client 2026-07-16 — demo/promo logins & trades were showing here). Keep
+    # system rows (NULL user_id).
+    _excl_users = select(User.id).where(
+        or_(User.is_promotional == True, User.is_demo == True)  # noqa: E712
+    )
+    stmt = stmt.where(
+        or_(UserAuditLog.user_id.is_(None), UserAuditLog.user_id.notin_(_excl_users))
+    )
     if user_id:
         stmt = stmt.where(UserAuditLog.user_id == user_id)
     if action_type:
