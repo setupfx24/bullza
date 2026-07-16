@@ -38,6 +38,12 @@ async def list_employees(db: AsyncSession) -> dict:
     for emp in employees:
         user_q = await db.execute(select(User).where(User.id == emp.user_id))
         user = user_q.scalar_one_or_none()
+        # Hide soft-deleted employees from the list (client 2026-07-16 — "delete
+        # should actually remove them"). The Employee row + audit log stay in
+        # the DB for compliance; they just no longer clutter the list. A
+        # soft-deleted employee's linked user is demoted + terminated.
+        if user is not None and getattr(user, "status", None) == "terminated":
+            continue
         full_name = f"{user.first_name or ''} {user.last_name or ''}".strip() if user else ""
         items.append({
             "id": str(emp.id),
