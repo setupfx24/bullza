@@ -28,12 +28,14 @@ LP_FRESH_WINDOW_MS = 10_000                # consider LP "connected" for 10s aft
 async def get_book_stats(db: AsyncSession) -> dict:
     """Return A/B book user and trade counts."""
     _admin_roles = ("admin", "super_admin")
-    # User counts — include all non-admin roles, exclude demo
+    # User counts — non-admin roles, exclude demo AND promotional accounts
+    # (promo showcase users must not appear in the admin Book Management view;
+    # client 2026-07-15).
     a_users = (await db.execute(
-        select(func.count(User.id)).where(User.book_type == "A", User.role.notin_(_admin_roles), User.is_demo == False)
+        select(func.count(User.id)).where(User.book_type == "A", User.role.notin_(_admin_roles), User.is_demo == False, User.is_promotional.isnot(True))
     )).scalar() or 0
     b_users = (await db.execute(
-        select(func.count(User.id)).where(User.book_type == "B", User.role.notin_(_admin_roles), User.is_demo == False)
+        select(func.count(User.id)).where(User.book_type == "B", User.role.notin_(_admin_roles), User.is_demo == False, User.is_promotional.isnot(True))
     )).scalar() or 0
 
     # Trade counts (open positions)
@@ -41,13 +43,13 @@ async def get_book_stats(db: AsyncSession) -> dict:
         select(func.count(Position.id))
         .join(TradingAccount, Position.account_id == TradingAccount.id)
         .join(User, TradingAccount.user_id == User.id)
-        .where(Position.status == "open", User.book_type == "A", TradingAccount.is_demo == False)
+        .where(Position.status == "open", User.book_type == "A", TradingAccount.is_demo == False, User.is_promotional.isnot(True))
     )).scalar() or 0
     b_trades = (await db.execute(
         select(func.count(Position.id))
         .join(TradingAccount, Position.account_id == TradingAccount.id)
         .join(User, TradingAccount.user_id == User.id)
-        .where(Position.status == "open", User.book_type == "B", TradingAccount.is_demo == False)
+        .where(Position.status == "open", User.book_type == "B", TradingAccount.is_demo == False, User.is_promotional.isnot(True))
     )).scalar() or 0
 
     return {
@@ -63,8 +65,8 @@ async def list_book_users(
 ) -> dict:
     """Paginated user list with book type, account count, trade count."""
     _admin_roles = ("admin", "super_admin")
-    base = select(User).where(User.role.notin_(_admin_roles), User.is_demo == False)
-    count_base = select(func.count(User.id)).where(User.role.notin_(_admin_roles), User.is_demo == False)
+    base = select(User).where(User.role.notin_(_admin_roles), User.is_demo == False, User.is_promotional.isnot(True))
+    count_base = select(func.count(User.id)).where(User.role.notin_(_admin_roles), User.is_demo == False, User.is_promotional.isnot(True))
 
     if book_filter and book_filter in ("A", "B"):
         base = base.where(User.book_type == book_filter)
@@ -293,13 +295,13 @@ async def get_abook_positions(page: int, per_page: int, db: AsyncSession) -> dic
         select(Position)
         .join(TradingAccount, Position.account_id == TradingAccount.id)
         .join(User, TradingAccount.user_id == User.id)
-        .where(Position.status == "open", User.book_type == "A", TradingAccount.is_demo == False)
+        .where(Position.status == "open", User.book_type == "A", TradingAccount.is_demo == False, User.is_promotional.isnot(True))
     )
     total = (await db.execute(
         select(func.count(Position.id))
         .join(TradingAccount, Position.account_id == TradingAccount.id)
         .join(User, TradingAccount.user_id == User.id)
-        .where(Position.status == "open", User.book_type == "A", TradingAccount.is_demo == False)
+        .where(Position.status == "open", User.book_type == "A", TradingAccount.is_demo == False, User.is_promotional.isnot(True))
     )).scalar() or 0
 
     result = await db.execute(
@@ -336,13 +338,13 @@ async def get_abook_history(page: int, per_page: int, db: AsyncSession) -> dict:
         select(TradeHistory)
         .join(TradingAccount, TradeHistory.account_id == TradingAccount.id)
         .join(User, TradingAccount.user_id == User.id)
-        .where(User.book_type == "A", TradingAccount.is_demo == False)
+        .where(User.book_type == "A", TradingAccount.is_demo == False, User.is_promotional.isnot(True))
     )
     total = (await db.execute(
         select(func.count(TradeHistory.id))
         .join(TradingAccount, TradeHistory.account_id == TradingAccount.id)
         .join(User, TradingAccount.user_id == User.id)
-        .where(User.book_type == "A", TradingAccount.is_demo == False)
+        .where(User.book_type == "A", TradingAccount.is_demo == False, User.is_promotional.isnot(True))
     )).scalar() or 0
 
     result = await db.execute(
