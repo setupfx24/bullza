@@ -31,6 +31,13 @@ PERMISSION_CATALOG = {
     "Withdrawals": ["withdrawals.view", "withdrawals.approve", "withdrawals.reject"],
     "Approvals":   ["funds.approve"],
     "Trading":     ["trades.view", "trades.modify", "trades.close", "trades.create", "trades.manage", "positions.view", "orders.view"],
+    # Risk Management page + actions (client 2026-07-16 — was missing from the
+    # custom-role builder). Mirrors the built-in risk_manager role: the page is
+    # gated by trades.view; exposure.view shows house exposure; the user-control
+    # actions (ban / block trading / kill switch) are the risk levers. These
+    # keys also appear under Users/Trading/Analytics — granting via either box
+    # sets the same permission.
+    "Risk Management": ["trades.view", "positions.view", "exposure.view", "users.ban", "users.block_trading", "users.kill_switch"],
     "Social":      ["social.view", "social.manage"],
     "Banks":       ["banks.view", "banks.create", "banks.update"],
     "IB":          ["ib.view", "ib.manage"],
