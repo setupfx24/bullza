@@ -154,7 +154,15 @@ async def list_all_tasks(
 ):
     """Reports view — admin/super-admin see all employees' tasks (the daily
     reports). Filter by employee, status, or date."""
-    stmt = select(EmployeeTask).order_by(desc(EmployeeTask.created_at)).limit(1000)
+    # Hide tasks of soft-deleted employees (client 2026-07-16) — a deleted
+    # employee's linked user is terminated, and their old tasks shouldn't
+    # clutter the reports once they're gone from the Employees list.
+    _terminated = select(User.id).where(User.status == "terminated")
+    stmt = (
+        select(EmployeeTask)
+        .where(EmployeeTask.assigned_to.notin_(_terminated))
+        .order_by(desc(EmployeeTask.created_at)).limit(1000)
+    )
     if assigned_to is not None:
         stmt = stmt.where(EmployeeTask.assigned_to == assigned_to)
     if status in ("pending", "done", "undone"):
