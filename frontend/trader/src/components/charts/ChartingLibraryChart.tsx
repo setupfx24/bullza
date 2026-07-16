@@ -488,13 +488,13 @@ export default function ChartingLibraryChart() {
       });
       if (p.stop_loss && Number(p.stop_loss) > 0) {
         const slp = Number(p.stop_loss);
-        const r = livePnlFor(p, { bid: slp, ask: slp }, useTradingStore.getState().instruments, sym);
+        const r = livePnlFor(p, { bid: slp, ask: slp }, useTradingStore.getState().instruments, sym, useTradingStore.getState().prices);
         const pl = r ? `  ${r.pnl >= 0 ? '+' : '−'}$${Math.abs(r.pnl).toFixed(2)}` : '';
         desired.push({ key: `${p.id}-sl`, price: slp, color: '#f59e0b', text: `SL ${fp(slp)}${pl}`, dashed: true });
       }
       if (p.take_profit && Number(p.take_profit) > 0) {
         const tpp = Number(p.take_profit);
-        const r = livePnlFor(p, { bid: tpp, ask: tpp }, useTradingStore.getState().instruments, sym);
+        const r = livePnlFor(p, { bid: tpp, ask: tpp }, useTradingStore.getState().instruments, sym, useTradingStore.getState().prices);
         const pl = r ? `  ${r.pnl >= 0 ? '+' : '−'}$${Math.abs(r.pnl).toFixed(2)}` : '';
         desired.push({ key: `${p.id}-tp`, price: tpp, color: '#14b8a6', text: `TP ${fp(tpp)}${pl}`, dashed: true });
       }
@@ -916,7 +916,7 @@ export default function ChartingLibraryChart() {
           // the live P&L uses, evaluated at the SL/TP level — accurate).
           let ptxt = `${kind === 'sl' ? 'SL' : 'TP'} ${price ? price.toFixed(digits) : '—'}`;
           if (price) {
-            const rr = livePnlFor(p, { bid: price, ask: price }, useTradingStore.getState().instruments, sym);
+            const rr = livePnlFor(p, { bid: price, ask: price }, useTradingStore.getState().instruments, sym, useTradingStore.getState().prices);
             if (rr) ptxt += `  ${rr.pnl >= 0 ? '+' : '−'}$${Math.abs(rr.pnl).toFixed(2)}`;
           }
           lbl.textContent = ptxt;
@@ -932,7 +932,7 @@ export default function ChartingLibraryChart() {
           const price = r ? priceForY(ev.clientY - r.top) : null;
           if (!price || !(price > 0)) { toast.error('Could not read price'); return; }
           const label = kind === 'sl' ? 'Stop Loss' : 'Take Profit';
-          const proj = livePnlFor(p, { bid: price, ask: price }, useTradingStore.getState().instruments, sym);
+          const proj = livePnlFor(p, { bid: price, ask: price }, useTradingStore.getState().instruments, sym, useTradingStore.getState().prices);
           const projTxt = proj ? ` → ${proj.pnl >= 0 ? 'profit' : 'loss'} ${proj.pnl >= 0 ? '+' : '−'}$${Math.abs(proj.pnl).toFixed(2)}` : '';
           const applyBracket = async () => {
             try {

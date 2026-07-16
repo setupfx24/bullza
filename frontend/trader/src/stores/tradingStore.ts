@@ -22,11 +22,30 @@ export function defaultContractSize(symbol: string): number {
  * which was the ~1s "P&L flickers to zero" flash. Returns null when there's no
  * usable tick, so the caller keeps whatever value it already had.
  */
+/** USD value of 1 unit of `quote` currency, from live prices. USD{quote}
+ *  (e.g. USDJPY → JPY per USD, so USD per JPY = 1/mid) or {quote}USD
+ *  (e.g. EURUSD → USD per EUR, use directly). null if no rate is available. */
+function usdPerQuote(
+  quote: string,
+  allPrices?: Record<string, { bid: number; ask: number }> | null,
+): number | null {
+  if (!quote || quote === 'USD') return 1;
+  if (!allPrices) return null;
+  const mid = (t?: { bid: number; ask: number }) =>
+    t && t.bid > 0 && t.ask > 0 ? (t.bid + t.ask) / 2 : 0;
+  const usdQuote = mid(allPrices[`USD${quote}`]);   // quote per 1 USD
+  if (usdQuote > 0) return 1 / usdQuote;
+  const quoteUsd = mid(allPrices[`${quote}USD`]);   // USD per 1 quote
+  if (quoteUsd > 0) return quoteUsd;
+  return null;
+}
+
 export function livePnlFor(
   pos: { side: string; open_price: number; lots: number; effective_lots?: number },
   tick: { bid: number; ask: number } | undefined | null,
   instruments: Array<{ symbol: string; contract_size?: number | null; base_currency?: string | null; quote_currency?: string | null }>,
   symbol: string,
+  allPrices?: Record<string, { bid: number; ask: number }> | null,
 ): { cp: number; pnl: number } | null {
   if (!tick) return null;
   const sym = (symbol || '').trim().toUpperCase();
@@ -46,10 +65,20 @@ export function livePnlFor(
   let pnl = pos.side === 'buy'
     ? (cp - pos.open_price) * pnlLots * cs
     : (pos.open_price - cp) * pnlLots * cs;
+  // Convert quote-currency P&L → USD (account currency).
   const base = (inst?.base_currency || (sym.length >= 6 ? sym.slice(0, 3) : '')).toUpperCase();
   const quote = (inst?.quote_currency || (sym.length >= 6 ? sym.slice(3, 6) : '')).toUpperCase();
-  if (quote && quote !== 'USD' && base === 'USD' && cp) {
-    pnl = pnl / cp;
+  if (quote && quote !== 'USD' && cp) {
+    if (base === 'USD') {
+      // USD-base pair (USDJPY/USDCAD/USDCHF): cp = quote per USD → divide.
+      pnl = pnl / cp;
+    } else {
+      // CROSS pair (GBPJPY, EURJPY, EURGBP…): neither side is USD. Convert the
+      // quote currency to USD via a live rate — previously skipped, so a JPY
+      // cross showed raw JPY as dollars, ~150× too large (client 2026-07-16).
+      const r = usdPerQuote(quote, allPrices);
+      if (r != null) pnl = pnl * r;
+    }
   }
   return { cp, pnl };
 }
@@ -317,7 +346,7 @@ export const useTradingStore = create<TradingState>()((set, get) => ({
             insurance_expires_at: p.insurance_expires_at ?? null,
           };
           const sym = (mapped.symbol || '').trim().toUpperCase();
-          const r = livePnlFor(mapped, livePrices[sym], liveInstruments, sym);
+          const r = livePnlFor(mapped, livePrices[sym], liveInstruments, sym, livePrices);
           return r ? { ...mapped, current_price: r.cp, profit: r.pnl } : mapped;
         }),
       });
@@ -396,18 +425,21 @@ export const useTradingStore = create<TradingState>()((set, get) => ({
     }
 
     const prev = state.prices[sym];
+    // The full price map including this tick — passed to livePnlFor so a JPY
+    // cross (GBPJPY etc.) can look up USDJPY to convert quote→USD.
+    const nextPrices = { ...state.prices, [sym]: normalized };
     return {
       prevPrices: prev
         ? { ...state.prevPrices, [sym]: prev.bid }
         : state.prevPrices,
-      prices: { ...state.prices, [sym]: normalized },
+      prices: nextPrices,
       positions: state.positions.map((pos) => {
         const pSym = String(pos.symbol || '').trim().toUpperCase();
         if (pSym !== sym) return pos;
         // Value floating P&L at the tick MID via the shared helper (same
         // "user close quote" basis the backend uses) — keeps the frontend in
         // lockstep with the backend so the number doesn't snap on refresh.
-        const r = livePnlFor(pos, normalized, state.instruments, sym);
+        const r = livePnlFor(pos, normalized, state.instruments, sym, nextPrices);
         if (!r) return pos;
         return { ...pos, current_price: r.cp, profit: r.pnl };
       }),
