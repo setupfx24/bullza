@@ -8,6 +8,7 @@ import { Loader2, Lock, AlertTriangle, CheckCircle2, Clock, Calendar, ChevronsUp
 import DashboardShell from '@/components/layout/DashboardShell';
 import Modal from '@/components/ui/Modal';
 import api from '@/lib/api/client';
+import AiStationPortfolio from './AiStationPortfolio';
 
 interface Tier { label: string; min_amount: number }
 interface Tenure { label: string; days: number }
@@ -713,6 +714,8 @@ export default function FixedReturnPage() {
             </div>
           )}
         </section>
+
+        <AiStationPortfolio />
       </div>
 
       <Modal

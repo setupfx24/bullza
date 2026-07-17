@@ -21,6 +21,7 @@ from routes import (
     fixed_return as fixed_return_admin, rm as rm_admin, tasks as tasks_admin,
     expenses as expenses_admin, risk as risk_admin,
     reward_campaigns as reward_campaigns_admin,
+    ai_station as ai_station_admin,
 )
 
 app_settings = get_settings()
@@ -229,6 +230,7 @@ app.include_router(rm_admin.router, prefix=prefix)
 app.include_router(expenses_admin.router, prefix=prefix)
 app.include_router(risk_admin.router, prefix=prefix)
 app.include_router(reward_campaigns_admin.router, prefix=prefix)
+app.include_router(ai_station_admin.router, prefix=prefix)
 
 
 @app.get("/health")

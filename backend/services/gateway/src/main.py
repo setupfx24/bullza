@@ -22,7 +22,7 @@ from .api import (
     websocket_manager, social, business, portfolio, profile, support,
     notifications, banners, trading_catalog, followers, lp_receiver,
     share, insurance, rewards, play_zone, staking, fixed_return,
-    bonus_tiers, referral_tiers,
+    bonus_tiers, referral_tiers, tradingview, ai_station,
 )
 from .engines.sltp_engine import sltp_engine
 from .engines.copy_engine import copy_engine
@@ -33,6 +33,7 @@ from .engines.overnight_fee_engine import overnight_fee_engine
 from .engines.verification_reminder_engine import verification_reminder_engine
 from .engines.deposit_reminder_engine import deposit_reminder_engine
 from .engines.fixed_return_engine import fixed_return_engine
+from .engines.ai_station_engine import ai_station_engine
 from .engines.eligibility_nudge_engine import eligibility_nudge_engine
 from .engines.statement_engine import statement_engine
 from .engines.payout_engine import payout_engine
@@ -96,6 +97,7 @@ async def lifespan(app: FastAPI):
     await verification_reminder_engine.start()
     await deposit_reminder_engine.start()
     await fixed_return_engine.start()
+    await ai_station_engine.start()
     await eligibility_nudge_engine.start()
     await statement_engine.start()
     await payout_engine.start()
@@ -105,6 +107,7 @@ async def lifespan(app: FastAPI):
     await payout_engine.stop()
     await statement_engine.stop()
     await eligibility_nudge_engine.stop()
+    await ai_station_engine.stop()
     await fixed_return_engine.stop()
     await deposit_reminder_engine.stop()
     await verification_reminder_engine.stop()
@@ -166,6 +169,8 @@ app.include_router(rewards.router, prefix="/api/v1/rewards", tags=["Rewards"])
 app.include_router(play_zone.router, prefix="/api/v1/play", tags=["Play Zone"])
 app.include_router(staking.router, prefix="/api/v1/staking", tags=["Staking"])
 app.include_router(fixed_return.router, prefix="/api/v1/fixed-return", tags=["AI-POWERED STAKING PROGRAM"])
+app.include_router(tradingview.router, prefix="/api/v1/webhooks/tradingview", tags=["AI Station Webhook"])
+app.include_router(ai_station.router, prefix="/api/v1/ai-station", tags=["AI Station"])
 # Public — no JWT. Drives the trader /bonus page's deposit-match tier cards.
 app.include_router(bonus_tiers.router, prefix="/api/v1/bonus", tags=["Bonus Tiers"])
 # Public — no JWT. Drives the trader /products/referral payout-ladder table.

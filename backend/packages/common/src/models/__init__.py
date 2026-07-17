@@ -70,6 +70,7 @@ from .staking import (
     StakingPlan, StakingPosition, StakingRewardAccrual,
 )
 from .fixed_return import FixedReturnLock
+from .ai_station import AiStationSignal, AiStationTrade
 from .vip import VipPass
 from .share import SharedTrade
 from .rm import RMFundingRequest, RmManualRequest
@@ -113,6 +114,8 @@ __all__ = [
     "StakingPlan", "StakingPosition", "StakingRewardAccrual",
     # AI-POWERED STAKING PROGRAM
     "FixedReturnLock",
+    # AI Station (display-only signals/trades)
+    "AiStationSignal", "AiStationTrade",
     # vip
     "VipPass",
     # share

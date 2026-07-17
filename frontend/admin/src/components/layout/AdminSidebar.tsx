@@ -80,6 +80,7 @@ const NAV_ITEMS: NavItem[] = [
   // reach the page without needing config.view (it also lives under Config
   // for super-admins). Same page either way.
   { label: 'AI-POWERED STAKING PROGRAM', href: '/config/fixed-return', icon: Wallet, perm: 'fixed_return.view' },
+  { label: 'AI Station (Trades)', href: '/ai-station', icon: Sparkles, perm: 'ai_station.manage' },
   { label: 'Trade Insurance', href: '/insurance', icon: ShieldCheck, perm: '*' },
   // Play Zone + Lifestyle Fulfillment (gamification/rewards) are not used on
   // this platform — hidden from the sidebar. The pages + APIs still exist, so
