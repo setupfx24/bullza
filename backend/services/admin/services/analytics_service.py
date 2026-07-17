@@ -245,10 +245,14 @@ async def analytics_dashboard(
     )
     active_copies = active_copies_q.scalar() or 0
 
-    # Master earnings — performance fees credited to masters (not admin's share)
+    # Master earnings — performance fees credited to masters (not admin's share).
+    # Promo/demo masters excluded (client 2026-07-16 "yha data delete nhi hua" —
+    # the $659 here was entirely the promo showcase masters). NULL user_id rows
+    # are kept: they can't be attributed, and notin_ would silently drop them.
     copy_perf_fee_q = await db.execute(
         select(func.coalesce(func.sum(Transaction.amount), 0)).where(
             Transaction.type.in_(["ib_commission", "performance_fee", "master_commission"]),
+            or_(Transaction.user_id.is_(None), Transaction.user_id.notin_(promo_demo_user_ids)),
         )
     )
     master_earnings_total = float(copy_perf_fee_q.scalar() or 0)
@@ -269,19 +273,31 @@ async def analytics_dashboard(
     # CREDIT (Give Credit) + bonus WALLET (main_wallet_bonus). Previously this
     # summed only UserBonus rows, so credit/grants showed $0 even after money had
     # been given — matches Finance Overview's Net Credit now (client 2026-07-03).
+    # Promo/demo accounts excluded (client 2026-07-16 — the $1,367 "bonus
+    # given" was entirely promo showcase credit + bonus wallets).
     credit_sum = (await db.execute(
-        select(func.coalesce(func.sum(TradingAccount.credit), 0))
+        select(func.coalesce(func.sum(TradingAccount.credit), 0)).where(
+            TradingAccount.id.notin_(_excl) if _excl else True
+        )
     )).scalar() or 0
     wallet_bonus_sum = (await db.execute(
-        select(func.coalesce(func.sum(User.main_wallet_bonus), 0))
+        select(func.coalesce(func.sum(User.main_wallet_bonus), 0)).where(
+            User.is_promotional.isnot(True), User.is_demo.isnot(True),
+        )
     )).scalar() or 0
     total_bonus_given = float(credit_sum) + float(wallet_bonus_sum)
 
     active_credit = (await db.execute(
-        select(func.count()).select_from(TradingAccount).where(TradingAccount.credit > 0)
+        select(func.count()).select_from(TradingAccount).where(
+            TradingAccount.credit > 0,
+            TradingAccount.id.notin_(_excl) if _excl else True,
+        )
     )).scalar() or 0
     active_user_bonus = (await db.execute(
-        select(func.count(UserBonus.id)).where(UserBonus.status == "active")
+        select(func.count(UserBonus.id)).where(
+            UserBonus.status == "active",
+            or_(UserBonus.user_id.is_(None), UserBonus.user_id.notin_(promo_demo_user_ids)),
+        )
     )).scalar() or 0
     active_bonuses = int(active_credit) + int(active_user_bonus)
 
