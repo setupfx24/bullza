@@ -92,16 +92,17 @@ async def _open_trades(
         .where(Position.status == "open")
         .options(selectinload(Position.instrument))
     )
+    # Promotional showcase accounts are NEVER real house risk — exclude them
+    # from Risk Management in EVERY filter mode, not just "Real only" (client
+    # 2026-07-16: "vaibhav ka promotion account h, trades still showing"; the
+    # dropdown was on "All accounts"). Promo is flagged at the USER level by the
+    # seeders and the per-account flag can lag, so exclude on both.
+    q = q.where(
+        User.is_promotional.isnot(True),
+        TradingAccount.is_promotional == False,  # noqa: E712
+    )
     if book == "real":
-        # Promotional showcase users are flagged at the USER level by the promo
-        # seeders; the per-account flag may lag behind (client 2026-07-16:
-        # "vaibhav ka promotional account h, iski trade yha show ho rhi h").
-        # A trade is non-real if EITHER the account OR its owner is promotional.
-        q = q.where(
-            TradingAccount.is_demo == False,  # noqa: E712
-            TradingAccount.is_promotional == False,  # noqa: E712
-            User.is_promotional.isnot(True),
-        )
+        q = q.where(TradingAccount.is_demo == False)  # noqa: E712
     elif book == "demo":
         q = q.where(TradingAccount.is_demo == True)  # noqa: E712
     if symbol:
