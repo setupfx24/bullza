@@ -540,7 +540,10 @@ class MarketDataService:
         except Exception as exc:
             logger.warning("Stopping AllTick feed: %s", exc)
         self.feed = FeedSimulator(tick_rate_multiplier=1.0)
-        asyncio.create_task(self.feed.start())
+        # Keep a STRONG reference: asyncio holds only weak refs to tasks, so a
+        # bare create_task() can be garbage-collected mid-run and the feed would
+        # die silently (same bug class as the dropped bars, 2026-07-17).
+        self._sim_feed_task = asyncio.create_task(self.feed.start())
 
     async def _infoway_fallback_watchdog(self) -> None:
         """Same safety net as the AllTick watchdog, scoped to InfoWay.
@@ -574,7 +577,10 @@ class MarketDataService:
         except Exception as exc:
             logger.warning("Stopping InfoWay feed: %s", exc)
         self.feed = FeedSimulator(tick_rate_multiplier=1.0)
-        asyncio.create_task(self.feed.start())
+        # Keep a STRONG reference: asyncio holds only weak refs to tasks, so a
+        # bare create_task() can be garbage-collected mid-run and the feed would
+        # die silently (same bug class as the dropped bars, 2026-07-17).
+        self._sim_feed_task = asyncio.create_task(self.feed.start())
 
     async def _auto_seed_bars(self) -> None:
         """Wait for first ticks to arrive, then seed historical bars.

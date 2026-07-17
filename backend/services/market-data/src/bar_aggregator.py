@@ -58,6 +58,38 @@ class BarAggregator:
         # it, and only live ticks reach update() — so it's the signal for the
         # market-closed freeze in run_aggregation_loop.
         self._last_real_tick: dict[str, float] = {}
+        # STRONG references to in-flight _store_bar tasks (client 2026-07-17
+        # "ye gaps q a rhe h firse"). asyncio only keeps WEAK references to
+        # tasks, so a bare `asyncio.create_task(...)` whose result nobody holds
+        # can be garbage-collected mid-await — silently, with no exception. That
+        # dropped ~40% of closed bars under load (428 ticks/min/symbol × 7 TFs
+        # churns enough garbage to run the GC constantly), which is exactly the
+        # chart gaps: ticks healthy, bars missing, logs clean. Keep every task
+        # referenced until it finishes; discard on completion.
+        self._store_tasks: set = set()
+
+    def _spawn_store(self, symbol: str, tf_name: str, bar: "BarData", bar_start: int) -> None:
+        """Fire off a bar persist while holding a STRONG reference to the task.
+
+        Never use a bare asyncio.create_task() here — see _store_tasks in
+        __init__. Failures are logged instead of vanishing, so a lost bar is
+        always visible in the logs rather than showing up as a chart gap.
+        """
+        task = asyncio.create_task(self._store_bar(symbol, tf_name, bar, bar_start))
+        self._store_tasks.add(task)
+
+        def _done(t: "asyncio.Task") -> None:
+            self._store_tasks.discard(t)
+            if t.cancelled():
+                logger.warning("bar store CANCELLED %s %s @%s", symbol, tf_name, bar_start)
+                return
+            exc = t.exception()
+            if exc is not None:
+                logger.error(
+                    "bar store FAILED %s %s @%s: %r", symbol, tf_name, bar_start, exc,
+                )
+
+        task.add_done_callback(_done)
 
     def update(self, symbol: str, bid: float, ask: float, timestamp: str):
         self._last_real_tick[symbol] = time.monotonic()
@@ -75,7 +107,7 @@ class BarAggregator:
                 if current_start is not None and key in self._bars.get(symbol, {}):
                     old_bar = self._bars[symbol].pop(tf_name, None)
                     if old_bar:
-                        asyncio.create_task(self._store_bar(symbol, tf_name, old_bar, current_start))
+                        self._spawn_store(symbol, tf_name, old_bar, current_start)
 
                 if symbol not in self._bars:
                     self._bars[symbol] = {}
@@ -186,9 +218,7 @@ class BarAggregator:
                         # Persist the bar that just ended.
                         old_bar = self._bars[symbol].pop(tf_name, None)
                         if old_bar is not None:
-                            asyncio.create_task(
-                                self._store_bar(symbol, tf_name, old_bar, bar_start)
-                            )
+                            self._spawn_store(symbol, tf_name, old_bar, bar_start)
                         if symbol_stale:
                             # Market closed / feed down: FREEZE. Do NOT paint dojis
                             # or open a new window — leave the last real bar as the
