@@ -99,12 +99,21 @@ class BarAggregator:
 
         for tf_name, tf_seconds in TIMEFRAMES.items():
             bar_start = (epoch // tf_seconds) * tf_seconds
-            key = f"{symbol}:{tf_name}"
 
             current_start = self._bar_timestamps.get(symbol, {}).get(tf_name)
 
             if current_start != bar_start:
-                if current_start is not None and key in self._bars.get(symbol, {}):
+                # Persist the bar that just closed. The guard MUST use tf_name:
+                # self._bars[symbol] is keyed by timeframe ("1m"), not by
+                # "SYMBOL:1m". It used to check a `key = f"{symbol}:{tf_name}"`
+                # left over from when _bars was flat-keyed, which never matched
+                # the nested dict — so this branch never ran, _store_bar was
+                # never called from update(), and the line below overwrote the
+                # finished candle. Bars only survived when the 1s aggregation
+                # loop happened to fire in the ~0.1s gap before the next tick,
+                # so ~40% of them vanished with no error on a healthy feed
+                # (client 2026-07-17 "ye gaps q a rhe h firse").
+                if current_start is not None and tf_name in self._bars.get(symbol, {}):
                     old_bar = self._bars[symbol].pop(tf_name, None)
                     if old_bar:
                         self._spawn_store(symbol, tf_name, old_bar, current_start)
