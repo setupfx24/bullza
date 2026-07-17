@@ -30,12 +30,15 @@ async def get_book_stats(db: AsyncSession) -> dict:
     _admin_roles = ("admin", "super_admin")
     # User counts — non-admin roles, exclude demo AND promotional accounts
     # (promo showcase users must not appear in the admin Book Management view;
-    # client 2026-07-15).
+    # client 2026-07-15). Also exclude terminated/soft-deleted accounts —
+    # deleting a user demotes it to status terminated/deleted and it was still
+    # listed here (client 2026-07-16, "FINANCE 1").
+    _dead_statuses = ("terminated", "deleted")
     a_users = (await db.execute(
-        select(func.count(User.id)).where(User.book_type == "A", User.role.notin_(_admin_roles), User.is_demo == False, User.is_promotional.isnot(True))
+        select(func.count(User.id)).where(User.book_type == "A", User.role.notin_(_admin_roles), User.is_demo == False, User.is_promotional.isnot(True), User.status.notin_(_dead_statuses))
     )).scalar() or 0
     b_users = (await db.execute(
-        select(func.count(User.id)).where(User.book_type == "B", User.role.notin_(_admin_roles), User.is_demo == False, User.is_promotional.isnot(True))
+        select(func.count(User.id)).where(User.book_type == "B", User.role.notin_(_admin_roles), User.is_demo == False, User.is_promotional.isnot(True), User.status.notin_(_dead_statuses))
     )).scalar() or 0
 
     # Trade counts (open positions)
@@ -65,8 +68,11 @@ async def list_book_users(
 ) -> dict:
     """Paginated user list with book type, account count, trade count."""
     _admin_roles = ("admin", "super_admin")
-    base = select(User).where(User.role.notin_(_admin_roles), User.is_demo == False, User.is_promotional.isnot(True))
-    count_base = select(func.count(User.id)).where(User.role.notin_(_admin_roles), User.is_demo == False, User.is_promotional.isnot(True))
+    # Same exclusions as get_book_stats: no staff, no demo/promo, and no
+    # terminated/soft-deleted accounts (client 2026-07-16, "FINANCE 1").
+    _dead_statuses = ("terminated", "deleted")
+    base = select(User).where(User.role.notin_(_admin_roles), User.is_demo == False, User.is_promotional.isnot(True), User.status.notin_(_dead_statuses))
+    count_base = select(func.count(User.id)).where(User.role.notin_(_admin_roles), User.is_demo == False, User.is_promotional.isnot(True), User.status.notin_(_dead_statuses))
 
     if book_filter and book_filter in ("A", "B"):
         base = base.where(User.book_type == book_filter)
