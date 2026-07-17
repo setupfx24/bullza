@@ -93,7 +93,15 @@ async def _open_trades(
         .options(selectinload(Position.instrument))
     )
     if book == "real":
-        q = q.where(TradingAccount.is_demo == False, TradingAccount.is_promotional == False)  # noqa: E712
+        # Promotional showcase users are flagged at the USER level by the promo
+        # seeders; the per-account flag may lag behind (client 2026-07-16:
+        # "vaibhav ka promotional account h, iski trade yha show ho rhi h").
+        # A trade is non-real if EITHER the account OR its owner is promotional.
+        q = q.where(
+            TradingAccount.is_demo == False,  # noqa: E712
+            TradingAccount.is_promotional == False,  # noqa: E712
+            User.is_promotional.isnot(True),
+        )
     elif book == "demo":
         q = q.where(TradingAccount.is_demo == True)  # noqa: E712
     if symbol:
