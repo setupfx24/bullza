@@ -48,6 +48,16 @@ const pnlCls = (n: number | null | undefined) =>
 const sideCls = (s: string) => (s === 'buy' ? 'text-buy' : 'text-sell');
 const dt = (s: string | null) => (s ? new Date(s).toLocaleString() : '—');
 
+// Ready-to-copy TradingView alert messages. Each trade uses a UNIQUE `id`; the
+// close alert with the same `id` closes exactly that trade.
+const ALERT_TEMPLATES: { title: string; desc: string; json: Record<string, unknown> }[] = [
+  { title: 'Open BUY', desc: 'New buy trade — give it a unique id', json: { action: 'buy', symbol: 'EURUSD', id: 'eur-1' } },
+  { title: 'Open SELL', desc: 'New sell trade', json: { action: 'sell', symbol: 'XAUUSD', id: 'xau-1' } },
+  { title: 'Open with SL / TP', desc: 'SL & TP auto-close when hit', json: { action: 'buy', symbol: 'EURUSD', sl: 1.09, tp: 1.11, id: 'eur-2' } },
+  { title: 'Close THIS trade', desc: 'Closes only the trade with this id', json: { action: 'close', id: 'eur-1' } },
+  { title: 'Close ALL of a symbol', desc: 'Closes every open trade on the symbol', json: { action: 'close', symbol: 'EURUSD' } },
+];
+
 export default function AiStationPage() {
   const [tab, setTab] = useState<Tab>('overview');
   const [loading, setLoading] = useState(true);
@@ -338,7 +348,29 @@ function Connection({ cfg, setCfg, reload }: { cfg: Config; setCfg: (c: Config) 
             <button onClick={() => { if (confirm('Regenerate secret? The old URL stops working.')) save({ regenerate_secret: true }); }}
               className="inline-flex items-center gap-1 px-2 py-1.5 text-xxs border border-border-primary rounded text-text-secondary hover:bg-bg-hover"><RefreshCw size={12} /> Regenerate</button>
           </div>
-          <p className="text-[10px] text-text-tertiary mt-1">Alert message JSON: <code>{`{"action":"buy","symbol":"EURUSD","sl":1.09,"tp":1.11}`}</code> · close: <code>{`{"action":"close","symbol":"EURUSD"}`}</code></p>
+          <p className="text-[10px] text-text-tertiary mt-1">Set a UNIQUE <code>id</code> per trade. A close alert with the same id closes only that one trade.</p>
+        </div>
+      </section>
+
+      <section className="bg-bg-secondary border border-border-primary rounded-md p-5 space-y-3">
+        <h2 className="text-sm font-semibold text-text-primary">TradingView alert templates</h2>
+        <p className="text-[10px] text-text-tertiary">
+          In the TradingView alert: put the <b>Webhook URL</b> (above) in the Webhook field, and copy one JSON below into the <b>Message</b> field.
+          Keep each trade&apos;s <code>id</code> unique. Reuse the same id only to open → close → re-open the same strategy.
+        </p>
+        <div className="grid sm:grid-cols-2 gap-3">
+          {ALERT_TEMPLATES.map((t) => (
+            <div key={t.title} className="border border-border-primary rounded-md p-3 space-y-2">
+              <div className="flex items-center justify-between gap-2">
+                <div>
+                  <div className="text-xs font-medium text-text-primary">{t.title}</div>
+                  <div className="text-[10px] text-text-tertiary">{t.desc}</div>
+                </div>
+                <button onClick={() => copy(JSON.stringify(t.json))} className="p-1.5 border border-border-primary rounded text-text-secondary hover:bg-bg-hover shrink-0" title="Copy JSON"><Copy size={12} /></button>
+              </div>
+              <code className="block px-2 py-1.5 text-[11px] bg-bg-input rounded text-text-primary break-all">{JSON.stringify(t.json)}</code>
+            </div>
+          ))}
         </div>
       </section>
 

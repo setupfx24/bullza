@@ -89,13 +89,18 @@ async def tradingview_webhook(
     if side not in ("buy", "sell"):
         raise HTTPException(status_code=400, detail="side must be 'buy' or 'sell'")
 
-    # Idempotency — TradingView can retry an alert.
+    # One OPEN trade per id at a time (unique-id-per-trade model). A retry or a
+    # second open while the id is still open is a no-op; once the trade closes
+    # the id is free to reuse for a new trade.
     if ext:
         dup = await db.execute(
-            select(AiStationSignal.id).where(AiStationSignal.external_id == ext)
+            select(AiStationSignal.id).where(
+                AiStationSignal.external_id == ext,
+                AiStationSignal.status == "open",
+            )
         )
         if dup.scalar_one_or_none():
-            return {"status": "duplicate"}
+            return {"status": "duplicate", "reason": "id already has an open trade"}
 
     try:
         sig = await ai.open_signal(
