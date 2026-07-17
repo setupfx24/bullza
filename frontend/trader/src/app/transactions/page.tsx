@@ -294,7 +294,9 @@ export default function TransactionsPage() {
                 </div>
                 <div className="min-w-0">
                   <p className="text-[9px] sm:text-[10px] font-bold uppercase tracking-widest text-[#55a630]/60">Total Deposits</p>
-                  <p className="text-sm sm:text-lg md:text-xl font-bold font-mono text-text-primary tabular-nums mt-0.5 truncate">
+                  {/* Exact amount, never truncated (client 2026-07-17: "exact
+                      amount dikhe sidha, ..... na show ho"). */}
+                  <p title={fmt(totalDeposited)} className="text-xs sm:text-sm md:text-base font-bold font-mono text-text-primary tabular-nums mt-0.5 whitespace-nowrap">
                     {fmt(totalDeposited)}
                   </p>
                 </div>
@@ -320,7 +322,7 @@ export default function TransactionsPage() {
                 </div>
                 <div className="min-w-0">
                   <p className="text-[9px] sm:text-[10px] font-bold uppercase tracking-widest text-red-400/60">Withdrawals</p>
-                  <p className="text-sm sm:text-lg md:text-xl font-bold font-mono text-text-primary tabular-nums mt-0.5 truncate">
+                  <p title={fmt(totalWithdrawn)} className="text-xs sm:text-sm md:text-base font-bold font-mono text-text-primary tabular-nums mt-0.5 whitespace-nowrap">
                     {fmt(totalWithdrawn)}
                   </p>
                 </div>
@@ -346,7 +348,7 @@ export default function TransactionsPage() {
                 </div>
                 <div className="min-w-0">
                   <p className="text-[9px] sm:text-[10px] font-bold uppercase tracking-widest text-[#55a630]/50">IB Commissions</p>
-                  <p className="text-sm sm:text-lg md:text-xl font-bold font-mono text-text-primary tabular-nums mt-0.5 truncate">
+                  <p className="text-xs sm:text-sm md:text-base font-bold font-mono text-text-primary tabular-nums mt-0.5 whitespace-nowrap">
                     {fmt(0)}
                   </p>
                 </div>
