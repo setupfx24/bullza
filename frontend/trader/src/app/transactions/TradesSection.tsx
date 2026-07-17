@@ -744,7 +744,12 @@ function SummaryCard({
         </div>
         <div className="min-w-0">
           <p className={clsx('text-[9px] sm:text-[10px] font-bold uppercase tracking-widest opacity-70', colorMap.text)}>{label}</p>
-          <p className={clsx('text-sm sm:text-lg md:text-xl font-bold font-mono tabular-nums mt-0.5 truncate', valueColor || 'text-text-primary')}>
+          {/* Exact figure, never truncated — matches the Transactions tab
+              tiles (client 2026-07-17: "exact amount dikhe sidha"). */}
+          <p
+            title={typeof value === 'string' || typeof value === 'number' ? String(value) : undefined}
+            className={clsx('text-xs sm:text-sm md:text-base font-bold font-mono tabular-nums mt-0.5 whitespace-nowrap', valueColor || 'text-text-primary')}
+          >
             {value}
           </p>
         </div>
