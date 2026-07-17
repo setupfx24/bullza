@@ -129,7 +129,13 @@ class OHLCStore:
                 )
                 await session.commit()
         except Exception as exc:
-            logger.debug("OHLC upsert %s %s failed: %s", symbol, tf, exc)
+            # WARNING, not debug (client 2026-07-17 "ye gaps q a rhe h firse"):
+            # a failed upsert here means a MISSING CANDLE on the chart. At debug
+            # level (the service runs at INFO) every failure was invisible, so
+            # ~40% of XAUUSD 1m bars silently never landed in Timescale while
+            # Redis had them all — and the chart reads Timescale first, so it
+            # drew the gaps. A dropped bar must never be silent again.
+            logger.warning("OHLC upsert %s %s @%s FAILED: %r", symbol, tf, bar_start, exc)
 
     async def upsert_many(self, symbol: str, tf: str, bars: list[dict]) -> None:
         """Bulk upsert for history backfill (seed). Each bar: {time(epoch s),
@@ -149,4 +155,4 @@ class OHLCStore:
                     })
                 await session.commit()
         except Exception as exc:
-            logger.debug("OHLC bulk upsert %s %s failed: %s", symbol, tf, exc)
+            logger.warning("OHLC bulk upsert %s %s (%d bars) FAILED: %r", symbol, tf, len(bars), exc)
