@@ -72,6 +72,8 @@ async def _campaign_out(db: AsyncSession, c: RewardCampaign) -> dict:
         .join(User, User.id == FixedReturnLock.user_id)
         .where(
             User.referred_by_user_id.isnot(None),
+            # Exclude promo/demo showcase locks/referrers (client 2026-07-16).
+            User.is_promotional.isnot(True), User.is_demo.isnot(True),
             User.created_at >= c.starts_at,
             User.created_at <= c.ends_at,
             FixedReturnLock.locked_at >= c.starts_at,
@@ -293,6 +295,10 @@ async def campaign_leaderboard(
         .join(referrer, referrer.c.id == User.referred_by_user_id)
         .where(
             User.referred_by_user_id.isnot(None),
+            # Exclude promo/demo referred users AND promo/demo referrers
+            # (client 2026-07-16).
+            User.is_promotional.isnot(True), User.is_demo.isnot(True),
+            referrer.c.is_promotional.isnot(True), referrer.c.is_demo.isnot(True),
             User.created_at >= c.starts_at,
             User.created_at <= c.ends_at,
             FixedReturnLock.locked_at >= c.starts_at,

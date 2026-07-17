@@ -271,7 +271,10 @@ async def list_pending(db: AsyncSession, kind: str = "early") -> list[dict]:
     rows = (await db.execute(
         select(FixedReturnLock, User)
         .join(User, User.id == FixedReturnLock.user_id)
-        .where(FixedReturnLock.state == state)
+        # Hide promo/demo showcase users' requests (client 2026-07-16).
+        # .isnot(True) also matches NULL, so unflagged users still show.
+        .where(FixedReturnLock.state == state,
+               User.is_promotional.isnot(True), User.is_demo.isnot(True))
         .order_by(FixedReturnLock.early_requested_at.asc())
     )).all()
     fee_pct = await get_float_setting(

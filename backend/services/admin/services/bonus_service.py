@@ -159,7 +159,10 @@ async def list_user_bonuses(
     per_page: int,
     db: AsyncSession,
 ) -> PaginatedResponse:
-    query = select(UserBonus)
+    # Hide bonuses granted to promo/demo showcase users (client 2026-07-16).
+    from sqlalchemy import or_ as _or
+    _hide = select(User.id).where(_or(User.is_promotional == True, User.is_demo == True))  # noqa: E712
+    query = select(UserBonus).where(UserBonus.user_id.notin_(_hide))
     count_q = select(func.count()).select_from(query.subquery())
     total = (await db.execute(count_q)).scalar() or 0
 

@@ -42,7 +42,12 @@ async def get_kyc_file(document_id: uuid.UUID, db: AsyncSession) -> FileResponse
 
 async def list_kyc_pending(page: int, per_page: int, db: AsyncSession,
                            start_date=None, end_date=None) -> dict:
-    query = select(User).where(User.kyc_status == "submitted")
+    # Promotional/demo showcase users must never appear in admin (client
+    # 2026-07-16 — "promotional wale account ka kuch bhi admin me na show ho").
+    query = select(User).where(
+        User.kyc_status == "submitted",
+        User.is_promotional.isnot(True), User.is_demo.isnot(True),
+    )
     if start_date is not None:
         query = query.where(User.created_at >= start_date)
     if end_date is not None:
@@ -88,7 +93,10 @@ async def list_kyc_pending(page: int, per_page: int, db: AsyncSession,
 
 async def list_kyc_approved(page: int, per_page: int, db: AsyncSession,
                             start_date=None, end_date=None) -> dict:
-    query = select(User).where(User.kyc_status == "approved")
+    query = select(User).where(
+        User.kyc_status == "approved",
+        User.is_promotional.isnot(True), User.is_demo.isnot(True),
+    )
     if start_date is not None:
         query = query.where(User.created_at >= start_date)
     if end_date is not None:
@@ -137,7 +145,10 @@ async def list_kyc_approved(page: int, per_page: int, db: AsyncSession,
 
 async def list_kyc_rejected(page: int, per_page: int, db: AsyncSession,
                             start_date=None, end_date=None) -> dict:
-    query = select(User).where(User.kyc_status == "rejected")
+    query = select(User).where(
+        User.kyc_status == "rejected",
+        User.is_promotional.isnot(True), User.is_demo.isnot(True),
+    )
     if start_date is not None:
         query = query.where(User.created_at >= start_date)
     if end_date is not None:

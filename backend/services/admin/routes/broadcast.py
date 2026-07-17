@@ -31,12 +31,20 @@ async def _resolve_recipients(db: AsyncSession, audience: str) -> list:
     Segments: all / verified (same base), funded_only, ib, pamm_mam,
     fixed_return."""
     from sqlalchemy import func
+    # Promo + demo showcase users never receive admin broadcasts (client
+    # 2026-07-16 — "promotional wale account ka kuch bhi admin me na show ho";
+    # sending them mail is an admin-side action too).
     base = (await db.execute(
-        select(User).where(User.status == "active", User.email_verified.is_(True))
+        select(User).where(
+            User.status == "active", User.email_verified.is_(True),
+            User.is_promotional.isnot(True), User.is_demo.isnot(True),
+        )
     )).scalars().all()
     recipients = [
         u for u in base
-        if u.email and "@" in u.email and not bool(getattr(u, "is_demo", False))
+        if u.email and "@" in u.email
+        and not bool(getattr(u, "is_demo", False))
+        and not bool(getattr(u, "is_promotional", False))
     ]
 
     if audience in ("all", "verified"):
@@ -182,11 +190,15 @@ async def send_maintenance_broadcast(
         # /"closed"). No is_active boolean.
         User.status == "active",
         User.email_verified.is_(True),
+        # Promo + demo showcase users excluded (client 2026-07-16).
+        User.is_promotional.isnot(True), User.is_demo.isnot(True),
     )
     users = (await db.execute(q)).scalars().all()
     recipients = [
         u for u in users
-        if u.email and "@" in u.email and not bool(getattr(u, "is_demo", False))
+        if u.email and "@" in u.email
+        and not bool(getattr(u, "is_demo", False))
+        and not bool(getattr(u, "is_promotional", False))
     ]
 
     if body.audience == "funded_only":

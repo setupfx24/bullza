@@ -6,7 +6,14 @@ from fastapi import HTTPException
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from sqlalchemy import or_ as _or
+
 from packages.common.src.models import User, SupportTicket, TicketMessage
+
+
+def _promo_demo_user_ids():
+    """Promo/demo users hidden from every admin view (client 2026-07-16)."""
+    return select(User.id).where(_or(User.is_promotional == True, User.is_demo == True))  # noqa: E712
 from packages.common.src.admin_schemas import (
     TicketOut, TicketDetailOut, TicketMessageOut, PaginatedResponse,
     TicketReplyRequest, TicketStatusUpdate, TicketAssignRequest,
@@ -46,7 +53,8 @@ async def list_tickets(
     db: AsyncSession,
     assigned_to: uuid.UUID | None = None,
 ) -> PaginatedResponse:
-    query = select(SupportTicket)
+    # Hide tickets opened by promo/demo showcase users (client 2026-07-16).
+    query = select(SupportTicket).where(SupportTicket.user_id.notin_(_promo_demo_user_ids()))
     if status_filter:
         query = query.where(SupportTicket.status == status_filter)
     if priority_filter:
@@ -88,7 +96,10 @@ async def list_tickets(
 
 
 async def get_ticket_detail(ticket_id: uuid.UUID, db: AsyncSession) -> TicketDetailOut:
-    result = await db.execute(select(SupportTicket).where(SupportTicket.id == ticket_id))
+    result = await db.execute(select(SupportTicket).where(
+        SupportTicket.id == ticket_id,
+        SupportTicket.user_id.notin_(_promo_demo_user_ids()),  # promo/demo hidden
+    ))
     ticket = result.scalar_one_or_none()
     if not ticket:
         raise HTTPException(status_code=404, detail="Ticket not found")

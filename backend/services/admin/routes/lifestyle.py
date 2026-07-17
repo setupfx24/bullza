@@ -40,6 +40,9 @@ async def list_fulfillments(
         RewardStoreItem, RewardStoreItem.id == LifestyleFulfillment.item_id,
     ).join(
         User, User.id == LifestyleFulfillment.user_id,
+    ).where(
+        # Hide promo/demo showcase users' redemptions (client 2026-07-16).
+        User.is_promotional.isnot(True), User.is_demo.isnot(True),
     )
     if status:
         stmt = stmt.where(LifestyleFulfillment.status == status)

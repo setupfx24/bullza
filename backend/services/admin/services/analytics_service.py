@@ -136,6 +136,12 @@ async def analytics_dashboard(
 
     # Promotional demo accounts are excluded from every admin analytics number.
     promo_ids = select(User.id).where(User.is_promotional == True)  # noqa: E712
+    # Combined promo + demo user ids — nothing owned by these shows in admin
+    # (client 2026-07-16). Defined once, reused across every counter below.
+    promo_demo_user_ids = select(User.id).where(
+        or_(User.is_promotional == True, User.is_demo == True)  # noqa: E712
+    )
+    _pdc = or_(Transaction.user_id.is_(None), Transaction.user_id.notin_(promo_demo_user_ids))
 
     dep_q = await db.execute(
         select(func.coalesce(func.sum(Deposit.amount), 0)).where(
@@ -167,10 +173,11 @@ async def analytics_dashboard(
         .where(TradeHistory.account_id.notin_(_excl) if _excl else True)
     )
 
-    # Admin commission earned from all sources (PAMM performance fee, copy-trade, etc.)
+    # Admin commission earned from all sources (PAMM performance fee, copy-trade,
+    # etc.) — promo/demo-generated fees excluded (client 2026-07-16).
     admin_comm_all_q = await db.execute(
         select(func.coalesce(func.sum(Transaction.amount), 0)).where(
-            Transaction.type == "admin_commission",
+            Transaction.type == "admin_commission", _pdc,
         )
     )
     total_admin_commission = float(admin_comm_all_q.scalar() or 0)
@@ -178,7 +185,7 @@ async def analytics_dashboard(
     # PAMM/MAM specific admin commission (performance + management fees)
     pamm_admin_q = await db.execute(
         select(func.coalesce(func.sum(Transaction.amount), 0)).where(
-            Transaction.type == "admin_commission",
+            Transaction.type == "admin_commission", _pdc,
             Transaction.description.ilike("%pamm%") | Transaction.description.ilike("%performance%") | Transaction.description.ilike("%management%"),
         )
     )
@@ -187,14 +194,17 @@ async def analytics_dashboard(
     # Copy trade admin commission
     copy_rev_q = await db.execute(
         select(func.coalesce(func.sum(Transaction.amount), 0)).where(
-            Transaction.type == "admin_commission",
+            Transaction.type == "admin_commission", _pdc,
             Transaction.description.ilike("%copy%"),
         )
     )
     copy_trade_admin_revenue = float(copy_rev_q.scalar() or 0)
 
     master_count_q = await db.execute(
-        select(func.count(MasterAccount.id)).where(MasterAccount.status.in_(["approved", "active"]))
+        select(func.count(MasterAccount.id)).where(
+            MasterAccount.status.in_(["approved", "active"]),
+            MasterAccount.user_id.notin_(promo_demo_user_ids),
+        )
     )
 
     promo_ib_ids = select(IBProfile.id).where(IBProfile.user_id.in_(promo_ids))
@@ -217,9 +227,7 @@ async def analytics_dashboard(
     # Exclude commission EARNED BY a promo IB, and commission GENERATED FROM a
     # promo/demo trader's trades (client 2026-07-15 — the real Super IB was
     # showing $85.90 earned entirely from the promo showcase downline).
-    promo_demo_user_ids = select(User.id).where(
-        or_(User.is_promotional == True, User.is_demo == True)  # noqa: E712
-    )
+    # (promo_demo_user_ids defined once at the top of this function.)
     ib_commission_q = await db.execute(
         select(func.coalesce(func.sum(IBCommission.amount), 0)).where(
             IBCommission.ib_id.notin_(promo_ib_ids),
@@ -237,11 +245,23 @@ async def analytics_dashboard(
     )
     ib_pending_commission = float(ib_pending_q.scalar() or 0)
 
-    total_copy_trades_q = await db.execute(select(func.count(CopyTrade.id)))
+    # Copy trades / allocations owned by promo/demo investors are hidden
+    # (client 2026-07-16). CopyTrade → InvestorAllocation → investor user.
+    _promo_alloc_ids = select(InvestorAllocation.id).where(
+        InvestorAllocation.investor_user_id.in_(promo_demo_user_ids)
+    )
+    total_copy_trades_q = await db.execute(
+        select(func.count(CopyTrade.id)).where(
+            CopyTrade.investor_allocation_id.notin_(_promo_alloc_ids)
+        )
+    )
     total_copy_trades = total_copy_trades_q.scalar() or 0
 
     active_copies_q = await db.execute(
-        select(func.count(CopyTrade.id)).where(CopyTrade.status == "open")
+        select(func.count(CopyTrade.id)).where(
+            CopyTrade.status == "open",
+            CopyTrade.investor_allocation_id.notin_(_promo_alloc_ids),
+        )
     )
     active_copies = active_copies_q.scalar() or 0
 
@@ -259,13 +279,17 @@ async def analytics_dashboard(
 
     total_aum_q = await db.execute(
         select(func.coalesce(func.sum(InvestorAllocation.allocation_amount), 0)).where(
-            InvestorAllocation.status == "active"
+            InvestorAllocation.status == "active",
+            InvestorAllocation.investor_user_id.notin_(promo_demo_user_ids),
         )
     )
     total_aum = float(total_aum_q.scalar() or 0)
 
     total_followers_q = await db.execute(
-        select(func.count(InvestorAllocation.id)).where(InvestorAllocation.status == "active")
+        select(func.count(InvestorAllocation.id)).where(
+            InvestorAllocation.status == "active",
+            InvestorAllocation.investor_user_id.notin_(promo_demo_user_ids),
+        )
     )
     total_followers = total_followers_q.scalar() or 0
 
@@ -1107,6 +1131,13 @@ async def get_exposure(
     start_date: datetime | None = None,
     end_date: datetime | None = None,
 ) -> dict:
+    # Promo/demo showcase accounts are never real house exposure and must not
+    # appear in the admin exposure board or the top-profitable ranking (client
+    # 2026-07-16 — "promotional wale account ka kuch bhi admin me na show ho").
+    excl = await _excluded_account_ids(db)
+    _pos_filter = [Position.status == PositionStatus.OPEN.value]
+    if excl:
+        _pos_filter.append(Position.account_id.notin_(excl))
     result = await db.execute(
         select(
             Position.instrument_id,
@@ -1123,7 +1154,7 @@ async def get_exposure(
                 case((Position.side == OrderSide.SELL.value, 1), else_=0)
             ).label("sell_count"),
         )
-        .where(Position.status == PositionStatus.OPEN.value)
+        .where(*_pos_filter)
         .group_by(Position.instrument_id)
     )
     rows = result.all()
@@ -1159,6 +1190,8 @@ async def get_exposure(
         )
         .group_by(TradeHistory.account_id)
     )
+    if excl:
+        top_q = top_q.where(TradeHistory.account_id.notin_(excl))
     # Custom date window — restricts the profit / win-rate ranking to trades
     # CLOSED inside [start_date, end_date]. Open-position exposure above stays
     # live (it has no close date). When both are None this is unfiltered.

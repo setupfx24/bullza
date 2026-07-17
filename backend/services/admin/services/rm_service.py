@@ -36,6 +36,11 @@ RM_PROOF_EXT = {".jpg", ".jpeg", ".png", ".pdf", ".webp"}
 MAX_PROOF_BYTES = 10 * 1024 * 1024
 
 
+def _promo_demo_user_ids():
+    """Promo/demo users hidden from every admin view (client 2026-07-16)."""
+    return select(User.id).where(or_(User.is_promotional == True, User.is_demo == True))  # noqa: E712
+
+
 def _name(u: User | None) -> str:
     if not u:
         return "—"
@@ -75,7 +80,10 @@ def _rm_proof_root() -> Path:
 
 async def list_my_users(rm_id: uuid.UUID, db: AsyncSession) -> dict:
     rows = (await db.execute(
-        select(User).where(User.assigned_rm_id == rm_id).order_by(User.created_at.desc())
+        select(User).where(
+            User.assigned_rm_id == rm_id,
+            User.is_promotional.isnot(True), User.is_demo.isnot(True),
+        ).order_by(User.created_at.desc())
     )).scalars().all()
     return {"users": [{
         "id": str(u.id),
@@ -162,7 +170,8 @@ async def create_funding_request(
 # ── Admin-facing (rm.manage) ─────────────────────────────────────────
 
 async def list_requests(status: str | None, db: AsyncSession) -> dict:
-    q = select(RMFundingRequest)
+    # Hide requests belonging to promo/demo showcase users (client 2026-07-16).
+    q = select(RMFundingRequest).where(RMFundingRequest.user_id.notin_(_promo_demo_user_ids()))
     if status and status != "all":
         q = q.where(RMFundingRequest.status == status)
     q = q.order_by(RMFundingRequest.created_at.desc()).limit(500)
@@ -336,7 +345,10 @@ async def list_manual_requests(db: AsyncSession, status_filter: str | None = Non
     """Trader-submitted 'Request to RM' deposit/withdraw requests (migration
     0093) so admin sees them in the panel, not just the RM's inbox."""
     from packages.common.src.models import RmManualRequest
-    q = select(RmManualRequest).order_by(RmManualRequest.created_at.desc())
+    # Hide promo/demo showcase users' manual requests (client 2026-07-16).
+    q = (select(RmManualRequest)
+         .where(RmManualRequest.user_id.notin_(_promo_demo_user_ids()))
+         .order_by(RmManualRequest.created_at.desc()))
     if status_filter and status_filter != "all":
         q = q.where(RmManualRequest.status == status_filter)
     rows = (await db.execute(q.limit(500))).scalars().all()

@@ -39,26 +39,42 @@ async def notifications_summary(
             severity: 'critical' for items the platform shouldn't sit on
                       (withdrawals, approvals); 'normal' for routine queue.
     """
+    # Promo/demo showcase users are hidden everywhere in admin — the bell
+    # badge counts must match the (filtered) pages they link to, or the badge
+    # says "3" and the page shows 0 (client 2026-07-16). One subquery, reused;
+    # a raw-SQL twin (_hide_sql) for the text() counts further down.
+    from sqlalchemy import or_ as _or
+    _hide = select(User.id).where(_or(User.is_promotional == True, User.is_demo == True))  # noqa: E712
+    _hide_sql = ("(SELECT id FROM users WHERE is_promotional IS TRUE OR is_demo IS TRUE)")
+
     pending_deposits_q = await db.execute(
-        select(func.count(Deposit.id)).where(Deposit.status == "pending")
+        select(func.count(Deposit.id)).where(
+            Deposit.status == "pending", Deposit.user_id.notin_(_hide)
+        )
     )
     pending_deposits = int(pending_deposits_q.scalar() or 0)
 
     pending_withdrawals_q = await db.execute(
-        select(func.count(Withdrawal.id)).where(Withdrawal.status == "pending")
+        select(func.count(Withdrawal.id)).where(
+            Withdrawal.status == "pending", Withdrawal.user_id.notin_(_hide)
+        )
     )
     pending_withdrawals = int(pending_withdrawals_q.scalar() or 0)
 
     # KYC submissions waiting for review. State machine: pending → submitted
     # (user uploaded docs) → approved / rejected. We surface 'submitted'.
     pending_kyc_q = await db.execute(
-        select(func.count(User.id)).where(User.kyc_status == "submitted")
+        select(func.count(User.id)).where(
+            User.kyc_status == "submitted",
+            User.is_promotional.isnot(True), User.is_demo.isnot(True),
+        )
     )
     pending_kyc = int(pending_kyc_q.scalar() or 0)
 
     open_tickets_q = await db.execute(
         select(func.count(SupportTicket.id)).where(
-            SupportTicket.status.in_(("open", "pending"))
+            SupportTicket.status.in_(("open", "pending")),
+            SupportTicket.user_id.notin_(_hide),
         )
     )
     open_tickets = int(open_tickets_q.scalar() or 0)
@@ -86,7 +102,10 @@ async def notifications_summary(
     # but useful for admins to spot abnormal sign-up spikes.
     since_24h = datetime.now(timezone.utc) - timedelta(hours=24)
     new_users_q = await db.execute(
-        select(func.count(User.id)).where(User.created_at >= since_24h)
+        select(func.count(User.id)).where(
+            User.created_at >= since_24h,
+            User.is_promotional.isnot(True), User.is_demo.isnot(True),
+        )
     )
     new_users_24h = int(new_users_q.scalar() or 0)
 
@@ -98,7 +117,9 @@ async def notifications_summary(
     try:
         async with db.begin_nested():
             rm_pending_q = await db.execute(
-                text("SELECT COUNT(*) FROM rm_funding_requests WHERE status IN ('pending','approved')")
+                text("SELECT COUNT(*) FROM rm_funding_requests "
+                     "WHERE status IN ('pending','approved') "
+                     f"AND user_id NOT IN {_hide_sql}")
             )
             rm_pending = int(rm_pending_q.scalar() or 0)
     except Exception:
@@ -114,16 +135,19 @@ async def notifications_summary(
     try:
         async with db.begin_nested():
             fr_w_q = await db.execute(
-                text("SELECT COUNT(*) FROM fixed_return_locks WHERE state = 'early_pending'")
+                text("SELECT COUNT(*) FROM fixed_return_locks "
+                     f"WHERE state = 'early_pending' AND user_id NOT IN {_hide_sql}")
             )
             fr_withdrawals = int(fr_w_q.scalar() or 0)
             # Matured principal-withdrawal claims awaiting approval (2026-07-11).
             fr_p_q = await db.execute(
-                text("SELECT COUNT(*) FROM fixed_return_locks WHERE state = 'principal_pending'")
+                text("SELECT COUNT(*) FROM fixed_return_locks "
+                     f"WHERE state = 'principal_pending' AND user_id NOT IN {_hide_sql}")
             )
             fr_principal = int(fr_p_q.scalar() or 0)
             fr_n_q = await db.execute(
-                text("SELECT COUNT(*) FROM fixed_return_locks WHERE locked_at >= :since"),
+                text("SELECT COUNT(*) FROM fixed_return_locks "
+                     f"WHERE locked_at >= :since AND user_id NOT IN {_hide_sql}"),
                 {"since": since_24h},
             )
             fr_new_locks = int(fr_n_q.scalar() or 0)
@@ -144,7 +168,8 @@ async def notifications_summary(
             rm_manual_rows = await db.execute(
                 text(
                     "SELECT side, COUNT(*) FROM rm_manual_requests "
-                    "WHERE status = 'new' GROUP BY side"
+                    f"WHERE status = 'new' AND user_id NOT IN {_hide_sql} "
+                    "GROUP BY side"
                 )
             )
             for side_val, cnt in rm_manual_rows.all():
