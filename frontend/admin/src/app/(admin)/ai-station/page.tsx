@@ -48,15 +48,20 @@ const pnlCls = (n: number | null | undefined) =>
 const sideCls = (s: string) => (s === 'buy' ? 'text-buy' : 'text-sell');
 const dt = (s: string | null) => (s ? new Date(s).toLocaleString() : '—');
 
-// Ready-to-copy TradingView alert messages. Each trade uses a UNIQUE `id`; the
-// close alert with the same `id` closes exactly that trade.
-const ALERT_TEMPLATES: { title: string; desc: string; json: Record<string, unknown> }[] = [
-  { title: 'Open BUY', desc: 'New buy trade — give it a unique id', json: { action: 'buy', symbol: 'EURUSD', id: 'eur-1' } },
-  { title: 'Open SELL', desc: 'New sell trade', json: { action: 'sell', symbol: 'XAUUSD', id: 'xau-1' } },
-  { title: 'Open with SL / TP', desc: 'SL & TP auto-close when hit', json: { action: 'buy', symbol: 'EURUSD', sl: 1.09, tp: 1.11, id: 'eur-2' } },
-  { title: 'Close THIS trade', desc: 'Closes only the trade with this id', json: { action: 'close', id: 'eur-1' } },
-  { title: 'Close ALL of a symbol', desc: 'Closes every open trade on the symbol', json: { action: 'close', symbol: 'EURUSD' } },
-];
+// Ready-to-copy TradingView alert messages for ONE instrument. Each trade uses a
+// UNIQUE `id` (symbol-scoped) so a close alert with the same id closes exactly
+// that trade. `sl`/`tp` are examples — replace with your own price levels.
+function buildTemplates(symbol: string): { title: string; desc: string; json: Record<string, unknown> }[] {
+  const sym = (symbol || 'EURUSD').toUpperCase();
+  const tag = sym.toLowerCase();
+  return [
+    { title: 'Open BUY', desc: 'New buy trade — unique id', json: { action: 'buy', symbol: sym, id: `${tag}-1` } },
+    { title: 'Open SELL', desc: 'New sell trade — unique id', json: { action: 'sell', symbol: sym, id: `${tag}-2` } },
+    { title: 'Open with SL / TP', desc: 'Replace sl/tp with your prices', json: { action: 'buy', symbol: sym, sl: 0, tp: 0, id: `${tag}-3` } },
+    { title: 'Close THIS trade', desc: `Closes only ${tag}-1`, json: { action: 'close', id: `${tag}-1` } },
+    { title: `Close ALL ${sym}`, desc: 'Closes every open trade on this symbol', json: { action: 'close', symbol: sym } },
+  ];
+}
 
 export default function AiStationPage() {
   const [tab, setTab] = useState<Tab>('overview');
@@ -306,7 +311,20 @@ function Connection({ cfg, setCfg, reload }: { cfg: Config; setCfg: (c: Config) 
   const [slabs, setSlabs] = useState<Slab[]>(cfg.slabs.length ? cfg.slabs : [{ min: 1000, max: 5000, lots: 0.02 }]);
   const [base, setBase] = useState(cfg.webhook_base || '');
   const [saving, setSaving] = useState(false);
+  const [symbols, setSymbols] = useState<{ symbol: string; display_name?: string }[]>([]);
+  const [sym, setSym] = useState('EURUSD');
   const inputCls = 'px-2 py-1.5 text-sm bg-bg-input border border-border-primary rounded text-text-primary tabular-nums';
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const r = await adminApi.get<{ items: { symbol: string; display_name?: string }[] }>('/config/instruments');
+        const items = (r?.items || []).filter((i) => i.symbol);
+        setSymbols(items);
+        if (items.length && !items.find((i) => i.symbol === 'EURUSD')) setSym(items[0].symbol);
+      } catch { /* instruments optional */ }
+    })();
+  }, []);
 
   const save = async (extra: Partial<{ enabled: boolean; regenerate_secret: boolean }> = {}) => {
     setSaving(true);
@@ -353,13 +371,23 @@ function Connection({ cfg, setCfg, reload }: { cfg: Config; setCfg: (c: Config) 
       </section>
 
       <section className="bg-bg-secondary border border-border-primary rounded-md p-5 space-y-3">
-        <h2 className="text-sm font-semibold text-text-primary">TradingView alert templates</h2>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-sm font-semibold text-text-primary">TradingView alert templates</h2>
+          <div className="flex items-center gap-2">
+            <label className="text-xxs text-text-tertiary">Instrument</label>
+            <input list="ai-symbols" className={`${inputCls} w-44`} value={sym}
+              onChange={(e) => setSym(e.target.value.toUpperCase())} placeholder="EURUSD" />
+            <datalist id="ai-symbols">
+              {symbols.map((i) => <option key={i.symbol} value={i.symbol}>{i.display_name || i.symbol}</option>)}
+            </datalist>
+          </div>
+        </div>
         <p className="text-[10px] text-text-tertiary">
-          In the TradingView alert: put the <b>Webhook URL</b> (above) in the Webhook field, and copy one JSON below into the <b>Message</b> field.
-          Keep each trade&apos;s <code>id</code> unique. Reuse the same id only to open → close → re-open the same strategy.
+          Pick an instrument → its own alert messages appear below. In the TradingView alert: put the <b>Webhook URL</b> (above) in the Webhook field,
+          and copy one JSON below into the <b>Message</b> field. Keep each trade&apos;s <code>id</code> unique; reuse an id only to open → close → re-open the same strategy.
         </p>
         <div className="grid sm:grid-cols-2 gap-3">
-          {ALERT_TEMPLATES.map((t) => (
+          {buildTemplates(sym).map((t) => (
             <div key={t.title} className="border border-border-primary rounded-md p-3 space-y-2">
               <div className="flex items-center justify-between gap-2">
                 <div>

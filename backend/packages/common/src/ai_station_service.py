@@ -57,6 +57,15 @@ DEFAULT_SLABS = [
 
 # ── Pure helpers live in ai_station_math (stdlib-only, unit-tested). ─────────
 
+def _pos_or_none(v):
+    """A price is always > 0, so treat 0 / blank / negative as 'not set'. Guards
+    against an unedited sl:0/tp:0 template accidentally auto-closing a trade."""
+    if v in (None, ""):
+        return None
+    d = _dec(v)
+    return d if d > 0 else None
+
+
 def _f(v):
     return float(v) if v is not None else None
 
@@ -169,8 +178,8 @@ async def open_signal(
         symbol=symbol,
         side=side,
         entry_price=entry_price,
-        stop_loss=_dec(stop_loss) if stop_loss not in (None, "") else None,
-        take_profit=_dec(take_profit) if take_profit not in (None, "") else None,
+        stop_loss=_pos_or_none(stop_loss),
+        take_profit=_pos_or_none(take_profit),
         status="open",
         opened_at=now,
         external_id=external_id,
