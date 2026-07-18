@@ -53,10 +53,12 @@ export default function AiStationPortfolio() {
     return () => clearInterval(t);
   }, [load]);
 
-  // Hide the whole section until there is something to show (keeps the page
-  // clean for users who have no AI trades yet).
-  if (!loading && trades.length === 0) return null;
-
+  // Always visible so the staker can see their Portfolio; fills in as trades
+  // arrive (shows zeros / empty state until then).
+  const s: Summary = summary ?? {
+    open_count: 0, closed_count: 0, today_count: 0, open_pnl: 0,
+    realized_pnl_month: 0, realized_pnl_total: 0, monthly_pnl: 0, total_pnl: 0,
+  };
   const rows = trades.filter((t) => t.status === tab);
 
   return (
@@ -71,28 +73,26 @@ export default function AiStationPortfolio() {
         <div className="flex items-center justify-center h-24"><Loader2 className="animate-spin text-text-tertiary" size={18} /></div>
       ) : (
         <>
-          {summary && (
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
-              <div className="bg-bg-secondary border border-border-primary rounded-lg p-4">
-                <div className="text-xxs text-text-tertiary uppercase tracking-wide">This month P&L</div>
-                <div className={clsx('text-2xl font-semibold tabular-nums mt-1', pnlCls(summary.monthly_pnl))}>{money(summary.monthly_pnl)}</div>
-              </div>
-              <div className="bg-bg-secondary border border-border-primary rounded-lg p-4">
-                <div className="text-xxs text-text-tertiary uppercase tracking-wide">Total P&L</div>
-                <div className={clsx('text-2xl font-semibold tabular-nums mt-1', pnlCls(summary.total_pnl))}>{money(summary.total_pnl)}</div>
-              </div>
-              <div className="bg-bg-secondary border border-border-primary rounded-lg p-4">
-                <div className="text-xxs text-text-tertiary uppercase tracking-wide">Open trades</div>
-                <div className="text-2xl font-semibold tabular-nums mt-1 text-text-primary">{summary.open_count}</div>
-                <div className={clsx('text-xs tabular-nums', pnlCls(summary.open_pnl))}>{money(summary.open_pnl)} running</div>
-              </div>
-              <div className="bg-bg-secondary border border-border-primary rounded-lg p-4">
-                <div className="text-xxs text-text-tertiary uppercase tracking-wide">Today</div>
-                <div className="text-2xl font-semibold tabular-nums mt-1 text-text-primary">{summary.today_count}</div>
-                <div className="text-xs text-text-tertiary">trades today</div>
-              </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+            <div className="bg-bg-secondary border border-border-primary rounded-lg p-4">
+              <div className="text-xxs text-text-tertiary uppercase tracking-wide">This month P&L</div>
+              <div className={clsx('text-2xl font-semibold tabular-nums mt-1', pnlCls(s.monthly_pnl))}>{money(s.monthly_pnl)}</div>
             </div>
-          )}
+            <div className="bg-bg-secondary border border-border-primary rounded-lg p-4">
+              <div className="text-xxs text-text-tertiary uppercase tracking-wide">Total P&L</div>
+              <div className={clsx('text-2xl font-semibold tabular-nums mt-1', pnlCls(s.total_pnl))}>{money(s.total_pnl)}</div>
+            </div>
+            <div className="bg-bg-secondary border border-border-primary rounded-lg p-4">
+              <div className="text-xxs text-text-tertiary uppercase tracking-wide">Open trades</div>
+              <div className="text-2xl font-semibold tabular-nums mt-1 text-text-primary">{s.open_count}</div>
+              <div className={clsx('text-xs tabular-nums', pnlCls(s.open_pnl))}>{money(s.open_pnl)} running</div>
+            </div>
+            <div className="bg-bg-secondary border border-border-primary rounded-lg p-4">
+              <div className="text-xxs text-text-tertiary uppercase tracking-wide">Today</div>
+              <div className="text-2xl font-semibold tabular-nums mt-1 text-text-primary">{s.today_count}</div>
+              <div className="text-xs text-text-tertiary">trades today</div>
+            </div>
+          </div>
 
           <div className="flex gap-1 mb-2">
             {(['open', 'closed'] as const).map((k) => (
