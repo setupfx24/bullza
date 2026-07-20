@@ -32,8 +32,19 @@ type Campaign = {
   claimed_amount: number | null;
 };
 
-const fmtUsd = (n: number) =>
-  new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 }).format(n);
+// Drop the trailing ".00" on whole-dollar amounts — tier bands and flat
+// rewards are always round numbers, so "$1,000 – $5,000" reads cleaner than
+// "$1,000.00 – $5,000.00" (client 2026-07-20). Real cents are still shown:
+// maximumFractionDigits keeps e.g. $1,234.56 intact.
+const fmtUsd = (n: number) => {
+  // Whole dollars → no decimals ("$1,000"); real cents → always two
+  // ("$99.50", never "$99.5").
+  const whole = Number.isInteger(n);
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency', currency: 'USD',
+    minimumFractionDigits: whole ? 0 : 2, maximumFractionDigits: 2,
+  }).format(n);
+};
 
 const fmtDate = (iso: string) =>
   new Date(iso).toLocaleDateString(undefined, { day: '2-digit', month: 'short', year: 'numeric' });
