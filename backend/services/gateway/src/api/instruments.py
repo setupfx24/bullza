@@ -441,15 +441,21 @@ async def _fetch_ohlc_db(sym: str, tf: str, from_time: int, to_time: int) -> lis
     )
 
     def _row(row) -> dict:
+        # Use .mappings() (dict-like) access: iterating a Result yields Row
+        # objects whose attribute access (row.t) raised TypeError here, so this
+        # function threw on EVERY call and the durable ohlcv_<tf> store never
+        # actually served history — chart depth silently fell back to the
+        # InfoWay REST backfill alone (blank chart before its reach).
+        # (fixed 2026-07-20)
         return {
-            "time": int(row.t), "open": float(row.open), "high": float(row.high),
-            "low": float(row.low), "close": float(row.close), "volume": float(row.volume or 0),
+            "time": int(row["t"]), "open": float(row["open"]), "high": float(row["high"]),
+            "low": float(row["low"]), "close": float(row["close"]), "volume": float(row["volume"] or 0),
         }
 
     out: list[dict] = []
     async with TimescaleSessionLocal() as session:
         res = await session.execute(q, params)
-        out = [_row(r) for r in res]
+        out = [_row(r) for r in res.mappings()]
         # Weekend / closed-market fallback: the chart asks for a RECENT window,
         # which is empty when the market is shut (e.g. gold on Saturday). Rather
         # than a blank chart, return the most recent bars up to `to` — the last
@@ -466,7 +472,7 @@ async def _fetch_ohlc_db(sym: str, tf: str, from_time: int, to_time: int) -> lis
                 f"FROM ohlcv_{tf} WHERE {' AND '.join(fb_conds)} ORDER BY time DESC LIMIT 500"
             )
             fb_res = await session.execute(fb_q, fb_params)
-            fb = [_row(r) for r in fb_res]
+            fb = [_row(r) for r in fb_res.mappings()]
             fb.reverse()  # newest-first → chronological
             if len(fb) > len(out):
                 out = fb
