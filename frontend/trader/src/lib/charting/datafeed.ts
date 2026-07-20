@@ -68,17 +68,23 @@ function getSymbolCategory(symbol: string): string {
   return 'forex';
 }
 
-// Drop Saturday/Sunday candles from a NON-crypto symbol's history (client
-// 2026-07-11). Forex / metals / indices / commodities markets are closed on
-// weekends, so weekend bars are dashed "no-trade" fillers that just clutter the
-// chart. New bars already exclude weekends; this strips the OLD ones from the
-// history the chart renders. Crypto (24/7) is left untouched. Weekday is read
-// in UTC — bar.time is bar-open in ms UTC.
+// Drop closed-market weekend candles from a NON-crypto symbol's history
+// (client 2026-07-11). Forex / metals / indices / commodities are closed from
+// Friday ~21:00 UTC until Sunday ~21:00-22:00 UTC, so bars inside that window
+// are dashed "no-trade" fillers that just clutter the chart. The Sunday-night
+// reopen session (from 21:00 UTC — Monday 02:30 IST onwards) is REAL trading
+// data and must be kept: dropping all-of-Sunday-UTC blanked the first hours of
+// Monday's Asian session on the chart (client 2026-07-20 "3:30-5:30 AM gap").
+// Crypto (24/7) is left untouched. Weekday/hour read in UTC — bar.time is
+// bar-open in ms UTC.
 function dropWeekendBars(bars: Bar[], symbol: string): Bar[] {
   if (getSymbolCategory(symbol) === 'crypto') return bars;
   return bars.filter((b) => {
-    const day = new Date(b.time).getUTCDay(); // 0 = Sun, 6 = Sat
-    return day !== 0 && day !== 6;
+    const d = new Date(b.time);
+    const day = d.getUTCDay(); // 0 = Sun, 6 = Sat
+    if (day === 6) return false;              // Saturday: market closed all day
+    if (day === 0) return d.getUTCHours() >= 21; // Sunday: keep from 21:00 UTC reopen
+    return true;
   });
 }
 
