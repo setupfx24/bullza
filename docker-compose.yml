@@ -60,7 +60,11 @@ services:
       context: .
       dockerfile: backend/services/admin/Dockerfile
     ports:
-      - "8001:8001"
+      # Loopback-only. Compose MERGES ports lists across -f files, so a plain
+      # "8001:8001" here stayed published on 0.0.0.0 in prod alongside the
+      # overlay's 127.0.0.1:8003 — exposing the admin API to the internet
+      # past nginx/Cloudflare (found 2026-07-20).
+      - "127.0.0.1:8001:8001"
     env_file:
       - path: ./.env
         required: false
@@ -88,7 +92,8 @@ services:
       context: .
       dockerfile: backend/services/gateway/Dockerfile
     ports:
-      - "8000:8000"
+      # Loopback-only — see admin-api ports note (compose merge exposure).
+      - "127.0.0.1:8000:8000"
     env_file:
       - path: ./.env
         required: false
@@ -181,8 +186,9 @@ services:
         NEXT_PUBLIC_MARKETING_HOST: ${NEXT_PUBLIC_MARKETING_HOST:-}
         NEXT_PUBLIC_TRADE_HOST: ${NEXT_PUBLIC_TRADE_HOST:-}
     ports:
-      # Host 3010 if 3000 is already taken (local Next/other apps)
-      - "3010:3000"
+      # Host 3010 if 3000 is already taken (local Next/other apps).
+      # Loopback-only — see admin-api ports note (compose merge exposure).
+      - "127.0.0.1:3010:3000"
     environment:
       # Do NOT set NEXT_PUBLIC_* http/ws here — browsers on https:// will hit mixed-content blocks.
       # App route src/app/api/v1/[...path]/route.ts proxies using INTERNAL_API_URL or TRADER_API_PROXY_TARGET.
@@ -197,7 +203,8 @@ services:
       context: ./frontend/admin
       dockerfile: Dockerfile
     ports:
-      - "3011:3001"
+      # Loopback-only — see admin-api ports note (compose merge exposure).
+      - "127.0.0.1:3011:3001"
     environment:
       # Server-side proxy /admin-api → admin-api (browser must not use docker hostname admin-api)
       ADMIN_API_PROXY_TARGET: http://admin-api:8001
