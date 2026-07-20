@@ -22,6 +22,11 @@ const Contact = () => {
     message: ''
   })
 
+  const [showSuccess, setShowSuccess] = useState(false)
+  const [sentTo, setSentTo] = useState({ name: '', email: '' })
+  const [submitting, setSubmitting] = useState(false)
+  const [submitError, setSubmitError] = useState('')
+
   const [isChatOpen, setIsChatOpen] = useState(false)
   const [chatInput, setChatInput] = useState('')
   const [messages, setMessages] = useState([
@@ -32,6 +37,19 @@ const Contact = () => {
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, isChatOpen])
+
+  // Success modal: lock background scroll and close on Escape (same treatment
+  // the global PopupContext gives its overlay).
+  useEffect(() => {
+    if (!showSuccess) return
+    const onKeyDown = (e) => { if (e.key === 'Escape') setShowSuccess(false) }
+    document.addEventListener('keydown', onKeyDown)
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.removeEventListener('keydown', onKeyDown)
+      document.body.style.overflow = ''
+    }
+  }, [showSuccess])
 
   const getAutoReply = (text) => {
     const t = text.toLowerCase()
@@ -56,10 +74,49 @@ const Contact = () => {
     }, 800)
   }
 
-  const handleSubmit = (e) => {
+  /** POSTs to the gateway, which emails the submission to the support inbox
+   *  (CONTACT_INBOX_EMAIL → support@swisdex.com). The success modal only
+   *  opens once the backend confirms delivery — previously it always showed,
+   *  so failed messages looked sent. */
+  const handleSubmit = async (e) => {
     e.preventDefault()
-    alert('Thank you for your message! We will get back to you soon.')
-    setFormData({ name: '', email: '', subject: '', message: '' })
+    if (submitting) return
+    setSubmitting(true)
+    setSubmitError('')
+
+    // Capture the name before the reset below clears it — the modal greets by name.
+    const sender = { name: formData.name.trim(), email: formData.email.trim() }
+
+    try {
+      const res = await fetch('/api/v1/public/contact', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'omit',
+        body: JSON.stringify({
+          name: sender.name,
+          email: sender.email,
+          subject: formData.subject,
+          message: formData.message.trim(),
+        }),
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(
+          typeof data?.detail === 'string'
+            ? data.detail
+            : "We couldn't send your message. Please email support@swisdex.com directly."
+        )
+      }
+      setSentTo(sender)
+      setShowSuccess(true)
+      setFormData({ name: '', email: '', subject: '', message: '' })
+    } catch (err) {
+      setSubmitError(
+        err?.message || "We couldn't send your message. Please email support@swisdex.com directly."
+      )
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   const handleChange = (e) => {
@@ -211,9 +268,23 @@ const Contact = () => {
                       placeholder="How can we help you?"
                     ></textarea>
                   </div>
-                  <Button type="submit" variant="primary" noPopup className="w-full flex items-center justify-center gap-2">
+                  {submitError && (
+                    <p
+                      role="alert"
+                      className="text-sm text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg px-4 py-3"
+                    >
+                      {submitError}
+                    </p>
+                  )}
+                  <Button
+                    type="submit"
+                    variant="primary"
+                    noPopup
+                    disabled={submitting}
+                    className="w-full flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
+                  >
                     <Send className="w-5 h-5" />
-                    Send Message
+                    {submitting ? 'Sending…' : 'Send Message'}
                   </Button>
                 </form>
               </div>
@@ -289,6 +360,79 @@ const Contact = () => {
           </ScrollReveal>
         </div>
       </section>
+
+      {showSuccess && (
+        <div
+          className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fade-in"
+          onClick={() => setShowSuccess(false)}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="contact-success-title"
+        >
+          <div
+            className="relative w-full max-w-md glass-card p-8 pt-10 text-center overflow-hidden fx-pop-in"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Glow accents */}
+            <div className="absolute -top-20 -right-20 w-40 h-40 bg-primary-accent/30 rounded-full blur-3xl pointer-events-none" />
+            <div className="absolute -bottom-20 -left-20 w-40 h-40 bg-primary-purple/30 rounded-full blur-3xl pointer-events-none" />
+
+            <button
+              onClick={() => setShowSuccess(false)}
+              className="absolute top-4 right-4 text-text-secondary hover:text-white transition-colors z-10"
+              aria-label="Close"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="relative z-10">
+              {/* Check badge with an expanding pulse ring */}
+              <div className="relative w-20 h-20 mx-auto mb-6">
+                <span className="absolute inset-0 rounded-full bg-primary-accent/40 fx-ring-pulse" />
+                <div className="relative w-20 h-20 bg-primary-accent/20 rounded-full flex items-center justify-center">
+                  <svg className="w-10 h-10 text-primary-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path className="fx-tick-draw" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7" />
+                  </svg>
+                </div>
+              </div>
+
+              <h2 id="contact-success-title" className="text-2xl font-bold text-white mb-3">
+                {sentTo.name ? `Thanks, ${sentTo.name}!` : 'Message Sent!'}
+              </h2>
+
+              <p className="text-text-secondary mb-2">
+                Your message is on its way to our team.
+              </p>
+              {sentTo.email && (
+                <p className="text-text-secondary text-sm mb-6">
+                  We'll reply to <span className="text-white font-medium break-all">{sentTo.email}</span>
+                </p>
+              )}
+
+              <div className="flex items-center justify-center gap-2 text-xs text-text-secondary mb-6">
+                <span className="w-2 h-2 rounded-full bg-primary-accent" />
+                Typical response time: under 1 hour · 24/7
+              </div>
+
+              <div className="flex flex-col sm:flex-row gap-3">
+                <button
+                  onClick={() => setShowSuccess(false)}
+                  className="btn-primary flex-1 inline-flex items-center justify-center"
+                >
+                  Done
+                </button>
+                <button
+                  onClick={() => { setShowSuccess(false); setIsChatOpen(true) }}
+                  className="flex-1 inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl border border-white/20 text-white font-semibold hover:bg-white/5 transition"
+                >
+                  <MessageCircle className="w-4 h-4" />
+                  Live Chat
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {isChatOpen && (
         <div className="fixed bottom-6 right-6 z-[100] w-[calc(100vw-3rem)] sm:w-96 animate-fade-in">

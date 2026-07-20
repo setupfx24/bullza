@@ -26,6 +26,7 @@ from .deposit_bonus_offer import render_first_deposit_bonus_offer
 from .eligibility import render_fr_insurance_eligibility
 from .maintenance import render_maintenance_notice
 from .statement import render_statement_digest
+from .contact_inquiry import render_contact_inquiry, render_contact_ack
 
 __all__ = [
     "render_layout",
@@ -51,4 +52,6 @@ __all__ = [
     "render_fr_insurance_eligibility",
     "render_maintenance_notice",
     "render_statement_digest",
+    "render_contact_inquiry",
+    "render_contact_ack",
 ]

@@ -325,6 +325,34 @@
     from { transform: translateX(0); }
     to   { transform: translateX(-50%); }
   }
+
+  /* Modal entrance — card springs in, tick draws itself after it lands. */
+  .fx-pop-in { animation: fxPopIn .32s cubic-bezier(.2,.9,.3,1.2) both; }
+  @keyframes fxPopIn {
+    from { opacity: 0; transform: translate3d(0, 12px, 0) scale(.94); }
+    to   { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
+  }
+
+  .fx-tick-draw {
+    stroke-dasharray: 26;
+    stroke-dashoffset: 26;
+    animation: fxTickDraw .4s cubic-bezier(.6,0,.3,1) .18s both;
+  }
+  @keyframes fxTickDraw {
+    to { stroke-dashoffset: 0; }
+  }
+
+  .fx-ring-pulse { animation: fxRingPulse 1.6s ease-out .3s infinite; }
+  @keyframes fxRingPulse {
+    0%   { opacity: .5; transform: scale(1); }
+    100% { opacity: 0;  transform: scale(1.5); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .fx-pop-in, .fx-tick-draw, .fx-ring-pulse { animation: none; }
+    .fx-tick-draw { stroke-dashoffset: 0; }
+    .fx-ring-pulse { opacity: 0; }
+  }
 }
 
 /* ── Scrollbar ─────────────────────────────────────────────── */

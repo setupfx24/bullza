@@ -116,6 +116,11 @@ class Settings(BaseSettings):
     # sender reputation. Checked at the single send choke point (smtp_mail).
     EMAIL_SUPPRESSION_LIST: str = ""
 
+    # Destination inbox for the public website contact form
+    # (POST /api/v1/public/contact). Comma-separated to fan out to more
+    # than one mailbox.
+    CONTACT_INBOX_EMAIL: str = "support@swisdex.com"
+
     # ─── Per-category From aliases (Hostinger / any SMTP) ────────────────
     # SMTP authenticates as SMTP_USER (the mailbox owner) but the visible
     # `From:` header is selected by the call site's category so users see
