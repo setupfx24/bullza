@@ -11,12 +11,18 @@ const SIGNUP_HREF = '/auth/register';
 
 /** Wire shape from /api/v1/referral/tiers — kept lean: only the fields
  *  the marketing page actually renders. Admin owns the data in
- *  /config/ib-tiers (system_settings.ib_commission_tiers). */
+ *  /config/referral-tiers (system_settings.referral_tiers).
+ *
+ *  These names must match the API exactly. The referral ladder used to share
+ *  the IB key and shipped `per_lot` / `min_activations`; when it moved to its
+ *  own key those became `per_referral_bounty` / `min_referrals`, but this type
+ *  wasn't updated — every field read `undefined`, so the table rendered "$0"
+ *  and a "1-1" range regardless of what admin configured. (fixed 2026-07-20) */
 type ApiTier = {
   label: string;
-  per_lot: number;
-  min_activations: number;
-  min_amount: number;
+  per_referral_bounty: number;
+  min_referrals: number;
+  max_referrals: number | null;
   instant_payout: boolean;
 };
 
@@ -55,26 +61,26 @@ const FALLBACK_TIERS: DisplayTier[] = [
 const fmtUsd = (n: number) => `$${(n || 0).toLocaleString('en-US', { maximumFractionDigits: 2 })}`;
 
 function adaptApi(t: ApiTier): DisplayTier {
-  const requirement = t.min_activations > 0 ? `${t.min_activations}+ activations` : '—';
+  const lo = t.min_referrals > 0 ? t.min_referrals : 1;
   return {
     label: t.label,
-    perLot: fmtUsd(t.per_lot || 0),
-    requirement,
-    range: t.min_activations > 0 ? `${t.min_activations}+` : '—', // refined below once neighbours are known
+    perLot: fmtUsd(t.per_referral_bounty || 0),
+    requirement: `${lo}+ activations`,
+    range: `${lo}+`, // refined in buildTiers once max / neighbours are known
   };
 }
 
 /** Turn a sorted list of API tiers into display rows whose activation header
- *  reads as a range ("1-20", "21-100", … last "+"). A tier's range runs from
- *  its own activation threshold up to one below the next tier's threshold. */
+ *  reads as a range ("1-20", "21-100", … last "+"). Prefer the tier's own
+ *  max_referrals (admin sets it explicitly); fall back to one below the next
+ *  tier's threshold when max is open-ended but a higher tier exists. */
 function buildTiers(apiTiers: ApiTier[]): DisplayTier[] {
   return apiTiers.map((t, i) => {
     const d = adaptApi(t);
-    const lo = t.min_activations > 0 ? t.min_activations : 1;
+    const lo = t.min_referrals > 0 ? t.min_referrals : 1;
     const next = apiTiers[i + 1];
-    d.range = next
-      ? `${lo}-${Math.max(lo, (next.min_activations || lo) - 1)}`
-      : `${lo}+`;
+    const hi = t.max_referrals ?? (next ? (next.min_referrals || lo) - 1 : null);
+    d.range = hi != null ? `${lo}-${Math.max(lo, hi)}` : `${lo}+`;
     return d;
   });
 }
