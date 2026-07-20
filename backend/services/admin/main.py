@@ -16,6 +16,7 @@ from routes import (
     auth, dashboard, users, trades, deposits, banks, book,
     config as routes_config, instruments_admin, business, social, analytics, bonus, banners,
     support, employees, settings, transactions, kyc, account_types, user_audit_logs,
+    admin_audit_logs,
     insurance as insurance_admin, play_zone as play_zone_admin,
     lifestyle as lifestyle_admin, approvals, notifications, broadcast,
     fixed_return as fixed_return_admin, rm as rm_admin, tasks as tasks_admin,
@@ -219,6 +220,7 @@ app.include_router(transactions.router, prefix=prefix)
 app.include_router(kyc.router, prefix=prefix)
 app.include_router(account_types.router, prefix=prefix)
 app.include_router(user_audit_logs.router, prefix=prefix)
+app.include_router(admin_audit_logs.router, prefix=prefix)
 app.include_router(insurance_admin.router, prefix=prefix)
 app.include_router(fixed_return_admin.router, prefix=prefix)
 app.include_router(play_zone_admin.router, prefix=prefix)

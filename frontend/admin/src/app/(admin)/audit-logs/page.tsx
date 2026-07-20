@@ -6,6 +6,7 @@ import { adminApi } from '@/lib/api';
 import DateField from '@/components/ui/DateField';
 import toast from 'react-hot-toast';
 import { ChevronDown, ChevronLeft, ChevronRight, Loader2, ScrollText } from 'lucide-react';
+import AdminChangesTab from './AdminChangesTab';
 
 interface UserAuditRow {
   id: string;
@@ -40,6 +41,9 @@ function formatTime(d: string) {
 }
 
 export default function AuditLogsPage() {
+  // 'admin' = admin change trail (audit_logs), 'user' = trader activity.
+  // Admin changes lead: that's the compliance-relevant trail.
+  const [tab, setTab] = useState<'admin' | 'user'>('admin');
   const [page, setPage] = useState(1);
   const [actionType, setActionType] = useState('');
   const [userIdFilter, setUserIdFilter] = useState('');
@@ -98,10 +102,35 @@ export default function AuditLogsPage() {
           Audit logs
         </h1>
         <p className="text-xxs text-text-tertiary mt-0.5">
-          Trader registration, sign-in, sign-out, and order placement (IP and device from request)
+          {tab === 'admin'
+            ? 'Every change made by an admin — action, record, old → new values, IP and time (append-only)'
+            : 'Trader registration, sign-in, sign-out, and order placement (IP and device from request)'}
         </p>
       </div>
 
+      {/* Two distinct trails: admin_logs (admin changes) vs user_audit_logs
+          (trader activity). They were previously only the latter. */}
+      <div className="flex items-center gap-1 border-b border-border-primary">
+        {([
+          { key: 'admin', label: 'Admin changes' },
+          { key: 'user', label: 'Trader activity' },
+        ] as const).map((t) => (
+          <button
+            key={t.key}
+            onClick={() => setTab(t.key)}
+            className={cn(
+              'px-3 py-2 text-xs font-medium border-b-2 -mb-px transition-fast',
+              tab === t.key
+                ? 'border-buy text-text-primary'
+                : 'border-transparent text-text-tertiary hover:text-text-secondary',
+            )}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'admin' ? <AdminChangesTab /> : (
       <div className="bg-bg-secondary border border-border-primary rounded-md">
         <div className="flex flex-wrap items-end gap-3 p-3 border-b border-border-primary">
           <div>
@@ -251,6 +280,7 @@ export default function AuditLogsPage() {
           </div>
         )}
       </div>
+      )}
     </div>
   );
 }
