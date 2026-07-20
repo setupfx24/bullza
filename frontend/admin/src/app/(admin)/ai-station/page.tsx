@@ -312,19 +312,34 @@ function Connection({ cfg, setCfg, reload }: { cfg: Config; setCfg: (c: Config) 
   const [base, setBase] = useState(cfg.webhook_base || '');
   const [saving, setSaving] = useState(false);
   const [symbols, setSymbols] = useState<{ symbol: string; display_name?: string }[]>([]);
-  const [sym, setSym] = useState('EURUSD');
+  const [syms, setSyms] = useState<string[]>(['EURUSD']);
+  const [symInput, setSymInput] = useState('');
   const inputCls = 'px-2 py-1.5 text-sm bg-bg-input border border-border-primary rounded text-text-primary tabular-nums';
 
   useEffect(() => {
+    // Restore the instrument list this admin picked (per-browser).
+    try {
+      const saved = JSON.parse(localStorage.getItem('ai_station_alert_syms') || '[]');
+      if (Array.isArray(saved) && saved.length) setSyms(saved);
+    } catch { /* ignore */ }
     (async () => {
       try {
         const r = await adminApi.get<{ items: { symbol: string; display_name?: string }[] }>('/config/instruments');
-        const items = (r?.items || []).filter((i) => i.symbol);
-        setSymbols(items);
-        if (items.length && !items.find((i) => i.symbol === 'EURUSD')) setSym(items[0].symbol);
+        setSymbols((r?.items || []).filter((i) => i.symbol));
       } catch { /* instruments optional */ }
     })();
   }, []);
+
+  useEffect(() => {
+    try { localStorage.setItem('ai_station_alert_syms', JSON.stringify(syms)); } catch { /* ignore */ }
+  }, [syms]);
+
+  const addSym = (raw?: string) => {
+    const v = (raw ?? symInput).trim().toUpperCase();
+    if (!v) return;
+    setSyms((prev) => (prev.includes(v) ? prev : [...prev, v]));
+    setSymInput('');
+  };
 
   const save = async (extra: Partial<{ enabled: boolean; regenerate_secret: boolean }> = {}) => {
     setSaving(true);
@@ -371,32 +386,54 @@ function Connection({ cfg, setCfg, reload }: { cfg: Config; setCfg: (c: Config) 
       </section>
 
       <section className="bg-bg-secondary border border-border-primary rounded-md p-5 space-y-3">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-sm font-semibold text-text-primary">TradingView alert templates</h2>
-          <div className="flex items-center gap-2">
-            <label className="text-xxs text-text-tertiary">Instrument</label>
-            <input list="ai-symbols" className={`${inputCls} w-44`} value={sym}
-              onChange={(e) => setSym(e.target.value.toUpperCase())} placeholder="EURUSD" />
-            <datalist id="ai-symbols">
-              {symbols.map((i) => <option key={i.symbol} value={i.symbol}>{i.display_name || i.symbol}</option>)}
-            </datalist>
-          </div>
-        </div>
+        <h2 className="text-sm font-semibold text-text-primary">TradingView alert templates</h2>
         <p className="text-[10px] text-text-tertiary">
-          Pick an instrument → its own alert messages appear below. In the TradingView alert: put the <b>Webhook URL</b> (above) in the Webhook field,
-          and copy one JSON below into the <b>Message</b> field. Keep each trade&apos;s <code>id</code> unique; reuse an id only to open → close → re-open the same strategy.
+          Add every instrument you trade — each one gets its own alert set below. In the TradingView alert: put the <b>Webhook URL</b> (above)
+          in the Webhook field, and copy that instrument&apos;s JSON into the <b>Message</b> field. Keep each trade&apos;s <code>id</code> unique;
+          reuse an id only to open → close → re-open the same strategy.
         </p>
-        <div className="grid sm:grid-cols-2 gap-3">
-          {buildTemplates(sym).map((t) => (
-            <div key={t.title} className="border border-border-primary rounded-md p-3 space-y-2">
-              <div className="flex items-center justify-between gap-2">
-                <div>
-                  <div className="text-xs font-medium text-text-primary">{t.title}</div>
-                  <div className="text-[10px] text-text-tertiary">{t.desc}</div>
-                </div>
-                <button onClick={() => copy(JSON.stringify(t.json))} className="p-1.5 border border-border-primary rounded text-text-secondary hover:bg-bg-hover shrink-0" title="Copy JSON"><Copy size={12} /></button>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <input list="ai-symbols" className={`${inputCls} w-44`} value={symInput}
+            onChange={(e) => setSymInput(e.target.value.toUpperCase())}
+            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addSym(); } }}
+            placeholder="Add instrument…" />
+          <datalist id="ai-symbols">
+            {symbols.map((i) => <option key={i.symbol} value={i.symbol}>{i.display_name || i.symbol}</option>)}
+          </datalist>
+          <button onClick={() => addSym()} className="inline-flex items-center gap-1 px-2 py-1.5 text-xxs border border-border-primary rounded text-text-secondary hover:bg-bg-hover"><Plus size={12} /> Add</button>
+          {symbols.length > 0 && (
+            <button onClick={() => setSyms(symbols.map((i) => i.symbol))}
+              className="px-2 py-1.5 text-xxs border border-border-primary rounded text-text-secondary hover:bg-bg-hover">Add all ({symbols.length})</button>
+          )}
+          {syms.length > 0 && (
+            <button onClick={() => setSyms([])} className="px-2 py-1.5 text-xxs border border-border-primary rounded text-sell hover:bg-bg-hover">Clear</button>
+          )}
+        </div>
+
+        {syms.length === 0 && <p className="text-xxs text-text-tertiary">No instruments added yet — add one above.</p>}
+
+        <div className="space-y-3">
+          {syms.map((sy) => (
+            <div key={sy} className="border border-border-primary rounded-md p-3 space-y-2">
+              <div className="flex items-center justify-between">
+                <h3 className="text-xs font-semibold text-text-primary">{sy}</h3>
+                <button onClick={() => setSyms(syms.filter((x) => x !== sy))} className="p-1 text-sell hover:opacity-70" title="Remove"><Trash2 size={12} /></button>
               </div>
-              <code className="block px-2 py-1.5 text-[11px] bg-bg-input rounded text-text-primary break-all">{JSON.stringify(t.json)}</code>
+              <div className="grid sm:grid-cols-2 gap-2">
+                {buildTemplates(sy).map((t) => (
+                  <div key={t.title} className="border border-border-primary rounded p-2.5 space-y-1.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <div>
+                        <div className="text-xs font-medium text-text-primary">{t.title}</div>
+                        <div className="text-[10px] text-text-tertiary">{t.desc}</div>
+                      </div>
+                      <button onClick={() => copy(JSON.stringify(t.json))} className="p-1.5 border border-border-primary rounded text-text-secondary hover:bg-bg-hover shrink-0" title="Copy JSON"><Copy size={12} /></button>
+                    </div>
+                    <code className="block px-2 py-1.5 text-[11px] bg-bg-input rounded text-text-primary break-all">{JSON.stringify(t.json)}</code>
+                  </div>
+                ))}
+              </div>
             </div>
           ))}
         </div>
