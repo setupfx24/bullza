@@ -246,6 +246,26 @@ def _num(v):
         raise HTTPException(status_code=400, detail=f"invalid number: {v!r}")
 
 
+async def close_trade(db: AsyncSession, *, admin_id: UUID, ip_address: str | None,
+                      trade_id: UUID, close_price=None) -> dict:
+    res = await db.execute(select(AiStationTrade).where(AiStationTrade.id == trade_id))
+    t = res.scalar_one_or_none()
+    if not t:
+        raise HTTPException(status_code=404, detail="Trade not found")
+    if t.status == "closed":
+        raise HTTPException(status_code=400, detail="Trade already closed")
+    await core.close_trade(db, t, close_price=close_price)
+    await write_audit_log(
+        db, admin_id, "ai_station.close_trade", "ai_station_trade", trade_id,
+        old_values=None,
+        new_values={"close_price": float(t.close_price) if t.close_price is not None else None,
+                    "pnl": float(t.pnl) if t.pnl is not None else None},
+        ip_address=ip_address,
+    )
+    await db.commit()
+    return core.serialize_trade(t)
+
+
 async def edit_trade(db: AsyncSession, *, admin_id: UUID, ip_address: str | None,
                      trade_id: UUID, fields: dict) -> dict:
     res = await db.execute(select(AiStationTrade).where(AiStationTrade.id == trade_id))

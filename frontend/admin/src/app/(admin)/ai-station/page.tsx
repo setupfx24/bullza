@@ -219,9 +219,9 @@ function TradesTable({ trades, onEdit, reload }: { trades: Trade[]; onEdit: (t: 
   const [filter, setFilter] = useState<'all' | 'open' | 'closed'>('all');
   const rows = useMemo(() => trades.filter((t) => filter === 'all' || t.status === filter), [trades, filter]);
 
-  const closeSignal = async (t: Trade) => {
-    if (!confirm(`Close the whole signal for ${t.symbol}? All its open copies close.`)) return;
-    try { await adminApi.post(`/ai-station/signals/${t.signal_id}/close`, {}); toast.success('Signal closed'); reload(); }
+  const closeTrade = async (t: Trade) => {
+    if (!confirm(`Close ${t.user_email || 'this user'}'s ${t.symbol} ${t.side.toUpperCase()} trade at the current price?`)) return;
+    try { await adminApi.post(`/ai-station/trades/${t.id}/close`, {}); toast.success('Trade closed'); reload(); }
     catch (e: any) { toast.error(e?.message || 'Close failed'); }
   };
 
@@ -259,7 +259,7 @@ function TradesTable({ trades, onEdit, reload }: { trades: Trade[]; onEdit: (t: 
                 <td className="px-2 py-1.5">
                   <div className="flex gap-1">
                     <button onClick={() => onEdit(t)} className="p-1 text-text-tertiary hover:text-text-primary" title="Edit"><Pencil size={13} /></button>
-                    {t.status === 'open' && <button onClick={() => closeSignal(t)} className="p-1 text-sell hover:opacity-70" title="Close signal"><X size={13} /></button>}
+                    {t.status === 'open' && <button onClick={() => closeTrade(t)} className="p-1 text-sell hover:opacity-70" title="Close this trade"><X size={13} /></button>}
                   </div>
                 </td>
               </tr>

@@ -143,6 +143,21 @@ class EditTradeRequest(BaseModel):
     status: Optional[str] = None  # 'open' | 'closed'
 
 
+@router.post("/trades/{trade_id}/close")
+async def close_trade(
+    trade_id: UUID,
+    body: CloseSignalRequest,
+    request: Request,
+    admin: User = Depends(require_permission(PERM)),
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    """Manually close ONE user's AI trade (not the whole signal)."""
+    return await svc.close_trade(
+        db, admin_id=admin.id, ip_address=_ip(request),
+        trade_id=trade_id, close_price=body.close_price,
+    )
+
+
 @router.patch("/trades/{trade_id}")
 async def edit_trade(
     trade_id: UUID,

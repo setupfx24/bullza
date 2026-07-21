@@ -257,6 +257,27 @@ async def close_signal(db, signal: AiStationSignal, *, close_price=None) -> int:
     return len(trades)
 
 
+async def close_trade(db, trade, *, close_price=None) -> None:
+    """Close a SINGLE display trade (one user's copy) at the given / live price.
+    Does not touch the parent signal or any other user's copy. Caller commits."""
+    if trade.status == "closed":
+        return
+    if close_price is None:
+        q = await live_quote(trade.symbol)
+        if q is None:
+            close_price = trade.entry_price  # no tick -> flat
+        else:
+            bid, ask = q
+            close_price = _fill_price(trade.side, bid, ask, opening=False)
+    close_price = _dec(close_price)
+    cs = await _contract_size(db, trade.symbol)
+    trade.close_price = close_price
+    trade.pnl = compute_display_pnl(trade.side, trade.entry_price, close_price, trade.lots, cs)
+    trade.status = "closed"
+    trade.closed_at = datetime.now(timezone.utc)
+    await db.flush()
+
+
 async def sweep_sltp(db) -> int:
     """Close any open signal whose SL or TP has been hit by the live tick.
 
