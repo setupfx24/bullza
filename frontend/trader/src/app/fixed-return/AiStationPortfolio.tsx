@@ -6,8 +6,9 @@
  * guaranteed return; they show what the AI/desk traded on the locked capital.
  */
 import { useCallback, useEffect, useState } from 'react';
+import Link from 'next/link';
 import { clsx } from 'clsx';
-import { Loader2, Activity } from 'lucide-react';
+import { Loader2, Activity, LineChart } from 'lucide-react';
 import api from '@/lib/api/client';
 
 interface Trade {
@@ -63,10 +64,16 @@ export default function AiStationPortfolio() {
 
   return (
     <section className="mt-6">
-      <div className="flex items-center gap-2 mb-3">
+      <div className="flex flex-wrap items-center gap-2 mb-3">
         <Activity size={16} className="text-buy" />
         <h2 className="text-base font-semibold text-text-primary">Portfolio — AI trades</h2>
-        <span className="text-xxs text-text-tertiary">live · display only, does not affect your guaranteed return</span>
+        <span className="text-xxs text-text-tertiary hidden sm:inline">live · display only, does not affect your guaranteed return</span>
+        <Link
+          href={`/ai-station/terminal?symbol=${trades[0]?.symbol || 'XAUUSD'}`}
+          className="ml-auto inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md bg-buy text-white hover:bg-buy/90 transition-fast"
+        >
+          <LineChart size={14} /> View Terminal
+        </Link>
       </div>
 
       {loading && !summary ? (
