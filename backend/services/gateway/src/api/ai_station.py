@@ -94,6 +94,19 @@ async def my_trades(
     live = await ai.enrich_open_pnl(db, trades)
     items = [ai.serialize_trade(t, live_pnl=live.get(str(t.id))) for t in trades]
 
+    # Current market price for OPEN trades (buy closes at bid, sell at ask) so
+    # the UI can show a live "Now" price. One quote per distinct open symbol.
+    open_syms = {t.symbol for t in trades if t.status == "open"}
+    quotes = {}
+    for sy in open_syms:
+        quotes[sy] = await ai.live_quote(sy)
+    for t, it in zip(trades, items):
+        if t.status == "open":
+            qv = quotes.get(t.symbol)
+            if qv:
+                bid, ask = qv
+                it["current_price"] = float(bid if t.side == "buy" else ask)
+
     # The user's total active locked principal — for the % return figure.
     principal = float((await db.execute(
         select(func.coalesce(func.sum(FixedReturnLock.principal), 0))

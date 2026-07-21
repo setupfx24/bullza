@@ -18,7 +18,7 @@ const AiStationChart = dynamic(() => import('@/components/charts/AiStationChart'
 
 interface Trade {
   id: string; symbol: string; side: 'buy' | 'sell'; lots: number;
-  entry_price: number; close_price: number | null;
+  entry_price: number; close_price: number | null; current_price?: number | null;
   pnl: number | null; status: 'open' | 'closed';
   opened_at: string; closed_at: string | null;
 }
@@ -69,12 +69,15 @@ function TerminalInner() {
   const chartTrades: AiTrade[] = useMemo(() => symTrades
     .filter((t) => t.opened_at)
     .map((t) => ({
+      id: t.id,
       side: t.side,
       status: t.status,
       entryTime: Math.floor(new Date(t.opened_at).getTime() / 1000),
       entryPrice: t.entry_price,
       exitTime: t.closed_at ? Math.floor(new Date(t.closed_at).getTime() / 1000) : null,
       exitPrice: t.close_price,
+      lots: t.lots,
+      pnl: t.pnl,
       entryText: `${t.side.toUpperCase()} ${fmt(t.lots)} @ ${t.entry_price}`,
       exitText: `exit @ ${t.close_price} (${money(t.pnl)})`,
     })), [symTrades]);
@@ -151,7 +154,9 @@ function TerminalInner() {
                     <td className={clsx('py-1.5 pr-2 uppercase font-medium', t.side === 'buy' ? 'text-buy' : 'text-red-400')}>{t.side}</td>
                     <td className="py-1.5 pr-2 tabular-nums text-text-secondary">{fmt(t.lots)}</td>
                     <td className="py-1.5 pr-2 tabular-nums text-text-secondary">{fmt(t.entry_price, 5)}</td>
-                    <td className="py-1.5 pr-2 tabular-nums text-text-secondary">{t.close_price === null ? '—' : fmt(t.close_price, 5)}</td>
+                    <td className="py-1.5 pr-2 tabular-nums text-text-secondary">
+                      {t.close_price != null ? fmt(t.close_price, 5) : (t.current_price != null ? fmt(t.current_price, 5) : '—')}
+                    </td>
                     <td className={clsx('py-1.5 pr-2 tabular-nums font-medium', pnlCls(t.pnl))}>{money(t.pnl)}</td>
                     <td className="py-1.5 pr-2 text-[10px] text-text-tertiary whitespace-nowrap">
                       {new Date((tab === 'closed' ? t.closed_at : t.opened_at) || t.opened_at).toLocaleString()}

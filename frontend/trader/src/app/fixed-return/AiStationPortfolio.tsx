@@ -13,7 +13,7 @@ import api from '@/lib/api/client';
 
 interface Trade {
   id: string; symbol: string; side: string; lots: number;
-  entry_price: number; close_price: number | null;
+  entry_price: number; close_price: number | null; current_price?: number | null;
   pnl: number | null; status: string; opened_at: string; closed_at: string | null;
 }
 interface Summary {
@@ -126,7 +126,7 @@ export default function AiStationPortfolio() {
                     <td className={clsx('px-3 py-2 uppercase text-xs font-medium', t.side === 'buy' ? 'text-buy' : 'text-red-400')}>{t.side}</td>
                     <td className="px-3 py-2 tabular-nums text-text-secondary">{fmt(t.lots, 2)}</td>
                     <td className="px-3 py-2 tabular-nums text-text-secondary">{fmt(t.entry_price, 5)}</td>
-                    <td className="px-3 py-2 tabular-nums text-text-secondary">{t.close_price === null ? '—' : fmt(t.close_price, 5)}</td>
+                    <td className="px-3 py-2 tabular-nums text-text-secondary">{t.close_price != null ? fmt(t.close_price, 5) : (t.current_price != null ? fmt(t.current_price, 5) : '—')}</td>
                     <td className={clsx('px-3 py-2 tabular-nums font-medium', pnlCls(t.pnl))}>{money(t.pnl)}</td>
                     <td className="px-3 py-2 text-xxs text-text-tertiary whitespace-nowrap">
                       {new Date((tab === 'closed' ? t.closed_at : t.opened_at) || t.opened_at).toLocaleString()}
