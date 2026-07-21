@@ -486,16 +486,27 @@ export default function ChartingLibraryChart() {
         text: `${p.side.toUpperCase()} ${lots}  ${pnlStr} (${pctStr})`,
         dashed: false, pnl, label: true,
       });
+      // SL/TP labels PROJECT the realized outcome if price reaches that level,
+      // so they must show NET P&L — livePnlFor returns gross, but the actual
+      // close books `profit − commission − swap` (portfolio_service._closed_pnl,
+      // same value the Closed-trades tab shows). Without this the TP line read
+      // e.g. +$2.06 gross while the trade realized +$2.01 net of a $0.06
+      // commission — client 2026-07-21 "TP amount doesn't match what I get".
+      // Fees are the position's own commission/swap (round-turn, charged at open).
+      const fees = (Number(p.commission) || 0) + (Number(p.swap) || 0);
+      const netAt = (gross: number) => gross - fees;
       if (p.stop_loss && Number(p.stop_loss) > 0) {
         const slp = Number(p.stop_loss);
         const r = livePnlFor(p, { bid: slp, ask: slp }, useTradingStore.getState().instruments, sym, useTradingStore.getState().prices);
-        const pl = r ? `  ${r.pnl >= 0 ? '+' : '−'}$${Math.abs(r.pnl).toFixed(2)}` : '';
+        const net = r ? netAt(r.pnl) : null;
+        const pl = net != null ? `  ${net >= 0 ? '+' : '−'}$${Math.abs(net).toFixed(2)}` : '';
         desired.push({ key: `${p.id}-sl`, price: slp, color: '#f59e0b', text: `SL ${fp(slp)}${pl}`, dashed: true });
       }
       if (p.take_profit && Number(p.take_profit) > 0) {
         const tpp = Number(p.take_profit);
         const r = livePnlFor(p, { bid: tpp, ask: tpp }, useTradingStore.getState().instruments, sym, useTradingStore.getState().prices);
-        const pl = r ? `  ${r.pnl >= 0 ? '+' : '−'}$${Math.abs(r.pnl).toFixed(2)}` : '';
+        const net = r ? netAt(r.pnl) : null;
+        const pl = net != null ? `  ${net >= 0 ? '+' : '−'}$${Math.abs(net).toFixed(2)}` : '';
         desired.push({ key: `${p.id}-tp`, price: tpp, color: '#14b8a6', text: `TP ${fp(tpp)}${pl}`, dashed: true });
       }
     }
