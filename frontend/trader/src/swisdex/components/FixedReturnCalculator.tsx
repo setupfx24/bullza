@@ -23,6 +23,10 @@ interface RateConfig {
   tiers: Tier[];
   tenures: Tenure[];
   rate_matrix_pct: number[][];
+  // Standard post-launch ladder — the dashboard's "Standard rates" sheet. The
+  // public marketing calculator projects off THIS so it agrees with the
+  // marketing rate table, and both match the user dashboard. (client 2026-07-21)
+  base_rate_matrix_pct?: number[][];
   early_withdrawal_fee_pct: number;
   lock_months: number;
 }
@@ -125,7 +129,9 @@ export function FixedReturnCalculator() {
 
   const ratePct = useMemo(() => {
     if (tierIdx < 0 || tenureIdx < 0) return 0;
-    return cfg.rate_matrix_pct[tenureIdx]?.[tierIdx] ?? 0;
+    // Standard ladder to match the marketing table + dashboard standard view.
+    const matrix = cfg.base_rate_matrix_pct ?? cfg.rate_matrix_pct;
+    return matrix[tenureIdx]?.[tierIdx] ?? 0;
   }, [cfg, tierIdx, tenureIdx]);
 
   // Identical projection to the dashboard.

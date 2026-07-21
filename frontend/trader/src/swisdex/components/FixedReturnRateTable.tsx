@@ -17,7 +17,12 @@ interface Tenure { label: string; days: number }
 interface RateConfig {
   tiers: Tier[];
   tenures: Tenure[];
+  // Live matrix (= the pre-launch offer while it runs).
   rate_matrix_pct: number[][];
+  // Standard post-launch ladder. The user dashboard's "Standard rates" view
+  // shows THIS, and the client wants the public marketing table to match the
+  // dashboard exactly, so we render base when present. (client 2026-07-21)
+  base_rate_matrix_pct?: number[][];
 }
 
 const FALLBACK: RateConfig = {
@@ -75,6 +80,9 @@ export function FixedReturnRateTable({ heading = true }: { heading?: boolean }) 
   }, []);
 
   const tiers = cfg.tiers;
+  // Match the user dashboard's "Standard rates" sheet: prefer the base ladder,
+  // fall back to the live matrix when base isn't provided.
+  const matrix = cfg.base_rate_matrix_pct ?? cfg.rate_matrix_pct;
   return (
     <section className="mx-auto max-w-[1200px] px-[var(--gutter)] py-12 sm:py-16">
       {heading && (
@@ -128,7 +136,7 @@ export function FixedReturnRateTable({ heading = true }: { heading?: boolean }) 
                   </th>
                   {tiers.map((_, ci) => {
                     const highlight = ri === cfg.tenures.length - 1 || ci === tiers.length - 1;
-                    const v = cfg.rate_matrix_pct[ri]?.[ci];
+                    const v = matrix[ri]?.[ci];
                     return (
                       <td
                         key={ci}
