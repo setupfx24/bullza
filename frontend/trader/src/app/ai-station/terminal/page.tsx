@@ -12,7 +12,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { clsx } from 'clsx';
 import { ArrowLeft, Activity, Loader2, Lock } from 'lucide-react';
 import api from '@/lib/api/client';
-import type { TradeMarker } from '@/components/charts/AiStationChart';
+import type { AiTrade } from '@/components/charts/AiStationChart';
 
 const AiStationChart = dynamic(() => import('@/components/charts/AiStationChart'), { ssr: false });
 
@@ -66,26 +66,18 @@ function TerminalInner() {
 
   const symTrades = useMemo(() => trades.filter((t) => t.symbol.toUpperCase() === symbol), [trades, symbol]);
 
-  const markers: TradeMarker[] = useMemo(() => {
-    const ms: TradeMarker[] = [];
-    for (const t of symTrades) {
-      if (t.opened_at) {
-        ms.push({
-          time: Math.floor(new Date(t.opened_at).getTime() / 1000),
-          price: t.entry_price, side: t.side, type: 'entry',
-          text: `${t.side.toUpperCase()} ${fmt(t.lots)} @ ${t.entry_price}`,
-        });
-      }
-      if (t.close_price != null && t.closed_at) {
-        ms.push({
-          time: Math.floor(new Date(t.closed_at).getTime() / 1000),
-          price: t.close_price, side: t.side, type: 'exit',
-          text: `exit @ ${t.close_price} (${money(t.pnl)})`,
-        });
-      }
-    }
-    return ms;
-  }, [symTrades]);
+  const chartTrades: AiTrade[] = useMemo(() => symTrades
+    .filter((t) => t.opened_at)
+    .map((t) => ({
+      side: t.side,
+      status: t.status,
+      entryTime: Math.floor(new Date(t.opened_at).getTime() / 1000),
+      entryPrice: t.entry_price,
+      exitTime: t.closed_at ? Math.floor(new Date(t.closed_at).getTime() / 1000) : null,
+      exitPrice: t.close_price,
+      entryText: `${t.side.toUpperCase()} ${fmt(t.lots)} @ ${t.entry_price}`,
+      exitText: `exit @ ${t.close_price} (${money(t.pnl)})`,
+    })), [symTrades]);
 
   const rows = symTrades.filter((t) => t.status === tab);
   const s = summary;
@@ -131,7 +123,7 @@ function TerminalInner() {
       {/* Chart + trades panel */}
       <div className="flex-1 min-h-0 flex flex-col lg:flex-row">
         <div className="h-[42vh] lg:h-auto lg:flex-1 min-h-0 border-b lg:border-b-0 lg:border-r border-border-primary">
-          <AiStationChart symbol={symbol} markers={markers} />
+          <AiStationChart symbol={symbol} trades={chartTrades} />
         </div>
 
         <div className="lg:w-[400px] shrink-0 flex flex-col min-h-0">

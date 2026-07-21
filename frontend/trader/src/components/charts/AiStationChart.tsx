@@ -2,26 +2,32 @@
 
 /**
  * AI Station read-only chart — a self-contained TradingView Charting Library
- * widget that plots AI-Station trade entry/exit markers. Strictly read-only:
- * NO broker, NO order UI, NO drawing tools. Reuses the shared `swisDexDatafeed`
- * (unchanged) so bars/live candles match the real terminal.
+ * widget that plots AI-Station trades the way a real trading terminal shows
+ * them: an entry arrow, an entry price line for OPEN trades (like a live
+ * position line), and an exit flag + entry→exit connector for CLOSED trades.
+ * NO stop-loss / take-profit lines. Strictly read-only: no broker, no order UI,
+ * no drawing tools.
  *
- * Deliberately does NOT import the live terminal's ChartingLibraryChart so the
- * production terminal is never touched.
+ * Reuses the shared `swisDexDatafeed` (unchanged) so bars/live candles match the
+ * real terminal, and deliberately does NOT import the live terminal's chart
+ * component so production is never touched.
  */
 import { useEffect, useRef, useState } from 'react';
 import { swisDexDatafeed } from '@/lib/charting/datafeed';
 import { useUIStore } from '@/stores/uiStore';
 
-export interface TradeMarker {
-  time: number;                 // UNIX seconds
-  price: number;
+export interface AiTrade {
   side: 'buy' | 'sell';
-  type: 'entry' | 'exit';
-  text?: string;
+  status: 'open' | 'closed';
+  entryTime: number;              // UNIX seconds
+  entryPrice: number;
+  exitTime?: number | null;
+  exitPrice?: number | null;
+  entryText?: string;
+  exitText?: string;
 }
 
-interface Props { symbol: string; interval?: string; markers?: TradeMarker[]; }
+interface Props { symbol: string; interval?: string; trades?: AiTrade[]; }
 
 type TVWidget = {
   onChartReady?: (cb: () => void) => void;
@@ -48,11 +54,14 @@ function loadLib(): Promise<void> {
   return _libPromise;
 }
 
-export default function AiStationChart({ symbol, interval = '5', markers = [] }: Props) {
+const BUY = '#22c55e';
+const SELL = '#ef4444';
+
+export default function AiStationChart({ symbol, interval = '5', trades = [] }: Props) {
   const theme = useUIStore((s) => s.theme);
   const containerRef = useRef<HTMLDivElement>(null);
   const widgetRef = useRef<TVWidget | null>(null);
-  const markerIdsRef = useRef<any[]>([]);
+  const shapeIdsRef = useRef<any[]>([]);
   const lastSigRef = useRef('');
   const [ready, setReady] = useState(false);
 
@@ -84,8 +93,8 @@ export default function AiStationChart({ symbol, interval = '5', markers = [] }:
         enabled_features: [],
       });
       widgetRef.current = w;
-      markerIdsRef.current = [];   // old chart (and its shapes) are gone
-      lastSigRef.current = '';     // force a re-plot on the fresh chart
+      shapeIdsRef.current = [];   // old chart (and its shapes) are gone
+      lastSigRef.current = '';    // force a re-plot on the fresh chart
       try { w.onChartReady?.(() => { if (!cancelled) setReady(true); }); } catch { /* noop */ }
     }).catch(() => { /* lib load failed — container stays blank */ });
     return () => {
@@ -95,7 +104,7 @@ export default function AiStationChart({ symbol, interval = '5', markers = [] }:
     };
   }, [theme, symbol, interval]);
 
-  // Plot / re-plot markers whenever they (or readiness) change.
+  // Plot / re-plot trade shapes whenever they (or readiness) change.
   useEffect(() => {
     const w = widgetRef.current;
     if (!ready || !w?.activeChart) return;
@@ -103,44 +112,64 @@ export default function AiStationChart({ symbol, interval = '5', markers = [] }:
     try { chart = w.activeChart(); } catch { return; }
     if (!chart?.createShape) return;
 
-    // Skip when the marker set is unchanged (avoids a re-plot flicker every poll).
-    const sig = JSON.stringify(markers);
+    // Skip when unchanged (avoids a re-plot flicker every poll).
+    const sig = JSON.stringify(trades);
     if (sig === lastSigRef.current) return;
     lastSigRef.current = sig;
 
-    for (const id of markerIdsRef.current) { try { chart.removeEntity(id); } catch { /* noop */ } }
-    markerIdsRef.current = [];
+    for (const id of shapeIdsRef.current) { try { chart.removeEntity(id); } catch { /* noop */ } }
+    shapeIdsRef.current = [];
 
-    const BUY = '#22c55e', SELL = '#ef4444';
-    for (const m of markers) {
-      const color = m.side === 'buy' ? BUY : SELL;
-      const shape = m.type === 'entry'
-        ? (m.side === 'buy' ? 'arrow_up' : 'arrow_down')
-        : 'flag';
+    const track = (p: any) => {
+      if (p && typeof p.then === 'function') p.then((id: any) => shapeIdsRef.current.push(id)).catch(() => {});
+      else if (p !== undefined) shapeIdsRef.current.push(p);
+    };
+    const baseOpts = { lock: true, disableSelection: true, disableSave: true, disableUndo: true };
+
+    for (const t of trades) {
+      const color = t.side === 'buy' ? BUY : SELL;
+
+      // Entry arrow (buy = up, sell = down).
       try {
-        const p = chart.createShape(
-          { time: m.time, price: m.price },
-          {
-            shape,
-            text: m.text ?? `${m.type.toUpperCase()} ${m.side.toUpperCase()} @ ${m.price}`,
-            lock: true,
-            disableSelection: true,
-            disableSave: true,
-            disableUndo: true,
-            overrides: { color, textcolor: color, fontsize: 11, bold: true },
-          },
-        );
-        // createShape may return an id or a promise depending on version.
-        if (p && typeof p.then === 'function') {
-          p.then((id: any) => markerIdsRef.current.push(id)).catch(() => {});
-        } else if (p !== undefined) {
-          markerIdsRef.current.push(p);
-        }
-      } catch { /* skip a marker that can't be placed */ }
+        track(chart.createShape(
+          { time: t.entryTime, price: t.entryPrice },
+          { ...baseOpts, shape: t.side === 'buy' ? 'arrow_up' : 'arrow_down',
+            text: t.entryText ?? `${t.side.toUpperCase()} @ ${t.entryPrice}`,
+            overrides: { color, textcolor: color, fontsize: 11, bold: true } },
+        ));
+      } catch { /* noop */ }
+
+      if (t.status === 'open') {
+        // Open trade → entry price line across the chart (position-line look).
+        try {
+          track(chart.createShape(
+            { time: t.entryTime, price: t.entryPrice },
+            { ...baseOpts, shape: 'horizontal_line',
+              overrides: { linecolor: color, linewidth: 1, linestyle: 2, showPrice: true } },
+          ));
+        } catch { /* noop */ }
+      } else if (t.exitTime && t.exitPrice != null) {
+        // Closed trade → exit flag + entry→exit connector.
+        try {
+          track(chart.createShape(
+            { time: t.exitTime, price: t.exitPrice },
+            { ...baseOpts, shape: 'flag',
+              text: t.exitText ?? `exit @ ${t.exitPrice}`,
+              overrides: { color, textcolor: color, fontsize: 11, bold: true } },
+          ));
+        } catch { /* noop */ }
+        try {
+          track(chart.createMultipointShape(
+            [{ time: t.entryTime, price: t.entryPrice }, { time: t.exitTime, price: t.exitPrice }],
+            { ...baseOpts, shape: 'trend_line',
+              overrides: { linecolor: color, linewidth: 1, linestyle: 2 } },
+          ));
+        } catch { /* noop */ }
+      }
     }
-    // No cleanup here: markers are torn down when the widget rebuilds (symbol/
-    // theme change resets the refs) or on unmount (widget.remove()).
-  }, [ready, markers]);
+    // No cleanup here: shapes are torn down when the widget rebuilds
+    // (symbol/theme change resets the refs) or on unmount (widget.remove()).
+  }, [ready, trades]);
 
   return (
     <div className="relative w-full h-full min-h-[300px]">
