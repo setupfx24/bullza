@@ -20,6 +20,20 @@ export const metadata: Metadata = {
   /* Favicons are served via Next.js file conventions:
      src/app/icon.png and src/app/apple-icon.png. Adding manual
      metadata.icons here would override that — leave them out. */
+  // PWA: the manifest (src/app/manifest.ts) is auto-linked by Next.
+  applicationName: 'SwisDex',
+  // iOS reads these, NOT the manifest — this is what makes "Add to Home
+  // Screen" open the app FULL-SCREEN (standalone) with its own title/icon
+  // instead of inside Safari. apple-icon.png supplies the home-screen icon.
+  appleWebApp: {
+    capable: true,
+    title: 'SwisDex',
+    // 'default' = a solid status bar with content BELOW it. Deliberately not
+    // 'black-translucent': that flows content under the notch, and only the
+    // terminal pads for safe-area-inset-top — other pages (dashboard, wallet)
+    // would clip. 'default' renders every page correctly with no safe-area work.
+    statusBarStyle: 'default',
+  },
 };
 
 export const viewport: Viewport = {
