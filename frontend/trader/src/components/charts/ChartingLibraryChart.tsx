@@ -887,9 +887,15 @@ export default function ChartingLibraryChart() {
       b.textContent = txt;
       b.title = `${title} — drag up/down to set, or click to type`;
       b.style.cssText =
-        `display:flex;align-items:center;justify-content:center;height:18px;min-width:18px;`
-        + `padding:0 5px;border:0;border-radius:3px;cursor:ns-resize;`
+        `display:flex;align-items:center;justify-content:center;height:22px;min-width:22px;`
+        + `padding:0 6px;border:0;border-radius:3px;cursor:ns-resize;`
         + `font-size:10px;font-weight:700;line-height:1;color:#fff;pointer-events:auto;`
+        // touch-action:none is REQUIRED for the drag to work on touch devices.
+        // Without it the browser claims a vertical drag as a page/chart scroll,
+        // fires pointercancel, and stops sending pointermove — so on mobile the
+        // drag never tracked (worked on desktop because a mouse never scrolls).
+        // (client 2026-07-21 "SL/TP not draggable in mobile web")
+        + `touch-action:none;-webkit-user-select:none;user-select:none;`
         + `background:${bg};box-shadow:0 1px 3px rgba(0,0,0,.55);`;
       b.onmouseenter = () => { b.style.filter = 'brightness(1.15)'; };
       b.onmouseleave = () => { b.style.filter = 'none'; };
@@ -934,8 +940,16 @@ export default function ChartingLibraryChart() {
           const ey = entryY();
           if (ey != null) { zone.style.top = `${Math.min(ey, cy)}px`; zone.style.height = `${Math.abs(ey - cy)}px`; }
         };
+        // If the gesture is cancelled (browser hijack, second touch, chart
+        // grabs it) pointerup never fires — tidy up the preview + handlers so
+        // the ghost line/zone don't linger and the next drag starts clean.
+        b.onpointercancel = (ev) => {
+          b.onpointermove = null; b.onpointerup = null; b.onpointercancel = null;
+          try { b.releasePointerCapture(ev.pointerId); } catch { /* noop */ }
+          cleanup();
+        };
         b.onpointerup = (ev) => {
-          b.onpointermove = null; b.onpointerup = null;
+          b.onpointermove = null; b.onpointerup = null; b.onpointercancel = null;
           try { b.releasePointerCapture(ev.pointerId); } catch { /* noop */ }
           cleanup();
           if (!moved) { setBracket(p, kind); return; } // plain click → type-a-price
