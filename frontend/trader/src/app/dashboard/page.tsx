@@ -17,6 +17,7 @@ import {
   ShieldCheck, ExternalLink, Loader2, Calculator,
 } from 'lucide-react';
 import DashboardShell from '@/components/layout/DashboardShell';
+import { handleTerminalOpen } from '@/lib/tradingNav';
 import api from '@/lib/api/client';
 import toast from 'react-hot-toast';
 import { fmtAccountMoney, isCentAccount } from '@/lib/wallet/centDisplay';
@@ -61,11 +62,11 @@ const fmtNum = (n: number, dp = 2) =>
   new Intl.NumberFormat('en-US', { minimumFractionDigits: dp, maximumFractionDigits: dp })
     .format(Number.isFinite(n) ? n : 0);
 
-const tradeUrl = (accountId: string) => {
-  const host = process.env.NEXT_PUBLIC_TRADE_HOST;
-  const path = `/trading/terminal?account=${encodeURIComponent(accountId)}&view=chart`;
-  return host ? `https://${host}${path}` : path;
-};
+// Relative (same-origin) so the terminal stays inside the app / PWA. The old
+// absolute https://trade.swisdex.com/... form crossed origins and broke the
+// installed PWA out to Safari; the whole app is served from one origin now.
+const tradeUrl = (accountId: string) =>
+  `/trading/terminal?account=${encodeURIComponent(accountId)}&view=chart`;
 
 export default function DashboardPage() {
   return (
@@ -284,6 +285,7 @@ function AccountBalanceCard({
             href={a ? tradeUrl(a.id) : '#'}
             target={a ? '_blank' : undefined}
             rel="noopener noreferrer"
+            onClick={(e) => { if (a) handleTerminalOpen(e, tradeUrl(a.id)); }}
             aria-disabled={!a}
             className={clsx(
               'inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold transition-colors',

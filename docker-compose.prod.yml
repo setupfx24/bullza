@@ -56,8 +56,12 @@ services:
       args:
         NEXT_PUBLIC_APP_VERSION: ${APP_VERSION:-production}
         NEXT_PUBLIC_WS_URL: wss://api.swisdex.com
-        NEXT_PUBLIC_MARKETING_HOST: swisdex.com
-        NEXT_PUBLIC_TRADE_HOST: trade.swisdex.com
+        # Marketing/app host split intentionally UNSET: with both hosts unset the
+        # middleware no-ops and the whole app (marketing + dashboard + terminal)
+        # is served from one origin (swisdex.com). This is required for the PWA —
+        # a single origin lets the installed app contain the terminal instead of
+        # redirecting to trade.swisdex.com and breaking out of standalone.
+        # trade.swisdex.com keeps working as a full alias. (client 2026-07-21)
         # Baked into the bundle at build time so the Google Sign-In button can render.
         # Same value as backend GOOGLE_CLIENT_ID. Leave blank to hide the button.
         NEXT_PUBLIC_GOOGLE_CLIENT_ID: ${NEXT_PUBLIC_GOOGLE_CLIENT_ID:-}
@@ -81,9 +85,8 @@ services:
       TRADER_API_PROXY_TARGET: http://gateway:8000
       # Browser WebSocket connects directly to api subdomain
       NEXT_PUBLIC_WS_URL: wss://api.swisdex.com
-      # Host pair for the marketing/app domain split (read by src/middleware.ts)
-      NEXT_PUBLIC_MARKETING_HOST: swisdex.com
-      NEXT_PUBLIC_TRADE_HOST: trade.swisdex.com
+      # NEXT_PUBLIC_MARKETING_HOST / NEXT_PUBLIC_TRADE_HOST intentionally unset —
+      # single-origin app for the PWA (see build args note above).
       # DO NOT set NEXT_PUBLIC_GATEWAY_URL — browser uses same-origin /api/v1 proxy (avoids CORS)
     restart: always
 
