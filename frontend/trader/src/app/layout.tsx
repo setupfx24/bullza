@@ -34,6 +34,12 @@ export const metadata: Metadata = {
     // would clip. 'default' renders every page correctly with no safe-area work.
     statusBarStyle: 'default',
   },
+  other: {
+    // Next 15 emits the modern `mobile-web-app-capable`, but iPhones on
+    // iOS < 16.4 only honour the legacy tag for full-screen standalone.
+    // Emit both so Add-to-Home-Screen goes full-screen on every iOS version.
+    'apple-mobile-web-app-capable': 'yes',
+  },
 };
 
 export const viewport: Viewport = {
