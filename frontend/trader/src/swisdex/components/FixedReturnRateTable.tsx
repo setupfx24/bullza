@@ -23,7 +23,11 @@ interface RateConfig {
   // shows THIS, and the client wants the public marketing table to match the
   // dashboard exactly, so we render base when present. (client 2026-07-21)
   base_rate_matrix_pct?: number[][];
+  lock_months?: number;
 }
+
+const fmtUsd = (n: number) =>
+  `$${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 const FALLBACK: RateConfig = {
   tiers: [
@@ -47,6 +51,7 @@ const FALLBACK: RateConfig = {
     [4, 5, 5.5, 6, 5.5],
     [5, 6, 6.5, 7, 7],
   ],
+  lock_months: 24,
 };
 
 const tierShort = (min: number) => `$${min >= 1000 ? `${min / 1000}K` : min}`;
@@ -109,7 +114,7 @@ export function FixedReturnRateTable({ heading = true }: { heading?: boolean }) 
                   scope="col"
                   className="bg-foreground/[0.04] border-r border-foreground/15 px-5 py-4 text-left text-xs uppercase tracking-[0.16em] text-foreground/55"
                 >
-                  Tenure
+                  Tenure (Payout Cycle)
                 </th>
                 {tiers.map((tier, i) => (
                   <th
@@ -121,6 +126,9 @@ export function FixedReturnRateTable({ heading = true }: { heading?: boolean }) 
                     style={{ background: HEADER_BG[i % HEADER_BG.length] }}
                   >
                     {tierShort(tier.min_amount)}
+                    <div className="text-[10px] font-normal normal-case tracking-normal text-white/70 mt-0.5">
+                      ≥ {fmtUsd(tier.min_amount)}
+                    </div>
                   </th>
                 ))}
               </tr>
@@ -133,6 +141,7 @@ export function FixedReturnRateTable({ heading = true }: { heading?: boolean }) 
                     className="px-5 py-4 text-left text-sm font-semibold text-foreground/85 bg-foreground/[0.04] border-r border-foreground/15"
                   >
                     {tn.label}
+                    <div className="text-[10px] font-normal text-foreground/45 mt-0.5">every {tn.days} days</div>
                   </th>
                   {tiers.map((_, ci) => {
                     const highlight = ri === cfg.tenures.length - 1 || ci === tiers.length - 1;
@@ -144,7 +153,7 @@ export function FixedReturnRateTable({ heading = true }: { heading?: boolean }) 
                           highlight ? 'text-primary font-semibold bg-primary/[0.08]' : 'text-foreground/90 bg-foreground/[0.02]'
                         } ${ci < tiers.length - 1 ? 'border-r border-foreground/10' : ''}`}
                       >
-                        {v != null ? `${v}%` : '—'}
+                        {v != null ? `${v.toFixed(2)}%` : '—'}
                       </td>
                     );
                   })}
@@ -156,8 +165,8 @@ export function FixedReturnRateTable({ heading = true }: { heading?: boolean }) 
       </div>
 
       <p className="mt-5 text-center text-xs text-foreground/45 max-w-2xl mx-auto leading-relaxed">
-        Rates are per month; the tenure sets how often the return is paid out.
-        Early withdrawal forfeits the return earned to date and may incur a fee.
+        Each cell is the % paid <strong className="text-foreground/70">per cycle</strong>.
+        Your lock runs for {cfg.lock_months ?? 24} months total.
       </p>
     </section>
   );
