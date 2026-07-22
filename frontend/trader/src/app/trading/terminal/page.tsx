@@ -5,7 +5,7 @@ import { createPortal } from 'react-dom';
 import dynamic from 'next/dynamic';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { clsx } from 'clsx';
-import { Maximize2, Minimize2, Search, X } from 'lucide-react';
+import { Maximize2, Minimize2, Search, ShieldCheck, X } from 'lucide-react';
 import { useUIStore } from '@/stores/uiStore';
 import { TERMINAL_RESIZE, maxBottomPanelHeightPx } from '@/lib/terminalLayout';
 import PanelResizeHandle from '@/components/trading/PanelResizeHandle';
@@ -396,6 +396,29 @@ export default function TradingTerminalPage() {
       <div className="flex-1 flex flex-col overflow-hidden min-h-0 pb-[70px] scrollbar-none bg-bg-base">
         <div className="flex-1 min-h-0 overflow-hidden relative flex flex-col scrollbar-none">
           {mobileView === 'watchlist' && <Watchlist />}
+          {/* Full order ticket on mobile. The quick-trade bar can only fire a
+              bare market order, so insurance and SL/TP were unreachable on
+              phones/PWA — OrderPanel was rendered in the desktop layout only
+              (client 2026-07-22: "PWA iPhone users can't take insurance").
+              Reuses the same tested OrderPanel, no separate mobile logic. */}
+          {mobileView === 'ticket' && (
+            <div className="flex flex-col flex-1 min-h-0 overflow-hidden bg-bg-primary">
+              <div className="shrink-0 flex items-center justify-between gap-2 px-3 py-2 border-b border-border-glass bg-bg-secondary">
+                <button
+                  type="button"
+                  onClick={() => router.push(tradingTerminalUrl(accountId, { view: 'chart' }))}
+                  className="text-xs font-semibold text-buy"
+                >
+                  ← Chart
+                </button>
+                <span className="text-xs font-bold text-text-primary uppercase tracking-wider">Order ticket</span>
+                <span className="w-14" aria-hidden />
+              </div>
+              <div className="flex-1 min-h-0 overflow-y-auto">
+                <OrderPanel />
+              </div>
+            </div>
+          )}
           {mobileView === 'news' && (
             <div className="flex flex-col flex-1 min-h-0 overflow-hidden bg-bg-primary">
               <div className="shrink-0 flex items-center justify-between gap-2 px-3 py-2 border-b border-border-glass bg-bg-secondary">
@@ -580,6 +603,16 @@ export default function TradingTerminalPage() {
                     <span className="text-[10px] text-sell/80 truncate">{mobileMarketStatus.reason}</span>
                   </div>
                 )}
+                {/* Route to the full ticket — the quick buttons below place a
+                    bare market order with no insurance / SL / TP. */}
+                <button
+                  type="button"
+                  onClick={() => router.push(tradingTerminalUrl(accountId, { view: 'ticket' }))}
+                  className="mb-2 w-full flex items-center justify-center gap-1.5 rounded-lg border border-border-glass bg-bg-primary/60 py-1.5 text-[11px] font-semibold text-text-secondary active:scale-[0.98] transition-transform"
+                >
+                  <ShieldCheck className="w-3.5 h-3.5 text-buy" aria-hidden />
+                  Insure trade / Set SL &amp; TP
+                </button>
                 <div className="flex items-center gap-2 mt-1 h-[52px]">
                    {/* SELL button */}
                    <button
