@@ -62,6 +62,17 @@ export default function AiStationPortfolio() {
   };
   const rows = trades.filter((t) => t.status === tab);
 
+  // Count "today" in the viewer's LOCAL timezone so it matches the dates shown
+  // in the table (backend counts in UTC, which drifts near midnight). A trade
+  // counts for today if it was opened OR closed today (any activity today).
+  const now = new Date();
+  const isToday = (iso: string | null) => {
+    if (!iso) return false;
+    const d = new Date(iso);
+    return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate();
+  };
+  const todayCount = trades.filter((t) => isToday(t.opened_at) || isToday(t.closed_at)).length;
+
   return (
     <section className="mt-6">
       <div className="flex flex-wrap items-center gap-2 mb-3">
@@ -96,7 +107,7 @@ export default function AiStationPortfolio() {
             </div>
             <div className="bg-bg-secondary border border-border-primary rounded-lg p-4">
               <div className="text-xxs text-text-tertiary uppercase tracking-wide">Today</div>
-              <div className="text-2xl font-semibold tabular-nums mt-1 text-text-primary">{s.today_count}</div>
+              <div className="text-2xl font-semibold tabular-nums mt-1 text-text-primary">{todayCount}</div>
               <div className="text-xs text-text-tertiary">trades today</div>
             </div>
           </div>

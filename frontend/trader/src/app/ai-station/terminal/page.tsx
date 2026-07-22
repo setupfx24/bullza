@@ -85,6 +85,22 @@ function TerminalInner() {
   const rows = symTrades.filter((t) => t.status === tab);
   const s = summary;
 
+  // Count today / this month in the viewer's LOCAL timezone (over ALL symbols)
+  // so the boxes match the local dates shown in the tables.
+  const nowD = new Date();
+  const isToday = (iso: string | null) => {
+    if (!iso) return false;
+    const d = new Date(iso);
+    return d.getFullYear() === nowD.getFullYear() && d.getMonth() === nowD.getMonth() && d.getDate() === nowD.getDate();
+  };
+  const inThisMonth = (iso: string | null) => {
+    if (!iso) return false;
+    const d = new Date(iso);
+    return d.getFullYear() === nowD.getFullYear() && d.getMonth() === nowD.getMonth();
+  };
+  const todayCount = trades.filter((t) => isToday(t.opened_at) || isToday(t.closed_at)).length;
+  const monthlyTrades = trades.filter((t) => inThisMonth(t.opened_at) || inThisMonth(t.closed_at)).length;
+
   const Box = ({ label, main, sub, cls }: { label: string; main: string; sub?: string; cls?: string }) => (
     <div className="bg-bg-secondary border border-border-primary rounded-lg px-3 py-2">
       <div className="text-[10px] text-text-tertiary uppercase tracking-wide truncate">{label}</div>
@@ -119,8 +135,8 @@ function TerminalInner() {
         <Box label="This month P&L" main={money(s?.monthly_pnl ?? 0)} sub={`return ${pct(s?.monthly_pnl_pct ?? 0)}`} cls={pnlCls(s?.monthly_pnl)} />
         <Box label="Total P&L" main={money(s?.total_pnl ?? 0)} sub={`return ${pct(s?.total_pnl_pct ?? 0)}`} cls={pnlCls(s?.total_pnl)} />
         <Box label="Open (running)" main={String(s?.open_count ?? 0)} sub={`${money(s?.open_pnl ?? 0)} running`} cls="text-text-primary" />
-        <Box label="Trades today" main={String(s?.today_count ?? 0)} cls="text-text-primary" />
-        <Box label="Trades this month" main={String(s?.monthly_trades ?? 0)} cls="text-text-primary" />
+        <Box label="Trades today" main={String(todayCount)} cls="text-text-primary" />
+        <Box label="Trades this month" main={String(monthlyTrades)} cls="text-text-primary" />
       </div>
 
       {/* Chart + trades panel */}
