@@ -628,10 +628,13 @@ export default function TradingTerminalPage() {
                    {/* Lot size controls — center */}
                    <div className="shrink-0 flex flex-col items-center">
                       <span className="text-[8px] font-bold text-text-tertiary uppercase tracking-wider leading-none mb-1">Lots</span>
-                      <div className="flex items-center gap-1">
+                      {/* flex-nowrap + shrink-0 on each control: without them the
+                          row squeezed on narrow phones and clipped the "+"
+                          button off-screen (client 2026-07-22). */}
+                      <div className="flex items-center gap-1 flex-nowrap">
                          <button
                            onClick={() => handleLotChange(-0.01)}
-                           className="w-8 h-8 flex items-center justify-center rounded-lg bg-bg-primary border border-border-glass text-text-primary active:scale-90 transition-transform"
+                           className="w-8 h-8 shrink-0 flex items-center justify-center rounded-lg bg-bg-primary border border-border-glass text-text-primary active:scale-90 transition-transform"
                          >
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M5 12h14"/></svg>
                          </button>
@@ -648,11 +651,11 @@ export default function TradingTerminalPage() {
                              if (!Number.isFinite(n) || n <= 0) setLotSize('0.01');
                              else setLotSize(n.toFixed(2));
                            }}
-                           className="w-16 h-9 text-[15px] font-black font-mono text-center bg-bg-primary border-2 border-border-glass rounded-lg text-text-primary outline-none"
+                           className="w-14 h-9 shrink-0 text-[15px] font-black font-mono text-center bg-bg-primary border-2 border-border-glass rounded-lg text-text-primary outline-none px-0"
                          />
                          <button
                            onClick={() => handleLotChange(0.01)}
-                           className="w-8 h-8 flex items-center justify-center rounded-lg bg-bg-primary border border-border-glass text-text-primary active:scale-90 transition-transform"
+                           className="w-8 h-8 shrink-0 flex items-center justify-center rounded-lg bg-bg-primary border border-border-glass text-text-primary active:scale-90 transition-transform"
                          >
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M12 5v14M5 12h14"/></svg>
                          </button>
