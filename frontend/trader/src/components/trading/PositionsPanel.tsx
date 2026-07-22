@@ -1541,6 +1541,17 @@ export default function PositionsPanel({ variant = 'default' }: PositionsPanelPr
                               <div><span className="text-text-tertiary">Open</span> <span className="text-text-primary font-mono">{trade.open_price.toFixed(d)}</span></div>
                               <div><span className="text-text-tertiary">Close</span> <span className="text-text-primary font-mono">{trade.close_price.toFixed(d)}</span></div>
                               <div>
+                                <span className="text-text-tertiary">Charges</span>{' '}
+                                {(() => {
+                                  const charges = (trade.commission || 0) + (trade.swap || 0);
+                                  return (
+                                    <span className={clsx('font-mono', charges > 0 ? 'text-sell' : charges < 0 ? 'text-buy' : 'text-text-secondary')}>
+                                      {charges === 0 ? '$0.00' : (charges > 0 ? '-' : '+') + '$' + Math.abs(charges).toFixed(2)}
+                                    </span>
+                                  );
+                                })()}
+                              </div>
+                              <div>
                                 <span className={clsx('inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wide', exitBadge.className)}>
                                   {exitBadge.label}
                                 </span>
@@ -1567,6 +1578,9 @@ export default function PositionsPanel({ variant = 'default' }: PositionsPanelPr
                         <th className={th}>Close</th>
                         <th className={th}>
                           <span className="block">P&amp;L</span>
+                        </th>
+                        <th className={th}>
+                          <span className="block">Charges</span>
                         </th>
                         <th className={th}>
                           <span className="block">Close</span>
@@ -1613,6 +1627,20 @@ export default function PositionsPanel({ variant = 'default' }: PositionsPanelPr
                             <td className={clsx(td, 'font-mono')}>{trade.close_price.toFixed(d)}</td>
                             <td className={clsx(td, 'font-mono font-bold tabular-nums')} style={{ color: net >= 0 ? '#2962FF' : '#FF2440' }}>
                               {fmtAccountMoney(net, isCentAccount(activeAccount), { signDisplay: 'always' })}
+                            </td>
+                            <td className={td}>
+                              {(() => {
+                                // Per-trade charges = commission + swap booked when the
+                                // trade ran (already deducted from the NET P&L shown left).
+                                // Shown separately so the trader can see the cost. A cost
+                                // is red "-$x"; a swap credit is blue "+$x".
+                                const charges = (trade.commission || 0) + (trade.swap || 0);
+                                return (
+                                  <span className={clsx('font-mono tabular-nums', charges > 0 ? 'text-sell' : charges < 0 ? 'text-buy' : 'text-text-secondary')}>
+                                    {charges === 0 ? '$0.00' : (charges > 0 ? '-' : '+') + '$' + Math.abs(charges).toFixed(2)}
+                                  </span>
+                                );
+                              })()}
                             </td>
                             <td className={td}>
                               <span
