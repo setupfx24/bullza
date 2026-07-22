@@ -390,6 +390,21 @@ async def trade_history(
     count_result = await db.execute(select(func.count()).select_from(TradeHistory).where(*base_filter))
     total = count_result.scalar()
 
+    # Period totals over the WHOLE filtered set (all pages), so the UI can show
+    # "Total Charges" for a custom date range without summing paginated rows.
+    # charges = commission + swap; net = price P&L − charges (matches each row's
+    # `pnl`). (client 2026-07-22 — one place to see total charges, period-wise)
+    totals_row = (await db.execute(
+        select(
+            func.coalesce(func.sum(TradeHistory.commission), 0),
+            func.coalesce(func.sum(TradeHistory.swap), 0),
+            func.coalesce(func.sum(TradeHistory.profit), 0),
+        ).where(*base_filter)
+    )).one()
+    sum_commission = float(totals_row[0] or 0)
+    sum_swap = float(totals_row[1] or 0)
+    sum_gross = float(totals_row[2] or 0)
+
     result = await db.execute(
         select(TradeHistory).where(*base_filter)
         .order_by(TradeHistory.closed_at.desc())
@@ -443,6 +458,15 @@ async def trade_history(
     return {
         "items": items, "total": total, "page": page, "per_page": per_page,
         "pages": (total + per_page - 1) // per_page if total else 0,
+        # Aggregate over the full filtered window (not just this page).
+        "totals": {
+            "commission": sum_commission,
+            "swap": sum_swap,
+            "charges": sum_commission + sum_swap,
+            "gross_pnl": sum_gross,
+            "net_pnl": sum_gross - sum_commission - sum_swap,
+            "count": total or 0,
+        },
     }
 
 

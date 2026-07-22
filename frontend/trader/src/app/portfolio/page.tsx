@@ -219,6 +219,31 @@ function PortfolioPageContent() {
 
   const [allTrades, setAllTrades] = useState<Trade[]>([]);
 
+  // Total-charges-for-a-period (client 2026-07-22): one place showing the sum
+  // of commission + swap over a custom date range. Backed by the `totals`
+  // aggregate the /portfolio/trades endpoint now returns for the filtered set.
+  const [chFrom, setChFrom] = useState('');
+  const [chTo, setChTo] = useState('');
+  const [chTotals, setChTotals] = useState<{ commission: number; swap: number; charges: number; net_pnl: number; count: number } | null>(null);
+  const [chLoading, setChLoading] = useState(false);
+
+  const fetchChargeTotals = useCallback(async () => {
+    setChLoading(true);
+    try {
+      const params: Record<string, string> = { page: '1', per_page: '1' };
+      if (validAccountId) params.account_id = validAccountId;
+      // Whole-day boundaries so `to` includes trades closed later that day.
+      if (chFrom) params.date_from = `${chFrom}T00:00:00`;
+      if (chTo) params.date_to = `${chTo}T23:59:59`;
+      const res = await api.get<{ totals?: typeof chTotals }>('/portfolio/trades', params);
+      setChTotals(res.totals ?? null);
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : 'Failed to load charges');
+    } finally {
+      setChLoading(false);
+    }
+  }, [validAccountId, chFrom, chTo]);
+
   const fetchData = useCallback(async () => {
 
     try {
@@ -436,6 +461,11 @@ function PortfolioPageContent() {
   useEffect(() => { fetchData(); }, [fetchData]);
 
   useEffect(() => { if (tab === 'history') fetchTrades(page); }, [tab, page, fetchTrades]);
+
+  // Load the all-time charge total when the tab opens / account changes; the
+  // Apply button refetches for a chosen range. Not tied to date keystrokes.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { if (tab === 'history') void fetchChargeTotals(); }, [tab, validAccountId]);
 
 
 
@@ -713,6 +743,78 @@ function PortfolioPageContent() {
         {tab === 'history' && (
 
           <>
+
+            {/* Total charges for a custom period — commission + swap summed over
+                the selected date range (all-time by default). */}
+            <Card variant="glass" padding="none">
+              <div className="px-4 py-3 border-b border-border-glass">
+                <h3 className="text-md font-semibold text-text-primary">Total charges</h3>
+                <p className="text-[10px] text-text-tertiary mt-0.5">
+                  Commission + swap paid across your trades. Pick a date range, or leave blank for all-time.
+                </p>
+              </div>
+              <div className="p-4 space-y-4">
+                <div className="flex flex-wrap items-end gap-3">
+                  <label className="flex flex-col gap-1">
+                    <span className="text-[10px] uppercase tracking-wide text-text-tertiary">From</span>
+                    <input
+                      type="date"
+                      value={chFrom}
+                      max={chTo || undefined}
+                      onChange={(e) => setChFrom(e.target.value)}
+                      className="text-sm px-2.5 py-1.5 rounded-lg bg-bg-input border border-border-glass text-text-primary"
+                    />
+                  </label>
+                  <label className="flex flex-col gap-1">
+                    <span className="text-[10px] uppercase tracking-wide text-text-tertiary">To</span>
+                    <input
+                      type="date"
+                      value={chTo}
+                      min={chFrom || undefined}
+                      onChange={(e) => setChTo(e.target.value)}
+                      className="text-sm px-2.5 py-1.5 rounded-lg bg-bg-input border border-border-glass text-text-primary"
+                    />
+                  </label>
+                  <Button type="button" variant="outline" size="sm" loading={chLoading} disabled={chLoading}
+                    onClick={() => void fetchChargeTotals()} className="shrink-0">
+                    Apply
+                  </Button>
+                  {(chFrom || chTo) && (
+                    <button type="button"
+                      onClick={() => { setChFrom(''); setChTo(''); setTimeout(() => void fetchChargeTotals(), 0); }}
+                      className="text-xs text-text-tertiary hover:text-text-primary underline">
+                      Clear
+                    </button>
+                  )}
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  <div className="rounded-xl border border-border-glass bg-bg-secondary/30 p-3">
+                    <div className="text-[10px] uppercase tracking-wide text-text-tertiary">Total charges</div>
+                    <div className="text-lg font-mono font-bold text-sell tabular-nums mt-0.5">
+                      {chTotals ? `$${fmt(chTotals.charges)}` : '—'}
+                    </div>
+                  </div>
+                  <div className="rounded-xl border border-border-glass bg-bg-secondary/30 p-3">
+                    <div className="text-[10px] uppercase tracking-wide text-text-tertiary">Commission</div>
+                    <div className="text-sm font-mono text-text-primary tabular-nums mt-0.5">
+                      {chTotals ? `$${fmt(chTotals.commission)}` : '—'}
+                    </div>
+                  </div>
+                  <div className="rounded-xl border border-border-glass bg-bg-secondary/30 p-3">
+                    <div className="text-[10px] uppercase tracking-wide text-text-tertiary">Swap</div>
+                    <div className="text-sm font-mono text-text-primary tabular-nums mt-0.5">
+                      {chTotals ? `$${fmt(chTotals.swap)}` : '—'}
+                    </div>
+                  </div>
+                  <div className="rounded-xl border border-border-glass bg-bg-secondary/30 p-3">
+                    <div className="text-[10px] uppercase tracking-wide text-text-tertiary">Trades</div>
+                    <div className="text-sm font-mono text-text-primary tabular-nums mt-0.5">
+                      {chTotals ? chTotals.count : '—'}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </Card>
 
             <Card variant="glass" padding="none">
 
