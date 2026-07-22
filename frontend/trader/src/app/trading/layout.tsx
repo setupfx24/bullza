@@ -59,6 +59,21 @@ function TradingSession({ children }: { children: React.ReactNode }) {
   } = useTradingStore();
   const accounts = useTradingStore((s) => s.accounts);
 
+  // Load THIS user's resolved spread for every symbol on screen, so the chart
+  // and P&L show the spread configured for their account type rather than the
+  // shared wildcard the broadcast carries. Re-runs when the account changes
+  // (different account type => different spread). (client 2026-07-22)
+  const activeAccountId = useTradingStore((s) => s.activeAccount?.id);
+  const selectedSymbol = useTradingStore((s) => s.selectedSymbol);
+  useEffect(() => {
+    const st = useTradingStore.getState();
+    const syms = new Set<string>();
+    if (selectedSymbol) syms.add(selectedSymbol.toUpperCase());
+    for (const p of st.positions) if (p.symbol) syms.add(String(p.symbol).toUpperCase());
+    for (const w of st.watchlist || []) if (w) syms.add(String(w).toUpperCase());
+    syms.forEach((s) => { void st.loadMySpread(s); });
+  }, [activeAccountId, selectedSymbol]);
+
   useEffect(() => {
     const onFirstGesture = () => {
       unlockAudio();

@@ -99,6 +99,23 @@ export function livePnlFor(
 // STALE_TICK_GRACE_MS we let even a stale value through, so a dead WS falls back
 // to the poll. Centralised here so every caller (trading layout + trade panel,
 // each WS + poll) is covered. (client 2026-07-10)
+/** Rebuild bid/ask symmetrically around the broadcast MID using the user's own
+ *  resolved spread. Mid is preserved, so callers deriving from the mid are
+ *  unaffected. Returns the tick untouched when no spread is known yet. */
+function applyUserSpread(
+  t: TickData,
+  sp?: { effective_value: number; spread_type: string; pip_size: number },
+): TickData {
+  if (!sp) return t;
+  const mid = (Number(t.bid) + Number(t.ask)) / 2;
+  if (!(mid > 0)) return t;
+  const spreadPrice = sp.spread_type === 'percentage'
+    ? mid * (sp.effective_value / 100)
+    : sp.effective_value * (sp.pip_size || 0.0001);
+  if (!Number.isFinite(spreadPrice) || spreadPrice < 0) return t;
+  return { ...t, bid: mid - spreadPrice / 2, ask: mid + spreadPrice / 2, spread: spreadPrice };
+}
+
 const lastAppliedTickTs = new Map<string, number>();   // last applied server ts (epoch ms)
 const lastAppliedTickWall = new Map<string, number>(); // wall-clock of last apply (epoch ms)
 const STALE_TICK_GRACE_MS = 3000;
@@ -229,6 +246,13 @@ interface TradingState {
   selectedSymbol: string;
   prices: Record<string, TickData>;
   prevPrices: Record<string, number>;
+  /** The logged-in user's OWN effective spread per symbol, resolved server-side
+   *  through the full hierarchy (user → instrument → segment → default, with
+   *  account-type rows beating wildcards). The shared price broadcast can only
+   *  carry the wildcard spread, so we re-derive bid/ask from the broadcast MID
+   *  using this — that's what makes the chart/P&L match each account type. */
+  mySpreads: Record<string, { effective_value: number; spread_type: string; pip_size: number }>;
+  loadMySpread: (symbol: string) => Promise<void>;
   watchlist: string[];
   instruments: InstrumentInfo[];
 
@@ -286,6 +310,31 @@ export const useTradingStore = create<TradingState>()((set, get) => ({
   positions: [],
   pendingOrders: [],
   selectedSymbol: getPersistedSymbol(),
+  mySpreads: {},
+  loadMySpread: async (symbol) => {
+    const sym = String(symbol || '').trim().toUpperCase();
+    if (!sym) return;
+    const acct = get().activeAccount?.id;
+    try {
+      const q = acct ? `?account_id=${encodeURIComponent(acct)}` : '';
+      const r = await api.get<{ effective_value: number; spread_type: string; pip_size: number }>(
+        `/instruments/${encodeURIComponent(sym)}/my-spread${q}`,
+      );
+      if (!r || typeof r.effective_value !== 'number') return;
+      set((s) => ({
+        mySpreads: {
+          ...s.mySpreads,
+          [sym]: {
+            effective_value: r.effective_value,
+            spread_type: r.spread_type || 'pips',
+            pip_size: r.pip_size || 0.0001,
+          },
+        },
+      }));
+    } catch {
+      /* keep the broadcast quote as-is — never block pricing on this */
+    }
+  },
   prices: {},
   prevPrices: {},
   watchlist: DEFAULT_WATCHLIST,
@@ -410,7 +459,13 @@ export const useTradingStore = create<TradingState>()((set, get) => ({
   updatePrice: (tick) => set((state) => {
     const sym = String(tick.symbol || '').trim().toUpperCase();
     if (!sym) return state;
-    const normalized: TickData = { ...tick, symbol: sym };
+    // Re-derive bid/ask from the broadcast MID using THIS user's resolved
+    // spread, so the chart / P&L / panels reflect the spread their own account
+    // type is configured for — the shared broadcast can only carry the wildcard
+    // value (client 2026-07-22). The mid is unchanged, so anything computing
+    // from the mid (e.g. OrderPanel) is unaffected. No spread loaded yet →
+    // leave the broadcast quote untouched.
+    const normalized: TickData = applyUserSpread({ ...tick, symbol: sym }, state.mySpreads[sym]);
 
     // Freshness guard (see lastAppliedTickTs above): drop the round-trip-stale
     // REST-poll value (or a duplicate re-publish) that flashed the P&L backward,
