@@ -49,13 +49,18 @@ export function livePnlFor(
 ): { cp: number; pnl: number } | null {
   if (!tick) return null;
   const sym = (symbol || '').trim().toUpperCase();
-  // Value P&L at the tick MID (bid+ask)/2 — the calc validated as correct. The
-  // profit→negative→profit "flicker" was NOT this math; it was the 1.5s REST
-  // price poll clobbering the fresh WS bid with a round-trip-stale value (fixed
-  // by the tick freshness guard in updatePrice — see lastAppliedTickTs below).
-  const cp = (tick.bid > 0 && tick.ask > 0)
-    ? (tick.bid + tick.ask) / 2
-    : (pos.side === 'buy' ? tick.bid : tick.ask);
+  // Value P&L at the price the position will ACTUALLY close at: a BUY closes by
+  // selling at the BID, a SELL closes by buying at the ASK — the same side the
+  // backend books (trading_service.close_position: `c_bid if buy else c_ask`).
+  // Previously this used the MID, so the displayed/estimated P&L was optimistic
+  // by half the spread and never matched the booked amount — e.g. XAGUSD 0.01
+  // lot estimated -$0.75 but closed -$1.10 (client 2026-07-22). Falls back to
+  // the mid only if one side is missing.
+  // NOTE: the earlier flicker fix (tick freshness guard in updatePrice) is
+  // unrelated to this and still applies.
+  const cp = pos.side === 'buy'
+    ? (tick.bid > 0 ? tick.bid : (tick.bid + tick.ask) / 2)
+    : (tick.ask > 0 ? tick.ask : (tick.bid + tick.ask) / 2);
   if (!(cp > 0)) return null;
   const inst =
     instruments.find((i) => i.symbol === sym) ||
