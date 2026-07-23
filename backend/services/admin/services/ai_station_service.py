@@ -16,7 +16,7 @@ from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from packages.common.src.models import (
-    SystemSetting, AiStationSignal, AiStationTrade, FixedReturnLock, User,
+    SystemSetting, AiStationSignal, AiStationTrade, FixedReturnLock, User, Instrument,
 )
 from packages.common.src import ai_station_service as core
 from dependencies import write_audit_log
@@ -234,7 +234,24 @@ async def list_trades(db: AsyncSession, *, status=None, user_id=None, signal_id=
     rows = list((await db.execute(q)).scalars().all())
     live = await core.enrich_open_pnl(db, rows)
     items = [core.serialize_trade(t, live_pnl=live.get(str(t.id))) for t in rows]
-    return await _attach_user_emails(db, items)
+    await _attach_user_emails(db, items)
+    await _attach_contract_size(db, items)
+    return items
+
+
+async def _attach_contract_size(db: AsyncSession, items: list) -> list:
+    """Add each trade's instrument contract_size so the admin edit modal can
+    preview the P&L live (same math the backend uses on save)."""
+    syms = {it["symbol"] for it in items}
+    if not syms:
+        return items
+    rows = (await db.execute(
+        select(Instrument.symbol, Instrument.contract_size).where(Instrument.symbol.in_(syms))
+    )).all()
+    cmap = {r.symbol: float(r.contract_size or 100000) for r in rows}
+    for it in items:
+        it["contract_size"] = cmap.get(it["symbol"], 100000.0)
+    return items
 
 
 def _num(v):
@@ -272,17 +289,23 @@ async def edit_trade(db: AsyncSession, *, admin_id: UUID, ip_address: str | None
     t = res.scalar_one_or_none()
     if not t:
         raise HTTPException(status_code=404, detail="Trade not found")
-    for k in ("entry_price", "close_price", "stop_loss", "take_profit", "lots", "pnl"):
+    for k in ("entry_price", "close_price", "stop_loss", "take_profit", "lots"):
         if k in fields:
-            val = _num(fields[k])
-            setattr(t, k, val)
+            setattr(t, k, _num(fields[k]))
     if "status" in fields and fields["status"] in ("open", "closed"):
         t.status = fields["status"]
         if t.status == "closed" and t.closed_at is None:
             t.closed_at = datetime.now(timezone.utc)
         elif t.status == "open":
             t.closed_at = None
-    t.is_edited = True
+
+    # Recompute P&L from the (possibly edited) entry / close / lots so it always
+    # matches the prices. is_edited=False keeps OPEN trades on live P&L so the
+    # user side reflects the change. A closed trade gets its realised P&L here.
+    t.is_edited = False
+    if t.close_price is not None:
+        cs = await core._contract_size(db, t.symbol)
+        t.pnl = core.compute_display_pnl(t.side, t.entry_price, t.close_price, t.lots, cs)
     t.updated_at = datetime.now(timezone.utc)
     await write_audit_log(
         db, admin_id, "ai_station.edit_trade", "ai_station_trade", trade_id,

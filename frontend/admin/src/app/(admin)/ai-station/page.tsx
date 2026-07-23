@@ -32,6 +32,7 @@ interface Trade {
   stop_loss: number | null; take_profit: number | null;
   pnl: number | null; status: string; is_edited: boolean;
   opened_at: string; closed_at: string | null;
+  contract_size?: number;
 }
 interface Signal {
   id: string; source: string; symbol: string; side: string;
@@ -476,17 +477,26 @@ function EditTradeModal({ trade, onClose, onSaved }: { trade: Trade; onClose: ()
     stop_loss: trade.stop_loss === null ? '' : String(trade.stop_loss),
     take_profit: trade.take_profit === null ? '' : String(trade.take_profit),
     lots: String(trade.lots ?? ''),
-    pnl: trade.pnl === null ? '' : String(trade.pnl),
     status: trade.status,
   });
   const [busy, setBusy] = useState(false);
   const inputCls = 'w-full px-2 py-1.5 text-sm bg-bg-input border border-border-primary rounded text-text-primary tabular-nums';
 
+  // Live P&L preview (same math the backend uses on save) so the admin sees
+  // the recalculated value BEFORE saving.
+  const dir = trade.side === 'buy' ? 1 : -1;
+  const cs = trade.contract_size || 100000;
+  const entryN = parseFloat(f.entry_price) || 0;
+  const lotsN = parseFloat(f.lots) || 0;
+  const closeN = f.close_price === '' ? null : parseFloat(f.close_price);
+  const autoPnl = closeN === null ? null : Math.round((closeN - entryN) * dir * lotsN * cs * 100) / 100;
+
   const save = async () => {
     setBusy(true);
     try {
       const body: any = { status: f.status };
-      (['entry_price', 'close_price', 'stop_loss', 'take_profit', 'lots', 'pnl'] as const).forEach((k) => {
+      // No pnl sent — the backend recomputes it from entry/close/lots.
+      (['entry_price', 'close_price', 'stop_loss', 'take_profit', 'lots'] as const).forEach((k) => {
         body[k] = f[k] === '' ? null : parseFloat(f[k]);
       });
       await adminApi.patch(`/ai-station/trades/${trade.id}`, body);
@@ -498,7 +508,7 @@ function EditTradeModal({ trade, onClose, onSaved }: { trade: Trade; onClose: ()
   const fields: [string, keyof typeof f, number][] = [
     ['Entry', 'entry_price', 0.00001], ['Close', 'close_price', 0.00001],
     ['Stop Loss', 'stop_loss', 0.00001], ['Take Profit', 'take_profit', 0.00001],
-    ['Lots', 'lots', 0.01], ['P&L ($)', 'pnl', 0.01],
+    ['Lots', 'lots', 0.01],
   ];
 
   return (
@@ -516,6 +526,12 @@ function EditTradeModal({ trade, onClose, onSaved }: { trade: Trade; onClose: ()
                 onChange={(e) => setF({ ...f, [k]: e.target.value })} />
             </div>
           ))}
+        </div>
+        <div className="flex items-center justify-between bg-bg-secondary border border-border-primary rounded-md px-3 py-2">
+          <span className="text-xs text-text-secondary">P&L (auto-calculated)</span>
+          <span className={`text-sm font-semibold tabular-nums ${pnlCls(autoPnl)}`}>
+            {closeN === null ? 'open — live P&L' : `${(autoPnl ?? 0) >= 0 ? '+' : ''}$${fmt(autoPnl)}`}
+          </span>
         </div>
         <div><label className="text-xs text-text-secondary block mb-1">Status</label>
           <select className={inputCls} value={f.status} onChange={(e) => setF({ ...f, status: e.target.value })}>
