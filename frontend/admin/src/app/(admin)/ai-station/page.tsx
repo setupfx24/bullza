@@ -11,12 +11,17 @@ import { adminApi } from '@/lib/api';
 interface Slab { min: number; max: number | null; lots: number }
 interface Config {
   enabled: boolean;
+  terminal_enabled: boolean;
   has_secret: boolean;
   webhook_secret: string;
   webhook_path: string | null;
   webhook_base: string;
   webhook_url: string | null;
   slabs: Slab[];
+}
+interface Follower {
+  user_id: string; email: string | null; name: string | null;
+  principal: number; locks: number; trades: number; open_trades: number; realized_pnl: number;
 }
 interface Summary {
   active_principal: number;
@@ -40,7 +45,7 @@ interface Signal {
   fanout_count: number; note: string | null; opened_at: string; closed_at: string | null;
 }
 
-type Tab = 'overview' | 'trades' | 'signals' | 'connection';
+type Tab = 'overview' | 'trades' | 'signals' | 'followers' | 'connection';
 
 const fmt = (n: number | null | undefined, d = 2) =>
   n === null || n === undefined ? '—' : Number(n).toLocaleString(undefined, { minimumFractionDigits: d, maximumFractionDigits: d });
@@ -71,18 +76,20 @@ export default function AiStationPage() {
   const [summary, setSummary] = useState<Summary | null>(null);
   const [trades, setTrades] = useState<Trade[]>([]);
   const [signals, setSignals] = useState<Signal[]>([]);
+  const [followers, setFollowers] = useState<Follower[]>([]);
   const [editing, setEditing] = useState<Trade | null>(null);
 
   const loadAll = useCallback(async () => {
     setLoading(true);
     try {
-      const [c, s, t, sig] = await Promise.all([
+      const [c, s, t, sig, f] = await Promise.all([
         adminApi.get<Config>('/ai-station/config'),
         adminApi.get<Summary>('/ai-station/summary'),
         adminApi.get<Trade[]>('/ai-station/trades?limit=200'),
         adminApi.get<Signal[]>('/ai-station/signals?limit=100'),
+        adminApi.get<Follower[]>('/ai-station/followers'),
       ]);
-      setCfg(c); setSummary(s); setTrades(t || []); setSignals(sig || []);
+      setCfg(c); setSummary(s); setTrades(t || []); setSignals(sig || []); setFollowers(f || []);
     } catch (e: any) {
       toast.error(e?.message || 'Failed to load AI Station');
     } finally {
@@ -120,7 +127,7 @@ export default function AiStationPage() {
 
       {/* tabs */}
       <div className="flex gap-1 border-b border-border-primary">
-        {([['overview', 'Overview'], ['trades', 'Trades'], ['signals', 'Signals'], ['connection', 'Connection & Slabs']] as [Tab, string][]).map(([k, label]) => (
+        {([['overview', 'Overview'], ['trades', 'Trades'], ['signals', 'Signals'], ['followers', `Followers (${followers.length})`], ['connection', 'Connection & Slabs']] as [Tab, string][]).map(([k, label]) => (
           <button key={k} onClick={() => setTab(k)}
             className={`px-3 py-2 text-xs font-medium -mb-px border-b-2 ${tab === k ? 'border-buy text-text-primary' : 'border-transparent text-text-tertiary hover:text-text-secondary'}`}>
             {label}
@@ -131,6 +138,7 @@ export default function AiStationPage() {
       {tab === 'overview' && <Overview summary={summary} onOpened={loadAll} />}
       {tab === 'trades' && <TradesTable trades={trades} onEdit={setEditing} reload={loadAll} />}
       {tab === 'signals' && <SignalsTable signals={signals} reload={loadAll} />}
+      {tab === 'followers' && <FollowersTable followers={followers} />}
       {tab === 'connection' && <Connection cfg={cfg} setCfg={setCfg} reload={loadAll} />}
 
       {editing && <EditTradeModal trade={editing} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); loadAll(); }} />}
@@ -307,6 +315,46 @@ function SignalsTable({ signals, reload }: { signals: Signal[]; reload: () => vo
   );
 }
 
+// ── Followers (users participating in AI Station) ───────────────────────────
+function FollowersTable({ followers }: { followers: Follower[] }) {
+  const totalPrincipal = followers.reduce((a, f) => a + (f.principal || 0), 0);
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center gap-3 text-xxs text-text-tertiary">
+        <span>{followers.length} users following AI Station</span>
+        <span>·</span>
+        <span>Total principal ${fmt(totalPrincipal)}</span>
+        <span className="ml-auto">Users with an active AI-Powered Staking lock — the fan-out applies to them.</span>
+      </div>
+      <div className="overflow-x-auto border border-border-primary rounded-md">
+        <table className="w-full text-xs">
+          <thead className="bg-bg-secondary text-text-tertiary">
+            <tr className="text-left">
+              {['User', 'Principal', 'Locks', 'AI trades', 'Open', 'Realized P&L'].map((h) => <th key={h} className="px-2 py-2 font-medium">{h}</th>)}
+            </tr>
+          </thead>
+          <tbody>
+            {followers.map((f) => (
+              <tr key={f.user_id} className="border-t border-border-primary hover:bg-bg-hover">
+                <td className="px-2 py-1.5">
+                  <div className="text-text-primary">{f.email || f.user_id.slice(0, 8)}</div>
+                  {f.name && <div className="text-[10px] text-text-tertiary">{f.name}</div>}
+                </td>
+                <td className="px-2 py-1.5 tabular-nums text-text-primary">${fmt(f.principal)}</td>
+                <td className="px-2 py-1.5 tabular-nums">{f.locks}</td>
+                <td className="px-2 py-1.5 tabular-nums">{f.trades}</td>
+                <td className="px-2 py-1.5 tabular-nums">{f.open_trades}</td>
+                <td className={`px-2 py-1.5 tabular-nums ${pnlCls(f.realized_pnl)}`}>{f.realized_pnl >= 0 ? '+' : ''}${fmt(f.realized_pnl)}</td>
+              </tr>
+            ))}
+            {followers.length === 0 && <tr><td colSpan={6} className="px-2 py-8 text-center text-text-tertiary">No users have an active AI-Powered Staking lock yet.</td></tr>}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 // ── Connection & Slabs ─────────────────────────────────────────────────────
 function Connection({ cfg, setCfg, reload }: { cfg: Config; setCfg: (c: Config) => void; reload: () => void }) {
   const [slabs, setSlabs] = useState<Slab[]>(cfg.slabs.length ? cfg.slabs : [{ min: 1000, max: 5000, lots: 0.02 }]);
@@ -342,7 +390,7 @@ function Connection({ cfg, setCfg, reload }: { cfg: Config; setCfg: (c: Config) 
     setSymInput('');
   };
 
-  const save = async (extra: Partial<{ enabled: boolean; regenerate_secret: boolean }> = {}) => {
+  const save = async (extra: Partial<{ enabled: boolean; terminal_enabled: boolean; regenerate_secret: boolean }> = {}) => {
     setSaving(true);
     try {
       const c = await adminApi.put<Config>('/ai-station/config', {
@@ -359,12 +407,21 @@ function Connection({ cfg, setCfg, reload }: { cfg: Config; setCfg: (c: Config) 
   return (
     <div className="space-y-4 max-w-3xl">
       <section className="bg-bg-secondary border border-border-primary rounded-md p-5 space-y-3">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-sm font-semibold text-text-primary">TradingView connection</h2>
-          <label className="flex items-center gap-2 cursor-pointer text-xs text-text-secondary">
-            <input type="checkbox" className="w-4 h-4 accent-buy" checked={cfg.enabled}
-              onChange={(e) => save({ enabled: e.target.checked })} /> Enabled
-          </label>
+          <div className="flex items-center gap-4">
+            <label className="flex items-center gap-2 cursor-pointer text-xs text-text-secondary">
+              <input type="checkbox" className="w-4 h-4 accent-buy" checked={cfg.enabled}
+                onChange={(e) => save({ enabled: e.target.checked })} />
+              Trading enabled
+              <span className="text-[10px] text-text-tertiary">(webhook / trades)</span>
+            </label>
+            <label className="flex items-center gap-2 cursor-pointer text-xs text-text-secondary">
+              <input type="checkbox" className="w-4 h-4 accent-buy" checked={cfg.terminal_enabled}
+                onChange={(e) => save({ terminal_enabled: e.target.checked })} />
+              Show terminal to users
+            </label>
+          </div>
         </div>
         <div>
           <label className="text-xs text-text-secondary block mb-1">Webhook base URL <span className="text-text-tertiary">(gateway public origin, e.g. https://api.swisdex.com)</span></label>

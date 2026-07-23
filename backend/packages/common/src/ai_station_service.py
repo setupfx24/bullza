@@ -41,7 +41,8 @@ from .ai_station_math import (
 logger = logging.getLogger("ai-station")
 
 # system_settings keys
-SETTING_ENABLED = "ai_station_enabled"
+SETTING_ENABLED = "ai_station_enabled"            # trading / webhook on-off
+SETTING_TERMINAL = "ai_station_terminal_enabled"  # user-side terminal visibility
 SETTING_SECRET = "ai_station_webhook_secret"
 SETTING_SLABS = "ai_station_slabs"
 
@@ -85,8 +86,10 @@ async def get_slabs() -> list:
 
 async def get_config() -> dict:
     enabled = await get_bool_setting(SETTING_ENABLED, False)
+    terminal = await get_bool_setting(SETTING_TERMINAL, True)
     secret = await get_system_setting(SETTING_SECRET, "") or ""
-    return {"enabled": enabled, "webhook_secret": secret, "slabs": await get_slabs()}
+    return {"enabled": enabled, "terminal_enabled": terminal,
+            "webhook_secret": secret, "slabs": await get_slabs()}
 
 
 # ── Live price / instrument ──────────────────────────────────────────────────

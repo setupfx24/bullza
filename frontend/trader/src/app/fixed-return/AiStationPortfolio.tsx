@@ -31,15 +31,17 @@ const money = (n: number | null | undefined) => (n === null || n === undefined ?
 export default function AiStationPortfolio() {
   const [trades, setTrades] = useState<Trade[]>([]);
   const [summary, setSummary] = useState<Summary | null>(null);
+  const [terminalEnabled, setTerminalEnabled] = useState(true);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<'open' | 'closed'>('open');
 
   const load = useCallback(async (spinner = false) => {
     if (spinner) setLoading(true);
     try {
-      const r = await api.get<{ trades: Trade[]; summary: Summary }>('/ai-station/my-trades');
+      const r = await api.get<{ trades: Trade[]; summary: Summary; terminal_enabled?: boolean }>('/ai-station/my-trades');
       setTrades(r?.trades || []);
       setSummary(r?.summary || null);
+      setTerminalEnabled(r?.terminal_enabled !== false);
     } catch {
       /* silent — feature may be disabled / no trades */
     } finally {
@@ -79,12 +81,14 @@ export default function AiStationPortfolio() {
         <Activity size={16} className="text-buy" />
         <h2 className="text-base font-semibold text-text-primary">Portfolio — AI trades</h2>
         <span className="text-xxs text-text-tertiary hidden sm:inline">live · display only, does not affect your guaranteed return</span>
-        <Link
-          href={`/ai-station/terminal?symbol=${trades[0]?.symbol || 'XAUUSD'}`}
-          className="ml-auto inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md bg-buy text-white hover:bg-buy/90 transition-fast"
-        >
-          <LineChart size={14} /> View Terminal
-        </Link>
+        {terminalEnabled && (
+          <Link
+            href={`/ai-station/terminal?symbol=${trades[0]?.symbol || 'XAUUSD'}`}
+            className="ml-auto inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md bg-buy text-white hover:bg-buy/90 transition-fast"
+          >
+            <LineChart size={14} /> View Terminal
+          </Link>
+        )}
       </div>
 
       {loading && !summary ? (

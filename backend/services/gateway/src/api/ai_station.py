@@ -113,4 +113,9 @@ async def my_trades(
         .where(FixedReturnLock.user_id == uid, FixedReturnLock.state == "active")
     )).scalar() or 0)
 
-    return {"trades": items, "summary": _summary(trades, items, principal)}
+    cfg = await ai.get_config()
+    return {
+        "trades": items,
+        "summary": _summary(trades, items, principal),
+        "terminal_enabled": bool(cfg.get("terminal_enabled", True)),
+    }

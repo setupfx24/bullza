@@ -12,7 +12,7 @@ from decimal import Decimal, InvalidOperation
 from uuid import UUID
 
 from fastapi import HTTPException
-from sqlalchemy import select, func
+from sqlalchemy import select, func, case
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from packages.common.src.models import (
@@ -92,12 +92,14 @@ def _validate_slabs(slabs) -> list:
 
 async def get_config(db: AsyncSession) -> dict:
     enabled = bool(await _get(db, core.SETTING_ENABLED, False))
+    terminal_enabled = bool(await _get(db, core.SETTING_TERMINAL, True))
     secret = await _get(db, core.SETTING_SECRET, "") or ""
     slabs = await _get(db, core.SETTING_SLABS, None) or core.DEFAULT_SLABS
     base = (await _get(db, WEBHOOK_BASE_KEY, "") or "").rstrip("/")
     path = f"{WEBHOOK_PATH}/{secret}" if secret else None
     return {
         "enabled": enabled,
+        "terminal_enabled": terminal_enabled,
         "has_secret": bool(secret),
         # Admin is a trusted (super-admin) surface and must see the full URL to
         # paste into TradingView, so the secret is returned in the clear here.
@@ -115,12 +117,15 @@ async def update_config(
     admin_id: UUID,
     ip_address: str | None,
     enabled=None,
+    terminal_enabled=None,
     slabs=None,
     regenerate_secret: bool = False,
     webhook_base=None,
 ) -> dict:
     if enabled is not None:
         await _set(db, core.SETTING_ENABLED, bool(enabled), admin_id)
+    if terminal_enabled is not None:
+        await _set(db, core.SETTING_TERMINAL, bool(terminal_enabled), admin_id)
     if slabs is not None:
         await _set(db, core.SETTING_SLABS, _validate_slabs(slabs), admin_id)
     if webhook_base is not None:
@@ -136,6 +141,7 @@ async def update_config(
         old_values=None,
         new_values={
             "enabled": enabled,
+            "terminal_enabled": terminal_enabled,
             "slabs_count": len(slabs) if slabs is not None else None,
             "regenerate_secret": regenerate_secret,
         },
@@ -317,6 +323,54 @@ async def edit_trade(db: AsyncSession, *, admin_id: UUID, ip_address: str | None
 
 
 # ── P&L summary ──────────────────────────────────────────────────────────────
+
+async def list_followers(db: AsyncSession) -> list:
+    """Users participating in AI Station = holders of ACTIVE staking locks (whom
+    the fan-out applies to), with their principal + AI-trade stats."""
+    lock_rows = (await db.execute(
+        select(
+            FixedReturnLock.user_id,
+            func.coalesce(func.sum(FixedReturnLock.principal), 0),
+            func.count(),
+        ).where(FixedReturnLock.state == "active").group_by(FixedReturnLock.user_id)
+    )).all()
+    if not lock_rows:
+        return []
+    uids = [r[0] for r in lock_rows]
+    principal_map = {r[0]: (float(r[1] or 0), int(r[2])) for r in lock_rows}
+
+    users = {u.id: u for u in (await db.execute(
+        select(User).where(User.id.in_(uids))
+    )).scalars().all()}
+
+    trade_rows = (await db.execute(
+        select(
+            AiStationTrade.user_id,
+            func.count(),
+            func.coalesce(func.sum(case((AiStationTrade.status == "open", 1), else_=0)), 0),
+            func.coalesce(func.sum(case((AiStationTrade.status == "closed", AiStationTrade.pnl), else_=0)), 0),
+        ).where(AiStationTrade.user_id.in_(uids)).group_by(AiStationTrade.user_id)
+    )).all()
+    tmap = {r[0]: (int(r[1]), int(r[2] or 0), float(r[3] or 0)) for r in trade_rows}
+
+    out = []
+    for uid in uids:
+        u = users.get(uid)
+        principal, locks = principal_map.get(uid, (0.0, 0))
+        trades, open_trades, realized = tmap.get(uid, (0, 0, 0.0))
+        out.append({
+            "user_id": str(uid),
+            "email": u.email if u else None,
+            "name": (f"{u.first_name or ''} {u.last_name or ''}".strip() if u else None),
+            "principal": round(principal, 2),
+            "locks": locks,
+            "trades": trades,
+            "open_trades": open_trades,
+            "realized_pnl": round(realized, 2),
+        })
+    out.sort(key=lambda x: x["principal"], reverse=True)
+    return out
+
 
 async def summary(db: AsyncSession) -> dict:
     rows = list((await db.execute(select(AiStationTrade))).scalars().all())

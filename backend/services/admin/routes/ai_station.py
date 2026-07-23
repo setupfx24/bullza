@@ -31,7 +31,8 @@ def _ip(request: Request) -> str | None:
 # ── config ───────────────────────────────────────────────────────────────────
 
 class UpdateConfigRequest(BaseModel):
-    enabled: Optional[bool] = None
+    enabled: Optional[bool] = None            # trading / webhook on-off
+    terminal_enabled: Optional[bool] = None   # user-side terminal visibility
     slabs: Optional[list[dict[str, Any]]] = None
     regenerate_secret: bool = False
     webhook_base: Optional[str] = None
@@ -54,7 +55,7 @@ async def update_config(
 ) -> dict[str, Any]:
     return await svc.update_config(
         db, admin_id=admin.id, ip_address=_ip(request),
-        enabled=body.enabled, slabs=body.slabs,
+        enabled=body.enabled, terminal_enabled=body.terminal_enabled, slabs=body.slabs,
         regenerate_secret=body.regenerate_secret, webhook_base=body.webhook_base,
     )
 
@@ -183,3 +184,12 @@ async def summary(
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
     return await svc.summary(db)
+
+
+@router.get("/followers")
+async def followers(
+    _admin: User = Depends(require_permission(PERM)),
+    db: AsyncSession = Depends(get_db),
+) -> list[dict[str, Any]]:
+    """Users following AI Station (active staking-lock holders) + their stats."""
+    return await svc.list_followers(db)

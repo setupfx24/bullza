@@ -42,12 +42,14 @@ function TerminalInner() {
   const [symbol, setSymbol] = useState((params.get('symbol') || 'XAUUSD').toUpperCase());
   const [tab, setTab] = useState<'open' | 'closed'>('open');
   const [loaded, setLoaded] = useState(false);
+  const [enabled, setEnabled] = useState(true);
 
   const load = useCallback(async () => {
     try {
-      const r = await api.get<{ trades: Trade[]; summary: Summary }>('/ai-station/my-trades');
+      const r = await api.get<{ trades: Trade[]; summary: Summary; terminal_enabled?: boolean }>('/ai-station/my-trades');
       setTrades(r?.trades || []);
       setSummary(r?.summary || null);
+      setEnabled(r?.terminal_enabled !== false);
     } catch { /* silent */ } finally { setLoaded(true); }
   }, []);
 
@@ -108,6 +110,19 @@ function TerminalInner() {
       {sub && <div className="text-[10px] text-text-tertiary tabular-nums">{sub}</div>}
     </div>
   );
+
+  // Admin can hide the terminal from users.
+  if (loaded && !enabled) {
+    return (
+      <div className="flex flex-col items-center justify-center h-[100dvh] bg-bg-primary text-text-primary gap-3 px-4 text-center">
+        <Lock size={28} className="text-text-tertiary" />
+        <div className="text-sm text-text-secondary">The AI Station terminal is currently unavailable.</div>
+        <button onClick={() => router.push('/fixed-return')} className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md bg-buy text-white hover:bg-buy/90">
+          <ArrowLeft size={14} /> Back
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col h-[100dvh] bg-bg-primary text-text-primary overflow-hidden">
