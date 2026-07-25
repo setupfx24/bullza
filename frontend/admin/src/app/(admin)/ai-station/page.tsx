@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 import {
-  Loader2, Save, Plus, Trash2, RefreshCw, Copy, X, Pencil, Radio, TrendingUp, Eye, EyeOff,
+  Loader2, Save, Plus, Trash2, RefreshCw, Copy, X, Pencil, Radio, TrendingUp, Eye, EyeOff, Power,
 } from 'lucide-react';
 import { adminApi } from '@/lib/api';
 
@@ -99,6 +99,15 @@ export default function AiStationPage() {
 
   useEffect(() => { loadAll(); }, [loadAll]);
 
+  const toggleTrading = async () => {
+    if (!cfg) return;
+    try {
+      const c = await adminApi.put<Config>('/ai-station/config', { enabled: !cfg.enabled });
+      setCfg(c);
+      toast.success(c.enabled ? 'Trading enabled' : 'Trading OFF — TradingView signals will not open trades');
+    } catch (e: any) { toast.error(e?.message || 'Failed'); }
+  };
+
   if (loading || !cfg || !summary) {
     return <div className="flex items-center justify-center h-96"><Loader2 className="animate-spin text-text-tertiary" /></div>;
   }
@@ -116,9 +125,12 @@ export default function AiStationPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <span className={`text-xxs px-2 py-1 rounded ${cfg.enabled ? 'bg-buy/15 text-buy' : 'bg-sell/15 text-sell'}`}>
-            {cfg.enabled ? 'ENABLED' : 'DISABLED'}
-          </span>
+          <button
+            onClick={toggleTrading}
+            title="Turn AI Station trading on/off (TradingView signals won't open trades when off)"
+            className={`inline-flex items-center gap-1.5 text-xxs font-semibold px-2.5 py-1.5 rounded transition-fast ${cfg.enabled ? 'bg-buy/15 text-buy hover:bg-buy/25' : 'bg-sell/15 text-sell hover:bg-sell/25'}`}>
+            <Power size={12} /> {cfg.enabled ? 'TRADING ON' : 'TRADING OFF'}
+          </button>
           <button onClick={loadAll} className="inline-flex items-center gap-1 px-2 py-1.5 text-xs text-text-secondary border border-border-primary rounded hover:bg-bg-hover">
             <RefreshCw size={13} /> Refresh
           </button>
@@ -150,6 +162,16 @@ export default function AiStationPage() {
 function Overview({ summary, onOpened }: { summary: Summary; onOpened: () => void }) {
   const [f, setF] = useState({ symbol: '', side: 'buy', price: '', stop_loss: '', take_profit: '', note: '' });
   const [busy, setBusy] = useState(false);
+  const [symbols, setSymbols] = useState<{ symbol: string; display_name?: string }[]>([]);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const r = await adminApi.get<{ items: { symbol: string; display_name?: string }[] }>('/config/instruments');
+        setSymbols((r?.items || []).filter((i) => i.symbol));
+      } catch { /* instruments optional */ }
+    })();
+  }, []);
 
   const open = async () => {
     if (!f.symbol.trim()) { toast.error('Symbol required'); return; }
@@ -201,7 +223,11 @@ function Overview({ summary, onOpened }: { summary: Summary; onOpened: () => voi
         <h2 className="text-sm font-semibold text-text-primary flex items-center gap-2"><TrendingUp size={15} /> Open a trade manually (fans out to all active locks)</h2>
         <div className="grid sm:grid-cols-2 gap-3">
           <div><label className="text-xs text-text-secondary block mb-1">Symbol</label>
-            <input className={inputCls} placeholder="EURUSD" value={f.symbol} onChange={(e) => setF({ ...f, symbol: e.target.value })} /></div>
+            <input list="ai-open-symbols" className={inputCls} placeholder="Select or type…" value={f.symbol}
+              onChange={(e) => setF({ ...f, symbol: e.target.value.toUpperCase() })} />
+            <datalist id="ai-open-symbols">
+              {symbols.map((i) => <option key={i.symbol} value={i.symbol}>{i.display_name || i.symbol}</option>)}
+            </datalist></div>
           <div><label className="text-xs text-text-secondary block mb-1">Side</label>
             <select className={inputCls} value={f.side} onChange={(e) => setF({ ...f, side: e.target.value })}>
               <option value="buy">Buy</option><option value="sell">Sell</option></select></div>
