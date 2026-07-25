@@ -45,6 +45,7 @@ SETTING_ENABLED = "ai_station_enabled"            # trading / webhook on-off
 SETTING_TERMINAL = "ai_station_terminal_enabled"  # user-side terminal visibility
 SETTING_SECRET = "ai_station_webhook_secret"
 SETTING_SLABS = "ai_station_slabs"
+SETTING_DISABLED_USERS = "ai_station_disabled_users"  # users whose AI portfolio is hidden
 
 # Fallback slabs so a fresh install still fans out sensibly. principal range
 # -> display lot size. Lower bound inclusive, upper exclusive; max=None = top.
@@ -82,6 +83,12 @@ async def get_slabs() -> list:
     if isinstance(slabs, list) and slabs:
         return slabs
     return DEFAULT_SLABS
+
+
+async def get_disabled_users() -> set:
+    """User ids whose AI-Station portfolio the admin has hidden."""
+    val = await get_system_setting(SETTING_DISABLED_USERS, [])
+    return {str(x) for x in val} if isinstance(val, list) else set()
 
 
 async def get_config() -> dict:

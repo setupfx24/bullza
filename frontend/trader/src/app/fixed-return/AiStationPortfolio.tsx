@@ -32,16 +32,18 @@ export default function AiStationPortfolio() {
   const [trades, setTrades] = useState<Trade[]>([]);
   const [summary, setSummary] = useState<Summary | null>(null);
   const [terminalEnabled, setTerminalEnabled] = useState(true);
+  const [portfolioEnabled, setPortfolioEnabled] = useState(true);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<'open' | 'closed'>('open');
 
   const load = useCallback(async (spinner = false) => {
     if (spinner) setLoading(true);
     try {
-      const r = await api.get<{ trades: Trade[]; summary: Summary; terminal_enabled?: boolean }>('/ai-station/my-trades');
+      const r = await api.get<{ trades: Trade[]; summary: Summary; terminal_enabled?: boolean; portfolio_enabled?: boolean }>('/ai-station/my-trades');
       setTrades(r?.trades || []);
       setSummary(r?.summary || null);
       setTerminalEnabled(r?.terminal_enabled !== false);
+      setPortfolioEnabled(r?.portfolio_enabled !== false);
     } catch {
       /* silent — feature may be disabled / no trades */
     } finally {
@@ -58,6 +60,9 @@ export default function AiStationPortfolio() {
 
   // Always visible so the staker can see their Portfolio; fills in as trades
   // arrive (shows zeros / empty state until then).
+  // Admin can hide the whole AI Station Portfolio for specific users.
+  if (!portfolioEnabled) return null;
+
   const s: Summary = summary ?? {
     open_count: 0, closed_count: 0, today_count: 0, open_pnl: 0,
     realized_pnl_month: 0, realized_pnl_total: 0, monthly_pnl: 0, total_pnl: 0,

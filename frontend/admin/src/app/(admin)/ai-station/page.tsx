@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 import {
-  Loader2, Save, Plus, Trash2, RefreshCw, Copy, X, Pencil, Radio, TrendingUp,
+  Loader2, Save, Plus, Trash2, RefreshCw, Copy, X, Pencil, Radio, TrendingUp, Eye, EyeOff,
 } from 'lucide-react';
 import { adminApi } from '@/lib/api';
 
@@ -138,7 +138,7 @@ export default function AiStationPage() {
       {tab === 'overview' && <Overview summary={summary} onOpened={loadAll} />}
       {tab === 'trades' && <TradesTable trades={trades} onEdit={setEditing} reload={loadAll} />}
       {tab === 'signals' && <SignalsTable signals={signals} reload={loadAll} />}
-      {tab === 'followers' && <FollowersTable followers={followers} />}
+      {tab === 'followers' && <FollowersTable followers={followers} reload={loadAll} />}
       {tab === 'connection' && <Connection cfg={cfg} setCfg={setCfg} reload={loadAll} />}
 
       {editing && <EditTradeModal trade={editing} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); loadAll(); }} />}
@@ -316,26 +316,53 @@ function SignalsTable({ signals, reload }: { signals: Signal[]; reload: () => vo
 }
 
 // ── Followers (users participating in AI Station) ───────────────────────────
-function FollowersTable({ followers }: { followers: Follower[] }) {
+function FollowersTable({ followers, reload }: { followers: Follower[]; reload: () => void }) {
+  const [sel, setSel] = useState<Set<string>>(new Set());
+  const [busy, setBusy] = useState(false);
   const totalPrincipal = followers.reduce((a, f) => a + (f.principal || 0), 0);
+  const allSelected = followers.length > 0 && sel.size === followers.length;
+
+  const toggle = (id: string) => setSel((prev) => {
+    const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n;
+  });
+  const toggleAll = () => setSel(allSelected ? new Set() : new Set(followers.map((f) => f.user_id)));
+
+  const setVisibility = async (hidden: boolean) => {
+    if (sel.size === 0) { toast.error('Select at least one user'); return; }
+    setBusy(true);
+    try {
+      await adminApi.post('/ai-station/followers/visibility', { user_ids: Array.from(sel), hidden });
+      toast.success(hidden ? 'Portfolio hidden for selected users' : 'Portfolio shown for selected users');
+      setSel(new Set());
+      reload();
+    } catch (e: any) { toast.error(e?.message || 'Failed'); } finally { setBusy(false); }
+  };
+
   return (
     <div className="space-y-2">
-      <div className="flex items-center gap-3 text-xxs text-text-tertiary">
-        <span>{followers.length} users following AI Station</span>
-        <span>·</span>
-        <span>Total principal ${fmt(totalPrincipal)}</span>
-        <span className="ml-auto">Users with an active AI-Powered Staking lock — the fan-out applies to them.</span>
+      <div className="flex flex-wrap items-center gap-3 text-xxs text-text-tertiary">
+        <span>{followers.length} users · Total principal ${fmt(totalPrincipal)}</span>
+        <span className="hidden md:inline">Users with an active AI-Powered Staking lock — the fan-out applies to them.</span>
+        <div className="ml-auto flex items-center gap-2">
+          <span className="text-text-secondary">{sel.size} selected</span>
+          <button onClick={() => setVisibility(true)} disabled={busy || sel.size === 0}
+            className="inline-flex items-center gap-1 px-2 py-1 rounded border border-border-primary text-sell hover:bg-bg-hover disabled:opacity-40"><EyeOff size={12} /> Hide portfolio</button>
+          <button onClick={() => setVisibility(false)} disabled={busy || sel.size === 0}
+            className="inline-flex items-center gap-1 px-2 py-1 rounded border border-border-primary text-buy hover:bg-bg-hover disabled:opacity-40"><Eye size={12} /> Show portfolio</button>
+        </div>
       </div>
       <div className="overflow-x-auto border border-border-primary rounded-md">
         <table className="w-full text-xs">
           <thead className="bg-bg-secondary text-text-tertiary">
             <tr className="text-left">
-              {['User', 'Principal', 'Locks', 'AI trades', 'Open', 'Realized P&L'].map((h) => <th key={h} className="px-2 py-2 font-medium">{h}</th>)}
+              <th className="px-2 py-2 w-8"><input type="checkbox" className="w-3.5 h-3.5 accent-buy" checked={allSelected} onChange={toggleAll} /></th>
+              {['User', 'Principal', 'Locks', 'AI trades', 'Open', 'Realized P&L', 'Portfolio'].map((h) => <th key={h} className="px-2 py-2 font-medium">{h}</th>)}
             </tr>
           </thead>
           <tbody>
             {followers.map((f) => (
-              <tr key={f.user_id} className="border-t border-border-primary hover:bg-bg-hover">
+              <tr key={f.user_id} className={`border-t border-border-primary hover:bg-bg-hover ${sel.has(f.user_id) ? 'bg-buy/5' : ''}`}>
+                <td className="px-2 py-1.5"><input type="checkbox" className="w-3.5 h-3.5 accent-buy" checked={sel.has(f.user_id)} onChange={() => toggle(f.user_id)} /></td>
                 <td className="px-2 py-1.5">
                   <div className="text-text-primary">{f.email || f.user_id.slice(0, 8)}</div>
                   {f.name && <div className="text-[10px] text-text-tertiary">{f.name}</div>}
@@ -345,9 +372,14 @@ function FollowersTable({ followers }: { followers: Follower[] }) {
                 <td className="px-2 py-1.5 tabular-nums">{f.trades}</td>
                 <td className="px-2 py-1.5 tabular-nums">{f.open_trades}</td>
                 <td className={`px-2 py-1.5 tabular-nums ${pnlCls(f.realized_pnl)}`}>{f.realized_pnl >= 0 ? '+' : ''}${fmt(f.realized_pnl)}</td>
+                <td className="px-2 py-1.5">
+                  {f.portfolio_hidden
+                    ? <span className="px-1.5 py-0.5 rounded text-[10px] bg-sell/15 text-sell">hidden</span>
+                    : <span className="px-1.5 py-0.5 rounded text-[10px] bg-buy/15 text-buy">visible</span>}
+                </td>
               </tr>
             ))}
-            {followers.length === 0 && <tr><td colSpan={6} className="px-2 py-8 text-center text-text-tertiary">No users have an active AI-Powered Staking lock yet.</td></tr>}
+            {followers.length === 0 && <tr><td colSpan={8} className="px-2 py-8 text-center text-text-tertiary">No users have an active AI-Powered Staking lock yet.</td></tr>}
           </tbody>
         </table>
       </div>

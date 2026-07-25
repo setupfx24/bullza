@@ -339,6 +339,9 @@ async def list_followers(db: AsyncSession) -> list:
     uids = [r[0] for r in lock_rows]
     principal_map = {r[0]: (float(r[1] or 0), int(r[2])) for r in lock_rows}
 
+    dv = await _get(db, core.SETTING_DISABLED_USERS, [])
+    disabled = {str(x) for x in dv} if isinstance(dv, list) else set()
+
     users = {u.id: u for u in (await db.execute(
         select(User).where(User.id.in_(uids))
     )).scalars().all()}
@@ -367,9 +370,32 @@ async def list_followers(db: AsyncSession) -> list:
             "trades": trades,
             "open_trades": open_trades,
             "realized_pnl": round(realized, 2),
+            "portfolio_hidden": str(uid) in disabled,
         })
     out.sort(key=lambda x: x["principal"], reverse=True)
     return out
+
+
+async def set_followers_visibility(db: AsyncSession, *, admin_id: UUID, ip_address: str | None,
+                                   user_ids: list, hidden: bool) -> dict:
+    """Add/remove users from the AI-portfolio hidden list. Hidden users don't see
+    the AI-Station Portfolio section at all."""
+    cur = await _get(db, core.SETTING_DISABLED_USERS, [])
+    s = {str(x) for x in cur} if isinstance(cur, list) else set()
+    for uid in user_ids:
+        if hidden:
+            s.add(str(uid))
+        else:
+            s.discard(str(uid))
+    await _set(db, core.SETTING_DISABLED_USERS, sorted(s), admin_id)
+    await write_audit_log(
+        db, admin_id, "ai_station.followers_visibility", "system_setting", None,
+        old_values=None, new_values={"count": len(user_ids), "hidden": hidden},
+        ip_address=ip_address,
+    )
+    await db.commit()
+    await _bust_gateway_cache()
+    return {"hidden_total": len(s)}
 
 
 async def summary(db: AsyncSession) -> dict:

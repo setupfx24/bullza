@@ -114,8 +114,11 @@ async def my_trades(
     )).scalar() or 0)
 
     cfg = await ai.get_config()
+    disabled = await ai.get_disabled_users()
     return {
         "trades": items,
         "summary": _summary(trades, items, principal),
         "terminal_enabled": bool(cfg.get("terminal_enabled", True)),
+        # Admin can hide the whole AI portfolio for specific users.
+        "portfolio_enabled": str(uid) not in disabled,
     }

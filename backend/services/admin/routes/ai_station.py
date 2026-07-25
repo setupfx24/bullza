@@ -193,3 +193,22 @@ async def followers(
 ) -> list[dict[str, Any]]:
     """Users following AI Station (active staking-lock holders) + their stats."""
     return await svc.list_followers(db)
+
+
+class VisibilityRequest(BaseModel):
+    user_ids: list[UUID]
+    hidden: bool
+
+
+@router.post("/followers/visibility")
+async def followers_visibility(
+    body: VisibilityRequest,
+    request: Request,
+    admin: User = Depends(require_permission(PERM)),
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    """Hide (or show) the AI-Station Portfolio section for the given users."""
+    return await svc.set_followers_visibility(
+        db, admin_id=admin.id, ip_address=_ip(request),
+        user_ids=body.user_ids, hidden=body.hidden,
+    )
