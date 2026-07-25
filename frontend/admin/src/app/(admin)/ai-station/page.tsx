@@ -22,6 +22,7 @@ interface Config {
 interface Follower {
   user_id: string; email: string | null; name: string | null;
   principal: number; locks: number; trades: number; open_trades: number; realized_pnl: number;
+  portfolio_hidden: boolean;
 }
 interface Summary {
   active_principal: number;
