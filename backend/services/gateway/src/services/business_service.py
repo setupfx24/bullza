@@ -3,7 +3,7 @@ from decimal import Decimal
 from uuid import UUID
 
 from fastapi import HTTPException
-from sqlalchemy import select, func, text, or_
+from sqlalchemy import select, func, text, or_, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from packages.common.src.models import (
@@ -393,18 +393,25 @@ async def ib_dashboard(user_id: UUID, db: AsyncSession) -> dict:
 
     ib_type = await _resolve_ib_type(db, profile)
 
-    # Demo-account commissions must never show/count for the IB (client
-    # 2026-07-27: "demo account ka commission nahi dikhna chahiye"). Commission
-    # source_trade_id is the trader's Order id, so drop every commission whose
-    # source order sits on a demo account. NULL/non-trade source ids are kept.
+    # Promotional AND demo commissions must never show/count for the IB (client
+    # 2026-07-27). Drop a commission when EITHER (a) the source trader is a
+    # promotional/demo user, or (b) its source order sits on a demo account
+    # (a real user's demo account). source_trade_id is the trader's Order id;
+    # NULL/non-trade source ids are kept.
+    _excl_comm_user_ids = select(User.id).where(
+        or_(User.is_promotional == True, User.is_demo == True)  # noqa: E712
+    )
     _demo_order_ids = (
         select(Order.id)
         .join(TradingAccount, TradingAccount.id == Order.account_id)
         .where(TradingAccount.is_demo == True)  # noqa: E712
     )
-    _not_demo_comm = or_(
-        IBCommission.source_trade_id.is_(None),
-        IBCommission.source_trade_id.notin_(_demo_order_ids),
+    _not_demo_comm = and_(
+        IBCommission.source_user_id.notin_(_excl_comm_user_ids),
+        or_(
+            IBCommission.source_trade_id.is_(None),
+            IBCommission.source_trade_id.notin_(_demo_order_ids),
+        ),
     )
 
     referral_count = await db.execute(
