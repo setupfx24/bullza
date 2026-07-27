@@ -190,6 +190,9 @@ async def maybe_pay_referral_after_trades(
         .select_from(TradeHistory)
         .join(TradingAccount, TradingAccount.id == TradeHistory.account_id)
         .where(TradingAccount.user_id == user_id)
+        # Only REAL closed trades qualify a referral — demo trades don't count
+        # (client 2026-07-25: 3 demo trades must NOT earn the referrer a bounty).
+        .where(TradingAccount.is_demo.isnot(True))
     )).scalar() or 0
     if trade_count < required:
         return None
@@ -295,6 +298,7 @@ async def claim_referral_bounty(
             select(func.count()).select_from(TradeHistory)
             .join(TradingAccount, TradingAccount.id == TradeHistory.account_id)
             .where(TradingAccount.user_id == referred_user_id)
+            .where(TradingAccount.is_demo.isnot(True))  # real trades only
         )).scalar() or 0
         trades_ok = int(trades_n) >= int(required_trades)
         if kyc_ok and funded_ok and trades_ok:
@@ -406,6 +410,7 @@ async def list_my_referrals(db: AsyncSession, user_id: UUID) -> dict:
             .select_from(TradeHistory)
             .join(TradingAccount, TradingAccount.id == TradeHistory.account_id)
             .where(TradingAccount.user_id == r.id)
+            .where(TradingAccount.is_demo.isnot(True))  # real trades only
         )).scalar() or 0
 
         kyc_ok = (r.kyc_status or "pending").lower() == "approved"

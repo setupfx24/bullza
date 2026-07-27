@@ -175,6 +175,9 @@ async def compute_ib_qualification(db: AsyncSession, ib_profile_id: UUID) -> tup
             .select_from(TradeHistory)
             .join(TradingAccount, TradingAccount.id == TradeHistory.account_id)
             .where(TradingAccount.user_id.in_(eligible_ids))
+            # Demo trades don't count toward an activation — only real closed
+            # trades qualify a referral as an IB "activation" (client 2026-07-25).
+            .where(TradingAccount.is_demo.isnot(True))
             .group_by(TradingAccount.user_id)
         )).all()
         for _uid, cnt in rows:
@@ -316,10 +319,21 @@ async def distribute_ib_commission(
         return
 
     # ── Eligibility gates ────────────────────────────────────────────
-    from packages.common.src.models import User, TradeHistory, TradingAccount
+    from packages.common.src.models import User, TradeHistory, TradingAccount, Order
     from packages.common.src.settings_store import (
         get_bool_setting, get_int_setting,
     )
+
+    # DEMO trades never earn IB commission — only real-money volume does
+    # (client 2026-07-25: "demo account ke lot ka commission nahi milna
+    # chahiye"). Gate on the account this order was placed on.
+    demo_row = (await db.execute(
+        select(TradingAccount.is_demo)
+        .join(Order, Order.account_id == TradingAccount.id)
+        .where(Order.id == order_id)
+    )).scalar_one_or_none()
+    if demo_row:
+        return
 
     requires_kyc = await get_bool_setting("ib_commission_requires_kyc", True)
     if requires_kyc:
@@ -337,6 +351,9 @@ async def distribute_ib_commission(
             .select_from(TradeHistory)
             .join(TradingAccount, TradingAccount.id == TradeHistory.account_id)
             .where(TradingAccount.user_id == trader_user_id)
+            # Only REAL closed trades count toward the min-trades gate — demo
+            # trades must not qualify a trader for IB commission.
+            .where(TradingAccount.is_demo.isnot(True))
         )).scalar() or 0
         if int(closed_n) < min_trades:
             return
