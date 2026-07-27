@@ -124,9 +124,19 @@ async def compute_ib_qualification(db: AsyncSession, ib_profile_id: UUID) -> tup
     )
     from packages.common.src.settings_store import get_int_setting, get_bool_setting
 
+    # Exclude PROMOTIONAL + DEMO referred users — a showcase account's fake
+    # admin credit must not inflate the pool/tier, and demo users aren't real
+    # downline (client 2026-07-25). Mirrors _ib_pool_and_active so the engine's
+    # tier matches what the IB sees on /business.
     referred_ids = [
         r[0] for r in (await db.execute(
-            select(Referral.referred_id).where(Referral.ib_profile_id == ib_profile_id)
+            select(Referral.referred_id)
+            .join(User, User.id == Referral.referred_id)
+            .where(
+                Referral.ib_profile_id == ib_profile_id,
+                User.is_promotional.isnot(True),
+                User.is_demo.isnot(True),
+            )
         )).all() if r[0] is not None
     ]
     if not referred_ids:
@@ -333,6 +343,13 @@ async def distribute_ib_commission(
         .where(Order.id == order_id)
     )).scalar_one_or_none()
     if demo_row:
+        return
+
+    # A PROMOTIONAL or fully-DEMO trader never generates real commission either.
+    trader_flags = (await db.execute(
+        select(User.is_promotional, User.is_demo).where(User.id == trader_user_id)
+    )).one_or_none()
+    if trader_flags and (trader_flags[0] or trader_flags[1]):
         return
 
     requires_kyc = await get_bool_setting("ib_commission_requires_kyc", True)

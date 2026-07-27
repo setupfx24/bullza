@@ -158,6 +158,10 @@ async def maybe_pay_referral_after_trades(
         return None
     if user.referral_qualified_at is not None:
         return None  # already paid
+    # A promotional/demo referred user must never earn the referrer a bounty
+    # (client 2026-07-25: keep promotional/demo out of real referral data).
+    if getattr(user, "is_promotional", False) or getattr(user, "is_demo", False):
+        return None
 
     # ── Activation gate #1: KYC verification ──────────────────────────
     # Marketing copy on /products/referral promises "Your friend ...

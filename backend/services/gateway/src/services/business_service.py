@@ -148,8 +148,18 @@ async def _ib_pool_and_active(db: AsyncSession, ib_user_id: UUID) -> tuple[float
     credits (Transaction type 'adjustment', positive) — client 2026-06-30:
     "deposit aur admin credit dono" should fund the IB pool / drive the tier.
     'Active' = a referred user funded by a deposit OR an admin credit."""
+    # Exclude PROMOTIONAL + DEMO users entirely — a showcase account's fake
+    # admin credit must never inflate the IB deposit pool or tier, and demo
+    # users aren't real downline (client 2026-07-25: "promotional/demo wala
+    # real data me nahi dikhna chahiye").
     referred = (await db.execute(
-        select(Referral.referred_id).where(Referral.referrer_id == ib_user_id)
+        select(Referral.referred_id)
+        .join(User, User.id == Referral.referred_id)
+        .where(
+            Referral.referrer_id == ib_user_id,
+            User.is_promotional.isnot(True),
+            User.is_demo.isnot(True),
+        )
     )).scalars().all()
     total_referred = len(referred)
     if not referred:
