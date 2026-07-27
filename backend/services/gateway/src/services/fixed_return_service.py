@@ -582,6 +582,23 @@ async def withdraw_interest(lock_id: UUID, user_id: UUID, db: AsyncSession) -> d
                 f"until then."
             ),
         )
+    # Interest withdrawal must follow the plan's OWN cycle, not the monthly
+    # window alone (client 2026-07-27): a Quarterly/Yearly plan whose next
+    # payout is a future month must stay LOCKED until that payout date — no
+    # pulling the accruing interest out early every month. next_payout_at=None
+    # means the plan is past its last cycle (near maturity) → allow.
+    nxt = lock.next_payout_at
+    if nxt is not None:
+        if nxt.tzinfo is None:
+            nxt = nxt.replace(tzinfo=timezone.utc)
+        if now < nxt:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"Interest unlocks on {nxt.strftime('%d %b %Y')}, your plan's "
+                    f"next payout date. It keeps accruing until then."
+                ),
+            )
     interest = await _elapsed_unpaid_interest(lock, now)
     if interest <= 0:
         raise HTTPException(status_code=400, detail="No interest has accrued yet to withdraw.")

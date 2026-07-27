@@ -673,24 +673,38 @@ export default function FixedReturnPage() {
                             clickable inside the admin payout window (default day
                             25–30 of each month); outside it the button is greyed
                             out and the backend refuses anyway. */}
-                        {isActive && l.accrued_since_last_payout > 0 && (
+                        {isActive && l.accrued_since_last_payout > 0 && (() => {
+                          // Interest withdrawal follows the plan's OWN cycle: locked
+                          // until the plan's next payout date, and then only inside
+                          // the monthly payout window. So a Quarterly/Yearly plan
+                          // whose next payout is months away stays locked till then —
+                          // no pulling accruing interest out early. (client 2026-07-27)
+                          const cycleDue = !l.next_payout_at || new Date(l.next_payout_at).getTime() <= Date.now();
+                          const canWithdraw = payoutWindowOpen && cycleDue;
+                          const lockMsg = (!cycleDue && l.next_payout_at)
+                            ? `Interest unlocks on ${fmtDate(l.next_payout_at)} — your plan's next payout date`
+                            : `Available only from day ${cfg.payout_day_start} to ${cfg.payout_day_end} of each month`;
+                          return (
                           <div className="flex flex-col items-end gap-0.5">
                             <button
                               onClick={() => void withdrawInterest(l)}
-                              disabled={withdrawingInterest === l.id || !payoutWindowOpen}
-                              title={payoutWindowOpen ? undefined : `Available only from day ${cfg.payout_day_start} to ${cfg.payout_day_end} of each month`}
+                              disabled={withdrawingInterest === l.id || !canWithdraw}
+                              title={canWithdraw ? undefined : lockMsg}
                               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-fast border border-buy/40 text-buy hover:bg-buy/10 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent"
                             >
                               {withdrawingInterest === l.id && <Loader2 size={11} className="animate-spin" />}
                               Withdraw interest ({fmtUsd(l.accrued_since_last_payout)})
                             </button>
-                            {!payoutWindowOpen && (
+                            {!canWithdraw && (
                               <span className="text-[10px] text-text-tertiary">
-                                Available {cfg.payout_day_start}–{cfg.payout_day_end} of every month
+                                {(!cycleDue && l.next_payout_at)
+                                  ? `Unlocks ${fmtDate(l.next_payout_at)}`
+                                  : `Available ${cfg.payout_day_start}–${cfg.payout_day_end} of every month`}
                               </span>
                             )}
                           </div>
-                        )}
+                          );
+                        })()}
                         {isActive && (
                           <button
                             onClick={() => withdraw(l)}
