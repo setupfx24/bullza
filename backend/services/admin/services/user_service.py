@@ -197,14 +197,12 @@ async def list_users(
             raise HTTPException(status_code=400, detail=f"Invalid date '{value}', expected YYYY-MM-DD")
         return datetime.combine(d, time.max if end_of_day else time.min, tzinfo=timezone.utc)
 
-    # Promotional accounts in the Users list (client 2026-07-11):
-    #   - The ROOT showcase accounts (their referrer is NOT itself promotional,
-    #     e.g. the two Super-IB demo accounts) appear as email + a "Promotional"
-    #     badge, every other field blanked below.
-    #   - Their promotional DOWNLINE (referrer is also promotional) are hidden
-    #     entirely — they exist only to pad referral counts on the trader side.
-    # Everything else about promo accounts stays hidden from the rest of admin.
-    promo_ids_sq = select(User.id).where(User.is_promotional == True)  # noqa: E712
+    # Promotional accounts in the Users list (client 2026-07-25): ALL
+    # promotional accounts now appear here as email + a "Promotional" badge,
+    # every other field blanked in the serialization below — so admins can see
+    # them in the Users list, while their trades / balances / commissions stay
+    # OUT of the admin dashboard and every real aggregate. (Previously the
+    # promotional downline was hidden entirely; client wants them visible.)
     # Staff accounts are not customers. Active employees have role=admin
     # (already excluded), but a SOFT-DELETED employee is demoted to role=user +
     # terminated and was leaking into the customer Users list (client
@@ -214,11 +212,6 @@ async def list_users(
         User.role.notin_(["admin", "super_admin"]),
         User.id.notin_(employee_ids_sq),
         User.is_demo == False,
-        or_(
-            User.is_promotional.isnot(True),
-            User.referred_by_user_id.is_(None),
-            User.referred_by_user_id.not_in(promo_ids_sq),
-        ),
     )
 
     if search:
