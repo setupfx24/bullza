@@ -224,7 +224,26 @@ async def list_signals(db: AsyncSession, *, status=None, limit=100, offset=0) ->
         q = q.where(AiStationSignal.status == status)
     q = q.order_by(AiStationSignal.opened_at.desc()).limit(limit).offset(offset)
     rows = list((await db.execute(q)).scalars().all())
-    return [core.serialize_signal(s) for s in rows]
+    if not rows:
+        return []
+
+    # Total P&L per signal = sum of every user copy's P&L (live for open ones).
+    sig_ids = [s.id for s in rows]
+    children = list((await db.execute(
+        select(AiStationTrade).where(AiStationTrade.signal_id.in_(sig_ids))
+    )).scalars().all())
+    live = await core.enrich_open_pnl(db, children)
+    totals: dict = {}
+    for c in children:
+        pnl = live.get(str(c.id)) if c.status == "open" else c.pnl
+        totals[c.signal_id] = totals.get(c.signal_id, 0.0) + float(pnl or 0)
+
+    out = []
+    for s in rows:
+        d = core.serialize_signal(s)
+        d["total_pnl"] = round(totals.get(s.id, 0.0), 2)
+        out.append(d)
+    return out
 
 
 async def list_trades(db: AsyncSession, *, status=None, user_id=None, signal_id=None,
@@ -320,6 +339,57 @@ async def edit_trade(db: AsyncSession, *, admin_id: UUID, ip_address: str | None
     )
     await db.commit()
     return core.serialize_trade(t)
+
+
+async def edit_signal(db: AsyncSession, *, admin_id: UUID, ip_address: str | None,
+                      signal_id: UUID, fields: dict) -> dict:
+    """Edit a signal's prices/status and CASCADE to every user's copy — each
+    copy takes the signal's new entry/close/SL/TP and recomputes its OWN P&L
+    from its OWN lots. This is the "edit once, applies to all users" flow."""
+    res = await db.execute(select(AiStationSignal).where(AiStationSignal.id == signal_id))
+    sig = res.scalar_one_or_none()
+    if not sig:
+        raise HTTPException(status_code=404, detail="Signal not found")
+
+    for k in ("entry_price", "close_price", "stop_loss", "take_profit"):
+        if k in fields:
+            setattr(sig, k, _num(fields[k]))
+    if "status" in fields and fields["status"] in ("open", "closed"):
+        sig.status = fields["status"]
+        if sig.status == "closed" and sig.closed_at is None:
+            sig.closed_at = datetime.now(timezone.utc)
+        elif sig.status == "open":
+            sig.closed_at = None
+            sig.close_price = None  # reopening clears the close
+    now = datetime.now(timezone.utc)
+    sig.updated_at = now
+
+    cs = await core._contract_size(db, sig.symbol)
+    children = (await db.execute(
+        select(AiStationTrade).where(AiStationTrade.signal_id == sig.id)
+    )).scalars().all()
+    for c in children:
+        c.entry_price = sig.entry_price
+        c.close_price = sig.close_price
+        c.stop_loss = sig.stop_loss
+        c.take_profit = sig.take_profit
+        c.status = sig.status
+        c.closed_at = sig.closed_at if sig.status == "closed" else None
+        c.is_edited = False
+        if sig.status == "closed" and sig.close_price is not None:
+            c.pnl = core.compute_display_pnl(c.side, c.entry_price, sig.close_price, c.lots, cs)
+        else:
+            c.pnl = None  # open -> live P&L recomputes on read
+        c.updated_at = now
+
+    await write_audit_log(
+        db, admin_id, "ai_station.edit_signal", "ai_station_signal", signal_id,
+        old_values=None,
+        new_values={**{k: str(v) for k, v in fields.items()}, "cascaded_to": len(children)},
+        ip_address=ip_address,
+    )
+    await db.commit()
+    return {"signal": core.serialize_signal(sig), "updated": len(children)}
 
 
 # ── P&L summary ──────────────────────────────────────────────────────────────

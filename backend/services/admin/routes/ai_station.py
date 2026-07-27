@@ -89,6 +89,31 @@ class CloseSignalRequest(BaseModel):
     close_price: Optional[float] = None
 
 
+class EditSignalRequest(BaseModel):
+    entry_price: Optional[float] = None
+    close_price: Optional[float] = None
+    stop_loss: Optional[float] = None
+    take_profit: Optional[float] = None
+    status: Optional[str] = None  # 'open' | 'closed'
+
+
+@router.patch("/signals/{signal_id}")
+async def edit_signal(
+    signal_id: UUID,
+    body: EditSignalRequest,
+    request: Request,
+    admin: User = Depends(require_permission(PERM)),
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    """Edit a signal and cascade the change to every user's copy (each recomputes
+    its own P&L from its own lots)."""
+    fields = body.model_dump(exclude_unset=True)
+    return await svc.edit_signal(
+        db, admin_id=admin.id, ip_address=_ip(request),
+        signal_id=signal_id, fields=fields,
+    )
+
+
 @router.post("/signals/{signal_id}/close")
 async def close_signal(
     signal_id: UUID,

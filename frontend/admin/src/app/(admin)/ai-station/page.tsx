@@ -44,6 +44,7 @@ interface Signal {
   id: string; source: string; symbol: string; side: string;
   entry_price: number; close_price: number | null; status: string;
   fanout_count: number; note: string | null; opened_at: string; closed_at: string | null;
+  total_pnl?: number;
 }
 
 type Tab = 'overview' | 'trades' | 'signals' | 'followers' | 'connection';
@@ -310,34 +311,95 @@ function TradesTable({ trades, onEdit, reload }: { trades: Trade[]; onEdit: (t: 
 
 // ── Signals table ──────────────────────────────────────────────────────────
 function SignalsTable({ signals, reload }: { signals: Signal[]; reload: () => void }) {
+  const [editing, setEditing] = useState<Signal | null>(null);
   const close = async (s: Signal) => {
-    if (!confirm(`Close signal ${s.symbol} (${s.side})?`)) return;
+    if (!confirm(`Close signal ${s.symbol} (${s.side})? Closes all ${s.fanout_count} user copies.`)) return;
     try { await adminApi.post(`/ai-station/signals/${s.id}/close`, {}); toast.success('Closed'); reload(); }
     catch (e: any) { toast.error(e?.message || 'Close failed'); }
   };
   return (
-    <div className="overflow-x-auto border border-border-primary rounded-md">
-      <table className="w-full text-xs">
-        <thead className="bg-bg-secondary text-text-tertiary">
-          <tr className="text-left">{['Source', 'Symbol', 'Side', 'Entry', 'Close', 'Fan-out', 'Status', 'Opened', ''].map((h) => <th key={h} className="px-2 py-2 font-medium">{h}</th>)}</tr>
-        </thead>
-        <tbody>
-          {signals.map((s) => (
-            <tr key={s.id} className="border-t border-border-primary hover:bg-bg-hover">
-              <td className="px-2 py-1.5"><span className={`px-1.5 py-0.5 rounded text-[10px] ${s.source === 'tradingview' ? 'bg-indigo-500/15 text-indigo-400' : 'bg-bg-input text-text-secondary'}`}>{s.source}</span></td>
-              <td className="px-2 py-1.5 font-medium text-text-primary">{s.symbol}</td>
-              <td className={`px-2 py-1.5 uppercase ${sideCls(s.side)}`}>{s.side}</td>
-              <td className="px-2 py-1.5 tabular-nums">{fmt(s.entry_price, 5)}</td>
-              <td className="px-2 py-1.5 tabular-nums">{s.close_price === null ? '—' : fmt(s.close_price, 5)}</td>
-              <td className="px-2 py-1.5 tabular-nums">{s.fanout_count}</td>
-              <td className="px-2 py-1.5"><span className={`px-1.5 py-0.5 rounded text-[10px] ${s.status === 'open' ? 'bg-buy/15 text-buy' : 'bg-bg-input text-text-tertiary'}`}>{s.status}</span></td>
-              <td className="px-2 py-1.5 text-text-tertiary whitespace-nowrap">{dt(s.opened_at)}</td>
-              <td className="px-2 py-1.5">{s.status === 'open' && <button onClick={() => close(s)} className="p-1 text-sell hover:opacity-70" title="Close"><X size={13} /></button>}</td>
-            </tr>
-          ))}
-          {signals.length === 0 && <tr><td colSpan={9} className="px-2 py-8 text-center text-text-tertiary">No signals yet.</td></tr>}
-        </tbody>
-      </table>
+    <>
+      <p className="text-[10px] text-text-tertiary mb-2">Edit a signal to change it for <b>every</b> user at once — each copy recomputes its own P&L from its own lots. P&L = sum across all users.</p>
+      <div className="overflow-x-auto border border-border-primary rounded-md">
+        <table className="w-full text-xs">
+          <thead className="bg-bg-secondary text-text-tertiary">
+            <tr className="text-left">{['Source', 'Symbol', 'Side', 'Entry', 'Close', 'P&L (all users)', 'Fan-out', 'Status', 'Opened', ''].map((h) => <th key={h} className="px-2 py-2 font-medium">{h}</th>)}</tr>
+          </thead>
+          <tbody>
+            {signals.map((s) => (
+              <tr key={s.id} className="border-t border-border-primary hover:bg-bg-hover">
+                <td className="px-2 py-1.5"><span className={`px-1.5 py-0.5 rounded text-[10px] ${s.source === 'tradingview' ? 'bg-indigo-500/15 text-indigo-400' : 'bg-bg-input text-text-secondary'}`}>{s.source}</span></td>
+                <td className="px-2 py-1.5 font-medium text-text-primary">{s.symbol}</td>
+                <td className={`px-2 py-1.5 uppercase ${sideCls(s.side)}`}>{s.side}</td>
+                <td className="px-2 py-1.5 tabular-nums">{fmt(s.entry_price, 5)}</td>
+                <td className="px-2 py-1.5 tabular-nums">{s.close_price === null ? '—' : fmt(s.close_price, 5)}</td>
+                <td className={`px-2 py-1.5 tabular-nums font-medium ${pnlCls(s.total_pnl)}`}>{s.total_pnl === undefined ? '—' : `${s.total_pnl >= 0 ? '+' : ''}$${fmt(s.total_pnl)}`}</td>
+                <td className="px-2 py-1.5 tabular-nums">{s.fanout_count}</td>
+                <td className="px-2 py-1.5"><span className={`px-1.5 py-0.5 rounded text-[10px] ${s.status === 'open' ? 'bg-buy/15 text-buy' : 'bg-bg-input text-text-tertiary'}`}>{s.status}</span></td>
+                <td className="px-2 py-1.5 text-text-tertiary whitespace-nowrap">{dt(s.opened_at)}</td>
+                <td className="px-2 py-1.5">
+                  <div className="flex gap-1">
+                    <button onClick={() => setEditing(s)} className="p-1 text-text-tertiary hover:text-text-primary" title="Edit (applies to all users)"><Pencil size={13} /></button>
+                    {s.status === 'open' && <button onClick={() => close(s)} className="p-1 text-sell hover:opacity-70" title="Close"><X size={13} /></button>}
+                  </div>
+                </td>
+              </tr>
+            ))}
+            {signals.length === 0 && <tr><td colSpan={10} className="px-2 py-8 text-center text-text-tertiary">No signals yet.</td></tr>}
+          </tbody>
+        </table>
+      </div>
+      {editing && <EditSignalModal signal={editing} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); reload(); }} />}
+    </>
+  );
+}
+
+// ── Edit a signal → cascades to every user's copy ───────────────────────────
+function EditSignalModal({ signal, onClose, onSaved }: { signal: Signal; onClose: () => void; onSaved: () => void }) {
+  const [f, setF] = useState({
+    entry_price: String(signal.entry_price ?? ''),
+    close_price: signal.close_price === null ? '' : String(signal.close_price),
+    status: signal.status,
+  });
+  const [busy, setBusy] = useState(false);
+  const inputCls = 'w-full px-2 py-1.5 text-sm bg-bg-input border border-border-primary rounded text-text-primary tabular-nums';
+
+  const save = async () => {
+    setBusy(true);
+    try {
+      const body: any = { status: f.status };
+      body.entry_price = f.entry_price === '' ? null : parseFloat(f.entry_price);
+      body.close_price = f.close_price === '' ? null : parseFloat(f.close_price);
+      const r = await adminApi.patch<{ updated: number }>(`/ai-station/signals/${signal.id}`, body);
+      toast.success(`Updated — applied to ${r.updated} user copies`);
+      onSaved();
+    } catch (e: any) { toast.error(e?.message || 'Update failed'); } finally { setBusy(false); }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={onClose}>
+      <div className="bg-bg-primary border border-border-primary rounded-lg p-5 w-[420px] space-y-3" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-semibold text-text-primary">Edit signal · {signal.symbol} <span className={sideCls(signal.side)}>{signal.side}</span></h3>
+          <button onClick={onClose} className="text-text-tertiary hover:text-text-primary"><X size={16} /></button>
+        </div>
+        <p className="text-[11px] text-text-tertiary">Changes cascade to all <b>{signal.fanout_count}</b> user copies; each recomputes its own P&L from its own lots.</p>
+        <div className="grid grid-cols-2 gap-3">
+          <div><label className="text-xs text-text-secondary block mb-1">Entry price</label>
+            <input className={inputCls} type="number" step={0.00001} value={f.entry_price} onChange={(e) => setF({ ...f, entry_price: e.target.value })} /></div>
+          <div><label className="text-xs text-text-secondary block mb-1">Close price</label>
+            <input className={inputCls} type="number" step={0.00001} value={f.close_price} onChange={(e) => setF({ ...f, close_price: e.target.value })} /></div>
+        </div>
+        <div><label className="text-xs text-text-secondary block mb-1">Status</label>
+          <select className={inputCls} value={f.status} onChange={(e) => setF({ ...f, status: e.target.value })}>
+            <option value="open">open</option><option value="closed">closed</option></select></div>
+        <div className="flex justify-end gap-2 pt-1">
+          <button onClick={onClose} className="px-3 py-1.5 text-xs text-text-secondary border border-border-primary rounded hover:bg-bg-hover">Cancel</button>
+          <button onClick={save} disabled={busy} className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-buy rounded-md hover:bg-buy-light disabled:opacity-50">
+            {busy ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />} Save for all users
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
