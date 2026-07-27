@@ -57,6 +57,23 @@ async def _set(db: AsyncSession, key: str, value, admin_id: UUID):
         db.add(SystemSetting(key=key, value=value, updated_by=admin_id))
 
 
+def _validate_strategies(strategies) -> list:
+    if not isinstance(strategies, list):
+        raise HTTPException(status_code=400, detail="strategies must be a list")
+    out, seen = [], set()
+    for i, s in enumerate(strategies):
+        if not isinstance(s, dict):
+            raise HTTPException(status_code=400, detail=f"strategy #{i} must be an object")
+        sym = str(s.get("symbol") or "").upper().strip()
+        if not sym or sym in seen:
+            continue
+        seen.add(sym)
+        out.append({"symbol": sym, "enabled": bool(s.get("enabled"))})
+    if not out:
+        raise HTTPException(status_code=400, detail="at least one strategy required")
+    return out
+
+
 def _validate_slabs(slabs) -> list:
     if not isinstance(slabs, list) or not slabs:
         raise HTTPException(status_code=400, detail="slabs must be a non-empty list")
@@ -95,11 +112,13 @@ async def get_config(db: AsyncSession) -> dict:
     terminal_enabled = bool(await _get(db, core.SETTING_TERMINAL, True))
     secret = await _get(db, core.SETTING_SECRET, "") or ""
     slabs = await _get(db, core.SETTING_SLABS, None) or core.DEFAULT_SLABS
+    strategies = await _get(db, core.SETTING_STRATEGIES, None) or core.DEFAULT_STRATEGIES
     base = (await _get(db, WEBHOOK_BASE_KEY, "") or "").rstrip("/")
     path = f"{WEBHOOK_PATH}/{secret}" if secret else None
     return {
         "enabled": enabled,
         "terminal_enabled": terminal_enabled,
+        "strategies": strategies,
         "has_secret": bool(secret),
         # Admin is a trusted (super-admin) surface and must see the full URL to
         # paste into TradingView, so the secret is returned in the clear here.
@@ -119,6 +138,7 @@ async def update_config(
     enabled=None,
     terminal_enabled=None,
     slabs=None,
+    strategies=None,
     regenerate_secret: bool = False,
     webhook_base=None,
 ) -> dict:
@@ -128,6 +148,8 @@ async def update_config(
         await _set(db, core.SETTING_TERMINAL, bool(terminal_enabled), admin_id)
     if slabs is not None:
         await _set(db, core.SETTING_SLABS, _validate_slabs(slabs), admin_id)
+    if strategies is not None:
+        await _set(db, core.SETTING_STRATEGIES, _validate_strategies(strategies), admin_id)
     if webhook_base is not None:
         await _set(db, WEBHOOK_BASE_KEY, str(webhook_base).rstrip("/"), admin_id)
 

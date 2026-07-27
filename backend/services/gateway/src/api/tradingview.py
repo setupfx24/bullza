@@ -89,6 +89,10 @@ async def tradingview_webhook(
     # ── OPEN ───────────────────────────────────────────────────────────────
     if not symbol:
         raise HTTPException(status_code=400, detail="symbol required")
+    # Per-symbol strategy allowlist — only admin-enabled strategies open trades.
+    # (Return 200 so TradingView shows "delivered"; we simply skip the trade.)
+    if not await ai.is_symbol_enabled(symbol):
+        return {"status": "strategy_disabled", "symbol": symbol}
     side = action if action in ("buy", "sell") else str(payload.get("side") or "").lower().strip()
     if side not in ("buy", "sell"):
         raise HTTPException(status_code=400, detail="side must be 'buy' or 'sell'")

@@ -9,6 +9,7 @@ import { adminApi } from '@/lib/api';
 
 // ── types ─────────────────────────────────────────────────────────────────
 interface Slab { min: number; max: number | null; lots: number }
+interface Strategy { symbol: string; enabled: boolean }
 interface Config {
   enabled: boolean;
   terminal_enabled: boolean;
@@ -18,6 +19,7 @@ interface Config {
   webhook_base: string;
   webhook_url: string | null;
   slabs: Slab[];
+  strategies: Strategy[];
 }
 interface Follower {
   user_id: string; email: string | null; name: string | null;
@@ -484,7 +486,26 @@ function Connection({ cfg, setCfg, reload }: { cfg: Config; setCfg: (c: Config) 
   const [symbols, setSymbols] = useState<{ symbol: string; display_name?: string }[]>([]);
   const [syms, setSyms] = useState<string[]>(['EURUSD']);
   const [symInput, setSymInput] = useState('');
+  const [strategies, setStrategies] = useState<Strategy[]>(cfg.strategies || []);
+  const [stratInput, setStratInput] = useState('');
   const inputCls = 'px-2 py-1.5 text-sm bg-bg-input border border-border-primary rounded text-text-primary tabular-nums';
+
+  const saveStrategies = async (next: Strategy[]) => {
+    setStrategies(next);
+    try {
+      const c = await adminApi.put<Config>('/ai-station/config', { strategies: next });
+      setCfg(c); setStrategies(c.strategies || next);
+    } catch (e: any) { toast.error(e?.message || 'Save failed'); }
+  };
+  const toggleStrat = (sym: string) => saveStrategies(strategies.map((s) => (s.symbol === sym ? { ...s, enabled: !s.enabled } : s)));
+  const addStrat = () => {
+    const v = stratInput.trim().toUpperCase();
+    if (!v) return;
+    if (strategies.some((s) => s.symbol === v)) { toast.error('Already added'); return; }
+    saveStrategies([...strategies, { symbol: v, enabled: false }]);
+    setStratInput('');
+  };
+  const removeStrat = (sym: string) => saveStrategies(strategies.filter((s) => s.symbol !== sym));
 
   useEffect(() => {
     // Restore the instrument list this admin picked (per-browser).
@@ -561,6 +582,37 @@ function Connection({ cfg, setCfg, reload }: { cfg: Config; setCfg: (c: Config) 
               className="inline-flex items-center gap-1 px-2 py-1.5 text-xxs border border-border-primary rounded text-text-secondary hover:bg-bg-hover"><RefreshCw size={12} /> Regenerate</button>
           </div>
           <p className="text-[10px] text-text-tertiary mt-1">Set a UNIQUE <code>id</code> per trade. A close alert with the same id closes only that one trade.</p>
+        </div>
+      </section>
+
+      <section className="bg-bg-secondary border border-border-primary rounded-md p-5 space-y-3">
+        <div>
+          <h2 className="text-sm font-semibold text-text-primary">Strategies (per-symbol on / off)</h2>
+          <p className="text-[10px] text-text-tertiary">Only <b>enabled</b> symbols open trades from TradingView. Disabled ones are ignored (existing trades still close). Changes save instantly.</p>
+        </div>
+        <div className="space-y-2 max-w-md">
+          {strategies.map((s) => (
+            <div key={s.symbol} className="flex items-center gap-3 bg-bg-input border border-border-primary rounded-md px-3 py-2">
+              <span className="text-sm font-medium text-text-primary w-24">{s.symbol}</span>
+              <button
+                onClick={() => toggleStrat(s.symbol)}
+                className={`ml-auto inline-flex items-center gap-1.5 text-xxs font-semibold px-2.5 py-1 rounded ${s.enabled ? 'bg-buy/15 text-buy hover:bg-buy/25' : 'bg-sell/15 text-sell hover:bg-sell/25'}`}>
+                <Power size={11} /> {s.enabled ? 'ON' : 'OFF'}
+              </button>
+              <button onClick={() => removeStrat(s.symbol)} className="p-1 text-sell hover:opacity-70" title="Remove"><Trash2 size={13} /></button>
+            </div>
+          ))}
+          {strategies.length === 0 && <p className="text-xxs text-text-tertiary">No strategies — add one below.</p>}
+        </div>
+        <div className="flex items-center gap-2">
+          <input list="ai-strat-symbols" className={`${inputCls} w-44`} value={stratInput}
+            onChange={(e) => setStratInput(e.target.value.toUpperCase())}
+            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addStrat(); } }}
+            placeholder="Add strategy symbol…" />
+          <datalist id="ai-strat-symbols">
+            {symbols.map((i) => <option key={i.symbol} value={i.symbol}>{i.display_name || i.symbol}</option>)}
+          </datalist>
+          <button onClick={addStrat} className="inline-flex items-center gap-1 px-2 py-1.5 text-xxs border border-border-primary rounded text-text-secondary hover:bg-bg-hover"><Plus size={12} /> Add</button>
         </div>
       </section>
 

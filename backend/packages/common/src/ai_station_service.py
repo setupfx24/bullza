@@ -46,6 +46,16 @@ SETTING_TERMINAL = "ai_station_terminal_enabled"  # user-side terminal visibilit
 SETTING_SECRET = "ai_station_webhook_secret"
 SETTING_SLABS = "ai_station_slabs"
 SETTING_DISABLED_USERS = "ai_station_disabled_users"  # users whose AI portfolio is hidden
+SETTING_STRATEGIES = "ai_station_strategies"          # per-symbol on/off allowlist
+
+# Strategies (symbols) the admin can turn on/off. Only Gold on by default.
+DEFAULT_STRATEGIES = [
+    {"symbol": "XAUUSD", "enabled": True},
+    {"symbol": "XAGUSD", "enabled": False},
+    {"symbol": "BTCUSD", "enabled": False},
+    {"symbol": "EURUSD", "enabled": False},
+    {"symbol": "GBPUSD", "enabled": False},
+]
 
 # Fallback slabs so a fresh install still fans out sensibly. principal range
 # -> display lot size. Lower bound inclusive, upper exclusive; max=None = top.
@@ -83,6 +93,20 @@ async def get_slabs() -> list:
     if isinstance(slabs, list) and slabs:
         return slabs
     return DEFAULT_SLABS
+
+
+async def get_strategies() -> list:
+    val = await get_system_setting(SETTING_STRATEGIES, None)
+    return val if isinstance(val, list) and val else DEFAULT_STRATEGIES
+
+
+async def is_symbol_enabled(symbol: str) -> bool:
+    """True only if the symbol's strategy exists AND is enabled by the admin."""
+    sym = (symbol or "").upper()
+    for s in await get_strategies():
+        if str(s.get("symbol", "")).upper() == sym:
+            return bool(s.get("enabled"))
+    return False  # not configured -> blocked
 
 
 async def get_disabled_users() -> set:

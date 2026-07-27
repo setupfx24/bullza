@@ -34,6 +34,7 @@ class UpdateConfigRequest(BaseModel):
     enabled: Optional[bool] = None            # trading / webhook on-off
     terminal_enabled: Optional[bool] = None   # user-side terminal visibility
     slabs: Optional[list[dict[str, Any]]] = None
+    strategies: Optional[list[dict[str, Any]]] = None  # per-symbol on/off
     regenerate_secret: bool = False
     webhook_base: Optional[str] = None
 
@@ -56,6 +57,7 @@ async def update_config(
     return await svc.update_config(
         db, admin_id=admin.id, ip_address=_ip(request),
         enabled=body.enabled, terminal_enabled=body.terminal_enabled, slabs=body.slabs,
+        strategies=body.strategies,
         regenerate_secret=body.regenerate_secret, webhook_base=body.webhook_base,
     )
 
