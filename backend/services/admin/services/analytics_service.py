@@ -461,9 +461,18 @@ async def finance_overview(db: AsyncSession, start_date=None, end_date=None) -> 
         ), Transaction.created_at), Transaction.account_id)
     )).scalar() or 0))
 
-    ib_commission = float((await db.execute(
-        _xu(_dr(select(func.coalesce(func.sum(IBCommission.amount), 0)), IBCommission.created_at), IBCommission.source_user_id)
-    )).scalar() or 0)
+    # Also drop IB commissions sourced from an excluded (demo/promo) account
+    # trade — a real user's DEMO-account trades must not earn commission in the
+    # company figures (client 2026-07-27). source_trade_id is the trader's
+    # Order id; NULL/non-trade sources are kept.
+    ib_q = _xu(_dr(select(func.coalesce(func.sum(IBCommission.amount), 0)), IBCommission.created_at), IBCommission.source_user_id)
+    if excl_acct_ids:
+        _excl_order_ids = select(Order.id).where(Order.account_id.in_(excl_acct_ids))
+        ib_q = ib_q.where(or_(
+            IBCommission.source_trade_id.is_(None),
+            IBCommission.source_trade_id.notin_(_excl_order_ids),
+        ))
+    ib_commission = float((await db.execute(ib_q)).scalar() or 0)
     referral_commission = abs(float((await db.execute(
         _xu(_dr(select(func.coalesce(func.sum(Transaction.amount), 0)).where(
             Transaction.type.in_(["referral_commission", "ib_referral_bounty"]),
