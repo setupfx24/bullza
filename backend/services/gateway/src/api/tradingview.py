@@ -59,12 +59,12 @@ async def tradingview_webhook(
 
     action = str(payload.get("action") or "").lower().strip()
     symbol = str(payload.get("symbol") or payload.get("ticker") or "").upper().strip()
-    if not symbol:
-        raise HTTPException(status_code=400, detail="symbol required")
     ext = payload.get("id") or payload.get("alert_id")
     ext = str(ext) if ext not in (None, "") else None
 
     # ── CLOSE ──────────────────────────────────────────────────────────────
+    # A close alert usually carries only an id (no symbol) — close by id; fall
+    # back to closing every open signal on the symbol when no id is given.
     if action in ("close", "exit", "flat", "sell_close", "buy_close"):
         close_id = payload.get("close_id") or payload.get("id")
         if close_id:
@@ -72,11 +72,13 @@ async def tradingview_webhook(
                 AiStationSignal.status == "open",
                 AiStationSignal.external_id == str(close_id),
             )
-        else:
+        elif symbol:
             q = select(AiStationSignal).where(
                 AiStationSignal.status == "open",
                 AiStationSignal.symbol == symbol,
             )
+        else:
+            raise HTTPException(status_code=400, detail="close needs an 'id' or 'symbol'")
         sigs = list((await db.execute(q)).scalars().all())
         total = 0
         for s in sigs:
@@ -85,6 +87,8 @@ async def tradingview_webhook(
         return {"status": "ok", "signals_closed": len(sigs), "trades_closed": total}
 
     # ── OPEN ───────────────────────────────────────────────────────────────
+    if not symbol:
+        raise HTTPException(status_code=400, detail="symbol required")
     side = action if action in ("buy", "sell") else str(payload.get("side") or "").lower().strip()
     if side not in ("buy", "sell"):
         raise HTTPException(status_code=400, detail="side must be 'buy' or 'sell'")
