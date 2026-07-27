@@ -42,6 +42,22 @@ PROTECTED_EMAILS = {
     "sahunami843525@gmail.com",     # Kamni Sahu (also promotional)
 }
 
+# Only these accounts are BLANKED (email + "Promotional" badge only) in the
+# admin Users list & detail. Every OTHER is_promotional-flagged account is a
+# showcase/seed account we keep OUT of the company money figures but still show
+# NORMALLY here — the is_promotional flag doubles as a "keep out of the
+# financial figures" marker, and the badge is reserved for these two genuine
+# promotional accounts only. (client 2026-07-27)
+PROMO_BADGE_EMAILS = {
+    "amardeepsonar2001@gmail.com",  # Amardeep (Amar)
+    "prospertech.pro@gmail.com",    # ProsperTech
+}
+
+
+def _is_badge_promo(user: User) -> bool:
+    """True only for the genuine promotional accounts shown as badge-only."""
+    return (user.email or "").strip().lower() in PROMO_BADGE_EMAILS
+
 
 def _assert_deletable(user: User) -> None:
     """Raise 403 if this user is protected from deletion (hard or soft):
@@ -271,10 +287,11 @@ async def list_users(
 
     user_list = []
     for u in users:
-        # Promotional accounts: show ONLY the email + the promotional flag.
-        # Everything else (name, balances, KYC, status) is blanked so no
-        # fabricated showcase data leaks into the admin panel.
-        if bool(getattr(u, "is_promotional", False)):
+        # Only the two genuine promotional accounts (PROMO_BADGE_EMAILS) show as
+        # email + badge with everything else blanked. Other is_promotional
+        # showcase/seed accounts are shown NORMALLY below — they're kept out of
+        # the money figures via the flag, but the admin still sees them here.
+        if _is_badge_promo(u):
             user_list.append({
                 "id": str(u.id),
                 "name": "",
@@ -325,10 +342,11 @@ async def get_user_detail(user_id: uuid.UUID, db: AsyncSession):
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    # Promotional accounts expose ONLY their email + the promotional flag —
+    # Only the two genuine promotional accounts expose ONLY their email —
     # no accounts, balances, deposits, trades, referrals or profile data
-    # (client 2026-07-11). Blank the optional PII fields and return zeros.
-    if bool(getattr(user, "is_promotional", False)):
+    # (client 2026-07-11). Other showcase/seed accounts (is_promotional but not
+    # badged) return their full detail normally. Blank the PII + return zeros.
+    if _is_badge_promo(user):
         blank = _user_to_out(user)
         for field in ("phone", "first_name", "last_name", "date_of_birth",
                       "country", "address", "language", "theme",
@@ -392,8 +410,12 @@ async def get_user_detail(user_id: uuid.UUID, db: AsyncSession):
         if rm:
             assigned_rm_name = f"{rm.first_name or ''} {rm.last_name or ''}".strip() or rm.email
 
+    # Non-badge showcase accounts reach here — never surface the promotional
+    # badge for them (they're only flagged to stay out of the money figures).
+    _out = _user_to_out(user)
+    _out["is_promotional"] = _is_badge_promo(user)
     return UserDetailOut(
-        user=UserOut(**_user_to_out(user)),
+        user=UserOut(**_out),
         accounts=[TradingAccountOut(**_account_to_out(a)) for a in accounts],
         total_deposit=total_deposit,
         total_withdrawal=total_withdrawal,
