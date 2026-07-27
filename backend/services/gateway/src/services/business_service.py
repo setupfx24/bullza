@@ -598,15 +598,27 @@ async def ib_referrals(user_id: UUID, page: int, per_page: int, db: AsyncSession
     if not profile:
         raise HTTPException(status_code=404, detail="IB profile not found")
 
+    # Promotional/demo referred users are showcase accounts — never list them
+    # among a (Super) IB's affiliates (client 2026-07-27).
+    _excl_referred = select(User.id).where(
+        or_(User.is_promotional == True, User.is_demo == True)  # noqa: E712
+    )
+
     count_result = await db.execute(
-        select(func.count()).select_from(Referral).where(Referral.ib_profile_id == profile.id)
+        select(func.count()).select_from(Referral).where(
+            Referral.ib_profile_id == profile.id,
+            Referral.referred_id.notin_(_excl_referred),
+        )
     )
     total = count_result.scalar()
 
     result = await db.execute(
         select(Referral, User.email, User.first_name, User.last_name, User.created_at)
         .join(User, Referral.referred_id == User.id)
-        .where(Referral.ib_profile_id == profile.id)
+        .where(
+            Referral.ib_profile_id == profile.id,
+            Referral.referred_id.notin_(_excl_referred),
+        )
         .order_by(Referral.created_at.desc())
         .offset((page - 1) * per_page).limit(per_page)
     )
