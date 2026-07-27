@@ -42,23 +42,6 @@ PROTECTED_EMAILS = {
     "sahunami843525@gmail.com",     # Kamni Sahu (also promotional)
 }
 
-# Only these accounts are BLANKED (email + "Promotional" badge only) in the
-# admin Users list & detail. Every OTHER is_promotional-flagged account is a
-# showcase/seed account we keep OUT of the company money figures but still show
-# NORMALLY here — the is_promotional flag doubles as a "keep out of the
-# financial figures" marker, and the badge is reserved for these two genuine
-# promotional accounts only. (client 2026-07-27)
-PROMO_BADGE_EMAILS = {
-    "amardeepsonar2001@gmail.com",  # Amardeep (Amar)
-    "prospertech.pro@gmail.com",    # ProsperTech
-}
-
-
-def _is_badge_promo(user: User) -> bool:
-    """True only for the genuine promotional accounts shown as badge-only."""
-    return (user.email or "").strip().lower() in PROMO_BADGE_EMAILS
-
-
 def _assert_deletable(user: User) -> None:
     """Raise 403 if this user is protected from deletion (hard or soft):
     super_admin, any promotional account, or a named anchor account."""
@@ -224,19 +207,22 @@ async def list_users(
     # terminated and was leaking into the customer Users list (client
     # 2026-07-16). Exclude anyone who has an Employee row, active or not.
     employee_ids_sq = select(Employee.user_id)
-    # Hide the promotional referral network from the admin Users list: only the
-    # two genuine promotional accounts (PROMO_BADGE_EMAILS) appear here as a
-    # badge; their showcase/referral downline (every OTHER is_promotional
-    # account) is hidden entirely — admin must see ONLY the two promo accounts,
-    # not their referred users. Real customers are unaffected. (client 2026-07-27)
-    badge_emails_lc = [e.lower() for e in PROMO_BADGE_EMAILS]
+    # Promotional accounts DO appear in the admin Users list — each as a
+    # "Promotional" badge with its data blanked (serialization below) — BUT
+    # their referral downline is hidden: any promotional account that was
+    # referred by ANOTHER promotional account is dropped entirely. So the admin
+    # sees the top-level promotional/showcase accounts (roots, or referred by a
+    # real IB) as badges, and never their fabricated referred users. Real
+    # customers are unaffected. (client 2026-07-27)
+    promo_ids_sq = select(User.id).where(User.is_promotional == True)  # noqa: E712
     query = select(User).where(
         User.role.notin_(["admin", "super_admin"]),
         User.id.notin_(employee_ids_sq),
         User.is_demo == False,
         or_(
-            User.is_promotional == False,
-            func.lower(User.email).in_(badge_emails_lc),
+            User.is_promotional == False,                    # real users: always shown
+            User.referred_by_user_id.is_(None),              # promotional root: badge
+            User.referred_by_user_id.notin_(promo_ids_sq),   # referrer not promotional: badge
         ),
     )
 
@@ -297,11 +283,11 @@ async def list_users(
 
     user_list = []
     for u in users:
-        # Only the two genuine promotional accounts (PROMO_BADGE_EMAILS) show as
-        # email + badge with everything else blanked. Other is_promotional
-        # showcase/seed accounts are shown NORMALLY below — they're kept out of
-        # the money figures via the flag, but the admin still sees them here.
-        if _is_badge_promo(u):
+        # Promotional accounts (only the top-level ones reach here; the referral
+        # downline was filtered out by the query above) show as email + a
+        # "Promotional" badge, with name/balances/KYC/status blanked so no
+        # fabricated showcase data leaks into the admin panel.
+        if bool(getattr(u, "is_promotional", False)):
             user_list.append({
                 "id": str(u.id),
                 "name": "",
