@@ -224,10 +224,20 @@ async def list_users(
     # terminated and was leaking into the customer Users list (client
     # 2026-07-16). Exclude anyone who has an Employee row, active or not.
     employee_ids_sq = select(Employee.user_id)
+    # Hide the promotional referral network from the admin Users list: only the
+    # two genuine promotional accounts (PROMO_BADGE_EMAILS) appear here as a
+    # badge; their showcase/referral downline (every OTHER is_promotional
+    # account) is hidden entirely — admin must see ONLY the two promo accounts,
+    # not their referred users. Real customers are unaffected. (client 2026-07-27)
+    badge_emails_lc = [e.lower() for e in PROMO_BADGE_EMAILS]
     query = select(User).where(
         User.role.notin_(["admin", "super_admin"]),
         User.id.notin_(employee_ids_sq),
         User.is_demo == False,
+        or_(
+            User.is_promotional == False,
+            func.lower(User.email).in_(badge_emails_lc),
+        ),
     )
 
     if search:
@@ -342,11 +352,11 @@ async def get_user_detail(user_id: uuid.UUID, db: AsyncSession):
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    # Only the two genuine promotional accounts expose ONLY their email —
-    # no accounts, balances, deposits, trades, referrals or profile data
-    # (client 2026-07-11). Other showcase/seed accounts (is_promotional but not
-    # badged) return their full detail normally. Blank the PII + return zeros.
-    if _is_badge_promo(user):
+    # Promotional accounts (the 2 badge accounts AND any hidden showcase/
+    # referral account) expose ONLY their email — no accounts, balances,
+    # deposits, trades, referrals or profile data (client 2026-07-11). Blank
+    # the optional PII fields and return zeros.
+    if bool(getattr(user, "is_promotional", False)):
         blank = _user_to_out(user)
         for field in ("phone", "first_name", "last_name", "date_of_birth",
                       "country", "address", "language", "theme",
@@ -410,12 +420,8 @@ async def get_user_detail(user_id: uuid.UUID, db: AsyncSession):
         if rm:
             assigned_rm_name = f"{rm.first_name or ''} {rm.last_name or ''}".strip() or rm.email
 
-    # Non-badge showcase accounts reach here — never surface the promotional
-    # badge for them (they're only flagged to stay out of the money figures).
-    _out = _user_to_out(user)
-    _out["is_promotional"] = _is_badge_promo(user)
     return UserDetailOut(
-        user=UserOut(**_out),
+        user=UserOut(**_user_to_out(user)),
         accounts=[TradingAccountOut(**_account_to_out(a)) for a in accounts],
         total_deposit=total_deposit,
         total_withdrawal=total_withdrawal,
