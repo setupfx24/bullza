@@ -3,12 +3,12 @@ from decimal import Decimal
 from uuid import UUID
 
 from fastapi import HTTPException
-from sqlalchemy import select, func, text
+from sqlalchemy import select, func, text, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from packages.common.src.models import (
     IBProfile, IBApplication, IBCommission, IBCommissionPlan,
-    Referral, User, TradingAccount, Deposit, Transaction,
+    Referral, User, TradingAccount, Deposit, Transaction, Order,
 )
 from packages.common.src.settings_store import get_float_setting
 
@@ -393,19 +393,36 @@ async def ib_dashboard(user_id: UUID, db: AsyncSession) -> dict:
 
     ib_type = await _resolve_ib_type(db, profile)
 
+    # Demo-account commissions must never show/count for the IB (client
+    # 2026-07-27: "demo account ka commission nahi dikhna chahiye"). Commission
+    # source_trade_id is the trader's Order id, so drop every commission whose
+    # source order sits on a demo account. NULL/non-trade source ids are kept.
+    _demo_order_ids = (
+        select(Order.id)
+        .join(TradingAccount, TradingAccount.id == Order.account_id)
+        .where(TradingAccount.is_demo == True)  # noqa: E712
+    )
+    _not_demo_comm = or_(
+        IBCommission.source_trade_id.is_(None),
+        IBCommission.source_trade_id.notin_(_demo_order_ids),
+    )
+
     referral_count = await db.execute(
         select(func.count()).select_from(Referral).where(Referral.ib_profile_id == profile.id)
     )
     total_referrals = referral_count.scalar()
 
     total_commission = await db.execute(
-        select(func.coalesce(func.sum(IBCommission.amount), 0)).where(IBCommission.ib_id == profile.id)
+        select(func.coalesce(func.sum(IBCommission.amount), 0)).where(
+            IBCommission.ib_id == profile.id, _not_demo_comm,
+        )
     )
     total_comm = total_commission.scalar()
 
     pending_comm = await db.execute(
         select(func.coalesce(func.sum(IBCommission.amount), 0)).where(
             IBCommission.ib_id == profile.id, IBCommission.status == "pending",
+            _not_demo_comm,
         )
     )
     pending = pending_comm.scalar()
@@ -469,7 +486,7 @@ async def ib_dashboard(user_id: UUID, db: AsyncSession) -> dict:
             func.count(IBCommission.id).label("count"),
         )
         .join(_U, _U.id == IBCommission.source_user_id)
-        .where(IBCommission.ib_id == profile.id)
+        .where(IBCommission.ib_id == profile.id, _not_demo_comm)
         .group_by(IBCommission.source_user_id, _U.first_name, _U.last_name, _U.email)
         .order_by(func.sum(IBCommission.amount).desc())
         .limit(100)
