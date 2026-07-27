@@ -184,6 +184,7 @@ async def list_users(
     group_id: str | None, db: AsyncSession,
     date_from: str | None = None,
     date_to:   str | None = None,
+    promo_filter: str | None = None,
 ) -> dict:
     from datetime import datetime, time, timezone
 
@@ -219,12 +220,24 @@ async def list_users(
         User.role.notin_(["admin", "super_admin"]),
         User.id.notin_(employee_ids_sq),
         User.is_demo == False,
-        or_(
+    )
+    # Promotional filter (client 2026-07-27): the admin can pull up the whole
+    # promotional network in one view.
+    #   • "promotional" → EVERY promotional account, INCLUDING the referral
+    #     downline that the default view hides (audit view).
+    #   • "real"        → only non-promotional (real) users.
+    #   • default       → real users + top-level promotional (badge); the
+    #     promotional downline (referred by another promo account) is hidden.
+    if promo_filter == "promotional":
+        query = query.where(User.is_promotional == True)  # noqa: E712
+    elif promo_filter == "real":
+        query = query.where(User.is_promotional == False)  # noqa: E712
+    else:
+        query = query.where(or_(
             User.is_promotional == False,                    # real users: always shown
             User.referred_by_user_id.is_(None),              # promotional root: badge
             User.referred_by_user_id.notin_(promo_ids_sq),   # referrer not promotional: badge
-        ),
-    )
+        ))
 
     if search:
         term = f"%{search}%"

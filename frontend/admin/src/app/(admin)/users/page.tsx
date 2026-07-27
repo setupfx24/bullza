@@ -194,6 +194,7 @@ export default function UsersPage() {
   const [statusFilter, setStatusFilter] = useState('');
   const [kycFilter, setKycFilter] = useState('');
   const [groupFilter, setGroupFilter] = useState('');
+  const [promoFilter, setPromoFilter] = useState('');
   // Created-at date range. Empty strings = no filter (default — show all).
   // Backend: created_at between [date_from 00:00 UTC, date_to 23:59:59 UTC].
   const [dateFrom, setDateFrom] = useState('');
@@ -274,6 +275,7 @@ export default function UsersPage() {
       if (debouncedSearch) params.search = debouncedSearch;
       if (statusFilter) params.status = statusFilter;
       if (kycFilter) params.kyc_status = kycFilter;
+      if (promoFilter) params.promo = promoFilter;
       if (dateFrom) params.date_from = dateFrom;
       if (dateTo) params.date_to = dateTo;
       const data = await adminApi.get<UsersResponse>('/users', params);
@@ -285,7 +287,7 @@ export default function UsersPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, debouncedSearch, statusFilter, kycFilter, dateFrom, dateTo]);
+  }, [page, debouncedSearch, statusFilter, kycFilter, promoFilter, dateFrom, dateTo]);
 
   const applyDatePreset = (key: DatePresetKey) => {
     const [s, e] = datePresetRange(key);
@@ -644,6 +646,7 @@ export default function UsersPage() {
               { label: 'Status', value: statusFilter, onChange: (v: string) => { setStatusFilter(v); setPage(1); }, options: [{ v: '', t: 'All statuses' }, { v: 'active', t: 'Active' }, { v: 'suspended', t: 'Suspended' }, { v: 'banned', t: 'Banned' }, { v: 'terminated', t: 'Terminated' }, { v: 'deleted', t: 'Soft-deleted' }, { v: 'pending', t: 'Pending' }] },
               { label: 'KYC', value: kycFilter, onChange: (v: string) => { setKycFilter(v); setPage(1); }, options: [{ v: '', t: 'All KYC' }, { v: 'verified', t: 'Verified' }, { v: 'pending', t: 'Pending' }, { v: 'rejected', t: 'Rejected' }] },
               { label: 'Group', value: groupFilter, onChange: setGroupFilter, options: [{ v: '', t: 'All groups' }, { v: 'Retail', t: 'Retail' }, { v: 'IB', t: 'IB' }, { v: 'VIP', t: 'VIP' }] },
+              { label: 'Promotional', value: promoFilter, onChange: (v: string) => { setPromoFilter(v); setPage(1); }, options: [{ v: '', t: 'All accounts' }, { v: 'promotional', t: 'Promotional only' }, { v: 'real', t: 'Real only' }] },
             ] as const).map(f => (
               <div key={f.label}>
                 <label className="block text-xs font-medium text-text-tertiary mb-1.5">{f.label}</label>
