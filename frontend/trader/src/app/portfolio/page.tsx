@@ -791,19 +791,19 @@ function PortfolioPageContent() {
                   <div className="rounded-xl border border-border-glass bg-bg-secondary/30 p-3">
                     <div className="text-[10px] uppercase tracking-wide text-text-tertiary">Total charges</div>
                     <div className="text-lg font-mono font-bold text-sell tabular-nums mt-0.5">
-                      {chTotals ? `$${fmt(chTotals.charges)}` : '—'}
+                      {chTotals ? fmt(chTotals.charges) : '—'}
                     </div>
                   </div>
                   <div className="rounded-xl border border-border-glass bg-bg-secondary/30 p-3">
                     <div className="text-[10px] uppercase tracking-wide text-text-tertiary">Commission</div>
                     <div className="text-sm font-mono text-text-primary tabular-nums mt-0.5">
-                      {chTotals ? `$${fmt(chTotals.commission)}` : '—'}
+                      {chTotals ? fmt(chTotals.commission) : '—'}
                     </div>
                   </div>
                   <div className="rounded-xl border border-border-glass bg-bg-secondary/30 p-3">
                     <div className="text-[10px] uppercase tracking-wide text-text-tertiary">Swap</div>
                     <div className="text-sm font-mono text-text-primary tabular-nums mt-0.5">
-                      {chTotals ? `$${fmt(chTotals.swap)}` : '—'}
+                      {chTotals ? fmt(chTotals.swap) : '—'}
                     </div>
                   </div>
                   <div className="rounded-xl border border-border-glass bg-bg-secondary/30 p-3">
