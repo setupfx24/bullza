@@ -455,7 +455,10 @@ async def list_masters(page: int, per_page: int, db: AsyncSession) -> dict:
         copy_trades_q = await db.execute(
             select(func.count(CopyTrade.id)).where(
                 CopyTrade.investor_allocation_id.in_(
-                    select(InvestorAllocation.id).where(InvestorAllocation.master_id == m.id)
+                    select(InvestorAllocation.id).where(
+                        InvestorAllocation.master_id == m.id,
+                        InvestorAllocation.investor_user_id.notin_(_promo_demo_user_ids()),
+                    )
                 )
             )
         )

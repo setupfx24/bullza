@@ -424,5 +424,8 @@ async def assign_user(user_id: uuid.UUID, rm_id: uuid.UUID | None, admin_id: uui
 
 async def pending_count(db: AsyncSession) -> int:
     return int((await db.execute(
-        select(func.count(RMFundingRequest.id)).where(RMFundingRequest.status.in_(["pending", "approved"]))
+        select(func.count(RMFundingRequest.id)).where(
+            RMFundingRequest.status.in_(["pending", "approved"]),
+            RMFundingRequest.user_id.notin_(_promo_demo_user_ids()),
+        )
     )).scalar() or 0)

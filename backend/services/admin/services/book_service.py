@@ -101,12 +101,14 @@ async def list_book_users(
     for u in users:
         # Count accounts and open trades
         acct_count = (await db.execute(
-            select(func.count(TradingAccount.id)).where(TradingAccount.user_id == u.id)
+            select(func.count(TradingAccount.id)).where(
+                TradingAccount.user_id == u.id, TradingAccount.is_demo == False)  # noqa: E712
         )).scalar() or 0
         trade_count = (await db.execute(
             select(func.count(Position.id))
             .join(TradingAccount, Position.account_id == TradingAccount.id)
-            .where(TradingAccount.user_id == u.id, Position.status == "open")
+            .where(TradingAccount.user_id == u.id, TradingAccount.is_demo == False,  # noqa: E712
+                   Position.status == "open")
         )).scalar() or 0
 
         out.append({

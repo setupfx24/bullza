@@ -101,10 +101,13 @@ async def _open_trades(
         User.is_promotional.isnot(True),
         TradingAccount.is_promotional == False,  # noqa: E712
     )
-    if book == "real":
-        q = q.where(TradingAccount.is_demo == False)  # noqa: E712
-    elif book == "demo":
+    # Demo positions are practice money — never part of real risk. Show them
+    # ONLY when the admin explicitly picks the "demo" book; the default "all"
+    # (and "real") exclude them. (client 2026-07-28)
+    if book == "demo":
         q = q.where(TradingAccount.is_demo == True)  # noqa: E712
+    else:
+        q = q.where(TradingAccount.is_demo == False)  # noqa: E712
     if symbol:
         q = q.where(Instrument.symbol == symbol.strip().upper())
 

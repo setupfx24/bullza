@@ -86,6 +86,7 @@ async def get_company_ib(db: AsyncSession) -> dict:
     n = (await db.execute(
         select(func.count()).select_from(Referral).where(
             Referral.ib_profile_id == ib_row.id,
+            Referral.referred_id.notin_(_promo_ids()),
         )
     )).scalar() or 0
 
@@ -214,7 +215,7 @@ async def referral_program_overview(
 
     total_paid = (await db.execute(
         select(func.coalesce(func.sum(Transaction.amount), 0))
-        .where(Transaction.type == "referral_commission")
+        .where(Transaction.type == "referral_commission", Transaction.user_id.notin_(_promo_ids()))
     )).scalar() or 0
 
     total_payouts = (await db.execute(
@@ -224,7 +225,7 @@ async def referral_program_overview(
 
     total_referred_users = (await db.execute(
         select(func.count()).select_from(User)
-        .where(User.referred_by_user_id.is_not(None), User.is_promotional.isnot(True))
+        .where(User.referred_by_user_id.is_not(None), User.id.notin_(_promo_ids()))
     )).scalar() or 0
 
     # Top 5 referrers by total commission earned.
@@ -433,7 +434,10 @@ async def list_ib_agents(page: int, per_page: int, db: AsyncSession):
         user = user_q.scalar_one_or_none()
 
         ref_count_q = await db.execute(
-            select(func.count(Referral.id)).where(Referral.ib_profile_id == p.id)
+            select(func.count(Referral.id)).where(
+                Referral.ib_profile_id == p.id,
+                Referral.referred_id.notin_(_promo_ids()),
+            )
         )
         ref_count = ref_count_q.scalar() or 0
 
@@ -902,7 +906,8 @@ async def reject_sub_broker(
 
 async def list_sub_brokers(page: int, per_page: int, db: AsyncSession):
     query = select(User).where(
-        User.role == "sub_broker", User.status == "active", User.is_promotional.isnot(True),
+        User.role == "sub_broker", User.status == "active",
+        User.id.notin_(_promo_ids()),
     )
     count_q = select(func.count()).select_from(query.subquery())
     total = (await db.execute(count_q)).scalar() or 0
@@ -919,7 +924,10 @@ async def list_sub_brokers(page: int, per_page: int, db: AsyncSession):
         ref_count = 0
         total_earned = 0.0
         if profile:
-            rc = await db.execute(select(func.count(Referral.id)).where(Referral.ib_profile_id == profile.id))
+            rc = await db.execute(select(func.count(Referral.id)).where(
+                Referral.ib_profile_id == profile.id,
+                Referral.referred_id.notin_(_promo_ids()),
+            ))
             ref_count = rc.scalar() or 0
             total_earned = float(profile.total_earned or 0)
 
@@ -1097,7 +1105,7 @@ async def get_unassigned_users(page: int, per_page: int, db: AsyncSession) -> di
     query = select(User).where(
         User.role.notin_(["ib", "sub_broker", "admin", "super_admin", "employee"]),
         not_(User.id.in_(subq)),
-        User.is_promotional.isnot(True),
+        User.id.notin_(_promo_ids()),
     )
     total = (await db.execute(select(func.count()).select_from(query.subquery()))).scalar() or 0
     result = await db.execute(
@@ -1142,7 +1150,7 @@ async def get_ib_referrals(ib_id: uuid.UUID, page: int, per_page: int, db: Async
         from packages.common.src.models import Position, TradingAccount
         trade_count = (await db.execute(
             select(func.count(Position.id)).join(TradingAccount, Position.account_id == TradingAccount.id)
-            .where(TradingAccount.user_id == user.id)
+            .where(TradingAccount.user_id == user.id, TradingAccount.is_demo == False)  # noqa: E712
         )).scalar() or 0
         comm = (await db.execute(
             select(func.coalesce(func.sum(IBCommission.amount), 0))

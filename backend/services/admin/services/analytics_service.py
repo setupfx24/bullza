@@ -146,7 +146,7 @@ async def analytics_dashboard(
     dep_q = await db.execute(
         select(func.coalesce(func.sum(Deposit.amount), 0)).where(
             Deposit.status.in_(["approved", "auto_approved"]),
-            Deposit.user_id.notin_(promo_ids),
+            Deposit.user_id.notin_(promo_demo_user_ids),
         )
     )
     total_deposits = float(dep_q.scalar() or 0)
@@ -154,7 +154,7 @@ async def analytics_dashboard(
     wd_q = await db.execute(
         select(func.coalesce(func.sum(Withdrawal.amount), 0)).where(
             Withdrawal.status.in_(["approved", "completed"]),
-            Withdrawal.user_id.notin_(promo_ids),
+            Withdrawal.user_id.notin_(promo_demo_user_ids),
         )
     )
     total_withdrawals = float(wd_q.scalar() or 0)
@@ -207,19 +207,20 @@ async def analytics_dashboard(
         )
     )
 
-    promo_ib_ids = select(IBProfile.id).where(IBProfile.user_id.in_(promo_ids))
+    promo_ib_ids = select(IBProfile.id).where(IBProfile.user_id.in_(promo_demo_user_ids))
 
     ib_count_q = await db.execute(
         select(func.count(IBProfile.id)).where(
             IBProfile.is_active == True,  # noqa: E712
-            IBProfile.user_id.notin_(promo_ids),
+            IBProfile.user_id.notin_(promo_demo_user_ids),
         )
     )
     total_ibs = ib_count_q.scalar() or 0
 
     sub_broker_q = await db.execute(
         select(func.count(User.id)).where(
-            User.role == "sub_broker", User.status == "active", User.is_promotional.isnot(True),
+            User.role == "sub_broker", User.status == "active",
+            User.is_promotional.isnot(True), User.is_demo.isnot(True),
         )
     )
     total_sub_brokers = sub_broker_q.scalar() or 0

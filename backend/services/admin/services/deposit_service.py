@@ -16,9 +16,11 @@ from dependencies import write_audit_log
 
 
 def _not_promo(user_id_col):
-    """Filter expression: exclude rows owned by a promotional demo account so
-    they never surface in admin listings."""
-    return user_id_col.notin_(select(User.id).where(User.is_promotional == True))  # noqa: E712
+    """Filter expression: exclude rows owned by a promotional OR demo account so
+    they never surface in admin listings (deposits/withdrawals are user-scoped)."""
+    return user_id_col.notin_(select(User.id).where(
+        or_(User.is_promotional == True, User.is_demo == True)  # noqa: E712
+    ))
 
 
 def _deposit_to_out(d: Deposit, user: User = None) -> DepositOut:
