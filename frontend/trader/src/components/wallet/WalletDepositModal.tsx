@@ -294,12 +294,12 @@ function DepositBody({
         const cur = (deposit.pay_currency || '').toLowerCase();
         const isStable = ['usdt', 'usdc', 'dai', 'busd', 'tusd'].some(s => cur.startsWith(s));
         const payNum = Number(deposit.pay_amount) || 0;
-        const feeUsd = isStable ? Math.max(0, payNum - amountUsd) : null;
+        const feeUsd = isStable ? Math.max(0, payNum - deposit.amount_usd) : null;
         return (
           <div className="rounded-lg border border-border-primary bg-bg-base p-3 space-y-1.5 text-xs">
             <div className="flex items-center justify-between">
               <span className="text-text-tertiary">You&apos;ll be credited</span>
-              <span className="text-buy font-semibold tabular-nums">${amountUsd.toFixed(2)}</span>
+              <span className="text-buy font-semibold tabular-nums">${deposit.amount_usd.toFixed(2)}</span>
             </div>
             {feeUsd !== null && (
               <div className="flex items-center justify-between">
