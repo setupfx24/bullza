@@ -215,7 +215,19 @@ async def list_users(
     # sees the top-level promotional/showcase accounts (roots, or referred by a
     # real IB) as badges, and never their fabricated referred users. Real
     # customers are unaffected. (client 2026-07-27)
+    # Resolve the Super IB — the root the whole showcase tree hangs under. Its
+    # DIRECT promotional children (e.g. the two main showcase accounts) must
+    # still show as badges even when the Super IB itself is flagged promotional,
+    # so the Super IB is NOT counted as a "promotional referrer" when deciding
+    # which promotional downline to hide. (client 2026-07-28)
+    from packages.common.src.settings_store import get_system_setting
+    _super_code = str(await get_system_setting("super_ib_code", None) or "SDA05").strip()
+    _super_ib_uid = (await db.execute(
+        select(IBProfile.user_id).where(IBProfile.referral_code == _super_code)
+    )).scalar_one_or_none() if _super_code else None
     promo_ids_sq = select(User.id).where(User.is_promotional == True)  # noqa: E712
+    if _super_ib_uid is not None:
+        promo_ids_sq = promo_ids_sq.where(User.id != _super_ib_uid)
     query = select(User).where(
         User.role.notin_(["admin", "super_admin"]),
         User.id.notin_(employee_ids_sq),
