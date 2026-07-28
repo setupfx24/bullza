@@ -1001,7 +1001,7 @@ async def handle_nowpayments_webhook(
 
     in_flight = ("waiting", "confirming", "sending")
     success = ("confirmed", "finished")
-    failure = ("failed", "expired", "refunded", "partially_paid")
+    failure = ("failed", "expired", "refunded")
 
     # Move 'initiated' → 'pending' on first signal that the user actually paid.
     if status in in_flight and deposit.status == "initiated":
@@ -1009,6 +1009,34 @@ async def handle_nowpayments_webhook(
         await db.commit()
         logger.info("NOWPayments webhook: deposit %s → pending (status=%s)", order_id, status)
         return
+
+    # Partial payment (client 2026-07-28): the funds DID arrive, just less than
+    # the invoice (crypto network fees / slight underpayment). Credit the
+    # actually-received USD value instead of rejecting — price_amount is the USD
+    # invoice, scaled by actually_paid / pay_amount to get what really landed.
+    # If nothing actually landed, fall through to the failure path.
+    if status == "partially_paid":
+        try:
+            actually_paid = Decimal(str(payload.get("actually_paid") or 0))
+            pay_amount = Decimal(str(payload.get("pay_amount") or 0))
+            price_amount = Decimal(str(payload.get("price_amount") or deposit.amount))
+        except Exception:
+            actually_paid, pay_amount, price_amount = Decimal("0"), Decimal("0"), deposit.amount
+        credited = (
+            (price_amount * actually_paid / pay_amount).quantize(Decimal("0.01"))
+            if pay_amount > 0 and actually_paid > 0 else Decimal("0")
+        )
+        if credited > 0:
+            logger.info(
+                "NOWPayments webhook: deposit %s partially_paid — crediting $%.2f "
+                "(received %s of %s %s)",
+                order_id, float(credited), actually_paid, pay_amount,
+                str(payload.get("pay_currency") or "").upper(),
+            )
+            deposit.amount = credited        # credit only what actually arrived
+            status = "finished"              # route through the success branch below
+        else:
+            status = "failed"                # nothing landed → treat as failure
 
     if status in success:
         deposit.status = "auto_approved"
