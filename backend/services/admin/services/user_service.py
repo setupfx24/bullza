@@ -1,6 +1,6 @@
 """Admin User Service — user listing, detail, fund/credit ops, ban, kill switch, login-as."""
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 import jwt
@@ -657,13 +657,31 @@ async def add_fund(
     old_balance = user_row.main_wallet_balance or Decimal("0")
     user_row.main_wallet_balance = old_balance + amt
 
+    # Admin "Add Fund" is a DEPOSIT (client 2026-07-28): record an approved
+    # Deposit + a type="deposit" transaction — exactly like a real/RM deposit —
+    # so it shows in the admin Deposits history AND as a "Deposit" in the user's
+    # transactions. (Bonus/credit is a separate action — see give_credit.)
+    deposit = Deposit(
+        user_id=user_id,
+        amount=amt,
+        currency="USD",
+        method="admin",
+        status="approved",
+        transaction_id=f"ADMIN-{str(admin_id)[:8]}",
+        approved_by=admin_id,
+        approved_at=datetime.now(timezone.utc),
+    )
+    db.add(deposit)
+    await db.flush()
+
     txn = Transaction(
         user_id=user_id,
         account_id=None,  # Main wallet — no trading account
-        type="adjustment",
+        type="deposit",
         amount=Decimal(str(body.amount)),
         balance_after=user_row.main_wallet_balance,
-        description=body.description or "Admin fund addition to main wallet",
+        description=body.description or "Admin fund addition (deposit)",
+        reference_id=deposit.id,
         created_by=admin_id,
     )
     db.add(txn)
