@@ -136,17 +136,20 @@ export function mergeWalletHistory(
   };
 
   const ledgerTx = ledger
+    // Deposits & withdrawals are already merged from their own lists above; the
+    // matching ledger rows would show each one a SECOND time. Drop them on the
+    // RAW backend type BEFORE mapping — mapLedgerToTransaction buckets raw
+    // 'deposit'/'withdrawal' into 'adjustment', so filtering the mapped type
+    // would miss them (this is why admin Add-Fund deposits still showed twice).
+    // (client 2026-07-28)
+    .filter((row) => {
+      const raw = (row.type || '').toLowerCase();
+      return raw !== 'deposit' && raw !== 'withdrawal';
+    })
     .map(mapLedgerToTransaction)
     // Realized trade P&L (profit/loss) belongs in the dedicated "Trades" tab,
-    // NOT the money-movement history — showing it here made the deposit/
-    // withdrawal history look like it contained trade history (client
-    // 2026-06-19). Keep transfers, bonuses, credits, fixed-return and fees;
-    // drop the per-trade P&L rows.
-    // Also drop ledger 'deposit'/'withdrawal' rows: every deposit/withdrawal is
-    // already merged from its own list above (with a matching ledger txn), so
-    // keeping them here showed each one TWICE (client 2026-07-28).
-    .filter((t) => t.type !== 'profit' && t.type !== 'loss'
-                && t.type !== 'deposit' && t.type !== 'withdrawal');
+    // NOT the money-movement history (client 2026-06-19); drop those rows.
+    .filter((t) => t.type !== 'profit' && t.type !== 'loss');
 
   const merged = [
     ...deposits.map((d) => mapRow(d, 'deposit')),
