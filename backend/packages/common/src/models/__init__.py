@@ -74,6 +74,7 @@ from .ai_station import AiStationSignal, AiStationTrade
 from .vip import VipPass
 from .share import SharedTrade
 from .rm import RMFundingRequest, RmManualRequest
+from .referral_bonus_campaign import ReferralBonusCampaign, ReferralBonusClaim
 
 
 __all__ = [
@@ -122,4 +123,6 @@ __all__ = [
     "SharedTrade",
     # rm
     "RMFundingRequest", "RmManualRequest",
+    # referral bonus campaigns
+    "ReferralBonusCampaign", "ReferralBonusClaim",
 ]

@@ -1,4 +1,5 @@
 """Admin KYC Service — document review, approval, rejection workflows."""
+import logging
 import uuid
 from datetime import datetime
 from pathlib import Path
@@ -10,7 +11,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from packages.common.src.models import User, KYCDocument
 from packages.common.src.notify import create_notification
+from packages.common.src.referral_bonus_campaign import check_and_award
 from dependencies import write_audit_log
+
+logger = logging.getLogger("kyc_service")
 
 
 async def get_kyc_file(document_id: uuid.UUID, db: AsyncSession) -> FileResponse:
@@ -229,6 +233,17 @@ async def approve_kyc(
         action_url="/profile",
         commit=False,
     )
+
+    # Referral bonus campaigns gated on KYC alone (required_trades == 0).
+    # SAVEPOINT-wrapped so a failure here can never block the KYC approval
+    # itself — a bare try/except would leave the session marked
+    # rolled-back, which then breaks the db.commit() below.
+    try:
+        async with db.begin_nested():
+            await check_and_award(db, user, event="kyc")
+    except Exception:
+        logger.exception("referral bonus campaign check failed on KYC approval")
+
     await db.commit()
 
     try:
