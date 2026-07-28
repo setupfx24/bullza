@@ -19,6 +19,29 @@ from packages.common.src.settings_store import get_float_setting
 IB_MIN_DEPOSIT_DEFAULT_USD = 100.0
 
 
+def _clean_commission_filter():
+    """WHERE clause that drops IB commissions from showcase sources — a
+    promotional/demo trader, OR a demo-account trade (a real user's demo
+    account). Reused by the IB dashboard totals, Earnings-by-Trader, and the
+    Commission History so showcase commission never surfaces anywhere.
+    Commissions with a NULL/non-trade source_trade_id are kept. (client 2026-07)"""
+    excl_users = select(User.id).where(
+        or_(User.is_promotional == True, User.is_demo == True)  # noqa: E712
+    )
+    demo_orders = (
+        select(Order.id)
+        .join(TradingAccount, TradingAccount.id == Order.account_id)
+        .where(TradingAccount.is_demo == True)  # noqa: E712
+    )
+    return and_(
+        IBCommission.source_user_id.notin_(excl_users),
+        or_(
+            IBCommission.source_trade_id.is_(None),
+            IBCommission.source_trade_id.notin_(demo_orders),
+        ),
+    )
+
+
 async def _get_ib_min_deposit_usd() -> float:
     return await get_float_setting("ib_min_deposit_usd", IB_MIN_DEPOSIT_DEFAULT_USD)
 
@@ -393,26 +416,9 @@ async def ib_dashboard(user_id: UUID, db: AsyncSession) -> dict:
 
     ib_type = await _resolve_ib_type(db, profile)
 
-    # Promotional AND demo commissions must never show/count for the IB (client
-    # 2026-07-27). Drop a commission when EITHER (a) the source trader is a
-    # promotional/demo user, or (b) its source order sits on a demo account
-    # (a real user's demo account). source_trade_id is the trader's Order id;
-    # NULL/non-trade source ids are kept.
-    _excl_comm_user_ids = select(User.id).where(
-        or_(User.is_promotional == True, User.is_demo == True)  # noqa: E712
-    )
-    _demo_order_ids = (
-        select(Order.id)
-        .join(TradingAccount, TradingAccount.id == Order.account_id)
-        .where(TradingAccount.is_demo == True)  # noqa: E712
-    )
-    _not_demo_comm = and_(
-        IBCommission.source_user_id.notin_(_excl_comm_user_ids),
-        or_(
-            IBCommission.source_trade_id.is_(None),
-            IBCommission.source_trade_id.notin_(_demo_order_ids),
-        ),
-    )
+    # Promotional AND demo commissions must never show/count for the IB
+    # (client 2026-07-27) — shared filter, see _clean_commission_filter.
+    _not_demo_comm = _clean_commission_filter()
 
     referral_count = await db.execute(
         select(func.count()).select_from(Referral).where(Referral.ib_profile_id == profile.id)
@@ -673,7 +679,10 @@ async def ib_commissions(
     if not profile:
         raise HTTPException(status_code=404, detail="IB profile not found")
 
-    base_query = select(func.count()).select_from(IBCommission).where(IBCommission.ib_id == profile.id)
+    _clean = _clean_commission_filter()
+    base_query = select(func.count()).select_from(IBCommission).where(
+        IBCommission.ib_id == profile.id, _clean,
+    )
     if status:
         base_query = base_query.where(IBCommission.status == status)
     count_result = await db.execute(base_query)
@@ -682,7 +691,7 @@ async def ib_commissions(
     query = (
         select(IBCommission, User.email, User.first_name, User.last_name)
         .join(User, IBCommission.source_user_id == User.id)
-        .where(IBCommission.ib_id == profile.id)
+        .where(IBCommission.ib_id == profile.id, _clean)
     )
     if status:
         query = query.where(IBCommission.status == status)
