@@ -426,12 +426,20 @@ async def edit_signal(db: AsyncSession, *, admin_id: UUID, ip_address: str | Non
 async def list_followers(db: AsyncSession) -> list:
     """Users participating in AI Station = holders of ACTIVE staking locks (whom
     the fan-out applies to), with their principal + AI-trade stats."""
+    # Showcase (promotional/demo) followers must not appear in the admin AI
+    # Station followers list either — only real followers. (client 2026-07-28)
+    _excl_users = select(User.id).where(
+        or_(User.is_promotional == True, User.is_demo == True)  # noqa: E712
+    )
     lock_rows = (await db.execute(
         select(
             FixedReturnLock.user_id,
             func.coalesce(func.sum(FixedReturnLock.principal), 0),
             func.count(),
-        ).where(FixedReturnLock.state == "active").group_by(FixedReturnLock.user_id)
+        ).where(
+            FixedReturnLock.state == "active",
+            FixedReturnLock.user_id.notin_(_excl_users),
+        ).group_by(FixedReturnLock.user_id)
     )).all()
     if not lock_rows:
         return []
