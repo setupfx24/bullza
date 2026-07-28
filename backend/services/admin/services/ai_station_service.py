@@ -523,9 +523,14 @@ async def summary(db: AsyncSession) -> dict:
             if t.closed_at and t.closed_at.year == now.year and t.closed_at.month == now.month:
                 realized_month += pnl
 
+    # Active principal must exclude showcase (promotional/demo) followers' locks
+    # too, so it matches the filtered trades/summary the admin sees.
     principal = float((await db.execute(
         select(func.coalesce(func.sum(FixedReturnLock.principal), 0))
-        .where(FixedReturnLock.state == "active")
+        .where(
+            FixedReturnLock.state == "active",
+            FixedReturnLock.user_id.notin_(_excl_users),
+        )
     )).scalar() or 0)
 
     monthly_pnl = realized_month + open_pnl
