@@ -47,18 +47,35 @@ async def _get_ib_min_deposit_usd() -> float:
 
 
 async def _get_user_total_deposits(user_id: UUID, db: AsyncSession) -> float:
-    """Sum lifetime approved/auto-approved deposits for a user, in USD.
-    Used as the gate for IB eligibility — a user must have demonstrably
-    funded their account before they can earn from referrals.
+    """Sum lifetime funded amount for a user, in USD — the gate for IB
+    eligibility (a user must have demonstrably funded their account before they
+    can earn from referrals).
+
+    Counts BOTH:
+      • approved / auto-approved real deposits, and
+      • admin "Add Fund" credits (positive `adjustment` transactions credited
+        by an admin) — the client treats an admin fund-add like a deposit
+        (client 2026-07-28).
+    Does NOT count bonuses or welcome credits (`type='bonus'`) — promotional
+    money must never unlock the IB program.
     """
-    result = await db.execute(
+    deposits = (await db.execute(
         select(func.coalesce(func.sum(Deposit.amount), 0))
         .where(
             Deposit.user_id == user_id,
             Deposit.status.in_(["approved", "auto_approved"]),
         )
-    )
-    return float(result.scalar() or 0)
+    )).scalar() or 0
+    admin_fund = (await db.execute(
+        select(func.coalesce(func.sum(Transaction.amount), 0))
+        .where(
+            Transaction.user_id == user_id,
+            Transaction.type == "adjustment",
+            Transaction.amount > 0,
+            Transaction.created_by.isnot(None),
+        )
+    )).scalar() or 0
+    return float(deposits) + float(admin_fund)
 
 
 def _get_frontend_url() -> str:
