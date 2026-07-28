@@ -249,21 +249,33 @@ async def list_signals(db: AsyncSession, *, status=None, limit=100, offset=0) ->
     if not rows:
         return []
 
-    # Total P&L per signal = sum of every user copy's P&L (live for open ones).
+    # Total P&L per signal = sum of every REAL user copy's P&L (live for open
+    # ones). Showcase (promotional/demo) followers' copies are excluded so the
+    # "P&L (all users)" and fan-out shown to the admin reflect only real users.
+    # (client 2026-07-28)
+    _excl_users = select(User.id).where(
+        or_(User.is_promotional == True, User.is_demo == True)  # noqa: E712
+    )
     sig_ids = [s.id for s in rows]
     children = list((await db.execute(
-        select(AiStationTrade).where(AiStationTrade.signal_id.in_(sig_ids))
+        select(AiStationTrade).where(
+            AiStationTrade.signal_id.in_(sig_ids),
+            AiStationTrade.user_id.notin_(_excl_users),
+        )
     )).scalars().all())
     live = await core.enrich_open_pnl(db, children)
     totals: dict = {}
+    counts: dict = {}
     for c in children:
         pnl = live.get(str(c.id)) if c.status == "open" else c.pnl
         totals[c.signal_id] = totals.get(c.signal_id, 0.0) + float(pnl or 0)
+        counts[c.signal_id] = counts.get(c.signal_id, 0) + 1
 
     out = []
     for s in rows:
         d = core.serialize_signal(s)
         d["total_pnl"] = round(totals.get(s.id, 0.0), 2)
+        d["fanout_count"] = counts.get(s.id, 0)  # real-follower copies only
         out.append(d)
     return out
 
