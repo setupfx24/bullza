@@ -119,6 +119,14 @@ async def set_user_promotional(
     )).scalar_one_or_none()
     if user is None:
         raise HTTPException(status_code=404, detail="User not found")
+    # Promotional is a ONE-WAY flag (client 2026-07-28): once an account is made
+    # promotional it can NEVER be reverted back to a real account. Block any
+    # attempt to un-flag it.
+    if bool(getattr(user, "is_promotional", False)) and not is_promotional:
+        raise HTTPException(
+            status_code=400,
+            detail="A promotional account cannot be turned back into a real account.",
+        )
     user.is_promotional = bool(is_promotional)
     await db.commit()
     return {"user_id": str(user_id), "is_promotional": user.is_promotional}

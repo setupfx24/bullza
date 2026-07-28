@@ -10,7 +10,7 @@ from time import monotonic
 import pyotp
 from fastapi import Request
 from fastapi.responses import JSONResponse
-from sqlalchemy import func, select, update
+from sqlalchemy import func, select, update, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 from uuid import UUID
 
@@ -669,6 +669,30 @@ async def issue_auth_json_response(
 
 # ─── Registration ─────────────────────────────────────────────────────────
 
+async def _referral_code_is_promotional(db: AsyncSession, code: str | None) -> bool:
+    """True if the referral/IB code belongs to a PROMOTIONAL account. Such codes
+    are showcase-only and must never onboard a real user — registration treats
+    them as invalid. Matches either a user's personal referral_code or an
+    IBProfile.referral_code owned by a promotional user. (client 2026-07-28)"""
+    c = (code or "").strip()
+    if not c:
+        return False
+    owner = (await db.execute(
+        select(User.id).where(
+            User.is_promotional == True,  # noqa: E712
+            or_(
+                func.lower(User.referral_code) == c.lower(),
+                User.id.in_(
+                    select(IBProfile.user_id).where(
+                        func.lower(IBProfile.referral_code) == c.lower()
+                    )
+                ),
+            ),
+        ).limit(1)
+    )).scalar_one_or_none()
+    return owner is not None
+
+
 async def register_user(
     email: str,
     password: str,
@@ -706,6 +730,11 @@ async def register_user(
     existing = await db.execute(select(User).where(User.email == email))
     if existing.scalar_one_or_none():
         raise AuthServiceError("Email already registered")
+
+    # A promotional account's referral/IB code must not onboard real users —
+    # reject the signup as an invalid code before creating anything. (client 2026-07-28)
+    if await _referral_code_is_promotional(db, referral_code):
+        raise AuthServiceError("Invalid referral code", 400)
 
     user = User(
         email=email,
@@ -1082,6 +1111,10 @@ async def google_oauth(
             if not user.google_id:
                 user.google_id = google_id
         else:
+            # A promotional account's referral/IB code must not onboard real
+            # users via Google sign-up either. (client 2026-07-28)
+            if await _referral_code_is_promotional(db, referral_code):
+                raise AuthServiceError("Invalid referral code", 400)
             user = User(
                 email=email,
                 password_hash=None,  # OAuth-only — no password
