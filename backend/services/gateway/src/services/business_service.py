@@ -521,8 +521,12 @@ async def ib_dashboard(user_id: UUID, db: AsyncSession) -> dict:
         "level": profile.level,
         "total_referrals": total_referrals,
         "total_commission": float(total_comm),
-        "pending_payout": float(profile.pending_payout),
-        "total_earned": float(profile.total_earned),
+        # Use the CLEAN, query-computed figures (promotional/demo already
+        # excluded) instead of the stored profile.* fields — so these auto-
+        # update the moment an account is flagged promotional/demo and never
+        # surface stale showcase totals. (client 2026-07-28)
+        "pending_payout": float(pending),
+        "total_earned": float(total_comm),
         "commission_balance": commission_balance,
         "earnings_by_user": earnings_by_user,
         "is_active": profile.is_active,
@@ -626,10 +630,16 @@ async def ib_referrals(user_id: UUID, page: int, per_page: int, db: AsyncSession
 
     items = []
     for ref, email, first_name, last_name, user_created in rows:
+        # Only REAL accounts count for a referred user's balance — a referred
+        # user's DEMO account (practice money) must not show in the IB's
+        # affiliate list (client 2026-07-28).
         deposit_result = await db.execute(
             select(func.count(), func.coalesce(func.sum(TradingAccount.balance), 0))
             .select_from(TradingAccount)
-            .where(TradingAccount.user_id == ref.referred_id)
+            .where(
+                TradingAccount.user_id == ref.referred_id,
+                TradingAccount.is_demo == False,  # noqa: E712
+            )
         )
         acct_count, total_deposit = deposit_result.one()
         items.append({
