@@ -53,14 +53,17 @@ async def get_active_campaigns_status(db: AsyncSession) -> list[dict]:
 
 
 async def _referred_users_closed_trade_count(db: AsyncSession, user_id) -> int:
-    """How many closed trades this user has, across all their trading
+    """How many closed trades this user has, across all their REAL trading
     accounts — same "qualifying trade" concept the existing default
     referral funnel already uses in referral_service.py. TradeHistory has
-    no user_id column directly, so this joins through TradingAccount."""
+    no user_id column directly, so this joins through TradingAccount.
+    Demo accounts are excluded (client 2026-07-25: demo trades must never
+    earn the referrer a bounty — see referral_service.maybe_pay_referral_after_trades)."""
     result = await db.execute(
         select(func.count(TradeHistory.id))
         .join(TradingAccount, TradeHistory.account_id == TradingAccount.id)
         .where(TradingAccount.user_id == user_id)
+        .where(TradingAccount.is_demo.isnot(True))
     )
     return int(result.scalar() or 0)
 
@@ -85,6 +88,11 @@ async def check_and_award(
     event if an admin has more than one running at once).
     """
     if referred_user is None or referred_user.referred_by_user_id is None:
+        return []
+    # A promotional/demo referred user must never earn the referrer a bonus
+    # (client 2026-07-25: keep promotional/demo out of real referral data —
+    # same rule referral_service.maybe_pay_referral_after_trades enforces).
+    if getattr(referred_user, "is_promotional", False) or getattr(referred_user, "is_demo", False):
         return []
     if referred_user.kyc_status != "approved":
         return []  # KYC is always required, regardless of which event fired
