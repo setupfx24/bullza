@@ -12,7 +12,7 @@ from decimal import Decimal, InvalidOperation
 from uuid import UUID
 
 from fastapi import HTTPException
-from sqlalchemy import select, func, case
+from sqlalchemy import select, func, case, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from packages.common.src.models import (
@@ -271,6 +271,13 @@ async def list_signals(db: AsyncSession, *, status=None, limit=100, offset=0) ->
 async def list_trades(db: AsyncSession, *, status=None, user_id=None, signal_id=None,
                       limit=200, offset=0) -> list:
     q = select(AiStationTrade)
+    # Never show showcase followers' mirrored trades in the admin panel —
+    # promotional and demo followers (e.g. demo@swisdex.com, the promo accounts)
+    # are display-only showcase, not real activity. (client 2026-07-28)
+    _excl_users = select(User.id).where(
+        or_(User.is_promotional == True, User.is_demo == True)  # noqa: E712
+    )
+    q = q.where(AiStationTrade.user_id.notin_(_excl_users))
     if status in ("open", "closed"):
         q = q.where(AiStationTrade.status == status)
     if user_id is not None:
@@ -491,7 +498,14 @@ async def set_followers_visibility(db: AsyncSession, *, admin_id: UUID, ip_addre
 
 
 async def summary(db: AsyncSession) -> dict:
-    rows = list((await db.execute(select(AiStationTrade))).scalars().all())
+    # Exclude showcase (promotional/demo) followers' mirrored trades from the
+    # admin summary too, so counts + P&L match the filtered Trades list.
+    _excl_users = select(User.id).where(
+        or_(User.is_promotional == True, User.is_demo == True)  # noqa: E712
+    )
+    rows = list((await db.execute(
+        select(AiStationTrade).where(AiStationTrade.user_id.notin_(_excl_users))
+    )).scalars().all())
     live = await core.enrich_open_pnl(db, rows)
     now = datetime.now(timezone.utc)
 
