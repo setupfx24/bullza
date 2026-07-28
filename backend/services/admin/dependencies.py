@@ -70,6 +70,8 @@ EMPLOYEE_ROLE_PERMISSIONS = {
         "banners.view", "banners.create", "banners.update", "banners.delete",
         "bonus.view", "bonus.create", "bonus.update",
         "ib.view", "ib.manage",
+        # Referral Bonus Campaigns
+        "referral_campaigns.view", "referral_campaigns.create", "referral_campaigns.update",
     },
     # Relationship Manager — a limited role that only sees its own assigned
     # users and can raise funding requests (with proof) for them. It cannot

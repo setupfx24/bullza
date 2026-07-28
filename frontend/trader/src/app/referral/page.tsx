@@ -8,6 +8,8 @@ import {
   CheckCircle2, Wallet,
 } from 'lucide-react';
 import DashboardShell from '@/components/layout/DashboardShell';
+import { ReferralPromoCounter } from '@/components/earn/ReferralPromoCounter';
+
 import api from '@/lib/api/client';
 
 interface ReferralDashboard {
@@ -160,6 +162,8 @@ export default function ReferralPage() {
             <Link href="/business" className="text-accent hover:underline">Affiliates (IB)</Link>.
           </p>
         </header>
+
+        <ReferralPromoCounter />
 
         {/* Stats */}
         <section className="grid grid-cols-2 sm:grid-cols-4 gap-3">

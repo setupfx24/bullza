@@ -27,6 +27,7 @@ from packages.common.src.redis_client import redis_client, PriceChannel
 from packages.common.src.notify import create_notification
 from packages.common.src.market_hours import is_market_open
 from packages.common.src import corecen_trade_client
+from packages.common.src.referral_bonus_campaign import check_and_award
 
 logger = logging.getLogger("trading_service")
 
@@ -1413,6 +1414,20 @@ async def close_position(position_id: UUID, req, user_id: UUID, db: AsyncSession
             logger.debug("rewards trade-volume distribution failed: %s", _vol_exc)
     except Exception as _exc:
         logger.debug("rewards mark_progress failed: %s", _exc)
+
+    # Referral bonus campaigns gated on a trade-count (required_trades > 0).
+    # Only closed trades count, so this only makes sense to check here, at
+    # close time — not at open time. SAVEPOINT-wrapped for the same reason
+    # the personal-referral payout below is: a bare try/except leaves the
+    # session marked rolled-back on failure, which then breaks the parent
+    # db.commit().
+    try:
+        async with db.begin_nested():
+            closer = await db.get(User, user_id)
+            if closer is not None:
+                await check_and_award(db, closer, event="trade")
+    except Exception:
+        logger.exception("referral bonus campaign check failed on trade close")
 
     # Personal-referral payout (flat $ amount, gated on the user
     # completing the qualifying trade count — default 3). Idempotent

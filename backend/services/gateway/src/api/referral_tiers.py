@@ -20,7 +20,11 @@ goes blank.
 import logging
 from typing import Any
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from packages.common.src.database import get_db
+from packages.common.src.referral_bonus_campaign import get_active_campaigns_status
 
 from packages.common.src.settings_store import (
     get_system_setting, get_bool_setting, get_int_setting,
@@ -95,3 +99,12 @@ async def list_referral_tiers():
             "required_trades": int(required_trades),
         },
     }
+
+
+@router.get("/promo/campaigns")
+async def active_referral_campaigns(
+    db: AsyncSession = Depends(get_db),
+):
+    """Public feed of currently-active referral bonus campaigns (with open
+    slots). Polled by the website/mobile referral pages every ~30s."""
+    return {"items": await get_active_campaigns_status(db)}
