@@ -670,17 +670,19 @@ async def issue_auth_json_response(
 # ─── Registration ─────────────────────────────────────────────────────────
 
 async def _referral_code_blocked(db: AsyncSession, code: str | None) -> bool:
-    """True if the referral/IB code must NOT onboard a new signup — i.e. it
-    belongs to a PROMOTIONAL account (showcase-only) OR the admin has DISABLED
-    that user's referral (`referral_disabled`). Registration treats such codes
-    as invalid. Matches a user's personal referral_code or an
-    IBProfile.referral_code owned by such a user. (client 2026-07-28 / 07-29)"""
+    """True if the referral/IB code must NOT onboard a new signup — i.e. the
+    admin has DISABLED that user's referral (`referral_disabled`). This is now
+    fully admin-controlled per user (via the Users-page toggle), including for
+    promotional accounts — so an admin can make a promotional user's referral
+    valid or invalid at will; it is NOT auto-blocked by is_promotional anymore.
+    Matches a user's personal referral_code or an IBProfile.referral_code owned
+    by such a user. (client 2026-07-29)"""
     c = (code or "").strip()
     if not c:
         return False
     owner = (await db.execute(
         select(User.id).where(
-            or_(User.is_promotional == True, User.referral_disabled == True),  # noqa: E712
+            User.referral_disabled == True,  # noqa: E712
             or_(
                 func.lower(User.referral_code) == c.lower(),
                 User.id.in_(
