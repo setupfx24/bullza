@@ -657,6 +657,14 @@ async def add_fund(
     old_balance = user_row.main_wallet_balance or Decimal("0")
     user_row.main_wallet_balance = old_balance + amt
 
+    # First-funding welcome bonus (client 2026-06-24): an admin-credited FIRST
+    # deposit earns the same welcome bonus a real first deposit would. This MUST
+    # run BEFORE the Deposit is recorded below — the eligibility check skips when
+    # the user already has an approved deposit, so recording this deposit first
+    # made it count itself as a "prior deposit" and suppressed the bonus
+    # (bug 2026-07-29). No-op unless welcome_bonus_enabled + it's the first funding.
+    bonus_credited = await _apply_first_funding_bonus(user_row, amt, db)
+
     # Admin "Add Fund" is a DEPOSIT (client 2026-07-28): record an approved
     # Deposit + a type="deposit" transaction — exactly like a real/RM deposit —
     # so it shows in the admin Deposits history AND as a "Deposit" in the user's
@@ -685,11 +693,6 @@ async def add_fund(
         created_by=admin_id,
     )
     db.add(txn)
-
-    # First-funding welcome bonus (client 2026-06-24): an admin-credited FIRST
-    # deposit earns the same welcome bonus a real first deposit would. No-op
-    # unless welcome_bonus_enabled is on AND this is the user's first funding.
-    bonus_credited = await _apply_first_funding_bonus(user_row, amt, db)
 
     await write_audit_log(
         db, admin_id, "add_fund", "user", user_id,

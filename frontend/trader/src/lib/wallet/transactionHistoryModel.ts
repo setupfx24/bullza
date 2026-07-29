@@ -54,6 +54,10 @@ export interface WalletListItem {
 
 export function formatMethod(method: string): string {
   const m = (method || '').toLowerCase().replace(/-/g, '_');
+  // Admin-credited funds show to the USER as a plain "Deposit" — no "· Admin"
+  // sub-label (client 2026-07-29). Empty string → the row hides the sub-label.
+  // The admin panel still records/shows method='admin' for its own tracking.
+  if (m === 'admin') return '';
   const labels: Record<string, string> = {
     bank_transfer: 'Bank transfer',
     bank: 'Bank transfer',
