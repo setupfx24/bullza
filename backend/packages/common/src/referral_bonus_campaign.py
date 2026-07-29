@@ -141,6 +141,13 @@ async def _try_award_one(db: AsyncSession, campaign: ReferralBonusCampaign, refe
     )).scalar_one_or_none()
     if referrer is None:
         return None
+    # A promotional/demo REFERRER must never accumulate real referral
+    # commission either — is_promotional/is_demo is a togglable flag on an
+    # ordinary, login-capable User row (not a separate pseudo-account type),
+    # so without this check a promo/demo account could refer a real user
+    # and withdraw the bonus as real money via withdraw_referral_commission.
+    if getattr(referrer, "is_promotional", False) or getattr(referrer, "is_demo", False):
+        return None
 
     # The database UNIQUE(campaign_id, referrer_id) constraint is the real
     # enforcement — this SELECT is just a cheap pre-check to avoid a wasted

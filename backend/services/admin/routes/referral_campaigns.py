@@ -160,6 +160,11 @@ async def list_campaign_claims(
         select(ReferralBonusClaim, User)
         .join(User, ReferralBonusClaim.referrer_id == User.id)
         .where(ReferralBonusClaim.campaign_id == campaign_id)
+        # Defense in depth — check_and_award already refuses to create a
+        # claim for a promotional/demo referrer, so this should never match
+        # anything, but every other admin financial listing in this codebase
+        # filters promo/demo too (client 2026-07-16/25).
+        .where(User.is_promotional.isnot(True), User.is_demo.isnot(True))
         .order_by(ReferralBonusClaim.created_at.desc())
     )).all()
     return {
