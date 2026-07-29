@@ -18,6 +18,7 @@ import {
   ChevronLeft,
   ChevronRight,
   CreditCard,
+  Link2,
   DollarSign,
   Download,
   Eye,
@@ -89,6 +90,8 @@ interface User {
   /** Promotional/pilot account — shown as email + a "Promotional" badge only,
    *  every other field blanked (client 2026-07-11). */
   is_promotional?: boolean;
+  /** Admin toggle: when true, this user's referral code stops working. */
+  referral_disabled?: boolean;
 }
 
 interface UsersResponse {
@@ -505,6 +508,24 @@ export default function UsersPage() {
     }
   };
 
+  // Enable/disable a user's referral. When disabled, their referral/IB code +
+  // link stop working for new signups (rejected as an invalid code). Nothing
+  // else about the user changes. (client 2026-07-29)
+  const toggleReferral = async (u: User) => {
+    setOpenActionsId(null); setMenuPos(null);
+    const next = !u.referral_disabled;
+    if (!window.confirm(next
+      ? `Disable ${u.name || u.email}'s referral? Their referral/IB code + link will stop working for new sign-ups.`
+      : `Enable ${u.name || u.email}'s referral again?`)) return;
+    try {
+      await adminApi.post(`/users/${u.id}/referral-disabled`, { referral_disabled: next });
+      toast.success(next ? 'Referral disabled' : 'Referral enabled');
+      fetchUsers();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Action failed');
+    }
+  };
+
   const submitDeleteUser = async () => {
     if (!modalUser) return;
     setModalSubmitting(true);
@@ -856,6 +877,8 @@ export default function UsersPage() {
           { label: 'Deduct Fund', icon: Minus, perm: 'users.deduct_fund', action: () => openModal('deduct-fund', u) },
           { label: 'Give Credit', icon: CreditCard, perm: 'users.add_fund', action: () => openModal('give-credit', u) },
           { label: 'Take Credit', icon: DollarSign, perm: 'users.deduct_fund', action: () => openModal('take-credit', u) },
+          { divider: true } as any,
+          { label: u.referral_disabled ? 'Enable Referral' : 'Disable Referral', icon: Link2, perm: 'users.add_fund', action: () => toggleReferral(u), danger: !u.referral_disabled },
           { divider: true } as any,
           { label: u.status?.toLowerCase() === 'banned' ? 'Unban User' : 'Ban User', icon: Ban, perm: 'users.ban', action: () => openModal(u.status?.toLowerCase() === 'banned' ? 'unban' : 'ban', u), danger: true },
           { label: 'Kill Switch', icon: Power, perm: 'users.kill_switch', action: () => openModal('kill-switch', u), danger: true },

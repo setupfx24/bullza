@@ -34,6 +34,10 @@ class User(Base):
     # their activity (every account's trades/deposits/withdrawals + user-scoped
     # FR / referral / IB / bonus) is EXCLUDED from admin's real company financials.
     is_promotional = Column(Boolean, default=False, server_default="false", nullable=False)
+    # Admin can disable a specific user's referral so their referral/IB code +
+    # link stop onboarding new signups (rejected as an invalid code). Does not
+    # affect anything else — the user stays fully live. (client 2026-07-29)
+    referral_disabled = Column(Boolean, default=False, server_default="false", nullable=False)
     kyc_status = Column(String(20), default="pending")
     # KYC reminder cadence stage: 0 = none sent, 1 = 3-day reminder fired,
     # 2 = 7-day reminder fired (terminal — no further reminders).

@@ -669,17 +669,18 @@ async def issue_auth_json_response(
 
 # ─── Registration ─────────────────────────────────────────────────────────
 
-async def _referral_code_is_promotional(db: AsyncSession, code: str | None) -> bool:
-    """True if the referral/IB code belongs to a PROMOTIONAL account. Such codes
-    are showcase-only and must never onboard a real user — registration treats
-    them as invalid. Matches either a user's personal referral_code or an
-    IBProfile.referral_code owned by a promotional user. (client 2026-07-28)"""
+async def _referral_code_blocked(db: AsyncSession, code: str | None) -> bool:
+    """True if the referral/IB code must NOT onboard a new signup — i.e. it
+    belongs to a PROMOTIONAL account (showcase-only) OR the admin has DISABLED
+    that user's referral (`referral_disabled`). Registration treats such codes
+    as invalid. Matches a user's personal referral_code or an
+    IBProfile.referral_code owned by such a user. (client 2026-07-28 / 07-29)"""
     c = (code or "").strip()
     if not c:
         return False
     owner = (await db.execute(
         select(User.id).where(
-            User.is_promotional == True,  # noqa: E712
+            or_(User.is_promotional == True, User.referral_disabled == True),  # noqa: E712
             or_(
                 func.lower(User.referral_code) == c.lower(),
                 User.id.in_(
@@ -733,7 +734,7 @@ async def register_user(
 
     # A promotional account's referral/IB code must not onboard real users —
     # reject the signup as an invalid code before creating anything. (client 2026-07-28)
-    if await _referral_code_is_promotional(db, referral_code):
+    if await _referral_code_blocked(db, referral_code):
         raise AuthServiceError("Invalid referral code", 400)
 
     user = User(
@@ -1113,7 +1114,7 @@ async def google_oauth(
         else:
             # A promotional account's referral/IB code must not onboard real
             # users via Google sign-up either. (client 2026-07-28)
-            if await _referral_code_is_promotional(db, referral_code):
+            if await _referral_code_blocked(db, referral_code):
                 raise AuthServiceError("Invalid referral code", 400)
             user = User(
                 email=email,

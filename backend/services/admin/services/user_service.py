@@ -86,6 +86,8 @@ def _user_to_out(u: User) -> dict:
         "bank_deposit_enabled": getattr(u, "bank_deposit_enabled", None),
         # Whole-user promotional/pilot flag — excluded from real company figures.
         "is_promotional": bool(getattr(u, "is_promotional", False)),
+        # Admin-toggled: when True the user's referral code no longer works.
+        "referral_disabled": bool(getattr(u, "referral_disabled", False)),
     }
 
 
@@ -130,6 +132,22 @@ async def set_user_promotional(
     user.is_promotional = bool(is_promotional)
     await db.commit()
     return {"user_id": str(user_id), "is_promotional": user.is_promotional}
+
+
+async def set_user_referral_disabled(
+    user_id: uuid.UUID, referral_disabled: bool, db: AsyncSession,
+) -> dict:
+    """Enable/disable a single user's referral. When disabled, their referral/IB
+    code + link stop onboarding new signups (rejected as an invalid code at
+    registration). Nothing else about the user changes. (client 2026-07-29)"""
+    user = (await db.execute(
+        select(User).where(User.id == user_id)
+    )).scalar_one_or_none()
+    if user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+    user.referral_disabled = bool(referral_disabled)
+    await db.commit()
+    return {"user_id": str(user_id), "referral_disabled": user.referral_disabled}
 
 
 async def get_fr_referral_override(user_id: uuid.UUID, db: AsyncSession) -> dict:
@@ -354,6 +372,7 @@ async def list_users(
             "kyc_status": u.kyc_status or "pending",
             "status": u.status or "active",
             "is_promotional": False,
+            "referral_disabled": bool(getattr(u, "referral_disabled", False)),
         })
 
     pages = max(1, (total + per_page - 1) // per_page)

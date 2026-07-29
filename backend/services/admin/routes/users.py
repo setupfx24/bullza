@@ -66,6 +66,25 @@ async def set_user_promotional(
     )
 
 
+class ReferralDisabledRequest(BaseModel):
+    referral_disabled: bool
+
+
+@router.post("/{user_id}/referral-disabled")
+async def set_user_referral_disabled(
+    user_id: uuid.UUID,
+    body: ReferralDisabledRequest,
+    admin: User = Depends(require_permission("users.add_fund")),
+    db: AsyncSession = Depends(get_db),
+):
+    """Enable/disable this user's referral. When disabled, their referral/IB
+    code + link stop working for new signups (rejected as an invalid code).
+    Nothing else about the user changes."""
+    return await user_service.set_user_referral_disabled(
+        user_id=user_id, referral_disabled=body.referral_disabled, db=db,
+    )
+
+
 class FrReferralOverrideBody(BaseModel):
     # null on a leg = clear it (fall back to the global %).
     principal_pct: float | None = None
