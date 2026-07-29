@@ -73,6 +73,8 @@ async def claim_one_referral(
         raise HTTPException(409, "This referral hasn't qualified yet")
     if err == "already_claimed":
         raise HTTPException(409, "Already claimed")
+    if err == "covered_by_campaign":
+        raise HTTPException(409, "An active referral campaign is running — bonuses are being paid through that campaign instead")
     if err == "zero_bounty":
         raise HTTPException(409, "Bounty configuration is zero — contact support")
     if err or amount is None:

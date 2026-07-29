@@ -25,6 +25,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from packages.common.src.models import (
     User, Deposit, Transaction, IBProfile, Referral, TradeHistory, TradingAccount,
+    ReferralBonusCampaign,
 )
 from packages.common.src.settings_store import (
     get_float_setting, get_int_setting, get_system_setting, get_bool_setting,
@@ -244,6 +245,22 @@ def _resolve_tier_bounty(tiers_raw, position: int) -> Optional[float]:
     return None
 
 
+async def _active_referral_campaign_exists(db: AsyncSession) -> bool:
+    """True if an admin-managed ReferralBonusCampaign (see
+    referral_bonus_campaign.py) is currently live — active and still has
+    open slots. While one is running it overrides the default flat/tiered
+    referral bonus below: the campaign pays instead, so we don't also pay
+    the default. When no campaign is active the default bonus works
+    exactly as it always has (client ask 2026-07-29)."""
+    row = (await db.execute(
+        select(ReferralBonusCampaign.id).where(
+            ReferralBonusCampaign.is_active.is_(True),
+            ReferralBonusCampaign.claimed_count < ReferralBonusCampaign.max_claims,
+        ).limit(1)
+    )).scalar_one_or_none()
+    return row is not None
+
+
 async def _bounty_for_next_claim(
     db: AsyncSession, referrer_id: UUID,
 ) -> Decimal:
@@ -311,6 +328,14 @@ async def claim_referral_bounty(
             return None, "not_eligible"
     if referred.referral_claimed_at is not None:
         return None, "already_claimed"
+
+    # An active referral campaign overrides the default bonus entirely —
+    # the campaign already pays the referrer automatically (see
+    # referral_bonus_campaign.check_and_award, called from the KYC-approval
+    # and trade-close hooks), so the default bounty is paused while one is
+    # running.
+    if await _active_referral_campaign_exists(db):
+        return None, "covered_by_campaign"
 
     amount = await _bounty_for_next_claim(db, referrer_id)
     if amount <= 0:
@@ -492,8 +517,14 @@ async def list_my_referrals(db: AsyncSession, user_id: UUID) -> dict:
 
     # What the trader would earn for their NEXT claim, given the tier
     # ladder + how many they've already claimed. Computed once here so the
-    # UI can show "Claim → $X" without a second roundtrip.
-    next_bounty = await _bounty_for_next_claim(db, user_id)
+    # UI can show "Claim → $X" without a second roundtrip. Zero while an
+    # active referral campaign is overriding the default bonus (see
+    # _active_referral_campaign_exists) so the UI doesn't advertise an
+    # amount the claim endpoint would then reject.
+    next_bounty = (
+        Decimal("0.00") if await _active_referral_campaign_exists(db)
+        else await _bounty_for_next_claim(db, user_id)
+    )
 
     return {
         "items": items,
