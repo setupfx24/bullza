@@ -54,6 +54,7 @@ const NAV_ITEMS: NavItem[] = [
       { label: 'PAMM', href: '/config/pamm' },
       { label: 'IB Tiers', href: '/config/ib-tiers' },
       { label: 'Referral Tiers', href: '/config/referral-tiers' },
+      { label: 'Referral Bonus Campaigns', href: '/config/referral-bonus-campaign', perm: 'referral_campaigns.view' },
     ],
   },
   { label: 'Social', href: '/social', icon: Share2, perm: 'social.view' },
@@ -76,7 +77,6 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Audit logs', href: '/audit-logs', icon: ScrollText, perm: 'audit_logs.view' },
   { label: 'Bonus', href: '/bonus', icon: Gift, perm: 'bonus.view' },
   { label: 'Reward Offers', href: '/reward-campaigns', icon: Gift, perm: 'bonus.view' },
-  { label: 'Referral Campaigns', href: '/config/referral-campaigns', icon: Gift, perm: 'referral_campaigns.view' },
   // Top-level entry so a Fixed-Return manager role (fixed_return.view) can
   // reach the page without needing config.view (it also lives under Config
   // for super-admins). Same page either way.

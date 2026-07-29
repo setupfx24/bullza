@@ -32,6 +32,7 @@ ADMIN_COOKIE_NAME = "swisdex_admin"
 #   fixed_return.manage — grant/approve fixed-return locks (payouts)
 #   insurance.manage    — edit insurance fee/payout economics
 #   funds.approve       — approve/reject a 2nd-admin financial sign-off
+#   referral_campaigns.* — create/pause/edit referral bonus campaigns (real payouts)
 EMPLOYEE_ROLE_PERMISSIONS = {
     "super_admin": {"*"},
     "trade_manager": {
@@ -70,8 +71,6 @@ EMPLOYEE_ROLE_PERMISSIONS = {
         "banners.view", "banners.create", "banners.update", "banners.delete",
         "bonus.view", "bonus.create", "bonus.update",
         "ib.view", "ib.manage",
-        # Referral Bonus Campaigns
-        "referral_campaigns.view", "referral_campaigns.create", "referral_campaigns.update",
     },
     # Relationship Manager — a limited role that only sees its own assigned
     # users and can raise funding requests (with proof) for them. It cannot
