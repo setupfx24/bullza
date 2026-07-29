@@ -352,6 +352,9 @@ async def list_users(
                 "kyc_status": "",
                 "status": "",
                 "is_promotional": True,
+                # Needed so the ⋮ menu shows the right Enable/Disable Referral
+                # label for promotional accounts too (they're blanked otherwise).
+                "referral_disabled": bool(getattr(u, "referral_disabled", False)),
             })
             continue
         name = " ".join(filter(None, [u.first_name, u.last_name])) or u.email.split("@")[0]
