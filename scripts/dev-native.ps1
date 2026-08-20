@@ -39,9 +39,15 @@ $adminEnv = $pyEnv.Clone(); $adminEnv.REDIS_URL = "redis://localhost:6381/1"
 Start-Svc "admin-api :8001" $backend `
     "& '$py' -m uvicorn main:app --app-dir services/admin --host 0.0.0.0 --port 8001 --reload" $adminEnv
 
-Start-Svc "market-data" $backend "& '$py' -m services.market_data.src.main" $pyEnv
-Start-Svc "b-book-engine" $backend "& '$py' -m services.b_book_engine.src.main" $pyEnv
-Start-Svc "risk-engine" $backend "& '$py' -m services.risk_engine.src.main" $pyEnv
+# Each service is launched through its own run.py. The old
+# `-m services.market_data.src.main` form only resolved via host-side
+# symlinks (market_data -> market-data, etc.) that mirrored the container
+# layout — those were dangling on any machine whose checkout path differed
+# and have been removed. run.py sets sys.path itself, so it works from a
+# plain checkout with no symlinks.
+Start-Svc "market-data" $backend "& '$py' services\market-data\run.py" $pyEnv
+Start-Svc "b-book-engine" $backend "& '$py' services\b-book-engine\run.py" $pyEnv
+Start-Svc "risk-engine" $backend "& '$py' services\risk-engine\run.py" $pyEnv
 
 Write-Host "[3/3] Starting frontend dev servers (next dev --turbo)..."
 Start-Svc "trader-frontend :3000" (Join-Path $root "frontend\trader") "npm run dev"
