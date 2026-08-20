@@ -1,45 +1,45 @@
 'use client';
 
 /**
- * Broker home — replaces the old open-positions / quick-actions dashboard.
- * Layout follows the Elev8-style brief: account balance card with action
- * buttons, popular deposit methods, top daily movers, status program /
- * rewards, invite-friends banner, deposit bonus, and the existing admin-
- * configurable banner carousel.
+ * Broker home — premium fintech redesign (2026-08-20).
+ *
+ * Visual language (spacious cards, soft radii, quiet borders, one strong
+ * figure per card, ring/wave visualizations) follows the client's design
+ * reference; every widget maps to an EXISTING platform feature and its
+ * EXISTING endpoint — no new features, metrics or APIs were introduced:
+ *
+ *   hero balance + actions      → /accounts (+ existing Deposit/Trade/
+ *                                 Withdraw/Details routes)
+ *   margin ring                 → existing account margin_used / equity
+ *   main wallet card            → /wallet/summary
+ *   P&L tiles                   → /portfolio/summary pnl_breakdown
+ *   performance wave + stats    → /portfolio/performance (+ summary equity)
+ *   open positions list         → /portfolio/summary holdings
+ *   top daily movers            → /instruments/{s}/bars + /prices/all
+ *                                 (existing live-movers computation)
+ *   daily streak                → existing StreakStrip (/rewards/state)
+ *   KYC card                    → existing user.kyc_status + /kyc
+ *   invite friends              → /business/referral/me
+ *   deposit bonus + banners     → existing /wallet CTA + /banners
  */
 
 import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
-import { clsx } from 'clsx';
-import {
-  ChevronDown, ArrowDownToLine, ArrowUpFromLine,
-  TrendingUp, TrendingDown, ArrowRight, Gift,
-  ShieldCheck, ExternalLink, Loader2, Calculator,
-} from 'lucide-react';
-import DashboardShell from '@/components/layout/DashboardShell';
-import { handleTerminalOpen } from '@/lib/tradingNav';
-import api from '@/lib/api/client';
+import { ArrowRight, Gift, Users } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { fmtAccountMoney, isCentAccount } from '@/lib/wallet/centDisplay';
-
-interface AccountRow {
-  id: string;
-  account_number: string;
-  balance: number;
-  equity: number;
-  free_margin: number;
-  margin_used?: number;
-  leverage: number;
-  is_demo: boolean;
-  swap_free?: boolean;
-  account_group_name?: string | null;
-  // Cent-account display flag (Mig 0068). Populated from
-  // `account_group.is_cent_account` on the backend payload. Use
-  // fmtAccountMoney(value, isCentAccount(account)) on every visible
-  // money figure so balances render in ¢ for cent groups.
-  account_group?: { is_cent_account?: boolean | null } | null;
-  is_cent_account?: boolean | null;
-}
+import DashboardShell from '@/components/layout/DashboardShell';
+import api from '@/lib/api/client';
+import { useAuthStore } from '@/stores/authStore';
+import StreakStrip from '@/components/earn/StreakStrip';
+import { AccountHero, type AccountRow } from '@/components/dashboard/AccountHero';
+import { MainWalletCard, type WalletSummary } from '@/components/dashboard/MainWalletCard';
+import { PnlTiles, type PnlBreakdown } from '@/components/dashboard/PnlTiles';
+import { PerformanceCard } from '@/components/dashboard/PerformanceCard';
+import { OpenPositionsCard, type HoldingRow } from '@/components/dashboard/OpenPositionsCard';
+import { TopMoversCard, type Mover } from '@/components/dashboard/TopMoversCard';
+import { KycCard } from '@/components/dashboard/KycCard';
+import { QuickLinksCard } from '@/components/dashboard/QuickLinksCard';
+import { PanelCard } from '@/components/dashboard/PanelCard';
 
 interface Banner {
   id: string;
@@ -49,24 +49,30 @@ interface Banner {
   position: string;
 }
 
+interface PortfolioSummary {
+  total_balance: number;
+  total_equity: number;
+  total_unrealized_pnl: number;
+  pnl_breakdown: PnlBreakdown;
+  holdings: HoldingRow[];
+  open_positions_count: number;
+}
+
+interface PerformanceData {
+  equity_curve: Array<{ date: string; equity: number }>;
+  stats: {
+    total_return: number;
+    max_drawdown: number;
+    sharpe_ratio: number;
+    win_rate: number;
+    total_trades: number;
+  };
+}
+
 interface PriceTick { symbol?: string; bid?: number; ask?: number; }
 interface BarRow { time: number; open: number; close: number; }
 
 const TOP_MOVER_SYMBOLS = ['XAUUSD', 'NAS100', 'BTCUSD', 'EURUSD'];
-
-const fmtUsd = (n: number) =>
-  new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 })
-    .format(Number.isFinite(n) ? n : 0);
-
-const fmtNum = (n: number, dp = 2) =>
-  new Intl.NumberFormat('en-US', { minimumFractionDigits: dp, maximumFractionDigits: dp })
-    .format(Number.isFinite(n) ? n : 0);
-
-// Relative (same-origin) so the terminal stays inside the app / PWA. The old
-// absolute https://trade.<domain>/... form crossed origins and broke the
-// installed PWA out to Safari; the whole app is served from one origin now.
-const tradeUrl = (accountId: string) =>
-  `/trading/terminal?account=${encodeURIComponent(accountId)}&view=chart`;
 
 export default function DashboardPage() {
   return (
@@ -77,12 +83,17 @@ export default function DashboardPage() {
 }
 
 function BrokerHome() {
+  const user = useAuthStore((s) => s.user);
   const [accounts, setAccounts] = useState<AccountRow[]>([]);
   const [banners, setBanners] = useState<Banner[]>([]);
-  const [movers, setMovers] = useState<{ symbol: string; pct: number; price: number }[]>([]);
+  const [movers, setMovers] = useState<Mover[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [summary, setSummary] = useState<PortfolioSummary | null>(null);
+  const [performance, setPerformance] = useState<PerformanceData | null>(null);
+  const [wallet, setWallet] = useState<WalletSummary | null>(null);
 
+  // Accounts + banners (unchanged data layer from the previous dashboard).
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -103,14 +114,29 @@ function BrokerHome() {
     return () => { cancelled = true; };
   }, []);
 
+  // Portfolio + wallet overview — same endpoints the portfolio and wallet
+  // pages already consume; each card degrades to a "—" state on failure.
   useEffect(() => {
     let cancelled = false;
-    // Daily bars (oldest→newest, today is the last row) only change once a
-    // day, so we fetch them ONCE per symbol and keep the day-open in a ref
-    // that the polling loop reads. Prices come from /prices/all and refresh
-    // every tick — the previous "fetch once on mount" build left the
-    // movers card showing whatever pct was computed at page load and
-    // never updating, which clients read as "Top Movers not live".
+    (async () => {
+      const [s, p, w] = await Promise.allSettled([
+        api.get<PortfolioSummary>('/portfolio/summary'),
+        api.get<PerformanceData>('/portfolio/performance'),
+        api.get<WalletSummary>('/wallet/summary'),
+      ]);
+      if (cancelled) return;
+      if (s.status === 'fulfilled') setSummary(s.value);
+      if (p.status === 'fulfilled') setPerformance(p.value);
+      if (w.status === 'fulfilled') setWallet(w.value);
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  // Live top movers (unchanged computation from the previous dashboard):
+  // daily bars give the day-open baseline once; /prices/all refreshes the
+  // pct every 5s; bars reload hourly to pick up the new trading day.
+  useEffect(() => {
+    let cancelled = false;
     type BarsResp = { bars?: BarRow[] } | BarRow[] | null | undefined;
     const dayOpenBySymbol: Record<string, number> = {};
     const closeFallbackBySymbol: Record<string, number> = {};
@@ -155,10 +181,6 @@ function BrokerHome() {
       } catch { /* keep previous values on transient failure */ }
     };
 
-    // Initial sequence: load bars first so the first render has a valid
-    // dayOpen baseline, then loop the recompute every 5s using the live
-    // /prices/all snapshot. Reload bars hourly so we pick up the new day
-    // when the date rolls over (cheap — 4 small responses cached upstream).
     const timers: { priceTimer?: ReturnType<typeof setInterval>; barTimer?: ReturnType<typeof setInterval> } = {};
     (async () => {
       await loadBars();
@@ -181,219 +203,74 @@ function BrokerHome() {
     [accounts, activeId],
   );
 
+  const today = useMemo(
+    () => new Date().toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'long' }),
+    [],
+  );
+
   return (
-    <div className="space-y-5 pb-8 max-w-[1200px] mx-auto w-full">
-      {/* Promotional banners sit at the TOP so a new banner pushes the rest
-          of the dashboard down rather than hiding at the bottom. */}
+    <div className="space-y-5 pb-10 max-w-[1240px] mx-auto w-full">
+      {/* Greeting — big, quiet, reference-style hierarchy. */}
+      <div className="flex flex-wrap items-end justify-between gap-3 px-1">
+        <div>
+          <p className="text-[11px] font-semibold text-text-tertiary">{today}</p>
+          <h1 className="mt-0.5 text-xl md:text-2xl font-extrabold tracking-tight text-text-primary">
+            {user?.first_name ? `Hey, ${user.first_name} 👋` : 'Welcome back 👋'}
+          </h1>
+        </div>
+        <Link
+          href="/support"
+          className="text-[11px] font-bold text-text-tertiary hover:text-text-primary transition-colors"
+        >
+          Need help? →
+        </Link>
+      </div>
+
       {banners.length > 0 && <BannerStrip banners={banners} />}
-      <AccountBalanceCard
+      <KycCard />
+
+      <AccountHero
         accounts={accounts}
         active={activeAccount}
         onChangeAccount={setActiveId}
         loading={loading}
       />
-      <TopMoversCard movers={movers} />
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-        <InviteFriendsCard />
-        <BonusCard />
-      </div>
-    </div>
-  );
-}
 
-function AccountBalanceCard({
-  accounts, active, onChangeAccount, loading,
-}: {
-  accounts: AccountRow[];
-  active: AccountRow | null;
-  onChangeAccount: (id: string) => void;
-  loading: boolean;
-}) {
-  const [pickerOpen, setPickerOpen] = useState(false);
-  const a = active;
-
-  return (
-    <div
-      className="rounded-2xl p-5 md:p-6"
-      style={{ background: 'var(--bg-card)', border: '1px solid var(--border-primary)' }}
-    >
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-        <div className="relative">
-          <button
-            type="button"
-            onClick={() => setPickerOpen((o) => !o)}
-            className="flex items-center gap-2.5 rounded-xl px-3 py-2 transition-colors hover:bg-bg-hover"
-            style={{ background: 'var(--bg-card-nested)', border: '1px solid var(--border-primary)' }}
-          >
-            <span
-              className="text-[10px] uppercase tracking-wider font-bold px-1.5 py-0.5 rounded"
-              style={a?.is_demo
-                ? { color: '#f59e0b', background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.3)' }
-                : { color: '#55a630', background: 'rgba(85,166,48,0.12)', border: '1px solid rgba(85,166,48,0.3)' }}
-            >
-              {a?.is_demo ? 'Demo' : 'Real'}
-            </span>
-            <span className="text-sm font-semibold tabular-nums text-text-primary">
-              {a?.account_number || (loading ? '…' : 'No accounts')}
-            </span>
-            <ChevronDown size={14} className="text-text-tertiary" />
-          </button>
-          {pickerOpen && accounts.length > 0 && (
-            <div
-              className="absolute top-full left-0 mt-2 z-30 rounded-xl p-1.5 min-w-[260px]"
-              style={{
-                background: 'rgba(16,17,20,0.97)',
-                border: '1px solid var(--border-primary)',
-                boxShadow: '0 16px 40px rgba(0,0,0,0.55)',
-              }}
-            >
-              {accounts.map((acc) => (
-                <button
-                  key={acc.id}
-                  type="button"
-                  onClick={() => { onChangeAccount(acc.id); setPickerOpen(false); }}
-                  className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-left text-sm hover:bg-bg-hover"
-                  style={{ color: 'var(--text-primary)' }}
-                >
-                  <span
-                    className="text-[10px] uppercase tracking-wider font-bold px-1.5 py-0.5 rounded"
-                    style={acc.is_demo
-                      ? { color: '#f59e0b', background: 'rgba(245,158,11,0.12)' }
-                      : { color: '#55a630', background: 'rgba(85,166,48,0.12)' }}
-                  >
-                    {acc.is_demo ? 'Demo' : 'Real'}
-                  </span>
-                  <span className="font-semibold tabular-nums">#{acc.account_number}</span>
-                  <span className="ml-auto text-xs text-text-tertiary tabular-nums">
-                    {fmtAccountMoney(acc.balance, isCentAccount(acc))}
-                  </span>
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-
-        <div className="flex flex-wrap gap-2">
-          <Link
-            href="/wallet"
-            className="inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-bold transition-colors"
-            style={{ background: '#55a630', color: '#1a1408' }}
-          >
-            <ArrowDownToLine size={14} /> Deposit
-          </Link>
-          <a
-            href={a ? tradeUrl(a.id) : '#'}
-            target={a ? '_blank' : undefined}
-            rel="noopener noreferrer"
-            onClick={(e) => { if (a) handleTerminalOpen(e, tradeUrl(a.id)); }}
-            aria-disabled={!a}
-            className={clsx(
-              'inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold transition-colors',
-              !a && 'pointer-events-none opacity-50',
-            )}
-            style={{ border: '1px solid var(--border-primary)', color: 'var(--text-primary)' }}
-          >
-            Trade <ExternalLink size={13} />
-          </a>
-          <Link
-            href="/wallet"
-            className="inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold transition-colors hover:bg-bg-hover"
-            style={{ border: '1px solid var(--border-primary)', color: 'var(--text-primary)' }}
-          >
-            <ArrowUpFromLine size={14} /> Withdraw
-          </Link>
-          <Link
-            href="/accounts"
-            className="inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold transition-colors hover:bg-bg-hover"
-            style={{ border: '1px solid var(--border-primary)', color: 'var(--text-primary)' }}
-          >
-            Details
-          </Link>
-          <Link
-            href="/risk-calculator"
-            className="inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold transition-colors hover:bg-bg-hover"
-            style={{ border: '1px solid var(--border-primary)', color: 'var(--text-primary)' }}
-          >
-            <Calculator size={14} /> Risk Calc
-          </Link>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-5">
+        <div className="lg:col-span-4"><MainWalletCard summary={wallet} /></div>
+        <div className="lg:col-span-4"><PnlTiles pnl={summary?.pnl_breakdown ?? null} /></div>
+        <div className="md:col-span-2 lg:col-span-4">
+          <PerformanceCard
+            totalEquity={summary ? summary.total_equity : null}
+            curve={performance?.equity_curve ?? []}
+            stats={performance?.stats ?? null}
+          />
         </div>
       </div>
 
-      <div className="mt-6 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-x-6 gap-y-4 md:gap-x-8">
-        <Stat label="Balance" value={fmtAccountMoney(a?.balance ?? 0, isCentAccount(a))} highlight />
-        <Stat label="Free margin" value={fmtAccountMoney(a?.free_margin ?? 0, isCentAccount(a))} />
-        <Stat label="Equity" value={fmtAccountMoney(a?.equity ?? 0, isCentAccount(a))} />
-        <Stat label="Leverage" value={a ? `1:${a.leverage}` : '—'} />
-        <Stat label="Server" value={isCentAccount(a) ? 'Cent' : '—'} />
-        <Stat label="No swap" value={a?.swap_free ? 'Yes' : 'No'} />
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+        <div className="lg:col-span-7">
+          <OpenPositionsCard
+            holdings={summary?.holdings ?? []}
+            count={summary?.open_positions_count ?? 0}
+          />
+        </div>
+        <div className="lg:col-span-5"><TopMoversCard movers={movers} /></div>
+      </div>
+
+      <StreakStrip />
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-5">
+        <div className="lg:col-span-4"><InviteFriendsCard /></div>
+        <div className="lg:col-span-4"><BonusCard /></div>
+        <div className="md:col-span-2 lg:col-span-4"><QuickLinksCard /></div>
       </div>
     </div>
   );
 }
-
-function Stat({ label, value, highlight }: { label: string; value: string; highlight?: boolean }) {
-  // `min-w-0` lets the grid cell shrink below the value's intrinsic width
-  // so wide balances ($113,900.00 etc.) clip with ellipsis instead of
-  // overflowing into the next column. `truncate` adds the ellipsis. The
-  // highlight tier keeps the green colour but matches the size of the
-  // other stats — the previous text-2xl size was the root cause of the
-  // visible overlap on narrow widths.
-  return (
-    <div className="min-w-0">
-      <p className="text-[10px] uppercase tracking-[0.14em] font-medium text-text-tertiary truncate">{label}</p>
-      <p
-        className={clsx(
-          'mt-1 font-bold tabular-nums whitespace-nowrap overflow-hidden text-ellipsis',
-          'text-base md:text-lg',
-        )}
-        style={{ color: highlight ? '#55a630' : 'var(--text-primary)' }}
-        title={value}
-      >
-        {value}
-      </p>
-    </div>
-  );
-}
-
-function TopMoversCard({ movers }: { movers: { symbol: string; pct: number; price: number }[] }) {
-  return (
-    <Card title="Top daily movers">
-      <ul className="divide-y divide-border-primary">
-        {movers.length === 0 && (
-          <li className="py-8 text-center text-sm text-text-tertiary flex items-center justify-center gap-2">
-            <Loader2 size={14} className="animate-spin" /> Loading…
-          </li>
-        )}
-        {movers.map((m) => {
-          const up = m.pct >= 0;
-          const Icon = up ? TrendingUp : TrendingDown;
-          return (
-            <li key={m.symbol} className="py-3 flex items-center gap-3">
-              <span className="text-sm font-semibold text-text-primary flex-1">{m.symbol}</span>
-              <span className="text-sm font-mono tabular-nums text-text-secondary">
-                {Number.isFinite(m.price) && m.price > 0 ? fmtNum(m.price, m.symbol === 'BTCUSD' ? 0 : 4) : '—'}
-              </span>
-              <span
-                className="inline-flex items-center gap-1 text-xs font-bold tabular-nums"
-                style={{ color: up ? '#22c55e' : '#ef4444' }}
-              >
-                <Icon size={12} />
-                {Number.isFinite(m.pct) ? `${up ? '+' : ''}${m.pct.toFixed(2)}%` : '—'}
-              </span>
-            </li>
-          );
-        })}
-      </ul>
-    </Card>
-  );
-}
-
 
 function InviteFriendsCard() {
   // Personal referral (every user has a code) — NOT the IB program.
-  // The IB version of this card used to point here and confused users
-  // who hadn't applied as an IB; the personal-referral endpoint is the
-  // right one for the dashboard's "Invite friends" CTA.
   const [link, setLink] = useState<string>('');
   const [code, setCode] = useState<string>('');
 
@@ -406,10 +283,6 @@ function InviteFriendsCard() {
         const c = (d.referral_code || '').trim();
         setCode(c);
         if (c && typeof window !== 'undefined') {
-          // Same shape as `${TRADER_APP_URL}/auth/register?ref=CODE` that
-          // /business/company-ib returns server-side. Building on the
-          // client keeps the link on the user's actual origin
-          // (apex domain vs trade subdomain vs local dev).
           setLink(`${window.location.origin}/auth/register?ref=${encodeURIComponent(c)}`);
         }
       })
@@ -427,17 +300,17 @@ function InviteFriendsCard() {
   };
 
   return (
-    <Card>
+    <PanelCard padding="lg" className="h-full">
       <div className="flex items-start gap-4">
         <div
-          className="shrink-0 w-14 h-14 rounded-xl flex items-center justify-center"
-          style={{ background: 'rgba(34,197,94,0.12)', border: '1px solid rgba(34,197,94,0.3)' }}
+          className="shrink-0 w-11 h-11 rounded-xl flex items-center justify-center"
+          style={{ background: 'rgba(34,197,94,0.10)' }}
         >
-          <ShieldCheck size={26} className="text-green-500" />
+          <Users size={20} className="text-green-500" />
         </div>
         <div className="min-w-0 flex-1">
-          <h3 className="text-base font-bold text-text-primary">Invite friends, earn together</h3>
-          <p className="text-xs text-text-secondary mt-0.5 leading-relaxed">
+          <h3 className="text-sm font-bold text-text-primary">Invite friends, earn together</h3>
+          <p className="text-[11px] text-text-secondary mt-0.5 leading-relaxed">
             Share your link — every trade your invitees make earns you commission for life.
           </p>
           {link ? (
@@ -448,18 +321,18 @@ function InviteFriendsCard() {
                   readOnly
                   value={link}
                   onFocus={(e) => e.currentTarget.select()}
-                  className="flex-1 min-w-0 text-[11px] font-mono bg-bg-secondary border border-border-primary rounded-md px-2.5 py-1.5 text-text-primary outline-none focus:border-[#55a630]/40"
+                  className="flex-1 min-w-0 text-[10px] font-mono bg-bg-secondary border border-border-primary rounded-full px-3 py-1.5 text-text-primary outline-none focus:border-[#55a630]/40"
                 />
                 <button
                   type="button"
                   onClick={() => onCopy(link)}
-                  className="shrink-0 px-2.5 py-1.5 text-[11px] font-bold rounded-md border border-[#55a630]/40 text-[#55a630] hover:bg-[#55a630]/10 transition-colors"
+                  className="shrink-0 px-3 py-1.5 text-[10px] font-extrabold rounded-full border border-[#55a630]/40 text-[#55a630] hover:bg-[#55a630]/10 transition-colors"
                 >
                   Copy
                 </button>
               </div>
               {code && (
-                <p className="text-[11px] text-text-tertiary mt-2">
+                <p className="text-[10px] text-text-tertiary mt-2">
                   Code:{' '}
                   <button
                     type="button"
@@ -475,42 +348,42 @@ function InviteFriendsCard() {
           ) : (
             <Link
               href="/referral"
-              className="inline-flex items-center gap-1.5 mt-3 text-xs font-bold text-[#55a630] hover:underline"
+              className="inline-flex items-center gap-1.5 mt-3 text-[11px] font-extrabold text-[#55a630] hover:underline"
             >
               Get your referral link <ArrowRight size={12} />
             </Link>
           )}
         </div>
       </div>
-    </Card>
+    </PanelCard>
   );
 }
 
 function BonusCard() {
   return (
-    <Card>
-      <div className="flex items-center gap-4">
+    <PanelCard padding="lg" className="h-full">
+      <div className="flex items-start gap-4">
         <div
-          className="shrink-0 w-14 h-14 rounded-xl flex items-center justify-center"
-          style={{ background: 'rgba(85,166,48,0.14)', border: '1px solid rgba(85,166,48,0.32)' }}
+          className="shrink-0 w-11 h-11 rounded-xl flex items-center justify-center"
+          style={{ background: 'rgba(85,166,48,0.12)' }}
         >
-          <Gift size={26} className="text-[#55a630]" />
+          <Gift size={20} className="text-[#55a630]" />
         </div>
         <div className="min-w-0 flex-1">
-          <h3 className="text-base font-bold text-text-primary">Up to 100% deposit bonus</h3>
-          <p className="text-xs text-text-secondary mt-0.5 leading-relaxed">
+          <h3 className="text-sm font-bold text-text-primary">Up to 100% deposit bonus</h3>
+          <p className="text-[11px] text-text-secondary mt-0.5 leading-relaxed">
             Top up your account and we&apos;ll add up to 100% extra trading credit. No expiry, fully tradeable.
           </p>
           <Link
             href="/wallet"
-            className="inline-flex items-center gap-1.5 mt-3 px-3 py-1.5 text-xs font-bold rounded-md"
-            style={{ background: '#55a630', color: '#1a1408' }}
+            className="inline-flex items-center gap-1.5 mt-3 px-3.5 py-1.5 text-[11px] font-extrabold rounded-full"
+            style={{ background: '#55a630', color: '#0c1105' }}
           >
             Get bonus <ArrowRight size={12} />
           </Link>
         </div>
       </div>
-    </Card>
+    </PanelCard>
   );
 }
 
@@ -523,13 +396,10 @@ function BannerStrip({ banners }: { banners: Banner[] }) {
   }, [banners.length]);
   if (banners.length === 0) return null;
   const b = banners[index];
-  // Fixed 5:1 aspect ratio everywhere a banner shows (dashboard +
-  // admin preview list). Previously the dashboard used height-only
-  // classes (h-44/h-52/h-60) which gave a different aspect ratio at
-  // every breakpoint — same banner looked 2:1 on mobile and 5:1 on
-  // desktop, breaking the design. Recommended upload size: 1500×300.
+  // Fixed 5:1 aspect ratio everywhere a banner shows (dashboard + admin
+  // preview list). Recommended upload size: 1500×300.
   return (
-    <div className="relative w-full rounded-2xl overflow-hidden" style={{ border: '1px solid var(--border-primary)' }}>
+    <div className="relative w-full rounded-2xl overflow-hidden" style={{ border: '1px solid var(--border-glass-bright)' }}>
       <div className="relative w-full aspect-[5/1] bg-bg-secondary">
         {b.link_url ? (
           <a href={b.link_url} target="_blank" rel="noopener noreferrer" className="absolute inset-0 block">
@@ -550,18 +420,6 @@ function BannerStrip({ banners }: { banners: Banner[] }) {
           ))}
         </div>
       )}
-    </div>
-  );
-}
-
-function Card({ title, children }: { title?: string; children: React.ReactNode }) {
-  return (
-    <div
-      className="rounded-2xl p-4 md:p-5"
-      style={{ background: 'var(--bg-card)', border: '1px solid var(--border-primary)' }}
-    >
-      {title && <h2 className="text-base font-bold text-text-primary mb-3">{title}</h2>}
-      {children}
     </div>
   );
 }
