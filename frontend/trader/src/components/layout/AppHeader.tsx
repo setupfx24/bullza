@@ -104,30 +104,30 @@ export default function AppHeader() {
               falls through to the marketing landing group.) */}
           <Link
             href="/wallet#bonus"
-            className="hidden md:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-[#55a630]/25 bg-[#55a630]/5 hover:bg-[#55a630]/10 transition-colors"
+            className="hidden md:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-[#E85D3D]/25 bg-[#E85D3D]/5 hover:bg-[#E85D3D]/10 transition-colors"
             title="View active bonus offers + your bonus history"
           >
-            <Gift size={13} className="text-[#55a630] shrink-0" />
+            <Gift size={13} className="text-[#E85D3D] shrink-0" />
             <span className="text-[11px] font-medium text-text-primary">Bonus</span>
           </Link>
           {/* Affiliates chip — quick link to the IB / partner dashboard */}
           <Link
             href="/business"
-            className="hidden md:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-[#55a630]/25 bg-[#55a630]/5 hover:bg-[#55a630]/10 transition-colors"
+            className="hidden md:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-[#E85D3D]/25 bg-[#E85D3D]/5 hover:bg-[#E85D3D]/10 transition-colors"
             title="IB Program — invite traders and earn"
           >
-            <Users size={13} className="text-[#55a630] shrink-0" />
+            <Users size={13} className="text-[#E85D3D] shrink-0" />
             <span className="text-[11px] font-medium text-text-primary">Affiliates</span>
           </Link>
 
           {/* Balance pill */}
           <Link
             href="/wallet"
-            className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1 sm:py-1.5 rounded-full border border-[#55a630]/30 bg-[#55a630]/5 hover:bg-[#55a630]/10 transition-colors"
+            className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1 sm:py-1.5 rounded-full border border-[#E85D3D]/30 bg-[#E85D3D]/5 hover:bg-[#E85D3D]/10 transition-colors"
           >
-            <Wallet size={14} className="text-[#55a630] shrink-0" />
-            <span className="text-[#55a630] text-xs sm:text-sm font-medium truncate max-w-[90px] sm:max-w-none">{formatUsd(balance)}</span>
-            <ChevronDown size={12} className="text-[#55a630]/60 shrink-0 hidden sm:block" />
+            <Wallet size={14} className="text-[#E85D3D] shrink-0" />
+            <span className="text-[#E85D3D] text-xs sm:text-sm font-medium truncate max-w-[90px] sm:max-w-none">{formatUsd(balance)}</span>
+            <ChevronDown size={12} className="text-[#E85D3D]/60 shrink-0 hidden sm:block" />
           </Link>
 
           {/* Notification bell */}
@@ -140,7 +140,7 @@ export default function AppHeader() {
               onClick={() => setUserMenuOpen(!userMenuOpen)}
               className="flex items-center gap-2 hover:opacity-80 transition-opacity"
             >
-              <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-[#55a630]/20 border border-[#55a630]/30 flex items-center justify-center text-[#55a630] text-[10px] sm:text-xs font-bold uppercase">
+              <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-[#E85D3D]/20 border border-[#E85D3D]/30 flex items-center justify-center text-[#E85D3D] text-[10px] sm:text-xs font-bold uppercase">
                 {initials}
               </div>
               <span className="text-sm text-text-primary hidden sm:inline">{handle}</span>

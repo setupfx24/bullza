@@ -321,12 +321,12 @@ function InviteFriendsCard() {
                   readOnly
                   value={link}
                   onFocus={(e) => e.currentTarget.select()}
-                  className="flex-1 min-w-0 text-[10px] font-mono bg-bg-secondary border border-border-primary rounded-full px-3 py-1.5 text-text-primary outline-none focus:border-[#55a630]/40"
+                  className="flex-1 min-w-0 text-[10px] font-mono bg-bg-secondary border border-border-primary rounded-full px-3 py-1.5 text-text-primary outline-none focus:border-[#E85D3D]/40"
                 />
                 <button
                   type="button"
                   onClick={() => onCopy(link)}
-                  className="shrink-0 px-3 py-1.5 text-[10px] font-extrabold rounded-full border border-[#55a630]/40 text-[#55a630] hover:bg-[#55a630]/10 transition-colors"
+                  className="shrink-0 px-3 py-1.5 text-[10px] font-extrabold rounded-full border border-[#E85D3D]/40 text-[#E85D3D] hover:bg-[#E85D3D]/10 transition-colors"
                 >
                   Copy
                 </button>
@@ -337,7 +337,7 @@ function InviteFriendsCard() {
                   <button
                     type="button"
                     onClick={() => onCopy(code)}
-                    className="text-[#55a630] font-mono font-bold cursor-pointer hover:underline"
+                    className="text-[#E85D3D] font-mono font-bold cursor-pointer hover:underline"
                     title="Click to copy your referral code"
                   >
                     {code}
@@ -348,7 +348,7 @@ function InviteFriendsCard() {
           ) : (
             <Link
               href="/referral"
-              className="inline-flex items-center gap-1.5 mt-3 text-[11px] font-extrabold text-[#55a630] hover:underline"
+              className="inline-flex items-center gap-1.5 mt-3 text-[11px] font-extrabold text-[#E85D3D] hover:underline"
             >
               Get your referral link <ArrowRight size={12} />
             </Link>
@@ -365,9 +365,9 @@ function BonusCard() {
       <div className="flex items-start gap-4">
         <div
           className="shrink-0 w-11 h-11 rounded-xl flex items-center justify-center"
-          style={{ background: 'rgba(85,166,48,0.12)' }}
+          style={{ background: 'rgba(232, 93, 61,0.12)' }}
         >
-          <Gift size={20} className="text-[#55a630]" />
+          <Gift size={20} className="text-[#E85D3D]" />
         </div>
         <div className="min-w-0 flex-1">
           <h3 className="text-sm font-bold text-text-primary">Up to 100% deposit bonus</h3>
@@ -377,7 +377,7 @@ function BonusCard() {
           <Link
             href="/wallet"
             className="inline-flex items-center gap-1.5 mt-3 px-3.5 py-1.5 text-[11px] font-extrabold rounded-full"
-            style={{ background: '#55a630', color: '#0c1105' }}
+            style={{ background: '#E85D3D', color: '#0c1105' }}
           >
             Get bonus <ArrowRight size={12} />
           </Link>
@@ -415,7 +415,7 @@ function BannerStrip({ banners }: { banners: Banner[] }) {
             <span
               key={i}
               className="w-1.5 h-1.5 rounded-full transition-colors"
-              style={{ background: i === index ? '#55a630' : 'rgba(255,255,255,0.4)' }}
+              style={{ background: i === index ? '#E85D3D' : 'rgba(255,255,255,0.4)' }}
             />
           ))}
         </div>

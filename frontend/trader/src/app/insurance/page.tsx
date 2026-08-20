@@ -8,7 +8,7 @@ import InsuranceOnboardingModal from '@/components/insurance/InsuranceOnboarding
 import toast from 'react-hot-toast';
 
 const STATUS_COLOR: Record<PolicyOut['status'], string> = {
-  active: '#55a630',
+  active: '#E85D3D',
   claimed: '#22c55e',
   expired: '#888888',
   denied: '#ef4444',
@@ -108,7 +108,7 @@ export default function InsurancePage() {
       <div className="space-y-5 pb-8">
         <div className="flex items-start justify-between gap-3 flex-wrap">
           <h1 className="text-2xl font-bold text-text-primary tracking-tight flex items-center gap-2">
-            <ShieldCheck size={22} className="text-[#55a630]" /> Trade Insurance
+            <ShieldCheck size={22} className="text-[#E85D3D]" /> Trade Insurance
           </h1>
           <button
             type="button"
@@ -116,7 +116,7 @@ export default function InsurancePage() {
               try { localStorage.removeItem('fx-insurance-onboarded'); } catch { /* private mode */ }
               window.location.reload();
             }}
-            className="text-xs text-text-tertiary hover:text-text-primary inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md border border-border-primary hover:border-[#55a630]/40"
+            className="text-xs text-text-tertiary hover:text-text-primary inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md border border-border-primary hover:border-[#E85D3D]/40"
           >
             <HelpCircle size={13} /> How it works
           </button>
@@ -139,7 +139,7 @@ export default function InsurancePage() {
                 label="Claimable"
                 value={`$${totalClaimableAmount.toFixed(2)}`}
                 sub={pendingClaims.length > 0 ? `${pendingClaims.length} payout${pendingClaims.length === 1 ? '' : 's'} waiting` : 'none yet'}
-                tone={pendingClaims.length > 0 ? 'text-[#55a630]' : 'text-text-secondary'}
+                tone={pendingClaims.length > 0 ? 'text-[#E85D3D]' : 'text-text-secondary'}
               />
               <Stat
                 label="Total Claimed"
@@ -168,9 +168,9 @@ export default function InsurancePage() {
                       <span
                         className="text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-full"
                         style={{
-                          color: '#55a630',
-                          background: '#55a6301f',
-                          border: '1px solid #55a63055',
+                          color: '#E85D3D',
+                          background: '#E85D3D1f',
+                          border: '1px solid #E85D3D55',
                         }}
                       >
                         pending
@@ -179,7 +179,7 @@ export default function InsurancePage() {
                         <p className="text-sm font-semibold text-text-primary truncate">
                           {c.instrument_symbol || '—'}{' '}
                           <span className="text-text-tertiary">·</span>{' '}
-                          <span className="text-[#55a630]">{formatTier(c.tier)}</span>
+                          <span className="text-[#E85D3D]">{formatTier(c.tier)}</span>
                         </p>
                         <p className="text-[10px] text-text-tertiary">
                           Loss ${Number(c.loss_amount).toFixed(2)}
@@ -194,7 +194,7 @@ export default function InsurancePage() {
                         type="button"
                         onClick={() => handleClaim(c.id, c.claim_amount)}
                         disabled={claimingId === c.id}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-semibold bg-[#55a630] hover:bg-[#4a9329] text-black disabled:opacity-60 disabled:cursor-wait transition-colors"
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-semibold bg-[#E85D3D] hover:bg-[#4a9329] text-black disabled:opacity-60 disabled:cursor-wait transition-colors"
                       >
                         {claimingId === c.id ? (
                           <>
@@ -240,7 +240,7 @@ export default function InsurancePage() {
                           <p className="text-sm font-semibold text-text-primary truncate">
                             {p.instrument_symbol || '—'}{' '}
                             <span className="text-text-tertiary">·</span>{' '}
-                            <span className="text-[#55a630]">{formatTier(p.tier)}</span>
+                            <span className="text-[#E85D3D]">{formatTier(p.tier)}</span>
                           </p>
                           {reason && (p.status === 'denied' || p.status === 'expired') && (
                             <p className="text-[11px] text-text-tertiary mt-0.5">
@@ -275,7 +275,7 @@ export default function InsurancePage() {
                         <p className="text-sm text-text-primary">
                           {c.instrument_symbol || '—'}{' '}
                           <span className="text-text-tertiary">·</span>{' '}
-                          <span className="text-[#55a630]">{formatTier(c.tier)}</span>
+                          <span className="text-[#E85D3D]">{formatTier(c.tier)}</span>
                           <span className="text-text-tertiary"> · </span>
                           Loss ${Number(c.loss_amount).toFixed(2)} → payout{' '}
                           <span className="font-bold text-green-500">${Number(c.claim_amount).toFixed(2)}</span>
@@ -302,8 +302,8 @@ function Card({ title, children, accent = false }: { title: string; children: Re
       className="rounded-2xl p-4 md:p-5"
       style={{
         background: 'var(--bg-card)',
-        border: accent ? '1px solid #55a63080' : '1px solid var(--border-primary)',
-        boxShadow: accent ? '0 0 0 1px #55a63022 inset' : undefined,
+        border: accent ? '1px solid #E85D3D80' : '1px solid var(--border-primary)',
+        boxShadow: accent ? '0 0 0 1px #E85D3D22 inset' : undefined,
       }}
     >
       <h2 className="text-base font-bold text-text-primary mb-3">{title}</h2>

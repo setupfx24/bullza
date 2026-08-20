@@ -64,7 +64,7 @@ const AboutUs = () => {
           className="absolute inset-0"
           style={{
             background:
-              'radial-gradient(60% 50% at 50% 0%, rgba(85,166,48,0.18) 0%, transparent 60%), ' +
+              'radial-gradient(60% 50% at 50% 0%, rgba(232, 93, 61,0.18) 0%, transparent 60%), ' +
               'radial-gradient(45% 35% at 50% 100%, rgba(208,0,0,0.10) 0%, transparent 70%)',
           }}
         />
@@ -84,11 +84,11 @@ const AboutUs = () => {
             <span
               className="inline-flex items-center gap-2 px-3 py-1 rounded-full mb-6"
               style={{
-                background: 'rgba(85,166,48,0.18)',
-                border: '1px solid rgba(85,166,48,0.4)',
+                background: 'rgba(232, 93, 61,0.18)',
+                border: '1px solid rgba(232, 93, 61,0.4)',
               }}
             >
-              <span className="size-1.5 rounded-full" style={{ background: '#55a630' }} />
+              <span className="size-1.5 rounded-full" style={{ background: '#E85D3D' }} />
               <span className="text-[11px] uppercase tracking-[0.22em] font-semibold text-white">About {BRAND_NAME}</span>
             </span>
             <h1

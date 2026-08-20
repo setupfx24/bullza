@@ -50,7 +50,7 @@ export default function AiAutoTradingPage() {
             src="https://images.unsplash.com/photo-1620712943543-bcc4688e7485?auto=format&fit=crop&w=900&q=80"
             alt="AI neural-network visualisation"
             className="rounded-2xl w-full min-h-[260px] max-h-[340px] object-cover"
-            style={{ border: '1px solid hsl(99 55% 42% / 0.35)' }}
+            style={{ border: '1px solid hsl(11 79% 57% / 0.35)' }}
           />
         </div>
       </section>

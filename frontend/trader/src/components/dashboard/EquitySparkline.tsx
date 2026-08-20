@@ -60,7 +60,7 @@ export function EquitySparkline({
       style={{ height }}
       aria-hidden
     >
-      <path d={path} fill="none" stroke="#55a630" strokeWidth={2.4} vectorEffect="non-scaling-stroke" />
+      <path d={path} fill="none" stroke="#E85D3D" strokeWidth={2.4} vectorEffect="non-scaling-stroke" />
     </svg>
   );
 }

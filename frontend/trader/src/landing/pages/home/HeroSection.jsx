@@ -79,7 +79,7 @@ export default function HeroSection() {
                     className="shrink-0 w-9 h-9 rounded-full flex items-center justify-center"
                     style={{
                       background: 'var(--fx-gold-soft)',
-                      border: '1px solid rgba(85,166,48,0.28)',
+                      border: '1px solid rgba(232, 93, 61,0.28)',
                     }}
                   >
                     <Icon size={15} style={{ color: 'var(--fx-gold-light)' }} />

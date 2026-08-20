@@ -310,7 +310,7 @@ export default function SupportPage() {
 
       <DashboardShell mainClassName="flex items-center justify-center">
         <div className="flex flex-col items-center gap-3 py-12">
-          <div className="w-8 h-8 border-2 border-[#55a630] border-t-transparent rounded-full animate-spin" />
+          <div className="w-8 h-8 border-2 border-[#E85D3D] border-t-transparent rounded-full animate-spin" />
           <span className="text-sm text-[#888]">Loading support...</span>
         </div>
       </DashboardShell>
@@ -504,13 +504,13 @@ export default function SupportPage() {
 
                     href={`mailto:${SUPPORT_EMAIL}`}
 
-                    className="flex-1 inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-md border border-[#55a630]/25 bg-[#55a630]/5 hover:bg-[#55a630]/10 transition-colors text-xs font-medium text-text-primary"
+                    className="flex-1 inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-md border border-[#E85D3D]/25 bg-[#E85D3D]/5 hover:bg-[#E85D3D]/10 transition-colors text-xs font-medium text-text-primary"
 
                     title={`Email ${SUPPORT_EMAIL}`}
 
                   >
 
-                    <Mail size={13} className="text-[#55a630]" />
+                    <Mail size={13} className="text-[#E85D3D]" />
 
                     Email
 

@@ -12,8 +12,8 @@
    "show only current month days" is satisfied by showOutsideDays={false}
    in the component; these rules just style what's visible. */
 .dob-popover .rdp-root {
-  --rdp-accent-color: #55a630;
-  --rdp-accent-background-color: rgba(85, 166, 48, 0.18);
+  --rdp-accent-color: #E85D3D;
+  --rdp-accent-background-color: rgba(232, 93, 61, 0.18);
   --rdp-day-height: 36px;
   --rdp-day-width: 36px;
   --rdp-day_button-height: 36px;
@@ -44,18 +44,18 @@
   color: var(--text-primary, #f5f5f5);
 }
 .dob-popover .rdp-day_button:hover:not(.rdp-day_disabled .rdp-day_button) {
-  background: rgba(85, 166, 48, 0.12);
+  background: rgba(232, 93, 61, 0.12);
 }
 .dob-popover .rdp-day_disabled {
   opacity: 0.32;
   pointer-events: none;
 }
 .dob-popover .rdp-today:not(.rdp-selected) .rdp-day_button {
-  color: #55a630;
+  color: #E85D3D;
   font-weight: 700;
 }
 .dob-popover .rdp-selected .rdp-day_button {
-  background: #55a630 !important;
+  background: #E85D3D !important;
   color: #0a0a0a !important;
   font-weight: 700;
 }
@@ -76,7 +76,7 @@
 /* CSS VARIABLES — DARK (Vantablack) THEME */
 /* ======================================= */
 
-/* Dark theme — aligned with crucial-ui (SetupFX): #0a0a0a base, #111 cards, #55a630 accent */
+/* Dark theme — aligned with crucial-ui (SetupFX): #0a0a0a base, #111 cards, #E85D3D accent */
 [data-theme="dark"], .theme-dark {
   --bg-page: #050707;
   --bg-base: #0a0a0a;
@@ -110,11 +110,11 @@
   --input-bg: #111111;
   --input-border: #1f1f1f;
   --input-shadow: inset 0 2px 6px rgba(0,0,0,0.5), inset 0 0 0 1px rgba(0,0,0,0.2), 0 1px 0 rgba(255,255,255,0.02);
-  --input-focus-border: rgba(85,166,48, 0.55);
-  --input-focus-shadow: inset 0 2px 6px rgba(0,0,0,0.5), inset 0 0 0 1px rgba(85,166,48, 0.12), 0 0 0 3px rgba(85,166,48, 0.12);
+  --input-focus-border: rgba(232, 93, 61, 0.55);
+  --input-focus-shadow: inset 0 2px 6px rgba(0,0,0,0.5), inset 0 0 0 1px rgba(232, 93, 61, 0.12), 0 0 0 3px rgba(232, 93, 61, 0.12);
   --input-placeholder: #555555;
 
-  --selection-bg: rgba(85,166,48, 0.22);
+  --selection-bg: rgba(232, 93, 61, 0.22);
 
   --noise-opacity: 0.012;
   --emboss-bg: rgba(0, 0, 0, 0.5);
@@ -123,7 +123,7 @@
   /* react-hot-toast — always dark surface (readable on charts + light UI) */
   --toast-bg: #111111;
   --toast-fg: #f0f0f0;
-  --toast-border: rgba(85,166,48, 0.28);
+  --toast-border: rgba(232, 93, 61, 0.28);
 
   color-scheme: dark;
 }
@@ -134,14 +134,14 @@
 /* ======================================= */
 
 [data-theme="light"] {
-  /* Soft sage-gray canvas behind white cards — the premium-fintech
-     backdrop from the 2026-08-20 dashboard redesign reference. Dark
-     theme defines its own --bg-page; this was previously missing here,
-     leaving bg-bg-page unresolved in light mode. */
-  --bg-page: #eef0ed;
-  --bg-base: #ffffff;
+  /* Warm neutral canvas behind white cards — the premium-fintech backdrop
+     from the 2026-08-20 redesign reference. Dark theme defines its own
+     --bg-page; this was previously missing here, leaving bg-bg-page
+     unresolved in light mode. */
+  --bg-page: #edece7;
+  --bg-base: #f4f3ef;
   --bg-primary: #ffffff;
-  --bg-secondary: #f9fafb;
+  --bg-secondary: #faf9f7;
   --bg-tertiary: #f3f4f6;
   --bg-hover: #f3f4f6;
   --bg-active: #e5e7eb;
@@ -220,12 +220,12 @@
   --scrollbar-hover: #3a3a3a;
   --input-bg: #111111;
   --input-border: #1f1f1f;
-  --input-focus-border: rgba(85,166,48, 0.55);
-  --input-focus-shadow: inset 0 2px 6px rgba(0,0,0,0.5), 0 0 0 3px rgba(85,166,48, 0.12);
-  --selection-bg: rgba(85,166,48, 0.22);
+  --input-focus-border: rgba(232, 93, 61, 0.55);
+  --input-focus-shadow: inset 0 2px 6px rgba(0,0,0,0.5), 0 0 0 3px rgba(232, 93, 61, 0.12);
+  --selection-bg: rgba(232, 93, 61, 0.22);
   --toast-bg: #111111;
   --toast-fg: #f0f0f0;
-  --toast-border: rgba(85,166,48, 0.28);
+  --toast-border: rgba(232, 93, 61, 0.28);
   color-scheme: dark;
 }
 
@@ -369,8 +369,8 @@ html, body {
   width: 34px;
   height: 34px;
   border-radius: 50%;
-  border: 3px solid rgba(85, 166, 48, 0.22);
-  border-top-color: #55a630;
+  border: 3px solid rgba(232, 93, 61, 0.22);
+  border-top-color: #E85D3D;
   animation: brand-splash-spin 0.8s linear infinite;
 }
 @keyframes brand-splash-pop {
@@ -640,30 +640,30 @@ html {
 }
 
 .skeu-btn-buy {
-  background: linear-gradient(180deg, #7dc24f 0%, #55a630 50%, #3f7d22 100%);
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.18), inset 0 -2px 0 rgba(0,0,0,0.15), 0 4px 16px rgba(85,166,48,0.28), 0 2px 4px rgba(0,0,0,0.15);
+  background: linear-gradient(180deg, #F08063 0%, #E85D3D 50%, #C9482D 100%);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.18), inset 0 -2px 0 rgba(0,0,0,0.15), 0 4px 16px rgba(232, 93, 61,0.28), 0 2px 4px rgba(0,0,0,0.15);
   color: #ffffff;
 }
 .skeu-btn-buy:hover {
-  background: linear-gradient(180deg, #f5d984 0%, #7dc24f 50%, #55a630 100%);
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.22), inset 0 -2px 0 rgba(0,0,0,0.12), 0 6px 24px rgba(85,166,48,0.38);
+  background: linear-gradient(180deg, #f5d984 0%, #F08063 50%, #E85D3D 100%);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.22), inset 0 -2px 0 rgba(0,0,0,0.12), 0 6px 24px rgba(232, 93, 61,0.38);
 }
 .skeu-btn-buy:active {
-  background: linear-gradient(180deg, #55a630 0%, #3f7d22 100%);
-  box-shadow: inset 0 2px 6px rgba(0,0,0,0.35), 0 2px 8px rgba(85,166,48,0.2);
+  background: linear-gradient(180deg, #E85D3D 0%, #C9482D 100%);
+  box-shadow: inset 0 2px 6px rgba(0,0,0,0.35), 0 2px 8px rgba(232, 93, 61,0.2);
   transform: translateY(1px);
 }
 [data-theme="light"] .skeu-btn-buy,
 .theme-light .skeu-btn-buy {
-  background: #55a630;
+  background: #E85D3D;
   color: #ffffff;
   border: none;
-  box-shadow: 0 2px 8px rgba(85,166,48, 0.3);
+  box-shadow: 0 2px 8px rgba(232, 93, 61, 0.3);
 }
 [data-theme="light"] .skeu-btn-buy:hover,
 .theme-light .skeu-btn-buy:hover {
-  background: #3f7d22;
-  box-shadow: 0 4px 12px rgba(85,166,48, 0.4);
+  background: #C9482D;
+  box-shadow: 0 4px 12px rgba(232, 93, 61, 0.4);
 }
 
 .skeu-btn-sell {
@@ -740,7 +740,7 @@ html {
 
 .flash-blue { animation: flashAccent 0.15s ease-out; }
 .flash-red { animation: flashRed 0.15s ease-out; }
-@keyframes flashAccent { 0% { background-color: rgba(85,166,48,0.22); } 100% { background-color: transparent; } }
+@keyframes flashAccent { 0% { background-color: rgba(232, 93, 61,0.22); } 100% { background-color: transparent; } }
 @keyframes flashRed { 0% { background-color: rgba(239,68,68,0.2); } 100% { background-color: transparent; } }
 
 /* react-hot-toast — library defaults are washed-out white squares; reskin
@@ -806,8 +806,8 @@ html {
 
 /* Sidebar icon glow pulse */
 @keyframes iconGlowPulse {
-  0%, 100% { filter: drop-shadow(0 0 4px rgba(85,166,48,0.15)); }
-  50%      { filter: drop-shadow(0 0 10px rgba(85,166,48,0.55)); }
+  0%, 100% { filter: drop-shadow(0 0 4px rgba(232, 93, 61,0.15)); }
+  50%      { filter: drop-shadow(0 0 10px rgba(232, 93, 61,0.55)); }
 }
 .sidebar-icon-glow {
   animation: iconGlowPulse 2.5s ease-in-out infinite;
@@ -821,7 +821,7 @@ html {
 
 .resize-handle-h { cursor: col-resize; }
 .resize-handle-v { cursor: row-resize; }
-.focus-ring:focus { outline: 1px solid #55a630; outline-offset: -1px; }
+.focus-ring:focus { outline: 1px solid #E85D3D; outline-offset: -1px; }
 .no-drag { -webkit-user-drag: none; user-select: none; }
 
 @layer components {
@@ -978,8 +978,8 @@ html {
     box-shadow: none !important;
   }
   .accounts-native-select:focus {
-    border-color: rgba(85,166,48, 0.55) !important;
-    box-shadow: 0 0 0 2px rgba(85,166,48, 0.2) !important;
+    border-color: rgba(232, 93, 61, 0.55) !important;
+    box-shadow: 0 0 0 2px rgba(232, 93, 61, 0.2) !important;
   }
   .accounts-native-select option {
     background-color: var(--bg-secondary);

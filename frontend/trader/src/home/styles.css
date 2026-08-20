@@ -18,7 +18,7 @@
   /* ── Raw palette (HSL triplets, no hsl() so Tailwind alpha works) ── */
   --ink:           0 0% 6%;
   --cream:         0 0% 96%;
-  --brand-green:  99 55% 42%;       /* #55a630 — primary */
+  --brand-green:  11 79% 57%;       /* #E85D3D — primary */
   --brand-red:     0 100% 41%;      /* #d00000 — destructive */
 
   --background:               var(--ink);
@@ -141,7 +141,7 @@
   border-radius: inherit;
   padding: 1.4px;
   background: linear-gradient(135deg,
-    rgba(85, 166, 48, 0.85) 0%,
+    rgba(232, 93, 61, 0.85) 0%,
     rgba(255, 255, 255, 0.25) 35%,
     rgba(255, 255, 255, 0)   55%,
     rgba(255, 255, 255, 0.25) 70%,
@@ -171,7 +171,7 @@
   border-radius: inherit;
   padding: 1.6px;
   background: linear-gradient(135deg,
-    rgba(85, 166, 48, 1) 0%,
+    rgba(232, 93, 61, 1) 0%,
     rgba(255, 255, 255, 0.35) 30%,
     rgba(255, 255, 255, 0.05) 55%,
     rgba(255, 255, 255, 0.35) 75%,

@@ -48,11 +48,11 @@ function CheckEmailContent() {
             <div style={{ width: '100%', maxWidth: 460, textAlign: 'center', padding: '48px 24px' }}>
               <div style={{
                 width: 84, height: 84, borderRadius: '50%',
-                background: 'rgba(85,166,48,0.14)', border: '2px solid rgba(85,166,48,0.4)',
+                background: 'rgba(232, 93, 61,0.14)', border: '2px solid rgba(232, 93, 61,0.4)',
                 margin: '0 auto 24px', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                boxShadow: '0 0 0 6px rgba(85,166,48,0.05)',
+                boxShadow: '0 0 0 6px rgba(232, 93, 61,0.05)',
               }}>
-                <CheckCircle2 size={44} strokeWidth={2.25} style={{ color: '#55a630' }} />
+                <CheckCircle2 size={44} strokeWidth={2.25} style={{ color: '#E85D3D' }} />
               </div>
               <h2 className="auth-form__title" style={{ fontSize: 28, marginBottom: 16 }}>
                 Please check your email.

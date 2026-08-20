@@ -33,7 +33,7 @@ export function Hero() {
             colorCycleSpeed={1.4}
             brightness={0.22}
             color1="#d00000"
-            color2="#55a630"
+            color2="#E85D3D"
             color3="#ffffff"
             enableMouseInteraction
             mouseInfluence={2}
@@ -103,8 +103,8 @@ export function Hero() {
             transition={{ delay: 1.6, duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
             className="mt-8 inline-flex items-center gap-2.5 rounded-full px-3 py-1.5 pointer-events-auto"
             style={{
-              background: 'rgba(85,166,48,0.18)',
-              border: '1px solid rgba(85,166,48,0.45)',
+              background: 'rgba(232, 93, 61,0.18)',
+              border: '1px solid rgba(232, 93, 61,0.45)',
               backdropFilter: 'blur(8px)',
             }}
           >

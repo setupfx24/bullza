@@ -26,7 +26,7 @@ export function CtaFooter() {
         className="absolute inset-0 w-full h-full"
         style={{
           background:
-            'radial-gradient(60% 50% at 50% 50%, rgba(85,166,48,0.12) 0%, rgba(0,0,0,0.7) 60%, #000 100%)',
+            'radial-gradient(60% 50% at 50% 50%, rgba(232, 93, 61,0.12) 0%, rgba(0,0,0,0.7) 60%, #000 100%)',
         }}
         aria-hidden
       />

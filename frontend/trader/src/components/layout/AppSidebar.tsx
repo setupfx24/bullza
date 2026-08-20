@@ -159,10 +159,10 @@ export default function AppSidebar() {
                       size={17}
                       strokeWidth={1.85}
                       className={cn(
-                        'shrink-0 transition-[filter,color] sidebar-icon-glow text-[#55a630]',
+                        'shrink-0 transition-[filter,color] sidebar-icon-glow text-[#E85D3D]',
                         groupActive
-                          ? 'drop-shadow-[0_0_8px_rgba(85,166,48,0.55)]'
-                          : 'drop-shadow-[0_0_6px_rgba(85,166,48,0.35)]',
+                          ? 'drop-shadow-[0_0_8px_rgba(232, 93, 61,0.55)]'
+                          : 'drop-shadow-[0_0_6px_rgba(232, 93, 61,0.35)]',
                       )}
                     />
                     <span className="truncate flex-1 text-left">{entry.label}</span>
@@ -189,7 +189,7 @@ export default function AppSidebar() {
                                 : 'text-text-secondary hover:text-text-primary hover:bg-bg-hover border border-transparent',
                             )}
                           >
-                            <child.icon size={14} strokeWidth={1.85} className="shrink-0 text-[#55a630]/85" />
+                            <child.icon size={14} strokeWidth={1.85} className="shrink-0 text-[#E85D3D]/85" />
                             <span className="truncate">{child.label}</span>
                           </Link>
                         );
@@ -220,10 +220,10 @@ export default function AppSidebar() {
                   size={17}
                   strokeWidth={1.85}
                   className={cn(
-                    'shrink-0 transition-[filter,color] sidebar-icon-glow text-[#55a630]',
+                    'shrink-0 transition-[filter,color] sidebar-icon-glow text-[#E85D3D]',
                     isActive
-                      ? 'drop-shadow-[0_0_8px_rgba(85,166,48,0.55)]'
-                      : 'drop-shadow-[0_0_6px_rgba(85,166,48,0.35)]',
+                      ? 'drop-shadow-[0_0_8px_rgba(232, 93, 61,0.55)]'
+                      : 'drop-shadow-[0_0_6px_rgba(232, 93, 61,0.35)]',
                   )}
                 />
                 <span className="truncate">{entry.label}</span>

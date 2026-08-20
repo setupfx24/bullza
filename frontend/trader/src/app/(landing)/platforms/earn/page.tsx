@@ -15,7 +15,7 @@ export default function EarnMarketingPage() {
       <div className="fx-glow-gold" aria-hidden="true" />
 
       <section className="fx-container relative z-10 pt-28 md:pt-36 pb-16">
-        <p className="text-xs uppercase tracking-[0.25em] text-[#55a630]/85 mb-3">Earn</p>
+        <p className="text-xs uppercase tracking-[0.25em] text-[#E85D3D]/85 mb-3">Earn</p>
         <h1 className="fx-headline text-[40px] sm:text-[52px] md:text-[64px] xl:text-[72px] leading-tight max-w-4xl">
           Earn Beyond
           <br />
@@ -26,10 +26,10 @@ export default function EarnMarketingPage() {
           benefits. Trade. Engage. Progress. Earn.
         </p>
         <div className="mt-8 flex flex-wrap gap-3">
-          <Link href="/earn/tasks" className="inline-flex items-center gap-2 px-5 py-3 rounded-lg bg-[#55a630] text-bg-base font-bold text-sm hover:brightness-110">
+          <Link href="/earn/tasks" className="inline-flex items-center gap-2 px-5 py-3 rounded-lg bg-[#E85D3D] text-bg-base font-bold text-sm hover:brightness-110">
             Start Earning <ArrowRight size={14} />
           </Link>
-          <Link href="/earn/store" className="inline-flex items-center gap-2 px-5 py-3 rounded-lg border border-[#55a630]/40 text-text-primary text-sm hover:border-[#55a630]/70">
+          <Link href="/earn/store" className="inline-flex items-center gap-2 px-5 py-3 rounded-lg border border-[#E85D3D]/40 text-text-primary text-sm hover:border-[#E85D3D]/70">
             Explore Rewards
           </Link>
         </div>
@@ -65,7 +65,7 @@ export default function EarnMarketingPage() {
       </section>
 
       <section className="fx-container relative z-10 py-20">
-        <div className="rounded-2xl border border-[#55a630]/30 p-10 md:p-14 text-center bg-[rgba(85,166,48,0.04)]">
+        <div className="rounded-2xl border border-[#E85D3D]/30 p-10 md:p-14 text-center bg-[rgba(232, 93, 61,0.04)]">
           <h2 className="text-2xl md:text-3xl font-bold mb-3" style={{ color: 'var(--fx-text)' }}>
             Start Your Reward Journey
           </h2>
@@ -73,10 +73,10 @@ export default function EarnMarketingPage() {
             Every action you take moves you forward.
           </p>
           <div className="flex justify-center gap-3 flex-wrap">
-            <Link href="/auth/register" className="inline-flex items-center gap-2 px-6 py-3 rounded-lg bg-[#55a630] text-bg-base font-bold text-sm hover:brightness-110">
+            <Link href="/auth/register" className="inline-flex items-center gap-2 px-6 py-3 rounded-lg bg-[#E85D3D] text-bg-base font-bold text-sm hover:brightness-110">
               Get Started <ArrowRight size={14} />
             </Link>
-            <Link href="/earn/tasks" className="inline-flex items-center gap-2 px-6 py-3 rounded-lg border border-[#55a630]/40 text-text-primary text-sm hover:border-[#55a630]/70">
+            <Link href="/earn/tasks" className="inline-flex items-center gap-2 px-6 py-3 rounded-lg border border-[#E85D3D]/40 text-text-primary text-sm hover:border-[#E85D3D]/70">
               Go to Dashboard
             </Link>
           </div>
@@ -88,10 +88,10 @@ export default function EarnMarketingPage() {
 
 function Card({ icon: Icon, title, tagline, body }: { icon: any; title: string; tagline: string; body: string }) {
   return (
-    <div className="rounded-xl border border-[#55a630]/25 p-6 bg-[rgba(255,255,255,0.02)]">
-      <Icon size={24} className="text-[#55a630] mb-3" />
+    <div className="rounded-xl border border-[#E85D3D]/25 p-6 bg-[rgba(255,255,255,0.02)]">
+      <Icon size={24} className="text-[#E85D3D] mb-3" />
       <h3 className="text-2xl font-bold mb-1" style={{ color: 'var(--fx-text)' }}>{title}</h3>
-      <p className="text-xs uppercase tracking-wider text-[#55a630]/80 mb-3">{tagline}</p>
+      <p className="text-xs uppercase tracking-wider text-[#E85D3D]/80 mb-3">{tagline}</p>
       <p className="text-sm leading-relaxed" style={{ color: 'var(--fx-text-2)' }}>{body}</p>
     </div>
   );
@@ -99,8 +99,8 @@ function Card({ icon: Icon, title, tagline, body }: { icon: any; title: string; 
 
 function MiniCard({ icon: Icon, title, body }: { icon: any; title: string; body: string }) {
   return (
-    <div className="rounded-lg border border-[#55a630]/20 p-5 bg-[rgba(255,255,255,0.02)]">
-      <Icon size={18} className="text-[#55a630] mb-2" />
+    <div className="rounded-lg border border-[#E85D3D]/20 p-5 bg-[rgba(255,255,255,0.02)]">
+      <Icon size={18} className="text-[#E85D3D] mb-2" />
       <h3 className="font-semibold text-sm mb-1" style={{ color: 'var(--fx-text)' }}>{title}</h3>
       <p className="text-xs" style={{ color: 'var(--fx-text-2)' }}>{body}</p>
     </div>

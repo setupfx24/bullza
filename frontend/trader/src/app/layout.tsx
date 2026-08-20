@@ -48,7 +48,7 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 1,
   userScalable: false,
-  themeColor: '#ffffff',
+  themeColor: '#edece7',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -57,7 +57,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <head>
         <script
           dangerouslySetInnerHTML={{
-            __html: `(function(){try{var L='trader-ui',N='trader-ui';var o=localStorage.getItem(L),n=localStorage.getItem(N);if(o&&!n){localStorage.setItem(N,o);localStorage.removeItem(L);}var s=localStorage.getItem(N);var t='light';if(s){var j=JSON.parse(s);t=(j&&j.state&&j.state.theme)||(j&&j.theme)||'light';}var d=document.documentElement;d.setAttribute('data-theme',t);d.classList.add(t==='light'?'theme-light':'theme-dark');if(t==='light'){d.style.backgroundColor='#ffffff';d.style.color='#111827';}else{d.style.backgroundColor='#0a0a0a';d.style.color='#ffffff';}}catch(e){document.documentElement.setAttribute('data-theme','light');document.documentElement.style.backgroundColor='#ffffff';document.documentElement.style.color='#111827';}})();`,
+            __html: `(function(){try{var L='trader-ui',N='trader-ui';var o=localStorage.getItem(L),n=localStorage.getItem(N);if(o&&!n){localStorage.setItem(N,o);localStorage.removeItem(L);}var s=localStorage.getItem(N);var t='light';if(s){var j=JSON.parse(s);t=(j&&j.state&&j.state.theme)||(j&&j.theme)||'light';}var d=document.documentElement;d.setAttribute('data-theme',t);d.classList.add(t==='light'?'theme-light':'theme-dark');if(t==='light'){d.style.backgroundColor='#f4f3ef';d.style.color='#111827';}else{d.style.backgroundColor='#0a0a0a';d.style.color='#ffffff';}}catch(e){document.documentElement.setAttribute('data-theme','light');document.documentElement.style.backgroundColor='#ffffff';document.documentElement.style.color='#111827';}})();`,
           }}
         />
 
@@ -106,7 +106,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                   className: 'brand-hot-toast',
                   // White check on a gold disc reads as "good" instantly on
                   // dark surface without losing the brand accent.
-                  iconTheme: { primary: '#55a630', secondary: '#1a1408' },
+                  iconTheme: { primary: '#E85D3D', secondary: '#1a1408' },
                 },
                 error: {
                   duration: 4000,
@@ -118,7 +118,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 loading: {
                   duration: Infinity,
                   className: 'brand-hot-toast',
-                  iconTheme: { primary: '#55a630', secondary: 'var(--toast-bg)' },
+                  iconTheme: { primary: '#E85D3D', secondary: 'var(--toast-bg)' },
                 },
               }}
             />

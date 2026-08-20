@@ -238,8 +238,8 @@ export default function PrivacyPage() {
           <div
             className="rounded-xl p-5 text-sm space-y-1"
             style={{
-              background: 'hsl(99 55% 42% / 0.10)',
-              border: '1px solid hsl(99 55% 42% / 0.35)',
+              background: 'hsl(11 79% 57% / 0.10)',
+              border: '1px solid hsl(11 79% 57% / 0.35)',
             }}
           >
             <p className="font-semibold text-foreground">{BRAND_NAME} Support Team</p>

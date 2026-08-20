@@ -70,7 +70,7 @@ export function AccountHero({
                 className="text-[9px] uppercase tracking-wider font-extrabold px-1.5 py-0.5 rounded-full"
                 style={a?.is_demo
                   ? { color: '#f59e0b', background: 'rgba(245,158,11,0.12)' }
-                  : { color: '#55a630', background: 'rgba(85,166,48,0.12)' }}
+                  : { color: '#E85D3D', background: 'rgba(232, 93, 61,0.12)' }}
               >
                 {a?.is_demo ? 'Demo' : 'Real'}
               </span>
@@ -101,7 +101,7 @@ export function AccountHero({
                       className="text-[9px] uppercase tracking-wider font-extrabold px-1.5 py-0.5 rounded-full"
                       style={acc.is_demo
                         ? { color: '#f59e0b', background: 'rgba(245,158,11,0.12)' }
-                        : { color: '#55a630', background: 'rgba(85,166,48,0.12)' }}
+                        : { color: '#E85D3D', background: 'rgba(232, 93, 61,0.12)' }}
                     >
                       {acc.is_demo ? 'Demo' : 'Real'}
                     </span>
@@ -133,7 +133,7 @@ export function AccountHero({
             <Link
               href="/wallet"
               className="inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-xs font-extrabold transition-transform hover:scale-[1.02]"
-              style={{ background: '#55a630', color: '#0c1105' }}
+              style={{ background: '#E85D3D', color: '#0c1105' }}
             >
               <ArrowDownToLine size={13} /> Deposit
             </Link>

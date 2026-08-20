@@ -254,8 +254,8 @@ export function ChatBot() {
             transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
             className="fixed bottom-20 right-5 sm:bottom-24 sm:right-6 z-[80] size-14 rounded-full flex items-center justify-center shadow-2xl"
             style={{
-              background: 'linear-gradient(135deg, hsl(99 55% 42%) 0%, hsl(99 60% 28%) 100%)',
-              boxShadow: '0 8px 28px rgba(85,166,48,0.45), 0 0 0 4px rgba(85,166,48,0.15)',
+              background: 'linear-gradient(135deg, hsl(11 79% 57%) 0%, hsl(11 79% 57%) 100%)',
+              boxShadow: '0 8px 28px rgba(232, 93, 61,0.45), 0 0 0 4px rgba(232, 93, 61,0.15)',
             }}
           >
             <MessageCircle className="size-6 text-white" />
@@ -271,7 +271,7 @@ export function ChatBot() {
             <span
               aria-hidden
               className="absolute inset-0 rounded-full animate-ping"
-              style={{ background: 'hsl(99 55% 42% / 0.4)' }}
+              style={{ background: 'hsl(11 79% 57% / 0.4)' }}
             />
           </motion.button>
         )}
@@ -289,8 +289,8 @@ export function ChatBot() {
             style={{
               height: minimised ? 'auto' : 'min(580px, calc(100vh - 11rem))',
               background: 'hsl(0 0% 7%)',
-              border: '1px solid hsl(99 55% 42% / 0.35)',
-              boxShadow: '0 20px 60px rgba(0,0,0,0.6), 0 0 0 1px rgba(85,166,48,0.08)',
+              border: '1px solid hsl(11 79% 57% / 0.35)',
+              boxShadow: '0 20px 60px rgba(0,0,0,0.6), 0 0 0 1px rgba(232, 93, 61,0.08)',
             }}
             role="dialog"
             aria-label={`${BRAND_NAME} assistant chat`}
@@ -298,9 +298,9 @@ export function ChatBot() {
             {/* Header */}
             <div
               className="flex items-center gap-3 px-4 py-3 border-b border-foreground/10"
-              style={{ background: 'linear-gradient(135deg, hsl(99 55% 42% / 0.18) 0%, hsl(0 0% 7%) 100%)' }}
+              style={{ background: 'linear-gradient(135deg, hsl(11 79% 57% / 0.18) 0%, hsl(0 0% 7%) 100%)' }}
             >
-              <div className="size-9 rounded-full flex items-center justify-center" style={{ background: 'hsl(99 55% 42% / 0.3)' }}>
+              <div className="size-9 rounded-full flex items-center justify-center" style={{ background: 'hsl(11 79% 57% / 0.3)' }}>
                 <Bot className="size-5 text-primary" />
               </div>
               <div className="flex-1 min-w-0">
@@ -350,8 +350,8 @@ export function ChatBot() {
                         className="text-xs font-semibold px-3.5 py-2 rounded-full transition"
                         style={{
                           color: '#ffffff',
-                          background: 'hsl(99 55% 42% / 0.22)',
-                          border: '1px solid hsl(99 55% 42% / 0.65)',
+                          background: 'hsl(11 79% 57% / 0.22)',
+                          border: '1px solid hsl(11 79% 57% / 0.65)',
                         }}
                       >
                         {q}
@@ -385,7 +385,7 @@ export function ChatBot() {
                     className="size-10 rounded-full flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed"
                     style={{
                       background:
-                        'linear-gradient(135deg, hsl(99 55% 42%) 0%, hsl(99 60% 28%) 100%)',
+                        'linear-gradient(135deg, hsl(11 79% 57%) 0%, hsl(11 79% 57%) 100%)',
                     }}
                   >
                     <Send className="size-4 text-white" />
@@ -406,7 +406,7 @@ function MessageBubble({ m }: { m: Msg }) {
     <div className={`flex items-end gap-2 ${isUser ? 'flex-row-reverse' : ''}`}>
       <div
         className={`size-7 rounded-full flex items-center justify-center shrink-0 ${isUser ? '' : ''}`}
-        style={{ background: isUser ? 'hsl(99 55% 42% / 0.25)' : 'hsl(0 0% 14%)' }}
+        style={{ background: isUser ? 'hsl(11 79% 57% / 0.25)' : 'hsl(0 0% 14%)' }}
       >
         {isUser ? <User className="size-3.5 text-primary" /> : <Bot className="size-3.5 text-primary" />}
       </div>
@@ -416,9 +416,9 @@ function MessageBubble({ m }: { m: Msg }) {
             isUser ? 'rounded-br-md' : 'rounded-bl-md'
           }`}
           style={{
-            background: isUser ? 'hsl(99 55% 42% / 0.28)' : 'hsl(0 0% 16%)',
+            background: isUser ? 'hsl(11 79% 57% / 0.28)' : 'hsl(0 0% 16%)',
             color: '#ffffff',
-            border: isUser ? '1px solid hsl(99 55% 42% / 0.5)' : '1px solid hsl(0 0% 22%)',
+            border: isUser ? '1px solid hsl(11 79% 57% / 0.5)' : '1px solid hsl(0 0% 22%)',
           }}
         >
           {m.text}

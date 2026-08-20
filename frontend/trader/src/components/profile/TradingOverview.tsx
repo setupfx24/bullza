@@ -28,7 +28,7 @@ import type { CalendarDayCell, TradingDashboardData } from '@/lib/trading-dashbo
 import { getTradingDashboardMock } from '@/lib/trading-dashboard';
 import TradingJournalSection from '@/components/profile/TradingJournalSection';
 
-const NEON = '#55a630';
+const NEON = '#E85D3D';
 const RED = '#FF4D4D';
 const CARD = 'var(--bg-card)';
 const BORDER = 'var(--border-primary)';
@@ -149,7 +149,7 @@ function EquityChart({ points }: { points: { date: string; equityUsd: number }[]
     <div className="relative w-full overflow-hidden rounded-xl border border-border-primary bg-bg-secondary p-3">
       <div className="flex flex-wrap items-center gap-3 mb-2 text-[10px] text-text-tertiary">
         <span className="flex items-center gap-1">
-          <span className="w-2 h-2 rounded-full bg-[#55a630]" /> Strong profit
+          <span className="w-2 h-2 rounded-full bg-[#E85D3D]" /> Strong profit
         </span>
         <span className="flex items-center gap-1">
           <span className="w-2 h-2 rounded-full bg-emerald-500" /> Small win
@@ -180,8 +180,8 @@ function EquityChart({ points }: { points: { date: string; equityUsd: number }[]
         })}
         <defs>
           <linearGradient id="eqFill" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#55a630" stopOpacity="0.25" />
-            <stop offset="100%" stopColor="#55a630" stopOpacity="0" />
+            <stop offset="0%" stopColor="#E85D3D" stopOpacity="0.25" />
+            <stop offset="100%" stopColor="#E85D3D" stopOpacity="0" />
           </linearGradient>
         </defs>
         {areaD ? <path d={areaD} fill="url(#eqFill)" /> : null}
@@ -191,7 +191,7 @@ function EquityChart({ points }: { points: { date: string; equityUsd: number }[]
             fill="none"
             stroke={NEON}
             strokeWidth={2}
-            className="drop-shadow-[0_0_8px_rgba(85,166,48,0.35)]"
+            className="drop-shadow-[0_0_8px_rgba(232, 93, 61,0.35)]"
           />
         ) : null}
         {hover ? (
@@ -301,7 +301,7 @@ export default function TradingOverview({ data }: { data?: TradingDashboardData 
         >
           <div className="p-3 md:p-4 border-b border-border-primary flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-2">
-              <Calendar className="w-5 h-5 text-[#55a630]" />
+              <Calendar className="w-5 h-5 text-[#E85D3D]" />
               <h3 className="font-bold text-text-primary">Trading calendar</h3>
             </div>
             <div className="flex items-center gap-1 flex-wrap">
@@ -319,7 +319,7 @@ export default function TradingOverview({ data }: { data?: TradingDashboardData 
                   onClick={() => setCalView(t.id)}
                   className={clsx(
                     'w-8 h-8 rounded-lg text-xs font-bold transition-colors',
-                    calView === t.id ? 'bg-[#55a630] text-text-inverse' : 'bg-bg-secondary text-text-tertiary hover:text-text-primary',
+                    calView === t.id ? 'bg-[#E85D3D] text-text-inverse' : 'bg-bg-secondary text-text-tertiary hover:text-text-primary',
                   )}
                 >
                   {t.label}
@@ -382,7 +382,7 @@ export default function TradingOverview({ data }: { data?: TradingDashboardData 
                 <button
                   type="button"
                   onClick={() => setCalMonth(startOfMonth(new Date()))}
-                  className="px-2 py-1 rounded-md text-[11px] font-semibold border border-[#55a630]/40 bg-[#55a630]/10 text-[#55a630] hover:bg-[#55a630]/20 transition-colors"
+                  className="px-2 py-1 rounded-md text-[11px] font-semibold border border-[#E85D3D]/40 bg-[#E85D3D]/10 text-[#E85D3D] hover:bg-[#E85D3D]/20 transition-colors"
                   title="Jump to current month"
                 >
                   Today
@@ -392,7 +392,7 @@ export default function TradingOverview({ data }: { data?: TradingDashboardData 
           </div>
 
           <div className="px-3 py-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] border-b border-border-primary bg-bg-secondary/40">
-            <span className="text-[#55a630] font-semibold">Monthly P&L {fmtCompactSigned(s.monthlyPnlUsd)}</span>
+            <span className="text-[#E85D3D] font-semibold">Monthly P&L {fmtCompactSigned(s.monthlyPnlUsd)}</span>
             <span className="text-text-tertiary">
               Active days <span className="text-text-primary">{s.activeDays}</span>
             </span>
@@ -403,7 +403,7 @@ export default function TradingOverview({ data }: { data?: TradingDashboardData 
               Lots <span className="text-text-primary">{s.lots.toFixed(2)}</span>
             </span>
             <span className="ml-auto text-text-tertiary">
-              <span className="text-[#55a630]">{s.wins}W</span> <span className="text-red-400">{s.losses}L</span>
+              <span className="text-[#E85D3D]">{s.wins}W</span> <span className="text-red-400">{s.losses}L</span>
             </span>
           </div>
 
@@ -431,7 +431,7 @@ export default function TradingOverview({ data }: { data?: TradingDashboardData 
                         'min-h-[72px] rounded-lg border p-1 flex flex-col',
                         !inMonth && 'opacity-25 border-transparent bg-transparent',
                         inMonth && !cell && 'border-border-primary bg-bg-secondary/40',
-                        inMonth && isWin && 'border-[#55a630]/50 bg-[#55a630]/10',
+                        inMonth && isWin && 'border-[#E85D3D]/50 bg-[#E85D3D]/10',
                         inMonth && isLoss && 'border-red-500/50 bg-red-500/10',
                       )}
                     >
@@ -442,7 +442,7 @@ export default function TradingOverview({ data }: { data?: TradingDashboardData 
                             <span
                               className={clsx(
                                 'text-[11px] font-bold leading-tight',
-                                cell.pnlUsd! >= 0 ? 'text-[#55a630]' : 'text-red-400',
+                                cell.pnlUsd! >= 0 ? 'text-[#E85D3D]' : 'text-red-400',
                               )}
                             >
                               {fmtCompactSigned(cell.pnlUsd!)}
@@ -486,34 +486,34 @@ export default function TradingOverview({ data }: { data?: TradingDashboardData 
           </div>
           <div className="rounded-xl p-4 border" style={{ backgroundColor: CARD, borderColor: BORDER }}>
             <div className="flex items-center gap-2 text-sm font-semibold mb-3">
-              <Target className="w-4 h-4 text-[#55a630]" />
+              <Target className="w-4 h-4 text-[#E85D3D]" />
               Trade win %
             </div>
-            <p className={clsx('text-3xl font-bold', d.stats.tradeWinPct >= 50 ? 'text-[#55a630]' : 'text-red-400')}>
+            <p className={clsx('text-3xl font-bold', d.stats.tradeWinPct >= 50 ? 'text-[#E85D3D]' : 'text-red-400')}>
               {d.stats.tradeWinPct.toFixed(1)}%
             </p>
             <div className="h-2 rounded-full bg-red-500/40 mt-3 overflow-hidden flex">
               <div
-                className="h-full bg-[#55a630]"
+                className="h-full bg-[#E85D3D]"
                 style={{ width: `${Math.min(100, d.stats.tradeWinPct)}%` }}
               />
             </div>
             <div className="flex justify-between text-[11px] mt-2">
-              <span className="text-[#55a630]">{j.wins} won</span>
+              <span className="text-[#E85D3D]">{j.wins} won</span>
               <span className="text-red-400">{j.losses} lost</span>
             </div>
           </div>
           <div className="rounded-xl p-4 border" style={{ backgroundColor: CARD, borderColor: BORDER }}>
             <div className="flex items-center gap-2 text-sm font-semibold mb-3">
-              <BarChart3 className="w-4 h-4 text-[#55a630]" />
+              <BarChart3 className="w-4 h-4 text-[#E85D3D]" />
               Performance
             </div>
             <ul className="space-y-2 text-sm">
               {[
-                ['Profit factor', d.stats.profitFactor.toFixed(2), 'text-[#55a630]'],
-                ['Avg win', fmtUsd(d.stats.avgWinUsd), 'text-[#55a630]'],
+                ['Profit factor', d.stats.profitFactor.toFixed(2), 'text-[#E85D3D]'],
+                ['Avg win', fmtUsd(d.stats.avgWinUsd), 'text-[#E85D3D]'],
                 ['Avg loss', fmtUsd(-d.stats.avgLossUsd), 'text-red-400'],
-                ['Period P&L', fmtCompactSigned(d.stats.periodPnlUsd), 'text-[#55a630]'],
+                ['Period P&L', fmtCompactSigned(d.stats.periodPnlUsd), 'text-[#E85D3D]'],
                 ['Total trades', String(d.stats.totalTrades), 'text-text-primary'],
               ].map(([k, v, c]) => (
                 <li key={k} className="flex justify-between gap-2">
@@ -530,7 +530,7 @@ export default function TradingOverview({ data }: { data?: TradingDashboardData 
       <section className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <div className="lg:col-span-2 rounded-xl p-4 border" style={{ backgroundColor: CARD, borderColor: BORDER }}>
           <div className="flex items-center gap-2 mb-3">
-            <LineChart className="w-5 h-5 text-[#55a630]" />
+            <LineChart className="w-5 h-5 text-[#E85D3D]" />
             <h3 className="font-bold text-text-primary">Equity growth</h3>
           </div>
           <EquityChart points={d.equity} />
@@ -540,11 +540,11 @@ export default function TradingOverview({ data }: { data?: TradingDashboardData 
             <h4 className="text-sm font-semibold text-text-primary mb-3">Trading statistics</h4>
             <ul className="space-y-2.5 text-sm">
               {[
-                ['Risk–reward', d.stats.riskReward, 'text-[#55a630]'],
-                ['Expectancy', `${d.stats.expectancyUsd >= 0 ? '+' : ''}${fmtUsd(d.stats.expectancyUsd)}`, d.stats.expectancyUsd >= 0 ? 'text-[#55a630]' : 'text-red-400'],
-                ['Best streak', d.stats.bestStreak, 'text-[#55a630]'],
+                ['Risk–reward', d.stats.riskReward, 'text-[#E85D3D]'],
+                ['Expectancy', `${d.stats.expectancyUsd >= 0 ? '+' : ''}${fmtUsd(d.stats.expectancyUsd)}`, d.stats.expectancyUsd >= 0 ? 'text-[#E85D3D]' : 'text-red-400'],
+                ['Best streak', d.stats.bestStreak, 'text-[#E85D3D]'],
                 ['Worst streak', d.stats.worstStreak, 'text-red-400'],
-                ['Best trade', fmtUsd(d.stats.bestTradeUsd), 'text-[#55a630]'],
+                ['Best trade', fmtUsd(d.stats.bestTradeUsd), 'text-[#E85D3D]'],
                 ['Worst trade', fmtUsd(d.stats.worstTradeUsd), 'text-red-400'],
               ].map(([k, v, c]) => (
                 <li key={k} className="flex justify-between gap-2">

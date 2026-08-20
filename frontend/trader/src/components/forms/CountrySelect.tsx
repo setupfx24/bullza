@@ -77,7 +77,7 @@ export default function CountrySelect({
         type="button"
         disabled={disabled}
         onClick={() => setOpen((v) => !v)}
-        className={`w-full flex items-center gap-2 px-3 py-2.5 rounded-lg border bg-bg-secondary text-text-primary outline-none focus:border-[#55a630]/50 text-sm transition-colors disabled:opacity-50 ${
+        className={`w-full flex items-center gap-2 px-3 py-2.5 rounded-lg border bg-bg-secondary text-text-primary outline-none focus:border-[#E85D3D]/50 text-sm transition-colors disabled:opacity-50 ${
           hasError ? 'border-red-500/50' : 'border-border-primary'
         }`}
       >
@@ -127,7 +127,7 @@ export default function CountrySelect({
                     setSearch('');
                   }}
                   className={`w-full flex items-center gap-2 px-3 py-2 text-left text-xs transition-colors ${
-                    c.name === value ? 'bg-[#55a630]/10 text-[#55a630]' : 'text-text-secondary hover:bg-bg-hover'
+                    c.name === value ? 'bg-[#E85D3D]/10 text-[#E85D3D]' : 'text-text-secondary hover:bg-bg-hover'
                   }`}
                 >
                   <span

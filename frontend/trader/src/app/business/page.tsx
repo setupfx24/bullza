@@ -189,7 +189,7 @@ export default function BusinessPage() {
 
                     {active ? (
 
-                      <span className="relative inline-block animate-wallet-main-tab-text drop-shadow-[0_0_20px_rgba(85,166,48,0.7)]">
+                      <span className="relative inline-block animate-wallet-main-tab-text drop-shadow-[0_0_20px_rgba(232, 93, 61,0.7)]">
 
                         {t.label}
 
@@ -436,7 +436,7 @@ function IBTab() {
               'w-full max-w-xs mx-auto px-6 py-3.5 rounded-xl text-sm font-bold transition-all border-2 border-accent',
               (applying || !subEligible)
                 ? 'opacity-50 cursor-not-allowed bg-bg-secondary text-text-tertiary'
-                : 'bg-accent text-black hover:brightness-110 shadow-[0_0_24px_rgba(85,166,48,0.35)]',
+                : 'bg-accent text-black hover:brightness-110 shadow-[0_0_24px_rgba(232, 93, 61,0.35)]',
             )}
           >
             {applying ? 'Submitting...' : subEligible ? 'Apply as Sub-IB' : (!subKyc ? 'Complete KYC first' : 'Deposit to Unlock')}
@@ -537,7 +537,7 @@ function IBTab() {
 
               ? 'opacity-50 cursor-not-allowed bg-bg-secondary text-text-tertiary'
 
-              : 'bg-accent text-black hover:brightness-110 shadow-[0_0_24px_rgba(85,166,48,0.35)]',
+              : 'bg-accent text-black hover:brightness-110 shadow-[0_0_24px_rgba(232, 93, 61,0.35)]',
 
           )}
 

@@ -27,9 +27,9 @@ export function MainWalletCard({ summary }: { summary: WalletSummary | null }) {
       <div className="flex items-center justify-between">
         <span
           className="w-9 h-9 rounded-xl flex items-center justify-center"
-          style={{ background: 'rgba(85,166,48,0.12)' }}
+          style={{ background: 'rgba(232, 93, 61,0.12)' }}
         >
-          <Wallet size={17} className="text-[#55a630]" />
+          <Wallet size={17} className="text-[#E85D3D]" />
         </span>
         <span className="text-[10px] uppercase tracking-[0.14em] font-semibold text-text-tertiary">
           Main wallet
@@ -40,7 +40,7 @@ export function MainWalletCard({ summary }: { summary: WalletSummary | null }) {
         {s ? fmtUsd(s.main_wallet_balance ?? 0) : '—'}
       </p>
       {(s?.main_wallet_bonus ?? 0) > 0 && (
-        <p className="mt-1 text-[11px] font-semibold text-[#55a630] tabular-nums">
+        <p className="mt-1 text-[11px] font-semibold text-[#E85D3D] tabular-nums">
           + {fmtUsd(s?.main_wallet_bonus ?? 0)} bonus
         </p>
       )}

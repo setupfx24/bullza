@@ -25,8 +25,8 @@ export default function BonusPage() {
           className="rounded-3xl p-6 sm:p-8 text-center"
           style={{
             background:
-              'linear-gradient(135deg, hsl(99 55% 42% / 0.18) 0%, hsl(0 0% 6% / 0.6) 60%, hsl(0 100% 41% / 0.12) 100%)',
-            border: '1px solid hsl(99 55% 42% / 0.45)',
+              'linear-gradient(135deg, hsl(11 79% 57% / 0.18) 0%, hsl(0 0% 6% / 0.6) 60%, hsl(0 100% 41% / 0.12) 100%)',
+            border: '1px solid hsl(11 79% 57% / 0.45)',
           }}
         >
           <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/30 text-primary text-[11px] uppercase tracking-[0.22em] font-bold">
@@ -70,7 +70,7 @@ export default function BonusPage() {
             src="/images/bonus_details3.png"
             alt="Welcome bonus illustration"
             className="rounded-2xl w-full min-h-[260px] max-h-[340px] object-cover"
-            style={{ border: '1px solid hsl(99 55% 42% / 0.35)' }}
+            style={{ border: '1px solid hsl(11 79% 57% / 0.35)' }}
           />
         </div>
       </section>

@@ -71,8 +71,8 @@ function Inner() {
             <p className="text-sm text-text-secondary mt-0.5">Spend Artha Coins to spin the wheel and win cashback or bonus AC.</p>
           </div>
         </div>
-        <div className="flex items-center gap-2 px-3 py-1.5 rounded-full border border-[#55a630]/30 bg-[#55a630]/5">
-          <Coins size={14} className="text-[#55a630]" />
+        <div className="flex items-center gap-2 px-3 py-1.5 rounded-full border border-[#E85D3D]/30 bg-[#E85D3D]/5">
+          <Coins size={14} className="text-[#E85D3D]" />
           <span className="text-sm font-semibold text-text-primary tabular-nums">{fmt(acBalance)} AC</span>
         </div>
       </header>

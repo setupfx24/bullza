@@ -115,7 +115,7 @@ export default function PhoneInput({
         type="button"
         disabled={disabled}
         onClick={() => setOpen((v) => !v)}
-        className={`flex items-center gap-1.5 rounded-l-lg border border-r-0 bg-bg-secondary px-2.5 py-2 text-sm text-text-primary outline-none focus:border-[#55a630]/50 transition-colors disabled:opacity-50 ${
+        className={`flex items-center gap-1.5 rounded-l-lg border border-r-0 bg-bg-secondary px-2.5 py-2 text-sm text-text-primary outline-none focus:border-[#E85D3D]/50 transition-colors disabled:opacity-50 ${
           hasError ? 'border-red-500/50' : 'border-border-primary'
         }`}
       >
@@ -133,7 +133,7 @@ export default function PhoneInput({
         onChange={(e) => setLocal(e.target.value.replace(/[^0-9 \-()]/g, ''))}
         placeholder={placeholder}
         disabled={disabled}
-        className={`flex-1 min-w-0 rounded-r-lg border bg-bg-secondary px-3 py-2 text-sm text-text-primary placeholder:text-text-tertiary outline-none focus:border-[#55a630]/50 transition-colors disabled:opacity-50 ${
+        className={`flex-1 min-w-0 rounded-r-lg border bg-bg-secondary px-3 py-2 text-sm text-text-primary placeholder:text-text-tertiary outline-none focus:border-[#E85D3D]/50 transition-colors disabled:opacity-50 ${
           hasError ? 'border-red-500/50' : 'border-border-primary'
         } ${inputClassName ?? ''}`}
       />
@@ -167,7 +167,7 @@ export default function PhoneInput({
                   type="button"
                   onClick={() => { setCountry(c); setOpen(false); setSearch(''); }}
                   className={`w-full flex items-center gap-2 px-3 py-2 text-left text-xs transition-colors ${
-                    c.code === country.code ? 'bg-[#55a630]/10 text-[#55a630]' : 'text-text-secondary hover:bg-bg-hover'
+                    c.code === country.code ? 'bg-[#E85D3D]/10 text-[#E85D3D]' : 'text-text-secondary hover:bg-bg-hover'
                   }`}
                 >
                   <span

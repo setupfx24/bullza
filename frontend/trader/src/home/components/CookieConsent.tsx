@@ -179,18 +179,18 @@ export function CookieConsent() {
               className="w-full px-4 sm:px-8 lg:px-12 py-5 sm:py-6 flex flex-col md:flex-row items-start md:items-center gap-4 md:gap-6"
               style={{
                 background: 'linear-gradient(135deg, #0d1014 0%, #050608 100%)',
-                borderTop: '1px solid rgba(85,166,48,0.45)',
+                borderTop: '1px solid rgba(232, 93, 61,0.45)',
                 boxShadow: '0 -10px 40px rgba(0,0,0,0.55)',
               }}
             >
               <div
                 className="size-14 shrink-0 rounded-xl flex items-center justify-center"
                 style={{
-                  background: 'rgba(85,166,48,0.18)',
-                  border: '1px solid rgba(85,166,48,0.4)',
+                  background: 'rgba(232, 93, 61,0.18)',
+                  border: '1px solid rgba(232, 93, 61,0.4)',
                 }}
               >
-                <Cookie className="size-6" style={{ color: '#55a630' }} />
+                <Cookie className="size-6" style={{ color: '#E85D3D' }} />
               </div>
               <div className="flex-1 min-w-0">
                 <h3
@@ -208,7 +208,7 @@ export function CookieConsent() {
                   <a
                     href="/privacy"
                     className="underline-offset-2 hover:underline font-semibold"
-                    style={{ color: '#55a630' }}
+                    style={{ color: '#E85D3D' }}
                   >
                     Privacy Policy
                   </a>{' '}
@@ -232,7 +232,7 @@ export function CookieConsent() {
                   type="button"
                   onClick={acceptAll}
                   className="flex-1 md:flex-none inline-flex items-center justify-center gap-2 rounded-full px-6 py-3 text-sm font-bold uppercase tracking-wider hover:opacity-90 transition-opacity"
-                  style={{ background: '#55a630', color: '#ffffff' }}
+                  style={{ background: '#E85D3D', color: '#ffffff' }}
                 >
                   Accept All <Check className="size-4" />
                 </button>
@@ -265,7 +265,7 @@ export function CookieConsent() {
               className="w-full max-w-2xl max-h-[80vh] rounded-3xl flex flex-col overflow-hidden"
               style={{
                 background: 'linear-gradient(180deg, #0d1014 0%, #05070a 100%)',
-                border: '1px solid rgba(85,166,48,0.35)',
+                border: '1px solid rgba(232, 93, 61,0.35)',
                 boxShadow: '0 30px 80px rgba(0,0,0,0.7)',
               }}
             >
@@ -278,11 +278,11 @@ export function CookieConsent() {
                   <div
                     className="size-10 rounded-xl flex items-center justify-center"
                     style={{
-                      background: 'rgba(85,166,48,0.18)',
-                      border: '1px solid rgba(85,166,48,0.4)',
+                      background: 'rgba(232, 93, 61,0.18)',
+                      border: '1px solid rgba(232, 93, 61,0.4)',
                     }}
                   >
-                    <Cookie className="size-5" style={{ color: '#55a630' }} />
+                    <Cookie className="size-5" style={{ color: '#E85D3D' }} />
                   </div>
                   <h2
                     className="font-display uppercase tracking-tight text-base sm:text-lg"
@@ -325,9 +325,9 @@ export function CookieConsent() {
                       className="px-3 sm:px-4 py-1.5 rounded-full text-xs sm:text-sm font-semibold transition-colors whitespace-nowrap"
                       style={{
                         color: active ? '#ffffff' : 'rgba(255,255,255,0.6)',
-                        background: active ? 'rgba(85,166,48,0.22)' : 'transparent',
+                        background: active ? 'rgba(232, 93, 61,0.22)' : 'transparent',
                         border: active
-                          ? '1px solid rgba(85,166,48,0.6)'
+                          ? '1px solid rgba(232, 93, 61,0.6)'
                           : '1px solid rgba(255,255,255,0.1)',
                       }}
                       aria-pressed={active}
@@ -366,7 +366,7 @@ export function CookieConsent() {
                   type="button"
                   onClick={acceptAll}
                   className="inline-flex items-center justify-center gap-1.5 rounded-full px-5 py-2.5 text-xs font-semibold uppercase tracking-wider hover:opacity-90 transition-opacity"
-                  style={{ background: '#55a630', color: '#ffffff' }}
+                  style={{ background: '#E85D3D', color: '#ffffff' }}
                 >
                   Enable All Cookies and Close <Check className="size-3.5" />
                 </button>
@@ -499,7 +499,7 @@ function WhyTab() {
               <span
                 aria-hidden
                 className="size-1.5 mt-2 rounded-full shrink-0"
-                style={{ background: '#55a630' }}
+                style={{ background: '#E85D3D' }}
               />
               <span>{p}</span>
             </li>
@@ -557,9 +557,9 @@ function CookieRow({
             <span
               className="text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-full"
               style={{
-                color: '#55a630',
-                background: 'rgba(85,166,48,0.18)',
-                border: '1px solid rgba(85,166,48,0.4)',
+                color: '#E85D3D',
+                background: 'rgba(232, 93, 61,0.18)',
+                border: '1px solid rgba(232, 93, 61,0.4)',
               }}
             >
               Required
@@ -581,7 +581,7 @@ function CookieRow({
               <span
                 aria-hidden
                 className="size-1.5 mt-2 rounded-full shrink-0"
-                style={{ background: '#55a630' }}
+                style={{ background: '#E85D3D' }}
               />
               <span>{e}</span>
             </li>
@@ -600,7 +600,7 @@ function CookieRow({
         <span style={{ color: 'rgba(255,255,255,0.5)' }}>Status: </span>
         <span
           className="font-semibold"
-          style={{ color: required ? '#55a630' : 'rgba(255,255,255,0.9)' }}
+          style={{ color: required ? '#E85D3D' : 'rgba(255,255,255,0.9)' }}
         >
           {status}
         </span>
@@ -638,7 +638,7 @@ function Toggle({
         disabled ? 'cursor-not-allowed opacity-90' : 'cursor-pointer'
       }`}
       style={{
-        background: on ? '#55a630' : 'rgba(255,255,255,0.22)',
+        background: on ? '#E85D3D' : 'rgba(255,255,255,0.22)',
         border: '1px solid rgba(255,255,255,0.12)',
       }}
     >

@@ -69,8 +69,8 @@ export default function LinkedWalletCard() {
   return (
     <div className="bg-card-base border border-border-glass/30 rounded-xl p-4 md:p-5">
       <div className="flex items-start gap-3 mb-3">
-        <div className="w-9 h-9 rounded-lg bg-[#55a630]/15 flex items-center justify-center shrink-0">
-          <Wallet size={16} className="text-[#55a630]" />
+        <div className="w-9 h-9 rounded-lg bg-[#E85D3D]/15 flex items-center justify-center shrink-0">
+          <Wallet size={16} className="text-[#E85D3D]" />
         </div>
         <div className="flex-1 min-w-0">
           <h3 className="text-base font-semibold text-text-primary leading-tight">
@@ -93,7 +93,7 @@ export default function LinkedWalletCard() {
             <button
               type="button"
               onClick={handleCopy}
-              className="ml-auto inline-flex items-center gap-1 text-[11px] text-text-tertiary hover:text-[#55a630] transition-colors"
+              className="ml-auto inline-flex items-center gap-1 text-[11px] text-text-tertiary hover:text-[#E85D3D] transition-colors"
               aria-label="Copy wallet address"
             >
               {copied ? (

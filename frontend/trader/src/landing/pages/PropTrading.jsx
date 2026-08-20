@@ -14,7 +14,7 @@ const PropTrading = () => {
           className="absolute inset-0 -z-10"
           style={{
             background:
-              'radial-gradient(ellipse 60% 50% at 50% 0%, rgba(85,166,48,0.18), transparent 70%)',
+              'radial-gradient(ellipse 60% 50% at 50% 0%, rgba(232, 93, 61,0.18), transparent 70%)',
           }}
         />
         <div className="container-custom text-center">

@@ -66,7 +66,7 @@ export default function AccountTypesPage() {
       <div
         aria-hidden
         className="absolute inset-0 -z-10"
-        style={{ background: 'radial-gradient(ellipse 60% 50% at 50% 0%, hsl(99 55% 42% / 0.18), transparent 70%)' }}
+        style={{ background: 'radial-gradient(ellipse 60% 50% at 50% 0%, hsl(11 79% 57% / 0.18), transparent 70%)' }}
       />
 
       <section className="mx-auto max-w-[1200px] px-[var(--gutter)] pt-32 pb-12 sm:pt-40 sm:pb-20 md:pt-48 md:pb-28 text-center">
@@ -138,7 +138,7 @@ export default function AccountTypesPage() {
 
 const COLUMN_HEADERS = [
   { name: 'Standard', gradient: 'linear-gradient(180deg, #1f2937 0%, #0a0a0a 100%)' }, // neutral slate
-  { name: 'ECN',      gradient: 'linear-gradient(180deg, #55a630 0%, #1a3210 100%)' }, // brand green (popular)
+  { name: 'ECN',      gradient: 'linear-gradient(180deg, #E85D3D 0%, #1a3210 100%)' }, // brand green (popular)
   { name: 'IB',       gradient: 'linear-gradient(180deg, #2c3e50 0%, #0e1418 100%)' }, // partner navy
   { name: 'Swap',     gradient: 'linear-gradient(180deg, #d00000 0%, #3d0000 100%)' }, // brand red (swap-free / Islamic)
 ];

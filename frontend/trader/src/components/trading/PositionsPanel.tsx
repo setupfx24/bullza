@@ -193,7 +193,7 @@ function TerminalPositionStaticCard({
             <span
               className={clsx(
                 'text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded',
-                pos.side === 'buy' ? 'bg-[#55a630]/18 text-[#55a630]' : 'bg-[#ff5252]/18 text-[#ff5252]',
+                pos.side === 'buy' ? 'bg-[#E85D3D]/18 text-[#E85D3D]' : 'bg-[#ff5252]/18 text-[#ff5252]',
               )}
             >
               {pos.side}
@@ -206,7 +206,7 @@ function TerminalPositionStaticCard({
             className={clsx(
               'inline-block px-2 py-0.5 rounded text-[10px] font-mono font-bold tabular-nums border',
               pnl >= 0
-                ? 'bg-green-500/10 border-green-500/20 text-[#55a630]'
+                ? 'bg-green-500/10 border-green-500/20 text-[#E85D3D]'
                 : 'bg-red-500/10 border-red-500/20 text-[#ff5252]',
             )}
           >
@@ -240,7 +240,7 @@ function TerminalPositionStaticCard({
               (priceDown ? (
                 <TrendingDown className="w-3 h-3 text-[#ff5252]" aria-hidden />
               ) : (
-                <TrendingUp className="w-3 h-3 text-[#55a630]" aria-hidden />
+                <TrendingUp className="w-3 h-3 text-[#E85D3D]" aria-hidden />
               ))}
           </div>
         </div>
@@ -818,7 +818,7 @@ export default function PositionsPanel({ variant = 'default' }: PositionsPanelPr
                       <span
                         className={clsx(
                           'text-xs font-mono font-semibold tabular-nums leading-tight',
-                          totalPnl >= 0 ? 'text-[#55a630]' : 'text-[#ef5350]',
+                          totalPnl >= 0 ? 'text-[#E85D3D]' : 'text-[#ef5350]',
                         )}
                       >
                         {totalPnl >= 0 ? '+' : ''}{fmtAccountMoney(totalPnl, isCent)}
@@ -969,7 +969,7 @@ export default function PositionsPanel({ variant = 'default' }: PositionsPanelPr
                     className={clsx(
                       'flex-1 min-w-0 py-2.5 px-1 sm:px-2 text-[10px] sm:text-xs font-bold transition-colors border-b-2 -mb-px',
                       activeTab === tab.id
-                        ? clsx('text-text-primary border-[#55a630]', 'bg-bg-secondary/70')
+                        ? clsx('text-text-primary border-[#E85D3D]', 'bg-bg-secondary/70')
                         : clsx(
                             'text-text-tertiary border-transparent hover:text-text-secondary',
                             'hover:bg-bg-hover/40',

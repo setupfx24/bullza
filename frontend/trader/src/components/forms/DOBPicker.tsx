@@ -171,7 +171,7 @@ export default function DOBPicker({
         type="button"
         onClick={() => !disabled && setOpen((o) => !o)}
         disabled={disabled}
-        className="w-full pl-9 pr-3 py-2.5 rounded-lg border border-border-primary bg-bg-secondary text-text-primary outline-none focus:border-[#55a630]/50 text-sm text-left disabled:opacity-60"
+        className="w-full pl-9 pr-3 py-2.5 rounded-lg border border-border-primary bg-bg-secondary text-text-primary outline-none focus:border-[#E85D3D]/50 text-sm text-left disabled:opacity-60"
         aria-haspopup="dialog"
         aria-expanded={open}
       >

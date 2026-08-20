@@ -84,7 +84,7 @@ const COLORS: Record<Strength, string> = {
   1: '#ef4444', // red
   2: '#f59e0b', // amber
   3: '#22c55e', // green
-  4: '#55a630', // brand green
+  4: '#E85D3D', // brand green
 };
 
 /**

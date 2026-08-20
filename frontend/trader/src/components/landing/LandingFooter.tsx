@@ -67,10 +67,10 @@ export default function LandingFooter() {
               Products
             </p>
             <ul className="space-y-2 text-sm" style={{ color: 'rgba(255,255,255,0.6)' }}>
-              <li><Link href="/platforms" className="hover:text-[#55a630] transition-colors">Trading Platforms</Link></li>
-              <li><Link href="/white-label" className="hover:text-[#55a630] transition-colors">White Label</Link></li>
-              <li><Link href="/auth/register" className="hover:text-[#55a630] transition-colors">Open Live Account</Link></li>
-              <li><Link href="/auth/register" className="hover:text-[#55a630] transition-colors">Demo Account</Link></li>
+              <li><Link href="/platforms" className="hover:text-[#E85D3D] transition-colors">Trading Platforms</Link></li>
+              <li><Link href="/white-label" className="hover:text-[#E85D3D] transition-colors">White Label</Link></li>
+              <li><Link href="/auth/register" className="hover:text-[#E85D3D] transition-colors">Open Live Account</Link></li>
+              <li><Link href="/auth/register" className="hover:text-[#E85D3D] transition-colors">Demo Account</Link></li>
             </ul>
           </div>
 
@@ -79,9 +79,9 @@ export default function LandingFooter() {
               Company
             </p>
             <ul className="space-y-2 text-sm" style={{ color: 'rgba(255,255,255,0.6)' }}>
-              <li><Link href="/company/about" className="hover:text-[#55a630] transition-colors">About Us</Link></li>
-              <li><Link href="/company/contact" className="hover:text-[#55a630] transition-colors">Contact</Link></li>
-              <li><Link href="/white-label" className="hover:text-[#55a630] transition-colors">Partnerships</Link></li>
+              <li><Link href="/company/about" className="hover:text-[#E85D3D] transition-colors">About Us</Link></li>
+              <li><Link href="/company/contact" className="hover:text-[#E85D3D] transition-colors">Contact</Link></li>
+              <li><Link href="/white-label" className="hover:text-[#E85D3D] transition-colors">Partnerships</Link></li>
             </ul>
           </div>
 
@@ -91,7 +91,7 @@ export default function LandingFooter() {
             </p>
             <ul className="space-y-2 text-sm" style={{ color: 'rgba(255,255,255,0.6)' }}>
               <li>
-                <Link href="/company/contact" className="hover:text-[#55a630] transition-colors">
+                <Link href="/company/contact" className="hover:text-[#E85D3D] transition-colors">
                   Contact Support
                 </Link>
               </li>
@@ -99,7 +99,7 @@ export default function LandingFooter() {
                 <Phone className="w-4 h-4 shrink-0" />
                 <a
                   href="tel:+447737119978"
-                  className="hover:text-[#55a630] transition-colors"
+                  className="hover:text-[#E85D3D] transition-colors"
                 >
                   +44 7737 119978
                 </a>
@@ -110,7 +110,7 @@ export default function LandingFooter() {
                   href="https://wa.me/447737119978"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="hover:text-[#55a630] transition-colors"
+                  className="hover:text-[#E85D3D] transition-colors"
                 >
                   WhatsApp
                 </a>
@@ -127,13 +127,13 @@ export default function LandingFooter() {
             {BRAND_COPYRIGHT}
           </p>
           <div className="flex items-center gap-5 text-sm" style={{ color: 'rgba(255,255,255,0.55)' }}>
-            <Link href="/privacy" className="hover:text-[#55a630] transition-colors">Privacy Policy</Link>
-            <Link href="/terms" className="hover:text-[#55a630] transition-colors">Terms of Service</Link>
-            <Link href="/risk" className="hover:text-[#55a630] transition-colors">Risk Disclosure</Link>
+            <Link href="/privacy" className="hover:text-[#E85D3D] transition-colors">Privacy Policy</Link>
+            <Link href="/terms" className="hover:text-[#E85D3D] transition-colors">Terms of Service</Link>
+            <Link href="/risk" className="hover:text-[#E85D3D] transition-colors">Risk Disclosure</Link>
             <button
               type="button"
               onClick={openCookieSettings}
-              className="inline-flex items-center gap-1.5 hover:text-[#55a630] transition-colors"
+              className="inline-flex items-center gap-1.5 hover:text-[#E85D3D] transition-colors"
               aria-label="Open cookie settings"
             >
               <Cookie className="w-3.5 h-3.5" /> Cookie Settings

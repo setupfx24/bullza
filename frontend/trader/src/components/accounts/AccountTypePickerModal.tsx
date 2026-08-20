@@ -230,11 +230,11 @@ export default function AccountTypePickerModal({ open, onClose, onCreated }: Pro
                     onClick={() => setSelectedId(g.id)}
                     className={clsx(
                       'relative text-left rounded-xl p-4 transition-all',
-                      sel ? 'ring-2 ring-[#55a630]/60' : '',
+                      sel ? 'ring-2 ring-[#E85D3D]/60' : '',
                     )}
                     style={{
                       background: 'var(--bg-card-nested)',
-                      border: `1px solid ${sel ? '#55a630' : 'var(--border-primary)'}`,
+                      border: `1px solid ${sel ? '#E85D3D' : 'var(--border-primary)'}`,
                     }}
                   >
                     {stocks && <Badge color="#f59e0b">Trading on stocks</Badge>}
@@ -242,9 +242,9 @@ export default function AccountTypePickerModal({ open, onClose, onCreated }: Pro
                     <div
                       className="w-9 h-9 rounded-full flex items-center justify-center font-bold text-sm mb-3"
                       style={{
-                        background: 'rgba(85,166,48,0.12)',
-                        color: '#55a630',
-                        border: '1px solid rgba(85,166,48,0.3)',
+                        background: 'rgba(232, 93, 61,0.12)',
+                        color: '#E85D3D',
+                        border: '1px solid rgba(232, 93, 61,0.3)',
                       }}
                     >
                       {i + 1}
@@ -312,7 +312,7 @@ export default function AccountTypePickerModal({ open, onClose, onCreated }: Pro
             onClick={handleCreate}
             disabled={creating || !selected || (accountKind === 'real' && !userIsDemo && !kycApproved)}
             className="inline-flex items-center gap-2 px-6 py-3 rounded-lg text-sm font-bold disabled:opacity-50 transition-all"
-            style={{ background: '#55a630', color: '#1a1408' }}
+            style={{ background: '#E85D3D', color: '#1a1408' }}
           >
             {creating && <Loader2 size={14} className="animate-spin" />}
             {accountKind === 'demo' ? 'Create demo account' : 'Create account'}
@@ -349,7 +349,7 @@ function TypePill({
       disabled={disabled}
       className="px-4 py-1.5 text-sm font-semibold rounded-md transition-colors select-none"
       style={{
-        background: active ? '#55a630' : 'transparent',
+        background: active ? '#E85D3D' : 'transparent',
         color: active ? '#1a1408' : 'var(--text-secondary)',
         opacity: disabled ? 0.55 : 1,
         cursor: disabled ? 'not-allowed' : 'pointer',

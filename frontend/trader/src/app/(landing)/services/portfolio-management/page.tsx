@@ -116,7 +116,7 @@ export default function PortfolioManagementPage() {
                 <tr>
                   <th className="bg-foreground/[0.04] border-r border-foreground/15 px-5 py-4 text-left text-xs uppercase tracking-[0.16em] text-foreground/55">Fee Type</th>
                   <th className="px-5 py-4 text-center font-display uppercase tracking-[0.16em] text-sm text-white border-r border-white/10" style={{ background: 'linear-gradient(180deg, #1f2937 0%, #0a0a0a 100%)' }}>PAMM</th>
-                  <th className="px-5 py-4 text-center font-display uppercase tracking-[0.16em] text-sm text-white" style={{ background: 'linear-gradient(180deg, #55a630 0%, #1a3210 100%)' }}>MAM</th>
+                  <th className="px-5 py-4 text-center font-display uppercase tracking-[0.16em] text-sm text-white" style={{ background: 'linear-gradient(180deg, #E85D3D 0%, #1a3210 100%)' }}>MAM</th>
                 </tr>
               </thead>
               <tbody>

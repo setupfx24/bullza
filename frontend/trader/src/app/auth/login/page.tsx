@@ -323,8 +323,8 @@ function LoginContent() {
                       <motion.div
                         {...fadeUp(0.32)}
                         style={{
-                          background: 'rgba(85, 166, 48, 0.10)',
-                          border: '1px solid rgba(85, 166, 48, 0.35)',
+                          background: 'rgba(232, 93, 61, 0.10)',
+                          border: '1px solid rgba(232, 93, 61, 0.35)',
                           borderRadius: 10,
                           padding: '10px 12px',
                           marginTop: 4,

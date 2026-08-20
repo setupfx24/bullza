@@ -27,20 +27,20 @@ export default function StakingPlanCard({
       className={
         'text-left rounded-xl p-5 transition-all border ' +
         (selected
-          ? 'border-[#55a630] bg-[#55a630]/8 ring-2 ring-[#55a630]/45'
-          : 'border-border-primary bg-bg-secondary hover:border-[#55a630]/45')
+          ? 'border-[#E85D3D] bg-[#E85D3D]/8 ring-2 ring-[#E85D3D]/45'
+          : 'border-border-primary bg-bg-secondary hover:border-[#E85D3D]/45')
       }
     >
       <div className="flex items-center justify-between">
-        <Icon size={20} className="text-[#55a630]" />
+        <Icon size={20} className="text-[#E85D3D]" />
         {plan.trading_bonus_multiplier_bps > 0 && (
-          <span className="inline-flex items-center gap-1 text-[10.5px] uppercase tracking-wider text-[#55a630] border border-[#55a630]/40 bg-[#55a630]/10 px-2 py-0.5 rounded-full">
+          <span className="inline-flex items-center gap-1 text-[10.5px] uppercase tracking-wider text-[#E85D3D] border border-[#E85D3D]/40 bg-[#E85D3D]/10 px-2 py-0.5 rounded-full">
             <Sparkles size={10} /> 1× bonus
           </span>
         )}
       </div>
       <h3 className="text-lg font-bold text-text-primary mt-3">{plan.label}</h3>
-      <div className="text-3xl font-extrabold text-[#55a630] tabular-nums mt-1">
+      <div className="text-3xl font-extrabold text-[#E85D3D] tabular-nums mt-1">
         {plan.apy_pct.toFixed(0)}%
         <span className="text-xs text-text-tertiary font-normal ml-1">APY</span>
       </div>

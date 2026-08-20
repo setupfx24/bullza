@@ -26,7 +26,7 @@ export default function IcoComingSoonPage() {
           className="image-placeholder absolute inset-0"
           style={{
             backgroundImage:
-              'linear-gradient(135deg, hsl(99 55% 42% / 0.18) 0%, hsl(0 0% 6%) 60%, hsl(0 100% 41% / 0.10) 100%)',
+              'linear-gradient(135deg, hsl(11 79% 57% / 0.18) 0%, hsl(0 0% 6%) 60%, hsl(0 100% 41% / 0.10) 100%)',
           }}
         />
         <div

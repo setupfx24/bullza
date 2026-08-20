@@ -145,8 +145,8 @@ export default function IbReferralPage() {
         <div
           className="mt-8 mx-auto max-w-3xl rounded-2xl p-5 sm:p-6 flex items-start gap-4"
           style={{
-            background: 'hsl(99 55% 42% / 0.12)',
-            border: '1px solid hsl(99 55% 42% / 0.45)',
+            background: 'hsl(11 79% 57% / 0.12)',
+            border: '1px solid hsl(11 79% 57% / 0.45)',
           }}
         >
           <Sparkles className="size-5 text-primary shrink-0 mt-0.5" />
@@ -209,7 +209,7 @@ export default function IbReferralPage() {
                 alt=""
                 className="size-12 rounded-full mb-4 object-cover"
                 aria-hidden
-                style={{ border: '1px solid rgba(85,166,48,0.35)' }}
+                style={{ border: '1px solid rgba(232, 93, 61,0.35)' }}
               />
               <p className="text-sm text-foreground/85 leading-relaxed italic">"{t.quote}"</p>
               <div className="mt-4 pt-4 border-t border-border">

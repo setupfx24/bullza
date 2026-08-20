@@ -47,7 +47,7 @@ export default function MarketNewsPanel({
               <Icon className="w-3.5 h-3.5" />
               {label}
               {active && (
-                <span className="absolute bottom-0 left-3 right-3 h-0.5 rounded-full bg-accent shadow-[0_0_10px_rgba(85,166,48,0.5)]" />
+                <span className="absolute bottom-0 left-3 right-3 h-0.5 rounded-full bg-accent shadow-[0_0_10px_rgba(232, 93, 61,0.5)]" />
               )}
             </button>
           );

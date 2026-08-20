@@ -91,7 +91,7 @@ function buildTiers(apiTiers: ApiTier[]): DisplayTier[] {
  *  tiers and the cycle keeps going. */
 const TIER_HEADER_GRADIENTS = [
   'linear-gradient(180deg, #1f2937 0%, #0a0a0a 100%)',
-  'linear-gradient(180deg, #55a630 0%, #1a3210 100%)',
+  'linear-gradient(180deg, #E85D3D 0%, #1a3210 100%)',
   'linear-gradient(180deg, #d00000 0%, #3d0000 100%)',
 ];
 
@@ -194,7 +194,7 @@ export default function ReferralPage() {
             src="/images/refer_banner.png"
             alt="Referral program illustration"
             className="rounded-2xl w-full min-h-[260px] max-h-[340px] object-cover"
-            style={{ border: '1px solid hsl(99 55% 42% / 0.35)' }}
+            style={{ border: '1px solid hsl(11 79% 57% / 0.35)' }}
           />
         </div>
       </section>

@@ -100,13 +100,13 @@ function Inner() {
           </Link>
           <div>
             <h1 className="text-2xl md:text-3xl font-bold text-text-primary tracking-tight flex items-center gap-2">
-              Bidding <Gavel size={22} className="text-[#55a630]" />
+              Bidding <Gavel size={22} className="text-[#E85D3D]" />
             </h1>
             <p className="text-sm text-text-secondary mt-0.5">Highest bid wins. Losers get 50% of their bid AC refunded automatically.</p>
           </div>
         </div>
-        <div className="flex items-center gap-2 px-3 py-1.5 rounded-full border border-[#55a630]/30 bg-[#55a630]/5">
-          <Coins size={14} className="text-[#55a630]" />
+        <div className="flex items-center gap-2 px-3 py-1.5 rounded-full border border-[#E85D3D]/30 bg-[#E85D3D]/5">
+          <Coins size={14} className="text-[#E85D3D]" />
           <span className="text-sm font-semibold text-text-primary tabular-nums">{fmt(acBalance)} AC</span>
         </div>
       </header>
@@ -151,7 +151,7 @@ function RoundCard({
   return (
     <div className="rounded-xl border border-border-primary bg-bg-secondary p-5 flex flex-col gap-3">
       <div className="flex items-center justify-between">
-        <Gavel size={20} className="text-[#55a630]" />
+        <Gavel size={20} className="text-[#E85D3D]" />
         <span
           className={
             'inline-flex items-center gap-1 text-[10.5px] uppercase tracking-wider px-2 py-0.5 rounded-full ' +
@@ -165,7 +165,7 @@ function RoundCard({
       </div>
       <div>
         <h3 className="text-base font-semibold text-text-primary flex items-center gap-1.5">
-          <Trophy size={14} className="text-[#55a630]" /> {r.prize_label}
+          <Trophy size={14} className="text-[#E85D3D]" /> {r.prize_label}
         </h3>
       </div>
       <div className="grid grid-cols-3 gap-2 text-[11px] text-text-tertiary">
@@ -187,13 +187,13 @@ function RoundCard({
             value={bidInput}
             onChange={(e) => onBidInput(e.target.value)}
             disabled={busy}
-            className="flex-1 px-3 py-2.5 rounded-lg bg-bg-base border border-border-primary text-sm text-text-primary tabular-nums focus:border-[#55a630] focus:outline-none"
+            className="flex-1 px-3 py-2.5 rounded-lg bg-bg-base border border-border-primary text-sm text-text-primary tabular-nums focus:border-[#E85D3D] focus:outline-none"
           />
           <button
             type="button"
             onClick={onPlace}
             disabled={busy || !bidInput || acBalance < Number(bidInput || 0)}
-            className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-lg text-sm font-bold bg-[#55a630] text-bg-base hover:brightness-110 disabled:opacity-60"
+            className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-lg text-sm font-bold bg-[#E85D3D] text-bg-base hover:brightness-110 disabled:opacity-60"
           >
             {busy ? <Loader2 size={14} className="animate-spin" /> : 'Bid'}
           </button>
@@ -211,7 +211,7 @@ function Stat({ label, value, accent }: { label: string; value: string; accent?:
   return (
     <div className="rounded-md border border-border-primary bg-bg-base p-2">
       <p className="text-[9.5px] uppercase tracking-wider text-text-tertiary">{label}</p>
-      <p className={'text-sm font-semibold tabular-nums ' + (accent ? 'text-[#55a630]' : 'text-text-primary')}>
+      <p className={'text-sm font-semibold tabular-nums ' + (accent ? 'text-[#E85D3D]' : 'text-text-primary')}>
         {value}
       </p>
     </div>

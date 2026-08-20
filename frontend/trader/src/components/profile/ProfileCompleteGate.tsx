@@ -190,8 +190,8 @@ export default function ProfileCompleteGate() {
         {/* Header */}
         <div className="px-6 pt-6 pb-4 border-b border-border-primary">
           <div className="flex items-center gap-3 mb-3">
-            <div className="w-10 h-10 rounded-xl bg-[#55a630]/15 flex items-center justify-center">
-              <UserCircle2 size={20} className="text-[#55a630]" />
+            <div className="w-10 h-10 rounded-xl bg-[#E85D3D]/15 flex items-center justify-center">
+              <UserCircle2 size={20} className="text-[#E85D3D]" />
             </div>
             <div className="flex-1">
               <h2 id="profile-gate-title" className="text-text-primary font-bold text-lg leading-tight">
@@ -219,7 +219,7 @@ export default function ProfileCompleteGate() {
                 placeholder="Jane"
                 autoComplete="given-name"
                 maxLength={100}
-                className="w-full px-3 py-2.5 rounded-lg border border-border-primary bg-bg-secondary text-text-primary placeholder:text-text-tertiary outline-none focus:border-[#55a630]/50 text-sm"
+                className="w-full px-3 py-2.5 rounded-lg border border-border-primary bg-bg-secondary text-text-primary placeholder:text-text-tertiary outline-none focus:border-[#E85D3D]/50 text-sm"
               />
             </Field>
             <Field label="Last name" required>
@@ -230,7 +230,7 @@ export default function ProfileCompleteGate() {
                 placeholder="Doe"
                 autoComplete="family-name"
                 maxLength={100}
-                className="w-full px-3 py-2.5 rounded-lg border border-border-primary bg-bg-secondary text-text-primary placeholder:text-text-tertiary outline-none focus:border-[#55a630]/50 text-sm"
+                className="w-full px-3 py-2.5 rounded-lg border border-border-primary bg-bg-secondary text-text-primary placeholder:text-text-tertiary outline-none focus:border-[#E85D3D]/50 text-sm"
               />
             </Field>
           </div>
@@ -269,7 +269,7 @@ export default function ProfileCompleteGate() {
               placeholder="House / flat / street"
               autoComplete="street-address"
               maxLength={200}
-              className="w-full px-3 py-2.5 rounded-lg border border-border-primary bg-bg-secondary text-text-primary placeholder:text-text-tertiary outline-none focus:border-[#55a630]/50 text-sm"
+              className="w-full px-3 py-2.5 rounded-lg border border-border-primary bg-bg-secondary text-text-primary placeholder:text-text-tertiary outline-none focus:border-[#E85D3D]/50 text-sm"
             />
           </Field>
 
@@ -292,7 +292,7 @@ export default function ProfileCompleteGate() {
                     setForm((f) => ({ ...f, state: next, city: '' }));
                   }}
                   disabled={!form.country}
-                  className="w-full px-3 py-2.5 rounded-lg border border-border-primary bg-bg-secondary text-text-primary outline-none focus:border-[#55a630]/50 text-sm appearance-none disabled:opacity-50"
+                  className="w-full px-3 py-2.5 rounded-lg border border-border-primary bg-bg-secondary text-text-primary outline-none focus:border-[#E85D3D]/50 text-sm appearance-none disabled:opacity-50"
                 >
                   <option value="">{form.country ? 'Select state…' : 'Pick a country first'}</option>
                   {stateList.map((s) => (
@@ -308,7 +308,7 @@ export default function ProfileCompleteGate() {
                   disabled={!form.country}
                   autoComplete="address-level1"
                   maxLength={100}
-                  className="w-full px-3 py-2.5 rounded-lg border border-border-primary bg-bg-secondary text-text-primary placeholder:text-text-tertiary outline-none focus:border-[#55a630]/50 text-sm disabled:opacity-50"
+                  className="w-full px-3 py-2.5 rounded-lg border border-border-primary bg-bg-secondary text-text-primary placeholder:text-text-tertiary outline-none focus:border-[#E85D3D]/50 text-sm disabled:opacity-50"
                 />
               )}
             </Field>
@@ -318,7 +318,7 @@ export default function ProfileCompleteGate() {
                   value={form.city}
                   onChange={handleChange('city')}
                   disabled={!form.state}
-                  className="w-full px-3 py-2.5 rounded-lg border border-border-primary bg-bg-secondary text-text-primary outline-none focus:border-[#55a630]/50 text-sm appearance-none disabled:opacity-50"
+                  className="w-full px-3 py-2.5 rounded-lg border border-border-primary bg-bg-secondary text-text-primary outline-none focus:border-[#E85D3D]/50 text-sm appearance-none disabled:opacity-50"
                 >
                   <option value="">{form.state ? 'Select city…' : 'Pick a state first'}</option>
                   {cityList.map((c) => (
@@ -334,7 +334,7 @@ export default function ProfileCompleteGate() {
                   disabled={!form.state}
                   autoComplete="address-level2"
                   maxLength={100}
-                  className="w-full px-3 py-2.5 rounded-lg border border-border-primary bg-bg-secondary text-text-primary placeholder:text-text-tertiary outline-none focus:border-[#55a630]/50 text-sm disabled:opacity-50"
+                  className="w-full px-3 py-2.5 rounded-lg border border-border-primary bg-bg-secondary text-text-primary placeholder:text-text-tertiary outline-none focus:border-[#E85D3D]/50 text-sm disabled:opacity-50"
                 />
               )}
             </Field>
@@ -348,7 +348,7 @@ export default function ProfileCompleteGate() {
                 onChange={handleChange('postal_code')}
                 autoComplete="postal-code"
                 maxLength={20}
-                className="w-full px-3 py-2.5 rounded-lg border border-border-primary bg-bg-secondary text-text-primary placeholder:text-text-tertiary outline-none focus:border-[#55a630]/50 text-sm"
+                className="w-full px-3 py-2.5 rounded-lg border border-border-primary bg-bg-secondary text-text-primary placeholder:text-text-tertiary outline-none focus:border-[#E85D3D]/50 text-sm"
               />
             </Field>
             <Field label="Date of birth" required hint="18+ to trade. Click the field to open the calendar.">
@@ -369,7 +369,7 @@ export default function ProfileCompleteGate() {
           <button
             type="submit"
             disabled={submitting || missingCount > 0}
-            className="w-full inline-flex items-center justify-center gap-2 py-3 rounded-xl bg-[#55a630] text-bg-base font-bold text-sm transition-all active:scale-[0.99] disabled:opacity-60 disabled:cursor-not-allowed"
+            className="w-full inline-flex items-center justify-center gap-2 py-3 rounded-xl bg-[#E85D3D] text-bg-base font-bold text-sm transition-all active:scale-[0.99] disabled:opacity-60 disabled:cursor-not-allowed"
           >
             {submitting ? (
               <>

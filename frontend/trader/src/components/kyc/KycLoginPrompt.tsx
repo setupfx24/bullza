@@ -52,7 +52,7 @@ export default function KycLoginPrompt() {
           <Link
             href="/kyc"
             onClick={() => setOpen(false)}
-            className="flex-1 py-2.5 rounded-xl bg-[#55a630] text-sm font-bold text-white text-center hover:bg-[#4a9329] transition-fast"
+            className="flex-1 py-2.5 rounded-xl bg-[#E85D3D] text-sm font-bold text-white text-center hover:bg-[#4a9329] transition-fast"
           >
             Start KYC
           </Link>

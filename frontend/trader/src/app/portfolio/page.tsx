@@ -521,7 +521,7 @@ function PortfolioPageContent() {
 
       <DashboardShell mainClassName="flex items-center justify-center bg-[#050505]">
         <div className="flex flex-col items-center gap-3 py-12">
-          <div className="w-8 h-8 border-2 border-[#55a630] border-t-transparent rounded-full animate-spin" />
+          <div className="w-8 h-8 border-2 border-[#E85D3D] border-t-transparent rounded-full animate-spin" />
           <span className="text-sm text-[#888]">Loading portfolio...</span>
         </div>
       </DashboardShell>
@@ -566,16 +566,16 @@ function PortfolioPageContent() {
         {invalidAccountParam ? (
           <div className="rounded-xl border border-amber-500/35 bg-amber-500/10 px-4 py-3 text-sm text-text-primary">
             Invalid account id in the URL — showing your full portfolio.{' '}
-            <Link href="/portfolio" className="font-semibold text-[#55a630] underline underline-offset-2 hover:text-[#3f7d22]">
+            <Link href="/portfolio" className="font-semibold text-[#E85D3D] underline underline-offset-2 hover:text-[#C9482D]">
               Reset
             </Link>
           </div>
         ) : null}
 
         {validAccountId ? (
-          <div className="rounded-xl border border-[#55a630]/30 bg-[#55a630]/10 px-4 py-3 flex flex-wrap items-center justify-between gap-3">
+          <div className="rounded-xl border border-[#E85D3D]/30 bg-[#E85D3D]/10 px-4 py-3 flex flex-wrap items-center justify-between gap-3">
             <div>
-              <p className="text-[10px] font-bold uppercase tracking-wider text-[#55a630]">Account scope</p>
+              <p className="text-[10px] font-bold uppercase tracking-wider text-[#E85D3D]">Account scope</p>
               <p className="text-sm text-text-primary mt-0.5">
                 Journal and trade list for{' '}
                 <span className="font-mono font-semibold">
@@ -585,7 +585,7 @@ function PortfolioPageContent() {
             </div>
             <Link
               href="/portfolio"
-              className="text-xs font-semibold text-[#55a630] hover:text-[#3f7d22] underline underline-offset-2 shrink-0"
+              className="text-xs font-semibold text-[#E85D3D] hover:text-[#C9482D] underline underline-offset-2 shrink-0"
             >
               View all accounts
             </Link>
@@ -1016,7 +1016,7 @@ function PortfolioPageContent() {
                       className={clsx(
                         'min-w-[32px] h-8 px-2 rounded-md text-xs font-semibold transition-colors border',
                         n === page
-                          ? 'bg-[#55a630] text-text-inverse border-[#55a630]'
+                          ? 'bg-[#E85D3D] text-text-inverse border-[#E85D3D]'
                           : 'bg-bg-card text-text-secondary border-border-primary hover:bg-bg-hover',
                       )}
                     >
@@ -1054,7 +1054,7 @@ export default function PortfolioPage() {
       fallback={(
         <DashboardShell mainClassName="flex items-center justify-center bg-[#050505]">
           <div className="flex flex-col items-center gap-3 py-12">
-            <div className="w-8 h-8 border-2 border-[#55a630] border-t-transparent rounded-full animate-spin" />
+            <div className="w-8 h-8 border-2 border-[#E85D3D] border-t-transparent rounded-full animate-spin" />
             <span className="text-sm text-[#888]">Loading portfolio...</span>
           </div>
         </DashboardShell>

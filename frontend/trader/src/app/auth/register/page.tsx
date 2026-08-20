@@ -387,9 +387,9 @@ function RegisterContent() {
                             transform: 'none',
                             padding: '0 0.9rem',
                             height: 'auto',
-                            background: 'rgba(85,166,48,0.18)',
-                            color: '#55a630',
-                            border: '1px solid rgba(85,166,48,0.45)',
+                            background: 'rgba(232, 93, 61,0.18)',
+                            color: '#E85D3D',
+                            border: '1px solid rgba(232, 93, 61,0.45)',
                             borderRadius: '8px',
                             fontWeight: 600,
                             fontSize: '0.78rem',
@@ -408,7 +408,7 @@ function RegisterContent() {
                         </button>
                       </div>
                       <span className="auth-field__helper">
-                        Apply to get <strong style={{ color: '#55a630' }}>100% bonus on your first deposit</strong>.
+                        Apply to get <strong style={{ color: '#E85D3D' }}>100% bonus on your first deposit</strong>.
                         Already from a friend&apos;s link? Their code is filled in for you.
                       </span>
                     </div>

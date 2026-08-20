@@ -106,7 +106,7 @@ export default function Footer() {
                     }}
                     onMouseEnter={(e) => {
                       e.currentTarget.style.color = 'var(--fx-gold-light)'
-                      e.currentTarget.style.borderColor = 'rgba(85,166,48,0.4)'
+                      e.currentTarget.style.borderColor = 'rgba(232, 93, 61,0.4)'
                     }}
                     onMouseLeave={(e) => {
                       e.currentTarget.style.color = 'var(--fx-text-2)'

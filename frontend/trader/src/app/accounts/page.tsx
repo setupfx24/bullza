@@ -508,7 +508,7 @@ export default function AccountsPage() {
   };
 
   const newAccountCtaClass =
-    'inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-lg border-2 border-[#55a630] text-[#55a630] text-sm font-bold hover:bg-[#55a630]/10 transition-colors shrink-0';
+    'inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-lg border-2 border-[#E85D3D] text-[#E85D3D] text-sm font-bold hover:bg-[#E85D3D]/10 transition-colors shrink-0';
 
   /** Open the account-type picker. Picker now hosts a Real/Demo toggle —
    *  Demo accounts don't need KYC, so we open the picker regardless of KYC
@@ -587,7 +587,7 @@ export default function AccountsPage() {
             <Link
               href="/kyc"
               onClick={() => setKycGateOpen(false)}
-              className="px-5 py-2.5 rounded-lg bg-[#55a630] text-white text-sm font-bold hover:bg-[#3f7d22] transition-colors text-center"
+              className="px-5 py-2.5 rounded-lg bg-[#E85D3D] text-white text-sm font-bold hover:bg-[#C9482D] transition-colors text-center"
             >
               Complete KYC
             </Link>
@@ -616,7 +616,7 @@ export default function AccountsPage() {
             <Link
               href="/auth/register"
               onClick={() => setDemoUpgradeOpen(false)}
-              className="px-5 py-2.5 rounded-lg bg-[#55a630] text-white text-sm font-bold hover:bg-[#3f7d22] transition-colors text-center"
+              className="px-5 py-2.5 rounded-lg bg-[#E85D3D] text-white text-sm font-bold hover:bg-[#C9482D] transition-colors text-center"
             >
               Register Real Account
             </Link>
@@ -671,7 +671,7 @@ export default function AccountsPage() {
                     {active ? (
                       <span
                         key={tab}
-                        className="relative inline-block animate-wallet-main-tab-text drop-shadow-[0_0_20px_rgba(85,166,48,0.7)]"
+                        className="relative inline-block animate-wallet-main-tab-text drop-shadow-[0_0_20px_rgba(232, 93, 61,0.7)]"
                       >
                         {t.label}
                       </span>
@@ -795,7 +795,7 @@ export default function AccountsPage() {
                         setTab('accounts');
                         handleOpenNewAccount();
                       }}
-                      className="text-sm font-bold text-[#55a630] hover:underline"
+                      className="text-sm font-bold text-[#E85D3D] hover:underline"
                     >
                       Open live account
                     </button>
@@ -831,7 +831,7 @@ export default function AccountsPage() {
                       const isWallet = uniFrom === 'wallet';
                       return (
                         <div className="rounded-xl border border-accent/35 bg-bg-base p-4 flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-full bg-[#55a630]/12 flex items-center justify-center text-[#55a630] shrink-0">
+                          <div className="w-10 h-10 rounded-full bg-[#E85D3D]/12 flex items-center justify-center text-[#E85D3D] shrink-0">
                             {isWallet ? <Wallet size={20} strokeWidth={2} /> : <Landmark size={20} strokeWidth={2} />}
                           </div>
                           <div className="min-w-0 flex-1">
@@ -890,7 +890,7 @@ export default function AccountsPage() {
                       const isWallet = uniTo === 'wallet';
                       return (
                         <div className="rounded-xl border border-border-primary bg-bg-base p-4 flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-full bg-[#55a630]/12 flex items-center justify-center text-[#55a630] shrink-0">
+                          <div className="w-10 h-10 rounded-full bg-[#E85D3D]/12 flex items-center justify-center text-[#E85D3D] shrink-0">
                             {isWallet ? <Wallet size={20} strokeWidth={2} /> : <Landmark size={20} strokeWidth={2} />}
                           </div>
                           <div className="min-w-0 flex-1">
@@ -917,7 +917,7 @@ export default function AccountsPage() {
                           setTransferAmount(uniFromBalance > 0 ? uniFromBalance.toFixed(2) : '')
                         }
                         disabled={uniFromBalance <= 0}
-                        className="text-sm font-bold text-[#55a630] hover:underline disabled:opacity-40 disabled:pointer-events-none"
+                        className="text-sm font-bold text-[#E85D3D] hover:underline disabled:opacity-40 disabled:pointer-events-none"
                       >
                         Max: {fmt(uniFromBalance)}
                       </button>
@@ -949,7 +949,7 @@ export default function AccountsPage() {
                       uniFromBalance <= 0 ||
                       uniFrom === uniTo
                     }
-                    className="w-full py-3.5 rounded-xl bg-[#55a630] text-white text-base font-bold hover:bg-[#3f7d22] disabled:opacity-45 disabled:pointer-events-none transition-colors flex items-center justify-center gap-2"
+                    className="w-full py-3.5 rounded-xl bg-[#E85D3D] text-white text-base font-bold hover:bg-[#C9482D] disabled:opacity-45 disabled:pointer-events-none transition-colors flex items-center justify-center gap-2"
                   >
                     <ArrowLeftRight size={20} />
                     {transferSubmitting ? 'Transferring…' : 'Transfer'}
@@ -1165,7 +1165,7 @@ function BalanceTrendBlock({ accountId }: { accountId: string }) {
       <div className="rounded-xl bg-bg-base border border-border-primary relative overflow-hidden" style={{ minHeight: '140px', maxHeight: '220px', aspectRatio: `${W}/${H + 10}` }}>
         {loading ? (
           <div className="absolute inset-0 flex items-center justify-center">
-            <div className="h-5 w-5 border-2 border-[#55a630] border-t-transparent rounded-full animate-spin" />
+            <div className="h-5 w-5 border-2 border-[#E85D3D] border-t-transparent rounded-full animate-spin" />
           </div>
         ) : (
           <svg className="w-full h-full" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="xMidYMid meet">
@@ -1325,7 +1325,7 @@ function AccountCard({
         <span
           className={clsx(
             'mt-2 h-2.5 w-2.5 rounded-full shrink-0',
-            row.is_demo ? 'bg-sky-400 shadow-[0_0_6px_rgba(56,189,248,0.7)]' : 'bg-[#55a630] shadow-[0_0_6px_rgba(85,166,48,0.7)]',
+            row.is_demo ? 'bg-sky-400 shadow-[0_0_6px_rgba(56,189,248,0.7)]' : 'bg-[#E85D3D] shadow-[0_0_6px_rgba(232, 93, 61,0.7)]',
           )}
           aria-hidden
         />
@@ -1376,14 +1376,14 @@ function AccountCard({
                 )}
               </p>
               <div className="flex items-center gap-1">
-                <span className={clsx('text-sm sm:text-lg font-bold tabular-nums font-mono truncate', pnlPositive ? 'text-[#55a630]' : 'text-red-400')}>
+                <span className={clsx('text-sm sm:text-lg font-bold tabular-nums font-mono truncate', pnlPositive ? 'text-[#E85D3D]' : 'text-red-400')}>
                   {/* Lifetime P&L is exact (equity − allocation), so drop
                       the "~ approximation" prefix that the floating-only
                       path uses. */}
                   {row.is_managed_account ? '' : '~ '}{pnlPositive ? '+' : ''}{fmtRow(row, pnl)}
                 </span>
               </div>
-              <p className={clsx('text-[10px] sm:text-xs font-semibold tabular-nums', pnlPositive ? 'text-[#55a630]/70' : 'text-red-400/70')}>
+              <p className={clsx('text-[10px] sm:text-xs font-semibold tabular-nums', pnlPositive ? 'text-[#E85D3D]/70' : 'text-red-400/70')}>
                 ({pnlPositive ? '+' : ''}{pct.toFixed(2)}%)
               </p>
             </div>
@@ -1458,7 +1458,7 @@ function AccountCard({
                 <Link
                   href={`/portfolio?account_id=${encodeURIComponent(row.id)}&account_no=${encodeURIComponent(row.account_number)}&tab=history`}
                   onClick={(e) => e.stopPropagation()}
-                  className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-lg bg-[#55a630] text-white text-sm font-bold hover:bg-[#3f7d22] transition-colors"
+                  className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-lg bg-[#E85D3D] text-white text-sm font-bold hover:bg-[#C9482D] transition-colors"
                 >
                   <BookOpen size={16} />
                   View Trades
@@ -1483,7 +1483,7 @@ function AccountCard({
                   target="_blank"
                   rel="noopener noreferrer"
                   onClick={(e) => { e.stopPropagation(); onTradePrepare(); handleTerminalOpen(e, tradeHref); }}
-                  className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-lg bg-[#55a630] text-white text-sm font-bold hover:bg-[#3f7d22] transition-colors"
+                  className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-lg bg-[#E85D3D] text-white text-sm font-bold hover:bg-[#C9482D] transition-colors"
                 >
                   Trade
                   <ExternalLink size={14} />
@@ -1511,7 +1511,7 @@ function AccountCard({
                   target="_blank"
                   rel="noopener noreferrer"
                   onClick={(e) => { e.stopPropagation(); onTradePrepare(); handleTerminalOpen(e, tradeHref); }}
-                  className="inline-flex items-center justify-center gap-1.5 px-4 sm:px-5 py-2 sm:py-2.5 rounded-lg bg-[#55a630] text-white text-xs sm:text-sm font-bold hover:bg-[#3f7d22] transition-colors"
+                  className="inline-flex items-center justify-center gap-1.5 px-4 sm:px-5 py-2 sm:py-2.5 rounded-lg bg-[#E85D3D] text-white text-xs sm:text-sm font-bold hover:bg-[#C9482D] transition-colors"
                 >
                   Trade
                   <ExternalLink size={13} />

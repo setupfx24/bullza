@@ -179,7 +179,7 @@ export default function DepositMethodsPage() {
                 (sel.max_amount != null && parseFloat(amount) > sel.max_amount)
               }
               onClick={() => setConfirmOpen(true)}
-              className="w-full py-3 rounded-xl bg-[#55a630] text-white font-bold disabled:opacity-50"
+              className="w-full py-3 rounded-xl bg-[#E85D3D] text-white font-bold disabled:opacity-50"
             >Deposit</button>
           </>
         )}
@@ -194,11 +194,11 @@ export default function DepositMethodsPage() {
                 <p className="text-[10px] uppercase tracking-wide text-amber-500/90">Order reference — add in your payment remark</p>
                 <div className="flex items-center justify-between gap-2">
                   <p className="font-mono font-bold text-sm select-all">{reference}</p>
-                  <button type="button" onClick={() => copyText(reference, 'Reference')} className="text-[10px] font-semibold text-[#55a630]">Copy</button>
+                  <button type="button" onClick={() => copyText(reference, 'Reference')} className="text-[10px] font-semibold text-[#E85D3D]">Copy</button>
                 </div>
               </div>
               {sel.qr_image ? <img src={sel.qr_image} alt="Payment QR" className="mx-auto w-full max-w-[240px] object-contain rounded-lg border border-border-primary bg-white p-2" /> : null}
-              {sel.upi_id ? <p className="text-xs">UPI: <span className="font-mono">{sel.upi_id}</span> <button type="button" onClick={() => copyText(sel.upi_id!, 'UPI')} className="text-[10px] text-[#55a630]">Copy</button></p> : null}
+              {sel.upi_id ? <p className="text-xs">UPI: <span className="font-mono">{sel.upi_id}</span> <button type="button" onClick={() => copyText(sel.upi_id!, 'UPI')} className="text-[10px] text-[#E85D3D]">Copy</button></p> : null}
               {sel.bank_text ? <pre className="whitespace-pre-wrap break-words text-[11px] font-mono text-left bg-bg-base rounded-lg p-2 border border-border-primary">{sel.bank_text}</pre> : null}
             </div>
 
@@ -206,7 +206,7 @@ export default function DepositMethodsPage() {
               <label className="text-xs text-text-secondary">Enter UTR / UPI reference number (after paying)</label>
               <input value={utr} onChange={(e) => setUtr(e.target.value)} placeholder="12-digit UTR" className="w-full px-4 py-3 rounded-xl border border-border-primary bg-bg-secondary font-mono outline-none focus:border-accent/50" />
             </div>
-            <button type="button" disabled={submitting || !utr.trim()} onClick={() => void confirmPayment()} className="w-full py-3 rounded-xl bg-[#55a630] text-white font-bold disabled:opacity-50">{submitting ? 'Submitting…' : 'Confirm Payment'}</button>
+            <button type="button" disabled={submitting || !utr.trim()} onClick={() => void confirmPayment()} className="w-full py-3 rounded-xl bg-[#E85D3D] text-white font-bold disabled:opacity-50">{submitting ? 'Submitting…' : 'Confirm Payment'}</button>
           </>
         )}
       </div>
@@ -218,7 +218,7 @@ export default function DepositMethodsPage() {
           <div className="relative w-full max-w-md rounded-2xl border border-border-primary bg-bg-primary p-5 space-y-3">
             <p className="text-sm font-bold">Before you proceed with {sel.display_name}:</p>
             <p className="text-xs text-text-secondary whitespace-pre-wrap">{sel.notice || 'Follow the payment instructions carefully and submit the UTR / reference immediately after payment, or the funds may not be credited.'}</p>
-            <button type="button" onClick={() => { setNoticeOpen(false); setStep('form'); }} className="w-full py-2.5 rounded-xl bg-[#55a630] text-white font-bold">Accept and Continue</button>
+            <button type="button" onClick={() => { setNoticeOpen(false); setStep('form'); }} className="w-full py-2.5 rounded-xl bg-[#E85D3D] text-white font-bold">Accept and Continue</button>
           </div>
         </div>
       )}
@@ -236,7 +236,7 @@ export default function DepositMethodsPage() {
             <p className="text-xs">Deposit <b>{cur} {Number(amount).toLocaleString()}</b>{usd != null ? <> (≈ <b>${usd.toFixed(2)} USD</b>)</> : null} into your account.</p>
             <div className="flex gap-2">
               <button type="button" onClick={() => setConfirmOpen(false)} className="flex-1 py-2.5 rounded-xl border border-border-primary text-text-secondary font-semibold">Cancel</button>
-              <button type="button" onClick={() => { setConfirmOpen(false); setStep('qr'); }} className="flex-1 py-2.5 rounded-xl bg-[#55a630] text-white font-bold">Confirm</button>
+              <button type="button" onClick={() => { setConfirmOpen(false); setStep('qr'); }} className="flex-1 py-2.5 rounded-xl bg-[#E85D3D] text-white font-bold">Confirm</button>
             </div>
           </div>
         </div>

@@ -8,9 +8,9 @@ import { phases } from '@/data/academy';
 import { BRAND_NAME } from '@/lib/brand';
 
 const phaseMeta = [
-  { icon: '◆', border: 'border-[#55a630]/30', bg: 'bg-[#55a630]/10' },
-  { icon: '●', border: 'border-[#55a630]/30', bg: 'bg-[#55a630]/10' },
-  { icon: '◉', border: 'border-[#55a630]/30', bg: 'bg-[#55a630]/10' },
+  { icon: '◆', border: 'border-[#E85D3D]/30', bg: 'bg-[#E85D3D]/10' },
+  { icon: '●', border: 'border-[#E85D3D]/30', bg: 'bg-[#E85D3D]/10' },
+  { icon: '◉', border: 'border-[#E85D3D]/30', bg: 'bg-[#E85D3D]/10' },
   { icon: '■', border: 'border-teal-400/30', bg: 'bg-teal-500/10' },
   { icon: '◆', border: 'border-amber-500/30', bg: 'bg-amber-500/10' },
   { icon: '▲', border: 'border-blue-500/30', bg: 'bg-blue-500/10' },
@@ -32,13 +32,13 @@ export default function AcademyPage() {
     <DashboardShell>
       <div className="page-main max-w-6xl mx-auto w-full pb-8">
         <div className="text-center mb-8">
-          <div className="inline-block px-4 py-1.5 rounded-full border border-[#55a630]/30 text-[#55a630] text-xs font-medium tracking-wider uppercase mb-4">
+          <div className="inline-block px-4 py-1.5 rounded-full border border-[#E85D3D]/30 text-[#E85D3D] text-xs font-medium tracking-wider uppercase mb-4">
             ● CURRICULUM
           </div>
           <h1 className="text-3xl font-light text-text-primary tracking-wider mb-1">
             {BRAND_NAME.toUpperCase()} <span className="font-bold italic">FOREX</span> ACADEMY
           </h1>
-          <p className="text-[#55a630] text-sm tracking-widest uppercase">MASTER FOREX TRADING FROM BEGINNER TO PROFESSIONAL</p>
+          <p className="text-[#E85D3D] text-sm tracking-widest uppercase">MASTER FOREX TRADING FROM BEGINNER TO PROFESSIONAL</p>
 
           <div className="flex items-center justify-center gap-8 mt-6 mb-4">
             {[
@@ -56,11 +56,11 @@ export default function AcademyPage() {
 
           <div className="text-center mb-4">
             <p className="text-[10px] uppercase tracking-widest text-text-tertiary mb-1">Overall Progress</p>
-            <p className="text-sm text-[#55a630] font-medium">
+            <p className="text-sm text-[#E85D3D] font-medium">
               {pct}% Complete ({done}/44)
             </p>
             <div className="h-2 max-w-md mx-auto mt-3 rounded-full bg-bg-secondary overflow-hidden border border-border-primary">
-              <div className="h-full bg-[#55a630] rounded-full transition-all" style={{ width: `${pct}%` }} />
+              <div className="h-full bg-[#E85D3D] rounded-full transition-all" style={{ width: `${pct}%` }} />
             </div>
           </div>
 
@@ -70,7 +70,7 @@ export default function AcademyPage() {
                 <div
                   className={clsx(
                     'w-8 h-8 rounded-full border flex items-center justify-center text-xs font-bold mb-1',
-                    i === 0 ? 'border-[#55a630] text-[#55a630]' : 'border-border-secondary text-text-tertiary',
+                    i === 0 ? 'border-[#E85D3D] text-[#E85D3D]' : 'border-border-secondary text-text-tertiary',
                   )}
                 >
                   {i + 1}
@@ -125,7 +125,7 @@ export default function AcademyPage() {
                     <span className="text-sm text-text-tertiary">
                       0/{modCount}
                     </span>
-                    <ArrowRight size={16} className="text-text-tertiary group-hover:text-[#55a630] transition-colors" />
+                    <ArrowRight size={16} className="text-text-tertiary group-hover:text-[#E85D3D] transition-colors" />
                   </div>
                 </div>
                 <div className="flex items-center gap-1 mt-2 ml-14">

@@ -115,13 +115,13 @@ export default function InsuranceTierPicker(props: Props) {
         className="flex w-full items-center gap-2.5 text-left"
       >
         <div
-          className={`w-9 h-5 rounded-full relative transition-colors ${enabled ? 'bg-[#55a630]' : 'bg-bg-hover'}`}
+          className={`w-9 h-5 rounded-full relative transition-colors ${enabled ? 'bg-[#E85D3D]' : 'bg-bg-hover'}`}
         >
           <span
             className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white transition-transform ${enabled ? 'translate-x-4' : ''}`}
           />
         </div>
-        <ShieldCheck size={15} className="text-[#55a630]" />
+        <ShieldCheck size={15} className="text-[#E85D3D]" />
         <span className="text-sm font-semibold text-text-primary">Insure this trade</span>
         <span className="ml-auto text-[10px] uppercase tracking-wider text-text-tertiary">Optional</span>
       </button>
@@ -170,16 +170,16 @@ export default function InsuranceTierPicker(props: Props) {
                     onClick={() => setTier(active ? null : q.tier)}
                     className="text-left rounded-lg p-2.5 transition-all"
                     style={{
-                      background: active ? 'rgba(85,166,48,0.10)' : 'var(--bg-card)',
-                      border: `1px solid ${active ? '#55a630' : 'var(--border-primary)'}`,
-                      boxShadow: active ? '0 0 0 2px rgba(85,166,48,0.2)' : 'none',
+                      background: active ? 'rgba(232, 93, 61,0.10)' : 'var(--bg-card)',
+                      border: `1px solid ${active ? '#E85D3D' : 'var(--border-primary)'}`,
+                      boxShadow: active ? '0 0 0 2px rgba(232, 93, 61,0.2)' : 'none',
                     }}
                   >
                     <p className="text-[10px] uppercase tracking-wider text-text-tertiary">{formatTierLabel(q.tier)}</p>
                     <p className="mt-1 text-sm font-bold tabular-nums" style={{ color: 'var(--text-primary)' }}>
                       {fmtAccountMoney(q.fee, !!isCent)}
                     </p>
-                    <p className="text-[10px] text-[#55a630] mt-0.5 font-semibold">
+                    <p className="text-[10px] text-[#E85D3D] mt-0.5 font-semibold">
                       {q.coverage_pct.toFixed(0)}% covered
                     </p>
                     <p className="text-[10px] text-text-tertiary mt-0.5">

@@ -82,12 +82,12 @@ function Inner() {
       <header className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
         <div>
           <h1 className="text-2xl md:text-3xl font-bold text-text-primary tracking-tight flex items-center gap-2">
-            Rewards Store <ShoppingBag size={22} className="text-[#55a630]" />
+            Rewards Store <ShoppingBag size={22} className="text-[#E85D3D]" />
           </h1>
           <p className="text-sm text-text-secondary mt-1">Spend Artha Coins on cashback, perks, tools, and lifestyle rewards.</p>
         </div>
-        <div className="flex items-center gap-2 px-3 py-1.5 rounded-full border border-[#55a630]/30 bg-[#55a630]/5">
-          <Coins size={14} className="text-[#55a630]" />
+        <div className="flex items-center gap-2 px-3 py-1.5 rounded-full border border-[#E85D3D]/30 bg-[#E85D3D]/5">
+          <Coins size={14} className="text-[#E85D3D]" />
           <span className="text-sm font-semibold text-text-primary tabular-nums">
             {state ? fmt(state.ac_balance) : '—'} AC
           </span>
@@ -104,7 +104,7 @@ function Inner() {
               className={
                 'px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ' +
                 (tab === t.key
-                  ? 'bg-[#55a630]/15 text-text-primary border border-[#55a630]/40'
+                  ? 'bg-[#E85D3D]/15 text-text-primary border border-[#E85D3D]/40'
                   : 'text-text-secondary hover:text-text-primary border border-transparent')
               }
             >
@@ -131,7 +131,7 @@ function Inner() {
                     className="rounded-lg border border-border-primary bg-bg-base p-3 flex flex-col gap-2"
                   >
                     <div className="flex items-center justify-between">
-                      <span className="text-[10.5px] uppercase tracking-wider text-[#55a630]/85 font-semibold">
+                      <span className="text-[10.5px] uppercase tracking-wider text-[#E85D3D]/85 font-semibold">
                         {it.category}
                       </span>
                       <span className="text-[12px] font-semibold text-text-primary tabular-nums">
@@ -149,7 +149,7 @@ function Inner() {
                       className={
                         'inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ' +
                         (canAfford
-                          ? 'bg-[#55a630] text-bg-base hover:brightness-110 disabled:opacity-60'
+                          ? 'bg-[#E85D3D] text-bg-base hover:brightness-110 disabled:opacity-60'
                           : 'border border-border-primary text-text-tertiary cursor-not-allowed')
                       }
                     >

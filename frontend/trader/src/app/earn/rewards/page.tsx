@@ -107,7 +107,7 @@ function Inner() {
     <div className="px-4 sm:px-6 py-6 space-y-5 max-w-[1000px] mx-auto">
       <header>
         <h1 className="text-2xl font-bold text-text-primary flex items-center gap-2">
-          <Gift className="text-[#55a630]" size={24} /> Rewards
+          <Gift className="text-[#E85D3D]" size={24} /> Rewards
         </h1>
         <p className="mt-1 text-sm text-text-secondary max-w-2xl">
           Limited-time offers: stake yourself or invite new users with your referral link — as the{' '}
@@ -140,7 +140,7 @@ function Inner() {
                       <h2 className="text-base font-bold text-text-primary">{c.title}</h2>
                       <span className={
                         'text-[10px] px-2 py-0.5 rounded-md font-bold uppercase ' +
-                        (c.status === 'running' ? 'bg-[#55a630]/15 text-[#55a630]'
+                        (c.status === 'running' ? 'bg-[#E85D3D]/15 text-[#E85D3D]'
                           : c.status === 'upcoming' ? 'bg-amber-500/15 text-amber-400'
                           : 'bg-bg-hover text-text-tertiary')
                       }>
@@ -153,7 +153,7 @@ function Inner() {
                     </p>
                   </div>
                   {c.claimed ? (
-                    <span className="shrink-0 text-xs font-bold text-[#55a630] border border-[#55a630]/40 rounded-lg px-3 py-1.5">
+                    <span className="shrink-0 text-xs font-bold text-[#E85D3D] border border-[#E85D3D]/40 rounded-lg px-3 py-1.5">
                       Claimed {c.claimed_amount != null ? fmtUsd(c.claimed_amount) : ''} ✓
                     </span>
                   ) : c.claimable ? (
@@ -161,7 +161,7 @@ function Inner() {
                       type="button"
                       disabled={claiming === c.id}
                       onClick={() => void claim(c)}
-                      className="shrink-0 px-4 py-2 rounded-xl bg-[#55a630] text-white text-sm font-bold hover:bg-[#3f7d22] disabled:opacity-50"
+                      className="shrink-0 px-4 py-2 rounded-xl bg-[#E85D3D] text-white text-sm font-bold hover:bg-[#C9482D] disabled:opacity-50"
                     >
                       {claiming === c.id ? 'Claiming…' : `Claim ${fmtUsd(c.projected_reward)}`}
                     </button>
@@ -181,12 +181,12 @@ function Inner() {
                       {c.tiers.map((t, i) => {
                         const active = inTier(t, c.my_staked_total);
                         return (
-                          <tr key={i} className={'border-t border-border-primary/40 text-xs ' + (active ? 'bg-[#55a630]/8' : '')}>
+                          <tr key={i} className={'border-t border-border-primary/40 text-xs ' + (active ? 'bg-[#E85D3D]/8' : '')}>
                             <td className="px-3 py-1.5 font-mono text-text-primary">
                               {tierLabel(t)}
-                              {active && <span className="ml-2 text-[9px] font-bold text-[#55a630] uppercase">← you are here</span>}
+                              {active && <span className="ml-2 text-[9px] font-bold text-[#E85D3D] uppercase">← you are here</span>}
                             </td>
-                            <td className="px-3 py-1.5 text-right font-bold text-[#55a630]">{tierReward(t)}</td>
+                            <td className="px-3 py-1.5 text-right font-bold text-[#E85D3D]">{tierReward(t)}</td>
                           </tr>
                         );
                       })}
@@ -203,7 +203,7 @@ function Inner() {
                     <span className="font-bold font-mono text-text-primary">{fmtUsd(c.my_staked_total)}</span>
                   </div>
                   <div className="h-2 rounded-full bg-bg-hover overflow-hidden">
-                    <div className="h-full rounded-full bg-[#55a630] transition-all" style={{ width: `${barPct}%` }} />
+                    <div className="h-full rounded-full bg-[#E85D3D] transition-all" style={{ width: `${barPct}%` }} />
                   </div>
                   <div className="flex items-center justify-between text-[11px] mt-1.5">
                     <span className="text-text-tertiary">
@@ -211,7 +211,7 @@ function Inner() {
                         ? `${fmtUsd(nextTier.min_amount - c.my_staked_total)} more to reach ${nextTier.reward_amount != null ? fmtUsd(nextTier.reward_amount) : `${nextTier.reward_pct}%`}`
                         : c.projected_reward > 0 ? 'Top tier reached 🎉' : ''}
                     </span>
-                    <span className={c.projected_reward > 0 ? 'font-bold text-[#55a630]' : 'text-text-tertiary'}>
+                    <span className={c.projected_reward > 0 ? 'font-bold text-[#E85D3D]' : 'text-text-tertiary'}>
                       {c.projected_reward > 0
                         ? `Projected reward: ${fmtUsd(c.projected_reward)}${c.current_reward_amount == null && c.current_pct > 0 ? ` (${c.current_pct}%)` : ''}`
                         : c.tiers.length ? `Reach ${fmtUsd(c.tiers[0].min_amount)} to start earning` : ''}

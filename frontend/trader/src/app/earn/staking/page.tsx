@@ -148,14 +148,14 @@ function Inner() {
       <header className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h1 className="text-2xl md:text-3xl font-bold text-text-primary tracking-tight flex items-center gap-2">
-            Staking <Coins size={22} className="text-[#55a630]" />
+            Staking <Coins size={22} className="text-[#E85D3D]" />
           </h1>
           <p className="text-sm text-text-secondary mt-1">
             Provide liquidity and earn structured rewards. Flexible mode or long-term lock — your choice.
           </p>
         </div>
-        <div className="flex items-center gap-2 px-3 py-1.5 rounded-full border border-[#55a630]/30 bg-[#55a630]/5">
-          <Wallet size={14} className="text-[#55a630]" />
+        <div className="flex items-center gap-2 px-3 py-1.5 rounded-full border border-[#E85D3D]/30 bg-[#E85D3D]/5">
+          <Wallet size={14} className="text-[#E85D3D]" />
           <span className="text-sm font-semibold text-text-primary tabular-nums">
             {fmtUsd(walletBalance)} available
           </span>
@@ -179,7 +179,7 @@ function Inner() {
         <div className="rounded-xl border border-border-primary bg-bg-secondary p-5 sm:p-6 grid grid-cols-1 lg:grid-cols-3 gap-5">
           <div className="lg:col-span-2 space-y-3">
             <h2 className="text-base font-semibold text-text-primary flex items-center gap-2">
-              {selectedPlan.mode === 'locked' ? <Lock size={16} className="text-[#55a630]" /> : <Sparkles size={16} className="text-[#55a630]" />}
+              {selectedPlan.mode === 'locked' ? <Lock size={16} className="text-[#E85D3D]" /> : <Sparkles size={16} className="text-[#E85D3D]" />}
               Open a {selectedPlan.label} stake
             </h2>
             <div className="flex flex-col sm:flex-row sm:items-end gap-3">
@@ -192,14 +192,14 @@ function Inner() {
                   placeholder={`Min ${fmtUsd(selectedPlan.min_amount)}`}
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
-                  className="w-full px-3 py-2.5 rounded-lg bg-bg-base border border-border-primary text-sm text-text-primary tabular-nums focus:border-[#55a630] focus:outline-none"
+                  className="w-full px-3 py-2.5 rounded-lg bg-bg-base border border-border-primary text-sm text-text-primary tabular-nums focus:border-[#E85D3D] focus:outline-none"
                 />
               </div>
               <button
                 type="button"
                 onClick={handleOpen}
                 disabled={busy || !amount}
-                className="inline-flex items-center justify-center gap-1.5 px-6 py-2.5 rounded-lg text-sm font-bold bg-[#55a630] text-bg-base hover:brightness-110 disabled:opacity-60 transition-colors"
+                className="inline-flex items-center justify-center gap-1.5 px-6 py-2.5 rounded-lg text-sm font-bold bg-[#E85D3D] text-bg-base hover:brightness-110 disabled:opacity-60 transition-colors"
               >
                 {busy ? <Loader2 size={14} className="animate-spin" /> : <ArrowRight size={14} />}
                 Stake
@@ -212,7 +212,7 @@ function Inner() {
                   type="checkbox"
                   checked={useTradingBonus}
                   onChange={(e) => setUseTradingBonus(e.target.checked)}
-                  className="mt-0.5 accent-[#55a630]"
+                  className="mt-0.5 accent-[#E85D3D]"
                 />
                 <span>
                   Activate {selectedPlan.trading_bonus_pct.toFixed(0)}% trading bonus
@@ -268,7 +268,7 @@ function Inner() {
                       type="button"
                       onClick={() => handleClaim(p)}
                       disabled={busyPosId === p.id}
-                      className="inline-flex items-center gap-1 px-3 py-1.5 rounded-md text-xs font-medium bg-[#55a630] text-bg-base hover:brightness-110 disabled:opacity-60"
+                      className="inline-flex items-center gap-1 px-3 py-1.5 rounded-md text-xs font-medium bg-[#E85D3D] text-bg-base hover:brightness-110 disabled:opacity-60"
                     >
                       {busyPosId === p.id ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />}
                       Claim
@@ -279,7 +279,7 @@ function Inner() {
                       type="button"
                       onClick={() => handleWithdraw(p)}
                       disabled={busyPosId === p.id}
-                      className="inline-flex items-center gap-1 px-3 py-1.5 rounded-md text-xs font-medium border border-border-primary text-text-secondary hover:text-text-primary hover:border-[#55a630]/45 disabled:opacity-60"
+                      className="inline-flex items-center gap-1 px-3 py-1.5 rounded-md text-xs font-medium border border-border-primary text-text-secondary hover:text-text-primary hover:border-[#E85D3D]/45 disabled:opacity-60"
                     >
                       {p.plan.mode === 'flexible' ? 'Withdraw' : 'Withdraw at unlock'}
                     </button>
@@ -312,7 +312,7 @@ function Stat({ label, value, accent }: { label: string; value: string; accent?:
   return (
     <div>
       <p className="text-[10.5px] uppercase tracking-wider text-text-tertiary">{label}</p>
-      <p className={'text-sm font-semibold tabular-nums ' + (accent ? 'text-[#55a630]' : 'text-text-primary')}>
+      <p className={'text-sm font-semibold tabular-nums ' + (accent ? 'text-[#E85D3D]' : 'text-text-primary')}>
         {value}
       </p>
     </div>

@@ -86,13 +86,13 @@ function Inner() {
           </Link>
           <div>
             <h1 className="text-2xl md:text-3xl font-bold text-text-primary tracking-tight flex items-center gap-2">
-              Lottery <Ticket size={22} className="text-[#55a630]" />
+              Lottery <Ticket size={22} className="text-[#E85D3D]" />
             </h1>
             <p className="text-sm text-text-secondary mt-0.5">Buy tickets for a chance to win the prize pool. One winner per round.</p>
           </div>
         </div>
-        <div className="flex items-center gap-2 px-3 py-1.5 rounded-full border border-[#55a630]/30 bg-[#55a630]/5">
-          <Coins size={14} className="text-[#55a630]" />
+        <div className="flex items-center gap-2 px-3 py-1.5 rounded-full border border-[#E85D3D]/30 bg-[#E85D3D]/5">
+          <Coins size={14} className="text-[#E85D3D]" />
           <span className="text-sm font-semibold text-text-primary tabular-nums">{fmt(acBalance)} AC</span>
         </div>
       </header>
@@ -125,7 +125,7 @@ function RoundCard({ r, busy, onBuy, acBalance }: { r: Round; busy: boolean; onB
   return (
     <div className="rounded-xl border border-border-primary bg-bg-secondary p-5 flex flex-col gap-3">
       <div className="flex items-center justify-between">
-        <Trophy size={20} className="text-[#55a630]" />
+        <Trophy size={20} className="text-[#E85D3D]" />
         <span
           className={
             'inline-flex items-center gap-1 text-[10.5px] uppercase tracking-wider px-2 py-0.5 rounded-full ' +
@@ -140,7 +140,7 @@ function RoundCard({ r, busy, onBuy, acBalance }: { r: Round; busy: boolean; onB
       <div>
         <h3 className="text-base font-semibold text-text-primary">{r.prize_label}</h3>
         {r.prize_amount > 0 && (
-          <p className="text-2xl font-extrabold text-[#55a630] tabular-nums mt-1">
+          <p className="text-2xl font-extrabold text-[#E85D3D] tabular-nums mt-1">
             {fmt(r.prize_amount)}{' '}
             <span className="text-xs text-text-tertiary font-normal">{r.prize_kind.toUpperCase()}</span>
           </p>
@@ -159,7 +159,7 @@ function RoundCard({ r, busy, onBuy, acBalance }: { r: Round; busy: boolean; onB
           type="button"
           onClick={onBuy}
           disabled={busy || !canAfford}
-          className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-lg text-sm font-bold bg-[#55a630] text-bg-base hover:brightness-110 disabled:opacity-60"
+          className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-lg text-sm font-bold bg-[#E85D3D] text-bg-base hover:brightness-110 disabled:opacity-60"
         >
           {busy ? <Loader2 size={14} className="animate-spin" /> : <Ticket size={14} />}
           {canAfford ? `Buy ticket for ${fmt(r.ticket_cost_ac)} AC` : 'Not enough AC'}
@@ -177,7 +177,7 @@ function Stat({ label, value, accent }: { label: string; value: string; accent?:
   return (
     <div className="rounded-md border border-border-primary bg-bg-base p-2">
       <p className="text-[9.5px] uppercase tracking-wider text-text-tertiary">{label}</p>
-      <p className={'text-sm font-semibold tabular-nums ' + (accent ? 'text-[#55a630]' : 'text-text-primary')}>
+      <p className={'text-sm font-semibold tabular-nums ' + (accent ? 'text-[#E85D3D]' : 'text-text-primary')}>
         {value}
       </p>
     </div>

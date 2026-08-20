@@ -25,7 +25,7 @@ export default function AcademyPhasePage() {
       <DashboardShell>
         <div className="page-main max-w-4xl mx-auto text-center py-20">
           <p className="text-text-secondary">Phase not found</p>
-          <Link href="/academy" className="text-[#55a630] hover:underline text-sm mt-2 inline-block">
+          <Link href="/academy" className="text-[#E85D3D] hover:underline text-sm mt-2 inline-block">
             ← Back to Academy
           </Link>
         </div>
@@ -41,7 +41,7 @@ export default function AcademyPhasePage() {
       <div className="page-main max-w-6xl mx-auto w-full pb-8">
         <Link
           href="/academy"
-          className="inline-flex items-center gap-1.5 text-sm text-text-secondary hover:text-[#55a630] transition-colors mb-5"
+          className="inline-flex items-center gap-1.5 text-sm text-text-secondary hover:text-[#E85D3D] transition-colors mb-5"
         >
           <ArrowLeft size={14} />
           ALL PHASES
@@ -111,7 +111,7 @@ export default function AcademyPhasePage() {
                   className={clsx(
                     'text-[10px] px-2 py-0.5 rounded-full border font-medium uppercase tracking-wider',
                     phase.level === 'BEGINNER'
-                      ? 'bg-[#55a630]/10 text-[#55a630] border-[#55a630]/20'
+                      ? 'bg-[#E85D3D]/10 text-[#E85D3D] border-[#E85D3D]/20'
                       : 'bg-amber-500/10 text-amber-400 border-amber-500/20',
                   )}
                 >
@@ -133,14 +133,14 @@ export default function AcademyPhasePage() {
                       className={clsx(
                         'flex items-center gap-4 px-5 py-4 rounded-xl border transition-colors group',
                         isDone
-                          ? 'bg-[#55a630]/5 border-[#55a630]/20 hover:border-[#55a630]/40'
+                          ? 'bg-[#E85D3D]/5 border-[#E85D3D]/20 hover:border-[#E85D3D]/40'
                           : 'bg-bg-secondary border-border-glass hover:border-text-tertiary',
                       )}
                     >
                       <div
                         className={clsx(
                           'w-10 h-10 rounded-full border-2 flex items-center justify-center text-xs font-bold shrink-0 transition-colors',
-                          isDone ? 'bg-[#55a630]/10 border-[#55a630] text-[#55a630]' : 'border-border-secondary text-text-tertiary',
+                          isDone ? 'bg-[#E85D3D]/10 border-[#E85D3D] text-[#E85D3D]' : 'border-border-secondary text-text-tertiary',
                         )}
                       >
                         {isDone ? <CheckCircle size={16} /> : module.id}
@@ -149,7 +149,7 @@ export default function AcademyPhasePage() {
                         <div className="flex items-center gap-2 flex-wrap">
                           <h3 className="text-text-primary font-semibold text-sm">{module.title}</h3>
                           {isDone && (
-                            <span className="text-[9px] px-1.5 py-0.5 rounded bg-[#55a630]/10 text-[#55a630] font-bold border border-[#55a630]/20 uppercase tracking-wider">
+                            <span className="text-[9px] px-1.5 py-0.5 rounded bg-[#E85D3D]/10 text-[#E85D3D] font-bold border border-[#E85D3D]/20 uppercase tracking-wider">
                               DONE
                             </span>
                           )}
@@ -162,7 +162,7 @@ export default function AcademyPhasePage() {
                             className={clsx(
                               'text-[9px] px-1.5 py-0.5 rounded-full font-medium uppercase tracking-wider',
                               module.level === 'BEGINNER'
-                                ? 'bg-[#55a630]/10 text-[#55a630]'
+                                ? 'bg-[#E85D3D]/10 text-[#E85D3D]'
                                 : 'bg-amber-500/10 text-amber-400',
                             )}
                           >
@@ -170,7 +170,7 @@ export default function AcademyPhasePage() {
                           </span>
                         </div>
                       </div>
-                      <ArrowRight size={16} className="text-text-tertiary group-hover:text-[#55a630] transition-colors shrink-0" />
+                      <ArrowRight size={16} className="text-text-tertiary group-hover:text-[#E85D3D] transition-colors shrink-0" />
                     </Link>
                     {i < phase.modules.length - 1 && (
                       <div className="flex justify-start ml-[29px]">
@@ -186,21 +186,21 @@ export default function AcademyPhasePage() {
 
         {/* Quiz Card */}
         {phase.quiz && phase.modules.length > 0 && (
-          <div className="mt-6 bg-bg-secondary border border-[#55a630]/20 rounded-xl p-5">
+          <div className="mt-6 bg-bg-secondary border border-[#E85D3D]/20 rounded-xl p-5">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
-                <p className="text-[10px] uppercase tracking-widest text-[#55a630] font-medium mb-1">KNOWLEDGE CHECK</p>
+                <p className="text-[10px] uppercase tracking-widest text-[#E85D3D] font-medium mb-1">KNOWLEDGE CHECK</p>
                 <h3 className="text-lg font-bold text-text-primary">{phase.quiz.title}</h3>
                 <div className="flex items-center gap-3 mt-2">
                   <div className="w-32 h-1.5 bg-bg-tertiary rounded-full overflow-hidden">
-                    <div className="h-full bg-[#55a630] rounded-full" style={{ width: '0%' }} />
+                    <div className="h-full bg-[#E85D3D] rounded-full" style={{ width: '0%' }} />
                   </div>
                   <p className="text-xs text-text-tertiary">0/{phase.quiz.questions.length} answered</p>
                 </div>
               </div>
               <Link
                 href={`/academy/${slug}/quiz`}
-                className="px-4 py-2 rounded-lg bg-[#55a630] hover:bg-[#3f7d22] text-white text-sm font-semibold transition-colors text-center whitespace-nowrap"
+                className="px-4 py-2 rounded-lg bg-[#E85D3D] hover:bg-[#C9482D] text-white text-sm font-semibold transition-colors text-center whitespace-nowrap"
               >
                 Start Quiz
               </Link>

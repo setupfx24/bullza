@@ -16,7 +16,7 @@ export default function HowItWorksPage() {
 
       {/* Hero */}
       <section className="fx-container relative z-10 pt-28 md:pt-36 pb-16">
-        <p className="text-xs uppercase tracking-[0.25em] text-[#55a630]/85 mb-3">How {BRAND_NAME} Works</p>
+        <p className="text-xs uppercase tracking-[0.25em] text-[#E85D3D]/85 mb-3">How {BRAND_NAME} Works</p>
         <h1 className="fx-headline text-[40px] sm:text-[52px] md:text-[64px] xl:text-[72px] leading-tight max-w-4xl">
           Not a Broker.
           <br />
@@ -28,10 +28,10 @@ export default function HowItWorksPage() {
           stays with you.
         </p>
         <div className="mt-8 flex flex-wrap gap-3">
-          <Link href="#flow" className="inline-flex items-center gap-2 px-5 py-3 rounded-lg bg-[#55a630] text-bg-base font-bold text-sm hover:brightness-110">
+          <Link href="#flow" className="inline-flex items-center gap-2 px-5 py-3 rounded-lg bg-[#E85D3D] text-bg-base font-bold text-sm hover:brightness-110">
             See the Flow <ArrowRight size={14} />
           </Link>
-          <Link href="/auth/register" className="inline-flex items-center gap-2 px-5 py-3 rounded-lg border border-[#55a630]/40 text-text-primary text-sm hover:border-[#55a630]/70">
+          <Link href="/auth/register" className="inline-flex items-center gap-2 px-5 py-3 rounded-lg border border-[#E85D3D]/40 text-text-primary text-sm hover:border-[#E85D3D]/70">
             Start Trading
           </Link>
         </div>
@@ -71,8 +71,8 @@ export default function HowItWorksPage() {
         </p>
         <ol className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {STEPS.map((s, i) => (
-            <li key={s.title} className="rounded-xl border border-[#55a630]/20 p-5 bg-[rgba(255,255,255,0.02)]">
-              <div className="flex items-center gap-2 text-xs text-[#55a630]/85 mb-2">
+            <li key={s.title} className="rounded-xl border border-[#E85D3D]/20 p-5 bg-[rgba(255,255,255,0.02)]">
+              <div className="flex items-center gap-2 text-xs text-[#E85D3D]/85 mb-2">
                 <span className="font-mono">{String(i + 1).padStart(2, '0')}</span>
                 <span className="uppercase tracking-wider">{s.eyebrow}</span>
               </div>
@@ -103,18 +103,18 @@ export default function HowItWorksPage() {
         <h2 className="text-2xl md:text-3xl font-bold mb-6" style={{ color: 'var(--fx-text)' }}>
           {BRAND_NAME} vs Traditional Brokers
         </h2>
-        <div className="overflow-hidden rounded-xl border border-[#55a630]/20">
+        <div className="overflow-hidden rounded-xl border border-[#E85D3D]/20">
           <table className="w-full text-sm">
-            <thead className="text-xs uppercase tracking-wider text-[#55a630]/90">
+            <thead className="text-xs uppercase tracking-wider text-[#E85D3D]/90">
               <tr>
-                <th className="text-left px-4 py-3 bg-[rgba(85,166,48,0.06)]">Feature</th>
-                <th className="text-left px-4 py-3 bg-[rgba(85,166,48,0.06)]">{BRAND_NAME}</th>
-                <th className="text-left px-4 py-3 bg-[rgba(85,166,48,0.06)]">Traditional Broker</th>
+                <th className="text-left px-4 py-3 bg-[rgba(232, 93, 61,0.06)]">Feature</th>
+                <th className="text-left px-4 py-3 bg-[rgba(232, 93, 61,0.06)]">{BRAND_NAME}</th>
+                <th className="text-left px-4 py-3 bg-[rgba(232, 93, 61,0.06)]">Traditional Broker</th>
               </tr>
             </thead>
             <tbody>
               {COMPARE.map((r) => (
-                <tr key={r[0]} className="border-t border-[#55a630]/10">
+                <tr key={r[0]} className="border-t border-[#E85D3D]/10">
                   <td className="px-4 py-3 font-medium" style={{ color: 'var(--fx-text)' }}>{r[0]}</td>
                   <td className="px-4 py-3" style={{ color: 'var(--fx-text-2)' }}>{r[1]}</td>
                   <td className="px-4 py-3" style={{ color: 'var(--fx-text-2)' }}>{r[2]}</td>
@@ -167,8 +167,8 @@ export default function HowItWorksPage() {
 
       {/* CTA */}
       <section className="fx-container relative z-10 py-20">
-        <div className="rounded-2xl border border-[#55a630]/30 p-10 md:p-14 text-center bg-[rgba(85,166,48,0.04)]">
-          <Zap size={28} className="text-[#55a630] mx-auto mb-4" />
+        <div className="rounded-2xl border border-[#E85D3D]/30 p-10 md:p-14 text-center bg-[rgba(232, 93, 61,0.04)]">
+          <Zap size={28} className="text-[#E85D3D] mx-auto mb-4" />
           <h2 className="text-2xl md:text-3xl font-bold mb-3" style={{ color: 'var(--fx-text)' }}>
             Experience System-Driven Trading
           </h2>
@@ -176,10 +176,10 @@ export default function HowItWorksPage() {
             No custody. No hidden control. Just structured execution.
           </p>
           <div className="flex justify-center gap-3 flex-wrap">
-            <Link href="/auth/register" className="inline-flex items-center gap-2 px-6 py-3 rounded-lg bg-[#55a630] text-bg-base font-bold text-sm hover:brightness-110">
+            <Link href="/auth/register" className="inline-flex items-center gap-2 px-6 py-3 rounded-lg bg-[#E85D3D] text-bg-base font-bold text-sm hover:brightness-110">
               Start Trading <ArrowRight size={14} />
             </Link>
-            <Link href="/auth/login" className="inline-flex items-center gap-2 px-6 py-3 rounded-lg border border-[#55a630]/40 text-text-primary text-sm hover:border-[#55a630]/70">
+            <Link href="/auth/login" className="inline-flex items-center gap-2 px-6 py-3 rounded-lg border border-[#E85D3D]/40 text-text-primary text-sm hover:border-[#E85D3D]/70">
               Connect Wallet
             </Link>
           </div>
@@ -228,8 +228,8 @@ function Card({
 
 function Pillar({ icon: Icon, title, body }: { icon: any; title: string; body: string }) {
   return (
-    <div className="rounded-xl border border-[#55a630]/20 p-6 bg-[rgba(255,255,255,0.02)]">
-      <Icon size={24} className="text-[#55a630] mb-3" />
+    <div className="rounded-xl border border-[#E85D3D]/20 p-6 bg-[rgba(255,255,255,0.02)]">
+      <Icon size={24} className="text-[#E85D3D] mb-3" />
       <h3 className="font-semibold mb-1.5" style={{ color: 'var(--fx-text)' }}>{title}</h3>
       <p className="text-sm leading-relaxed" style={{ color: 'var(--fx-text-2)' }}>{body}</p>
     </div>
@@ -250,11 +250,11 @@ function WhyCard({
       <div
         className="shrink-0 size-14 rounded-xl flex items-center justify-center"
         style={{
-          background: 'rgba(85,166,48,0.18)',
-          border: '1px solid rgba(85,166,48,0.4)',
+          background: 'rgba(232, 93, 61,0.18)',
+          border: '1px solid rgba(232, 93, 61,0.4)',
         }}
       >
-        <Icon size={26} className="text-[#55a630]" />
+        <Icon size={26} className="text-[#E85D3D]" />
       </div>
       <div>
         <h3 className="font-semibold text-base md:text-lg leading-tight" style={{ color: 'var(--fx-text)' }}>

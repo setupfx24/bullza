@@ -19,7 +19,7 @@ export default function MarketsPage() {
       <div
         aria-hidden
         className="absolute inset-0 -z-10"
-        style={{ background: 'radial-gradient(ellipse 60% 50% at 50% 0%, hsl(99 55% 42% / 0.18), transparent 70%)' }}
+        style={{ background: 'radial-gradient(ellipse 60% 50% at 50% 0%, hsl(11 79% 57% / 0.18), transparent 70%)' }}
       />
 
       {/* Live chart + instrument directory — moved to top of page */}

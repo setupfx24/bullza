@@ -47,7 +47,7 @@ export default function MarketResearchPage() {
             src="https://images.unsplash.com/photo-1554260570-9140fd3b7614?auto=format&fit=crop&w=900&q=80"
             alt="Trading charts and market analysis"
             className="rounded-2xl w-full min-h-[260px] max-h-[340px] object-cover"
-            style={{ border: '1px solid hsl(99 55% 42% / 0.35)' }}
+            style={{ border: '1px solid hsl(11 79% 57% / 0.35)' }}
           />
         </div>
       </section>

@@ -78,14 +78,14 @@ function VerifyEmailContent() {
               )}
               {state === 'loading' && (
                 <>
-                  <Loader2 size={36} className="auth-spinner" style={{ margin: '0 auto 16px', color: '#55a630' }} />
+                  <Loader2 size={36} className="auth-spinner" style={{ margin: '0 auto 16px', color: '#E85D3D' }} />
                   <h2 className="auth-form__title">Verifying…</h2>
                   <p className="auth-form__subtitle">Hold on while we confirm your email.</p>
                 </>
               )}
               {state === 'ok' && (
                 <>
-                  <CheckCircle2 size={48} style={{ color: '#55a630', margin: '0 auto 16px', display: 'block' }} />
+                  <CheckCircle2 size={48} style={{ color: '#E85D3D', margin: '0 auto 16px', display: 'block' }} />
                   <h2 className="auth-form__title">Email verified</h2>
                   <p className="auth-form__subtitle">{message}</p>
                 </>
