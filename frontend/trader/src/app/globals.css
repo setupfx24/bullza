@@ -66,9 +66,10 @@
   text-transform: uppercase;
 }
 
-/* Fallback: before JS runs, use dark. Script in <head> overrides immediately. */
+/* Fallback: before JS runs, use light (the app's default since the
+   2026-08-20 redesign). Script in <head> overrides immediately. */
 :root {
-  color-scheme: dark;
+  color-scheme: light;
 }
 
 /* ======================================= */
@@ -133,6 +134,11 @@
 /* ======================================= */
 
 [data-theme="light"] {
+  /* Soft sage-gray canvas behind white cards — the premium-fintech
+     backdrop from the 2026-08-20 dashboard redesign reference. Dark
+     theme defines its own --bg-page; this was previously missing here,
+     leaving bg-bg-page unresolved in light mode. */
+  --bg-page: #eef0ed;
   --bg-base: #ffffff;
   --bg-primary: #ffffff;
   --bg-secondary: #f9fafb;

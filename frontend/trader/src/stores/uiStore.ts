@@ -48,7 +48,10 @@ const WATCHLIST_DEFAULT_PX = WATCHLIST_LAYOUT.default;
 export const useUIStore = create<UIState>()(
   persist(
     (set, get) => ({
-      theme: 'dark' as Theme,
+      // Light-first (2026-08-20 redesign): the app now opens in the premium
+      // light theme; users who explicitly chose dark keep their choice via
+      // the persisted store, and the toggle still works both ways.
+      theme: 'light' as Theme,
       watchlistWidth: WATCHLIST_DEFAULT_PX,
       orderPanelWidth: 340,
       bottomPanelHeight: 320,
@@ -132,7 +135,7 @@ export const useUIStore = create<UIState>()(
           v < 9
             ? false
             : Boolean((state as UIState & { terminalNewsOpen?: boolean }).terminalNewsOpen);
-        const theme = state.theme ?? 'dark';
+        const theme = state.theme ?? 'light';
         return {
           ...state,
           theme,
