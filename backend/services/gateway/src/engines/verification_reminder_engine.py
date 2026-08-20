@@ -76,7 +76,7 @@ async def send_due_reminders(db: AsyncSession) -> int:
     now = datetime.now(timezone.utc)
     first_cutoff = now - timedelta(hours=FIRST_NUDGE_HOURS)
     resend_cutoff = now - timedelta(days=RESEND_DAYS)
-    app_url = (get_settings().TRADER_APP_URL or "https://trade.swisdex.com")
+    app_url = get_settings().TRADER_APP_URL
 
     candidates = (await db.execute(
         select(User).where(

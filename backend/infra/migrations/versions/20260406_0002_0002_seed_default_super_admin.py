@@ -13,8 +13,8 @@ down_revision = "0001"
 branch_labels = None
 depends_on = None
 
-_ADMIN_EMAIL = os.environ.get("ADMIN_EMAIL", "admin@swisdex.com")
-_ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "SwisDexAdmin2025!")
+_ADMIN_EMAIL = os.environ.get("ADMIN_EMAIL", "admin@example.com")
+_ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "ChangeMeAdmin2025!")
 _DEFAULT_HASH = bcrypt.hashpw(_ADMIN_PASSWORD.encode(), bcrypt.gensalt(12)).decode()
 
 

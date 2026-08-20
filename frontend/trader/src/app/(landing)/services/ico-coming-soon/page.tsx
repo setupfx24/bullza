@@ -5,6 +5,7 @@ import Link from 'next/link';
 import {
   ArrowUpRight, Gem, ShieldCheck, Layers, Users, Lock, Bell, Sparkles,
 } from 'lucide-react';
+import { BRAND_NAME } from '@/lib/brand';
 
 export default function IcoComingSoonPage() {
   const [email, setEmail] = useState('');
@@ -53,7 +54,7 @@ export default function IcoComingSoonPage() {
           </h1>
 
           <p className="mt-6 mx-auto max-w-2xl text-foreground/70 text-sm sm:text-base md:text-lg leading-relaxed">
-            Early access to promising blockchain projects, vetted by SwisDex before they hit the wider market.
+            Early access to promising blockchain projects, vetted by {BRAND_NAME} before they hit the wider market.
             Coming soon — join the early-access list to be notified the moment the first round opens.
           </p>
 
@@ -117,8 +118,8 @@ export default function IcoComingSoonPage() {
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
           {[
             { icon: Sparkles, title: 'Curated Projects',      body: 'Hand-picked launchpad — quality over quantity. Expect 3–6 projects per quarter, not a daily firehose.' },
-            { icon: Users,    title: 'Early-Access Tiers',     body: 'Loyalty-based allocation tiers. Active SwisDex traders get priority access and higher allocation caps.' },
-            { icon: Gem,      title: 'Discounted Entry',       body: 'Strategic-round pricing for SwisDex investors — below public-sale rates, with vesting to align incentives.' },
+            { icon: Users,    title: 'Early-Access Tiers',     body: `Loyalty-based allocation tiers. Active ${BRAND_NAME} traders get priority access and higher allocation caps.` },
+            { icon: Gem,      title: 'Discounted Entry',       body: `Strategic-round pricing for ${BRAND_NAME} investors — below public-sale rates, with vesting to align incentives.` },
             { icon: ShieldCheck, title: 'Audited Contracts',   body: 'No project lists without a clean audit from a tier-one firm and a published bug-bounty programme.' },
             { icon: Lock,     title: 'Vesting Transparency',   body: 'Schedules published on-chain — see every team and investor unlock before you commit a dollar.' },
             { icon: Layers,   title: 'Secondary Liquidity',    body: 'Tokens go straight to your wallet — trade on any DEX from the moment vesting unlocks.' },
@@ -137,7 +138,7 @@ export default function IcoComingSoonPage() {
         <div className="liquid-glass-strong rounded-3xl p-8 sm:p-12 text-center">
           <h2 className="font-display uppercase text-2xl sm:text-3xl tracking-tight">Be First in Line</h2>
           <p className="mt-4 text-foreground/70 max-w-xl mx-auto text-sm sm:text-base">
-            Open a SwisDex account today — every trade you place between now and launch counts toward your
+            Open a {BRAND_NAME} account today — every trade you place between now and launch counts toward your
             early-access tier.
           </p>
           <Link href="/auth/register" className="mt-7 inline-flex items-center gap-2 rounded-full bg-primary text-white px-6 py-3 text-sm font-semibold uppercase tracking-wider hover:opacity-90">

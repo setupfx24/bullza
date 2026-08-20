@@ -1,3 +1,3 @@
 'use client'
-import WhySwisDex from '@/landing/pages/WhySwisDex'
-export default function WhySwisDexPage() { return <WhySwisDex /> }
+import WhyUs from '@/landing/pages/WhyUs'
+export default function WhyUsPage() { return <WhyUs /> }

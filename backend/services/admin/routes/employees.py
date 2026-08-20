@@ -252,7 +252,7 @@ async def login_as_employee(
         ip_address=request.client.host if request.client else None, db=db,
     )
     # Mirror /auth/login: bake the impersonation JWT into the same
-    # httpOnly swisdex_admin cookie the rest of the admin app reads from.
+    # httpOnly admin auth cookie the rest of the admin app reads from.
     token = out.get("access_token") if isinstance(out, dict) else getattr(out, "access_token", None)
     if token:
         from .auth import _set_admin_cookie  # local import avoids circular at module load

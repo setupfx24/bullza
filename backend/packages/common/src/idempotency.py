@@ -68,11 +68,13 @@ async def claim_webhook(
             return False
         return True
     except Exception as exc:  # noqa: BLE001
-        logger.warning(
-            "claim_webhook failed (provider=%s external_id=%s): %s — allowing through",
+        logger.error(
+            "claim_webhook failed (provider=%s external_id=%s): %s — REJECTING (fail-closed)",
             provider, external_id, exc,
         )
-        # On infra failure (e.g. table missing), allow through rather than
-        # 500'ing the provider — they will keep retrying. Operational alert
-        # should fire from the warning log.
-        return True
+        # Fail CLOSED on infra failure (e.g. table missing, DB hiccup).
+        # Letting the event through without a dedup claim means a retried
+        # IPN can credit the user twice — the exact bug this table exists
+        # to prevent. Raising 500s the webhook; every provider we use
+        # retries on 5xx, so the event is processed once the infra heals.
+        raise

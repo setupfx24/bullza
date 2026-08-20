@@ -44,7 +44,7 @@ export const ROUTES = {
   // ── Landing ──
   HOME: '/',
   ABOUT: '/company/about',
-  WHY_SWISDEX: '/company/why-swisdex',
+  WHY_US: '/company/why-us',
   CONTACT: '/company/contact',
   PLATFORMS: '/platforms',
 

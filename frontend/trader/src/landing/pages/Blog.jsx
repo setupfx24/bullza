@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Calendar, ArrowRight } from 'lucide-react'
 import Card from '../components/Card'
 import ScrollReveal, { ScrollRevealGroup, ScrollRevealItem } from '../components/animations/ScrollReveal'
+import { BRAND_NAME } from '@/lib/brand'
 
 const Blog = () => {
   const [filter, setFilter] = useState('all')
@@ -45,8 +46,8 @@ const Blog = () => {
       title: 'Getting Started with Copy Trading',
       category: 'Platforms',
       date: 'March 5, 2025',
-      excerpt: 'Learn how to follow expert traders and automatically replicate their strategies on SwisDex.',
-      body: 'Copy trading lets you mirror the trades of experienced traders automatically — when they open a position, the same trade fires in your account, scaled to your allocated capital. On SwisDex, browse the leader board sorted by long-term return, max drawdown, and win rate. Allocate a portion of your capital (never all of it) and choose 3–5 leaders with different strategies (trend, scalping, swing) for diversification. Review monthly: keep what works, drop what does not. Copy trading is not passive income — it is active portfolio management of human strategies.',
+      excerpt: `Learn how to follow expert traders and automatically replicate their strategies on ${BRAND_NAME}.`,
+      body: `Copy trading lets you mirror the trades of experienced traders automatically — when they open a position, the same trade fires in your account, scaled to your allocated capital. On ${BRAND_NAME}, browse the leader board sorted by long-term return, max drawdown, and win rate. Allocate a portion of your capital (never all of it) and choose 3–5 leaders with different strategies (trend, scalping, swing) for diversification. Review monthly: keep what works, drop what does not. Copy trading is not passive income — it is active portfolio management of human strategies.`,
       image: '💻'
     },
     {

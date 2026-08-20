@@ -1,6 +1,7 @@
 import { useRef } from 'react'
 import { motion, useInView } from 'framer-motion'
 import { Zap, Shield, Globe, Target } from 'lucide-react'
+import { BRAND_NAME } from '@/lib/brand'
 
 const cards = [
   {
@@ -71,7 +72,7 @@ const StatsSection = () => {
           >
             <div className="inline-flex items-center rounded-full px-4 py-1 mb-4" style={{ background: '#EEF2FF', border: '1px solid #C7D2FE' }}>
               <span className="text-xs font-semibold uppercase tracking-[0.2em] text-blue-600">
-                Why SwisDex
+                Why {BRAND_NAME}
               </span>
             </div>
             <h2 className="text-4xl md:text-5xl font-bold leading-tight max-w-2xl mx-auto" style={{ color: '#0A0E1A' }}>

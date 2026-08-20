@@ -355,7 +355,7 @@ export default function BanksPage() {
                   {
                     key: 'account_holder',
                     label: 'Account Holder',
-                    placeholder: 'e.g. SwisDex Pvt Ltd',
+                    placeholder: 'e.g. Acme Broker Pvt Ltd',
                   },
                   {
                     key: 'account_number',

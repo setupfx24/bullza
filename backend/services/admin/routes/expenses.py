@@ -1,4 +1,4 @@
-"""SwisDex company expense ledger — Tally/Excel-style CRUD.
+"""Company expense ledger — Tally/Excel-style CRUD.
 
 Admin records the broker's own operating expenses (Date, Name, Amount, Reason,
 Result) and they persist as a running book. Super-admin gated (analytics.finance),

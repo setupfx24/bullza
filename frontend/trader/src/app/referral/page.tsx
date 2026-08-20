@@ -1,5 +1,7 @@
 'use client';
 
+import { BRAND_DOMAIN } from '@/lib/brand';
+
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
@@ -69,7 +71,7 @@ function fmt(n: number) {
 }
 
 function getOrigin() {
-  if (typeof window === 'undefined') return 'https://swisdex.com';
+  if (typeof window === 'undefined') return `https://${BRAND_DOMAIN}`;
   return window.location.origin;
 }
 

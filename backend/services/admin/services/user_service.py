@@ -516,9 +516,7 @@ async def _apply_first_funding_bonus(user_row, amount: Decimal, db) -> Decimal:
     if the user already has any bonus, any approved deposit, or has forfeited.
     Bracket-walk kept in lockstep with wallet_service.compute_welcome_bonus.
     Returns the bonus credited (0 if none)."""
-    from packages.common.src.settings_store import (
-        get_bool_setting, get_float_setting, get_system_setting,
-    )
+    from packages.common.src.settings_store import get_bool_setting
     from packages.common.src.models import Deposit as _Dep
     if getattr(user_row, "bonus_forfeited_at", None) is not None:
         return Decimal("0")
@@ -540,55 +538,12 @@ async def _apply_first_funding_bonus(user_row, amount: Decimal, db) -> Decimal:
     if prior_dep > 0:
         return Decimal("0")
 
-    raw = await get_system_setting("welcome_bonus_brackets", None)
-    brackets = raw if isinstance(raw, list) else []
-    if not brackets:
-        legacy = float(await get_float_setting("welcome_bonus_value", 0.0))
-        if legacy > 0:
-            brackets = [{
-                "min_deposit": 0, "max_deposit": None,
-                "type": (str(await get_system_setting("welcome_bonus_type", "percentage") or "percentage")).strip().lower(),
-                "value": legacy,
-                "cap_usd": float(await get_float_setting("welcome_bonus_cap_usd", 0.0)),
-            }]
-
-    bonus = Decimal("0")
-    label = ""
-    for row in brackets:
-        try:
-            min_d = Decimal(str(row.get("min_deposit") or 0))
-        except (TypeError, ValueError):
-            continue
-        mr = row.get("max_deposit")
-        try:
-            max_d = None if mr in (None, "") else Decimal(str(mr))
-        except (TypeError, ValueError):
-            max_d = None
-        if amount < min_d:
-            continue
-        if max_d is not None and amount > max_d:
-            continue
-        try:
-            value = Decimal(str(row.get("value") or 0))
-        except (TypeError, ValueError):
-            continue
-        if value <= 0:
-            continue
-        btype = (str(row.get("type") or "percentage")).strip().lower()
-        try:
-            cap = Decimal(str(row.get("cap_usd") or 0))
-        except (TypeError, ValueError):
-            cap = Decimal("0")
-        if btype == "percentage":
-            bonus = (amount * value / Decimal("100")).quantize(Decimal("0.01"))
-            label = f"Welcome bonus ({value}% of first fund-add)"
-        else:
-            bonus = value.quantize(Decimal("0.01"))
-            label = f"Welcome bonus (flat ${value})"
-        if cap > 0 and bonus > cap:
-            bonus = cap
-            label += f" — capped at ${cap}"
-        break
+    # Bracket math delegated to the ONE shared implementation — this used
+    # to be a hand-kept copy of wallet_service.compute_welcome_bonus
+    # ("kept in lockstep" by comment alone), which is exactly how money
+    # math drifts.
+    from packages.common.src.welcome_bonus import compute_welcome_bonus
+    bonus, label = await compute_welcome_bonus(amount)
 
     if bonus <= 0:
         return Decimal("0")
@@ -611,9 +566,7 @@ async def add_fund(
     instead of executing — a second admin must call /admin/approvals/{id}/approve
     and re-invoke this with ``approval_request_id`` set."""
     from packages.common.src.notify import create_notification
-    from .approval_service import (
-        request_or_execute, fetch_pending, mark_executed,
-    )
+    from .approval_service import request_or_execute, mark_executed
 
     amt = Decimal(str(body.amount))
 
@@ -649,10 +602,9 @@ async def add_fund(
             always=force_dual,
         )
     else:
-        # Second-pass: confirm the approval row matches what we're about to do.
-        rec = await fetch_pending(db, approval_request_id) if False else None
-        # Above call would 409 — pending requests aren't fetched here, only
-        # 'approved' ones. Verify via direct lookup.
+        # Second-pass: confirm the approval row matches what we're about to
+        # do. fetch_pending() is unusable here — it only accepts rows still
+        # in 'pending', and this row is already 'approved'. Direct lookup.
         from sqlalchemy import text as _t
         row = await db.execute(
             _t("SELECT status, action, target_id, payload FROM admin_approval_requests WHERE id = :rid FOR UPDATE"),
@@ -899,19 +851,55 @@ async def deduct_fund(
 async def give_credit(
     user_id: uuid.UUID, body: CreditRequest,
     admin_id: uuid.UUID, ip_address: str | None, db: AsyncSession,
+    *, approval_request_id: uuid.UUID | None = None,
 ) -> dict:
+    """Grant bonus credit on a trading account.
+
+    Credit counts toward equity — and therefore margin level — so it is
+    gated by the same dual-approval rules as add_fund (risk review
+    2026-08-20: credit previously bypassed the 4-eyes gate entirely,
+    letting a single admin inflate equity without a second signature)."""
+    from .approval_service import request_or_execute, mark_executed
+    from sqlalchemy import text as _t
+
+    amt = Decimal(str(body.amount))
+
+    if approval_request_id is None:
+        await request_or_execute(
+            db,
+            action="give_credit",
+            target_type="user",
+            target_id=user_id,
+            amount=amt,
+            payload={"description": body.description, "account_id": body.account_id},
+            requested_by=admin_id,
+        )
+    else:
+        row = await db.execute(
+            _t("SELECT status, action, target_id, payload FROM admin_approval_requests WHERE id = :rid FOR UPDATE"),
+            {"rid": str(approval_request_id)},
+        )
+        ar = row.mappings().first()
+        if not ar or ar["status"] != "approved":
+            raise HTTPException(status_code=409, detail="Approval not in 'approved' state")
+        if ar["action"] != "give_credit" or str(ar["target_id"]) != str(user_id):
+            raise HTTPException(status_code=409, detail="Approval does not match this action")
+        if Decimal(str(ar["payload"].get("amount", "0"))) != amt:
+            raise HTTPException(status_code=409, detail="Amount differs from approved request")
+
+    # Row lock — two concurrent admins must serialise on the same account.
     account_result = await db.execute(
         select(TradingAccount).where(
             TradingAccount.id == uuid.UUID(body.account_id),
             TradingAccount.user_id == user_id,
-        )
+        ).with_for_update()
     )
     account = account_result.scalar_one_or_none()
     if not account:
         raise HTTPException(status_code=404, detail="Trading account not found")
 
     old_credit = float(account.credit or 0)
-    account.credit = Decimal(str(old_credit)) + Decimal(str(body.amount))
+    account.credit = Decimal(str(old_credit)) + amt
     account.equity = (account.balance or Decimal("0")) + account.credit
 
     txn = Transaction(
@@ -931,6 +919,8 @@ async def give_credit(
         new_values={"credit": str(account.credit), "amount": str(body.amount)},
         ip_address=ip_address,
     )
+    if approval_request_id is not None:
+        await mark_executed(db, request_id=approval_request_id)
     await db.commit()
     return {"message": "Credit added successfully", "new_credit": float(account.credit)}
 
@@ -938,12 +928,43 @@ async def give_credit(
 async def take_credit(
     user_id: uuid.UUID, body: CreditRequest,
     admin_id: uuid.UUID, ip_address: str | None, db: AsyncSession,
+    *, approval_request_id: uuid.UUID | None = None,
 ) -> dict:
+    """Remove bonus credit from a trading account. Dual-approval gated for
+    the same reason as give_credit — credit moves equity and margin."""
+    from .approval_service import request_or_execute, mark_executed
+    from sqlalchemy import text as _t
+
+    amt = Decimal(str(body.amount))
+
+    if approval_request_id is None:
+        await request_or_execute(
+            db,
+            action="take_credit",
+            target_type="user",
+            target_id=user_id,
+            amount=amt,
+            payload={"description": body.description, "account_id": body.account_id},
+            requested_by=admin_id,
+        )
+    else:
+        row = await db.execute(
+            _t("SELECT status, action, target_id, payload FROM admin_approval_requests WHERE id = :rid FOR UPDATE"),
+            {"rid": str(approval_request_id)},
+        )
+        ar = row.mappings().first()
+        if not ar or ar["status"] != "approved":
+            raise HTTPException(status_code=409, detail="Approval not in 'approved' state")
+        if ar["action"] != "take_credit" or str(ar["target_id"]) != str(user_id):
+            raise HTTPException(status_code=409, detail="Approval does not match this action")
+        if Decimal(str(ar["payload"].get("amount", "0"))) != amt:
+            raise HTTPException(status_code=409, detail="Amount differs from approved request")
+
     account_result = await db.execute(
         select(TradingAccount).where(
             TradingAccount.id == uuid.UUID(body.account_id),
             TradingAccount.user_id == user_id,
-        )
+        ).with_for_update()
     )
     account = account_result.scalar_one_or_none()
     if not account:
@@ -953,7 +974,7 @@ async def take_credit(
     if old_credit < body.amount:
         raise HTTPException(status_code=400, detail="Insufficient credit")
 
-    account.credit = Decimal(str(old_credit)) - Decimal(str(body.amount))
+    account.credit = Decimal(str(old_credit)) - amt
     account.equity = (account.balance or Decimal("0")) + account.credit
 
     txn = Transaction(
@@ -973,6 +994,8 @@ async def take_credit(
         new_values={"credit": str(account.credit), "amount_removed": str(body.amount)},
         ip_address=ip_address,
     )
+    if approval_request_id is not None:
+        await mark_executed(db, request_id=approval_request_id)
     await db.commit()
     return {"message": "Credit removed successfully", "new_credit": float(account.credit)}
 

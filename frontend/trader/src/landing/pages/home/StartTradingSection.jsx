@@ -2,6 +2,7 @@ import { UserPlus, DollarSign, TrendingUp } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import ScrollReveal, { ScrollRevealGroup, ScrollRevealItem } from '../../components/animations/ScrollReveal'
 import SectionHeader from '../../components/SectionHeader'
+import { BRAND_NAME } from '@/lib/brand'
 
 const steps = [
   { number: '1', icon: <UserPlus size={24} />, title: 'Register Account', desc: 'Create your account in minutes.', color: 'text-blue-400', bg: 'bg-blue-400/10' },
@@ -17,7 +18,7 @@ export default function StartTradingSection() {
           badge="Get Started"
           title="Start Trading in 3 Simple Steps"
           highlight="3 Simple Steps"
-          subtitle="Begin your trading journey with SwisDex today"
+          subtitle={`Begin your trading journey with ${BRAND_NAME} today`}
         />
 
         <ScrollRevealGroup className="grid grid-cols-1 md:grid-cols-3 gap-8 mt-12 max-w-5xl mx-auto">

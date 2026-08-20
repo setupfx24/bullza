@@ -6,7 +6,8 @@ import {
   ArrowUpRight, Gift, Wallet, CheckCircle2, Sparkles,
   Zap, ShieldCheck, Clock, ChevronDown,
 } from 'lucide-react';
-import { BannerPlaceholder } from '@/swisdex/components/BannerPlaceholder';
+import { BannerPlaceholder } from '@/home/components/BannerPlaceholder';
+import { BRAND_NAME } from '@/lib/brand';
 
 const SIGNUP_HREF = '/auth/register';
 
@@ -51,7 +52,7 @@ export default function BonusPage() {
               Deposit more. <span className="text-primary">Trade with more.</span>
             </h2>
             <p className="mt-4 text-foreground/70 text-sm sm:text-base leading-relaxed max-w-xl">
-              SwisDex matches your first deposit with bonus equity that lands in your account within minutes.
+              {BRAND_NAME} matches your first deposit with bonus equity that lands in your account within minutes.
               The bigger the tier you hit, the larger the matched amount — up to a full <span className="text-primary font-semibold">$200</span> credited on a $200 deposit.
             </p>
             <div className="mt-7 flex flex-wrap gap-3">
@@ -146,7 +147,7 @@ export default function BonusPage() {
           </FaqItem>
           <FaqItem q="Which deposit methods qualify?">
             All standard methods qualify: crypto (BTC, ETH, USDT, USDC), bank wire, Visa/Mastercard, Skrill,
-            Neteller, and supported local options. Internal transfers between SwisDex accounts do not qualify.
+            Neteller, and supported local options. Internal transfers between {BRAND_NAME} accounts do not qualify.
           </FaqItem>
           <FaqItem q="What if I lose the bonus on a trade?">
             Bonus equity absorbs losses first — your deposited capital is protected ahead of bonus. If the
@@ -164,7 +165,7 @@ export default function BonusPage() {
         <div className="liquid-glass-strong rounded-3xl p-8 sm:p-12 text-center">
           <h2 className="font-display uppercase text-2xl sm:text-3xl tracking-tight">Claim Your Bonus Today</h2>
           <p className="mt-4 text-foreground/70 max-w-xl mx-auto text-sm sm:text-base">
-            Open your SwisDex account, make your first deposit, and the matching bonus is in your balance within minutes.
+            Open your {BRAND_NAME} account, make your first deposit, and the matching bonus is in your balance within minutes.
           </p>
           <div className="mt-7 flex flex-wrap justify-center gap-3">
             <Link href={SIGNUP_HREF} className="inline-flex items-center gap-2 rounded-full bg-primary text-white px-6 py-3 text-sm font-semibold uppercase tracking-wider hover:opacity-90">

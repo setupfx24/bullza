@@ -4,6 +4,7 @@ import { Inter } from 'next/font/google';
 import './globals.css';
 import ThemeInitScript from '@/components/ThemeInitScript';
 import AppToaster from '@/components/AppToaster';
+import { BRAND_NAME } from '@/lib/brand';
 
 const inter = Inter({
   subsets: ['latin'],
@@ -12,11 +13,11 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: 'SwisDex Admin',
-  description: 'SwisDex broker administration panel',
+  title: `${BRAND_NAME} Admin`,
+  description: `${BRAND_NAME} broker administration panel`,
   /* Favicons served via Next.js file convention from app/icon.png +
      app/apple-icon.png — same source files as the trader app, copied
-     across so the browser tab shows the SwisDex shield in both
+     across so the browser tab shows the same brand icon in both
      surfaces (client request 2026-06-01: "admin and user ka same
      favicon hona chahiye"). Don't add a metadata.icons entry here —
      it would override the file-convention discovery. */

@@ -41,7 +41,7 @@ interface UserProfile {
 }
 
 export default function P2PMarketplace({ mode }: { mode: Side }) {
-  // mode='buy'  → deposit flow (user gives money, RM credits SwisDex balance)
+  // mode='buy'  → deposit flow (user gives money, RM credits platform balance)
   // mode='sell' → withdraw flow (user pulls money out via RM)
   const side: 'deposit' | 'withdraw' = mode === 'buy' ? 'deposit' : 'withdraw';
   const authUser = useAuthStore((s) => s.user) as UserProfile | null;

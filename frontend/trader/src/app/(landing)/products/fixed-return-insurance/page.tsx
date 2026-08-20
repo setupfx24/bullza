@@ -6,9 +6,10 @@ import {
   ShieldCheck, TrendingUp, Calendar, Lock, FileCheck, Scale,
   ChevronDown, ArrowUpRight, Info,
 } from 'lucide-react';
-import { BannerPlaceholder } from '@/swisdex/components/BannerPlaceholder';
-import { FixedReturnRateTable } from '@/swisdex/components/FixedReturnRateTable';
-import { FixedReturnCalculator } from '@/swisdex/components/FixedReturnCalculator';
+import { BannerPlaceholder } from '@/home/components/BannerPlaceholder';
+import { FixedReturnRateTable } from '@/home/components/FixedReturnRateTable';
+import { FixedReturnCalculator } from '@/home/components/FixedReturnCalculator';
+import { BRAND_NAME } from '@/lib/brand';
 
 export default function FixedReturnInsurancePage() {
   return (
@@ -35,7 +36,7 @@ export default function FixedReturnInsurancePage() {
             { icon: ShieldCheck, title: 'Capital Protection',       body: 'Your principal is segregated and underwritten by a Tier-1 insurance counterparty. Returned in full at maturity.' },
             { icon: TrendingUp,  title: 'AI-POWERED STAKING PROGRAMs',             body: 'A clearly stated annual yield — no surprises, no last-look. What you sign up for is what you receive.' },
             { icon: Calendar,    title: 'Flexible Tenure',           body: 'Choose 6 months, 12 months, or 24 months. Longer tenures earn higher yields.' },
-            { icon: Lock,        title: 'Segregated Accounts',       body: 'Funds are held separately from SwisDex operating capital, in regulated bank custody.' },
+            { icon: Lock,        title: 'Segregated Accounts',       body: `Funds are held separately from ${BRAND_NAME} operating capital, in regulated bank custody.` },
             { icon: FileCheck,   title: 'Regulatory Compliance',     body: 'AML / KYC verified. Compliant with relevant financial market authorities in our operating jurisdictions.' },
             { icon: Scale,       title: 'Transparent Terms',         body: 'Plain-English contract. No hidden fees, no auto-renewal traps. Mature, withdraw, or roll — your call.' },
           ].map(({ icon: Icon, title, body }) => (
@@ -98,7 +99,7 @@ export default function FixedReturnInsurancePage() {
               specific risk factors. Past performance does not guarantee future returns.
             </p>
             <p>
-              SwisDex Ltd is a distributor and does not provide individual financial advice. Please review
+              {BRAND_NAME} is a distributor and does not provide individual financial advice. Please review
               the full plan documents and, where appropriate, consult a regulated advisor before investing.
             </p>
           </div>
@@ -121,7 +122,7 @@ export default function FixedReturnInsurancePage() {
             No — the lock-in is 2 years. If you withdraw before maturity, an early-withdrawal
             penalty will be applied and the yield earned to date is forfeited.
           </FaqItem>
-          <FaqItem q="Do I need to be a SwisDex trading client to apply?">
+          <FaqItem q={`Do I need to be a ${BRAND_NAME} trading client to apply?`}>
             No. The plans are open to non-trading investors. KYC and AML verification is still required.
           </FaqItem>
         </div>

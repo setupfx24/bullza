@@ -9,6 +9,7 @@
  * WalletConnect-based wallets (Trust Mobile, Rainbow, etc.) won't connect.
  */
 import { getDefaultConfig } from '@rainbow-me/rainbowkit';
+import { BRAND_DOMAIN, BRAND_NAME } from '@/lib/brand';
 import { arbitrum, bsc, mainnet, polygon } from 'wagmi/chains';
 
 const PROJECT_ID = (process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID || '').trim();
@@ -19,7 +20,8 @@ let _config: ReturnType<typeof getDefaultConfig> | null = null;
 export function getWagmiConfig() {
   if (_config) return _config;
   _config = getDefaultConfig({
-    appName: 'SwisDex',
+    appName: BRAND_NAME,
+    appUrl: `https://${BRAND_DOMAIN}`,
     // RainbowKit requires a non-empty project id at build time. We pass a
     // dummy when the env var is unset so the bundle still compiles; the
     // WalletDepositModal checks isWalletConnectConfigured() before mounting

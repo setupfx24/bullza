@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Menu, X, ChevronDown, ArrowRight } from 'lucide-react'
+import { BRAND_NAME, BRAND_LOGO } from '@/lib/brand'
 
 const navItems = [
   { label: 'Home', path: '/' },
@@ -73,17 +74,18 @@ export default function Navbar() {
         <div className="flex items-center justify-between h-16 md:h-[72px]">
 
           {/* Logo */}
-          <Link href="/" className="flex items-center flex-shrink-0 group" aria-label="SwisDex home">
-            <img
-              src="/images/swisdex_png5.png"
-              alt="SwisDex"
-              className="h-10 md:h-11 w-auto object-contain transition-transform duration-300 group-hover:scale-[1.03] hidden dark:block"
-            />
-            <img
-              src="/images/swisdex_png.png"
-              alt="SwisDex"
-              className="h-10 md:h-11 w-auto object-contain transition-transform duration-300 group-hover:scale-[1.03] dark:hidden"
-            />
+          <Link href="/" className="flex items-center flex-shrink-0 group" aria-label={`${BRAND_NAME} home`}>
+            {BRAND_LOGO ? (
+              <img
+                src={BRAND_LOGO}
+                alt={BRAND_NAME}
+                className="h-10 md:h-11 w-auto object-contain transition-transform duration-300 group-hover:scale-[1.03]"
+              />
+            ) : (
+              <span className="text-2xl font-black tracking-tight text-white transition-transform duration-300 group-hover:scale-[1.03]">
+                {BRAND_NAME}
+              </span>
+            )}
           </Link>
 
           {/* Desktop nav */}

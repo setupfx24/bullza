@@ -2,20 +2,42 @@ import { NextResponse, type NextRequest } from 'next/server';
 
 /**
  * Domain split:
- *   - swisdex.com (apex): marketing + auth + ALL user-app pages
+ *   - apex host (e.g. example.com): marketing + auth + ALL user-app pages
  *     (dashboard, wallet, kyc, accounts, portfolio, profile, etc.)
- *   - trade.swisdex.com: ONLY the trading terminal (/trading/terminal/*)
+ *   - trade host (e.g. trade.example.com): ONLY the trading terminal
+ *     (/trading/terminal/*)
  *
- * The auth cookie is set with Domain=.swisdex.com (see backend COOKIE_DOMAIN env)
+ * The auth cookie is set with Domain=.<apex> (see backend COOKIE_DOMAIN env)
  * so the same session works across the apex and the trade subdomain.
  *
  * If NEXT_PUBLIC_MARKETING_HOST or NEXT_PUBLIC_TRADE_HOST is unset (local dev),
- * this middleware no-ops and a single host serves every route.
+ * the host split no-ops and a single host serves every route.
+ *
+ * Auth gate: protected app routes require the presence of the httpOnly
+ * session cookie on top-level navigations; cookieless visitors are bounced
+ * to /auth/login before anything renders. Presence-only by design — the
+ * edge must not hold the JWT secret, so verification stays with the
+ * backend, and the client-side AuthProvider still covers SPA transitions.
  */
 
 const TRADE_PREFIXES = ['/trading/terminal'];
 const NEUTRAL_PREFIXES = ['/api/', '/_next/', '/s/', '/static/', '/images/', '/frames/', '/charting_library/', '/datafeeds/'];
 const NEUTRAL_EXACT = new Set<string>(['/favicon.ico', '/robots.txt', '/sitemap.xml']);
+
+// Authenticated app surface. Marketing, auth, and public share pages are
+// deliberately absent.
+const PROTECTED_PREFIXES = [
+  '/dashboard', '/accounts', '/wallet', '/transactions', '/portfolio',
+  '/profile', '/kyc', '/referral', '/business', '/social', '/pamm',
+  '/insurance', '/earn', '/rewards', '/fixed-return', '/risk-calculator',
+  '/more', '/support', '/trading',
+];
+
+// Must match ACCESS_TOKEN_COOKIE_NAME / REFRESH_TOKEN_COOKIE_NAME in
+// backend/packages/common/src/config.py. Either cookie counts: an expired
+// access token with a live refresh cookie is a recoverable session.
+const ACCESS_COOKIE = process.env.NEXT_PUBLIC_ACCESS_TOKEN_COOKIE || 'pt_access';
+const REFRESH_COOKIE = process.env.NEXT_PUBLIC_REFRESH_TOKEN_COOKIE || 'pt_refresh';
 
 function isTradePath(path: string): boolean {
   return TRADE_PREFIXES.some((p) => path === p || path.startsWith(p + '/') || path.startsWith(p + '?'));
@@ -26,7 +48,29 @@ function isNeutral(path: string): boolean {
   return NEUTRAL_PREFIXES.some((p) => path.startsWith(p));
 }
 
+function isProtected(path: string): boolean {
+  return PROTECTED_PREFIXES.some((p) => path === p || path.startsWith(p + '/'));
+}
+
 export function middleware(req: NextRequest) {
+  const { pathname: reqPath, search: reqSearch } = req.nextUrl;
+
+  // ── Auth gate (runs regardless of the host-split configuration) ──
+  if (!isNeutral(reqPath) && isProtected(reqPath)) {
+    const mode = req.headers.get('sec-fetch-mode');
+    const isNavigation = !mode || mode === 'navigate';
+    if (
+      isNavigation &&
+      !req.cookies.get(ACCESS_COOKIE)?.value &&
+      !req.cookies.get(REFRESH_COOKIE)?.value
+    ) {
+      const url = req.nextUrl.clone();
+      url.pathname = '/auth/login';
+      url.search = `?next=${encodeURIComponent(reqPath + reqSearch)}`;
+      return NextResponse.redirect(url);
+    }
+  }
+
   const marketingHost = process.env.NEXT_PUBLIC_MARKETING_HOST;
   const tradeHost = process.env.NEXT_PUBLIC_TRADE_HOST;
   if (!marketingHost || !tradeHost) return NextResponse.next();

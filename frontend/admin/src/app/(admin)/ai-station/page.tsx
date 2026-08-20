@@ -566,8 +566,8 @@ function Connection({ cfg, setCfg, reload }: { cfg: Config; setCfg: (c: Config) 
           </div>
         </div>
         <div>
-          <label className="text-xs text-text-secondary block mb-1">Webhook base URL <span className="text-text-tertiary">(gateway public origin, e.g. https://api.swisdex.com)</span></label>
-          <input className={`${inputCls} w-full`} placeholder="https://api.swisdex.com" value={base} onChange={(e) => setBase(e.target.value)} />
+          <label className="text-xs text-text-secondary block mb-1">Webhook base URL <span className="text-text-tertiary">(gateway public origin, e.g. https://api.example.com)</span></label>
+          <input className={`${inputCls} w-full`} placeholder="https://api.example.com" value={base} onChange={(e) => setBase(e.target.value)} />
         </div>
         <div>
           <label className="text-xs text-text-secondary block mb-1">Webhook URL (paste into TradingView alert)</label>

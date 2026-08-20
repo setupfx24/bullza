@@ -1,5 +1,8 @@
 'use client';
 
+import { BRAND_NAME } from '@/lib/brand';
+import { BrandWordmark } from '@/components/layout/BrandWordmark';
+
 import { useMemo, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
@@ -54,7 +57,7 @@ const NAV_ITEMS: NavEntry[] = [
   { label: 'PAMM', href: '/pamm', icon: TrendingUp },
   { label: 'MAMM', href: '/social', icon: Copy },
   { label: 'Affiliates', href: '/business', icon: Users },
-  { label: 'SwisDex Academy', href: '/academy', icon: GraduationCap },
+  { label: `${BRAND_NAME} Academy`, href: '/academy', icon: GraduationCap },
   { label: 'Economic News', href: '/news', icon: Newspaper },
   { label: 'Risk Management', href: '/risk-calculator', icon: Calculator },
   { label: 'KYC', href: '/kyc', icon: ShieldCheck },
@@ -122,22 +125,9 @@ export default function AppSidebar() {
         )}
       >
         <div className="flex items-center justify-between px-4 pt-4 pb-3 gap-2">
-          <Link href="/dashboard" className="flex items-center min-w-0" aria-label="SwisDex home">
-            {/* Two raster logos — dark-bg one for dark mode, light-bg
-                "white" variant for light mode. Tailwind's dark: variant
-                swaps based on [data-theme="dark"] on <html>, so the
-                wrong logo is always display:none on the other theme. */}
-            <img
-              src="/images/swisdex_png5.png"
-              alt="SwisDex"
-              className="h-9 w-auto object-contain shrink-0 hidden dark:block"
-            />
-            <img
-              src="/images/swisdex_png.png"
-              alt="SwisDex"
-              className="h-9 w-auto object-contain shrink-0 dark:hidden"
-            />
-          </Link>
+          {/* Brand mark — tenant logo image when configured, styled
+              wordmark text otherwise (see BrandWordmark). */}
+          <BrandWordmark href="/dashboard" className="flex items-center min-w-0" />
           <button
             type="button"
             onClick={() => setSidebarOpen(false)}

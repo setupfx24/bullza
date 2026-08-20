@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from ..config import get_settings
 from .base import render_layout, kv_table
 
 
@@ -10,8 +11,11 @@ def render_new_login(
     user_agent: str | None,
     location: str | None,
     when_utc: str,
-    trader_app_url: str = "https://trade.swisdex.com",
+    trader_app_url: str = "",
 ) -> tuple[str, str, str]:
+    s = get_settings()
+    brand = (s.BRAND_NAME or "").strip() or "YourBrand"
+    trader_app_url = (trader_app_url or "").strip() or s.TRADER_APP_URL
     name = (first_name or "trader").strip() or "trader"
     rows: list[tuple[str, str]] = [("When (UTC)", when_utc)]
     if location:
@@ -27,7 +31,7 @@ def render_new_login(
       change your password and review active sessions immediately.
     </p>
     """
-    subject = "New sign-in to your SwisDex account"
+    subject = f"New sign-in to your {brand} account"
     html = render_layout(
         title="New device signed in",
         intro=f"Hi {name}, we noticed a sign-in from a device we haven't seen before.",
@@ -42,7 +46,7 @@ def render_new_login(
     text_lines = [
         f"Hi {name},",
         "",
-        "A new device signed in to your SwisDex account.",
+        f"A new device signed in to your {brand} account.",
         "",
         f"When (UTC): {when_utc}",
     ]

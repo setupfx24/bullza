@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import Image from 'next/image'
+import { BRAND_NAME, BRAND_LOGO } from '@/lib/brand'
 
 export default function LandingHeader() {
   return (
@@ -9,12 +10,14 @@ export default function LandingHeader() {
       <div className="max-w-7xl mx-auto px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           <Link href="/" className="flex items-center gap-2 shrink-0">
-            {/* LandingHeader sits on a hard-coded white bar, so the
-                white-bg friendly logo variant is the right default
-                here regardless of the user's chosen theme. */}
-            <img src="/images/swisdex_png.png" alt="SwisDex" className="h-9 sm:h-10 w-auto object-contain" />
+            {/* LandingHeader sits on a hard-coded white bar, so a
+                white-bg friendly logo works here regardless of the
+                user's chosen theme. */}
+            {BRAND_LOGO ? (
+              <img src={BRAND_LOGO} alt={BRAND_NAME} className="h-9 sm:h-10 w-auto object-contain" />
+            ) : null}
             <span className="font-bold italic tracking-tight text-lg select-none">
-              <span className="text-gray-800">Swis</span><span className="text-[#55a630]">Dex</span>
+              <span className="text-gray-800">{BRAND_NAME}</span>
             </span>
           </Link>
 

@@ -12,12 +12,12 @@ from ..config import get_settings
 # Brand palette — kept inline because Outlook/Gmail/iOS Mail strip <style>
 # blocks, so every colour has to live on a style="" attribute.
 # LIGHT body + DARK header band. The body stays white/light, but the header
-# that holds the logo is a fixed dark band so the WHITE-lettered logo
-# (swisdex_png5.png) stays visible in EVERY client — Gmail's dark mode darkens
+# that holds the logo is a fixed dark band so a white-lettered logo image
+# stays visible in EVERY client — Gmail's dark mode darkens
 # light backgrounds (which hid the old dark logo) but never lightens a dark
 # one. Every element below references these tokens, so flipping them here
 # re-themes all ~25 templates.
-_BRAND       = "#55a630"   # SwisDex green (primary CTAs, logo accent)
+_BRAND       = "#55a630"   # brand green (primary CTAs, logo accent)
 _BRAND_DARK  = "#3f7d22"
 _GOLD        = "#d6a93d"   # legacy accent — still used for secondary action
 _BG          = "#f4f5f7"   # light page background (outside the card)
@@ -32,21 +32,23 @@ def _header_brand_html() -> str:
     """Header brand block.
 
     Per client request 2026-06-08: when EMAIL_LOGO_URL is set, render
-    ONLY the logo image — no "SwisDex" wordmark alongside it. The
+    ONLY the logo image — no wordmark text alongside it. The
     image already contains the brand wordmark, so the previous layout
     duplicated it. The styled CSS wordmark is kept ONLY as a fallback
     for the case when no EMAIL_LOGO_URL is configured at all.
 
     Sizing: height=48 with width=auto so the natural aspect ratio of
-    swisdex_png5.png renders correctly (the old 40×40 forced a square
-    crop, which made the wide brand logo collapse / look distorted).
-    `alt="SwisDex"` shows the brand name when the email client blocks
-    images, so we don't leave a lone broken icon.
+    the logo image renders correctly (the old 40×40 forced a square
+    crop, which made a wide brand logo collapse / look distorted).
+    `alt` carries the brand name so the email client shows it when it
+    blocks images — we don't leave a lone broken icon.
     """
-    logo = (getattr(get_settings(), "EMAIL_LOGO_URL", "") or "").strip()
+    s = get_settings()
+    brand = (s.BRAND_NAME or "").strip() or "YourBrand"
+    logo = (getattr(s, "EMAIL_LOGO_URL", "") or "").strip()
     if logo:
         return (
-            f'<img src="{escape(logo, quote=True)}" alt="SwisDex" '
+            f'<img src="{escape(logo, quote=True)}" alt="{escape(brand, quote=True)}" '
             f'height="48" '
             f'style="display:block;height:48px;width:auto;max-width:200px;'
             f'border:0;outline:none;text-decoration:none;">'
@@ -55,17 +57,17 @@ def _header_brand_html() -> str:
     return (
         f'<span style="font-weight:700;font-size:22px;letter-spacing:0.2px;'
         f'font-family:-apple-system,BlinkMacSystemFont,\'Segoe UI\',Helvetica,Arial,sans-serif;">'
-        f'<span style="color:#ffffff;">Swis</span>'
-        f'<span style="color:{_BRAND};">Dex</span>'
+        f'<span style="color:#ffffff;">{escape(brand)}</span>'
         f'</span>'
     )
 
 
 def _app_badges_html() -> str:
-    """"Get the SwisDex app" footer section.
+    """"Get the app" footer section.
 
     Renders only when at least one of IOS_APP_URL / ANDROID_APP_URL is set
-    so emails don't link to dead store pages before the apps ship.
+    so emails don't link to dead store pages before the apps ship. Each
+    badge image additionally requires its EMAIL_*_BADGE_URL to be set.
     """
     s = get_settings()
     ios_url = (getattr(s, "IOS_APP_URL", "") or "").strip()
@@ -108,7 +110,7 @@ def _app_badges_html() -> str:
           <tr>
             <td align="center" style="padding:0 0 10px;color:#0a0a0a;
                                       font-size:15px;font-weight:700;letter-spacing:0.2px;">
-              Trade anywhere — get the SwisDex app
+              Trade anywhere — get the {escape((s.BRAND_NAME or "").strip() or "YourBrand")} app
             </td>
           </tr>
           <tr>
@@ -136,7 +138,7 @@ def render_layout(
     footer_note: str | None = None,
     hero_eyebrow: str | None = None,
 ) -> str:
-    """Wraps body content in the standard SwisDex email shell.
+    """Wraps body content in the standard branded email shell.
 
     Args:
       title:                big headline at the top of the card (escaped)
@@ -152,6 +154,9 @@ def render_layout(
       hero_eyebrow:         optional small label above the title (e.g.
                             "Welcome to the Future of Decentralized Trading")
     """
+    s = get_settings()
+    brand = escape((s.BRAND_NAME or "").strip() or "YourBrand")
+    support_email = escape(f"support@{(s.BRAND_DOMAIN or '').strip() or 'example.com'}")
     cta_block = ""
     if cta_label and cta_url:
         primary = f"""
@@ -234,11 +239,11 @@ def render_layout(
           <tr>
             <td style="padding:20px 32px;border-top:1px solid {_BORDER};
                        color:{_TEXT_DIM};font-size:12px;line-height:1.5;">
-              SwisDex — Trade without giving your money to any broker.<br>
-              You received this because of activity on your SwisDex account.
+              {brand} — Trade without giving your money to any broker.<br>
+              You received this because of activity on your {brand} account.
               Need help? Reply to this email or contact
-              <a href="mailto:support@swisdex.com" style="color:{_BRAND};text-decoration:none;">
-                support@swisdex.com</a>.
+              <a href="mailto:{support_email}" style="color:{_BRAND};text-decoration:none;">
+                {support_email}</a>.
             </td>
           </tr>
         </table>

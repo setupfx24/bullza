@@ -1,5 +1,7 @@
 'use client';
 
+import { BRAND_NAME } from '@/lib/brand';
+
 /**
  * Blocks the trader UI with a one-time profile completion modal whenever
  * the signed-in user is missing required fields (first/last name, phone,
@@ -168,7 +170,7 @@ export default function ProfileCompleteGate() {
       // that runs before this form ever renders) is the security check; a
       // second email here was ceremony without a security payoff.
       await refreshUser();
-      toast.success('Welcome to SwisDex');
+      toast.success(`Welcome to ${BRAND_NAME}`);
     } catch (err: any) {
       const msg = err?.response?.data?.detail || err?.message || 'Could not save profile';
       toast.error(typeof msg === 'string' ? msg : 'Could not save profile');

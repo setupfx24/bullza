@@ -63,7 +63,7 @@ const fmtNum = (n: number, dp = 2) =>
     .format(Number.isFinite(n) ? n : 0);
 
 // Relative (same-origin) so the terminal stays inside the app / PWA. The old
-// absolute https://trade.swisdex.com/... form crossed origins and broke the
+// absolute https://trade.<domain>/... form crossed origins and broke the
 // installed PWA out to Safari; the whole app is served from one origin now.
 const tradeUrl = (accountId: string) =>
   `/trading/terminal?account=${encodeURIComponent(accountId)}&view=chart`;
@@ -409,7 +409,7 @@ function InviteFriendsCard() {
           // Same shape as `${TRADER_APP_URL}/auth/register?ref=CODE` that
           // /business/company-ib returns server-side. Building on the
           // client keeps the link on the user's actual origin
-          // (swisdex.com vs trade.swisdex.com vs local dev).
+          // (apex domain vs trade subdomain vs local dev).
           setLink(`${window.location.origin}/auth/register?ref=${encodeURIComponent(c)}`);
         }
       })

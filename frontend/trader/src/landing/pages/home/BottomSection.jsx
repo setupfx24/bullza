@@ -5,6 +5,7 @@ import { ArrowRight, Play, ChevronDown, TrendingUp } from 'lucide-react'
 import ScrollReveal from '../../components/animations/ScrollReveal'
 import SectionHeader from '../../components/SectionHeader'
 import { faqs } from '../HomeData'
+import { BRAND_NAME } from '@/lib/brand'
 
 function FAQItem({ q, a, index }) {
   const [open, setOpen] = useState(false)
@@ -40,7 +41,7 @@ export default function BottomSection() {
             badge="FAQ"
             title="Frequently Asked Questions"
             highlight="Frequently Asked"
-            subtitle="Find answers to the most common questions about trading with SwisDex."
+            subtitle={`Find answers to the most common questions about trading with ${BRAND_NAME}.`}
           />
           <div className="max-w-3xl mx-auto mt-12 space-y-3">
             {faqs.map((faq, i) => (
@@ -72,7 +73,7 @@ export default function BottomSection() {
           </ScrollReveal>
           <ScrollReveal variant="fadeIn" delay={0.2}>
             <p className="text-text-secondary text-lg mb-8 max-w-xl mx-auto">
-              Join thousands of traders who trust SwisDex for professional-grade execution, transparent pricing, and competitive conditions.
+              Join thousands of traders who trust {BRAND_NAME} for professional-grade execution, transparent pricing, and competitive conditions.
             </p>
           </ScrollReveal>
           <ScrollReveal variant="fadeUp" delay={0.3}>
@@ -88,7 +89,7 @@ export default function BottomSection() {
 
           <div className="flex items-center justify-center gap-3 mt-12 opacity-30">
             <div className="w-16 h-px bg-primary-accent" />
-            <div className="text-primary-accent text-sm font-semibold">SwisDex</div>
+            <div className="text-primary-accent text-sm font-semibold">{BRAND_NAME}</div>
             <div className="w-16 h-px bg-primary-accent" />
           </div>
         </div>

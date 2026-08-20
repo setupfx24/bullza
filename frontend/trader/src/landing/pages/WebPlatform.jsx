@@ -3,6 +3,7 @@ import { Check, Globe, Zap, BarChart3, Bell } from 'lucide-react'
 import Button from '../components/Button'
 import FeatureCard from '../components/FeatureCard'
 import ScrollReveal, { ScrollRevealGroup, ScrollRevealItem } from '../components/animations/ScrollReveal'
+import { BRAND_NAME, BRAND_LOGO } from '@/lib/brand'
 
 const WebPlatform = () => {
   const features = [
@@ -47,7 +48,7 @@ const WebPlatform = () => {
         <div className="container-custom text-center">
           <ScrollReveal variant="fadeUp">
             <h1 className="text-5xl md:text-6xl font-bold text-white mb-6">
-              SwisDex Web Platform — Trade Instantly, Anywhere
+              {BRAND_NAME} Web Platform — Trade Instantly, Anywhere
             </h1>
             <p className="text-xl text-text-secondary max-w-3xl mx-auto mb-8">
               No download required. Launch the platform from any browser and start trading in seconds.
@@ -103,7 +104,13 @@ const WebPlatform = () => {
             <ScrollReveal variant="fadeRight" delay={0.2}>
               <div className="glass-card overflow-hidden">
                 <div className="aspect-video rounded-t-lg overflow-hidden">
-                  <img src="/images/swisdex_png5.png" alt="SwisDex Web Platform" className="w-full h-full object-contain p-16 bg-gradient-to-br from-primary-bg to-primary-secondary" />
+                  {BRAND_LOGO ? (
+                    <img src={BRAND_LOGO} alt={`${BRAND_NAME} Web Platform`} className="w-full h-full object-contain p-16 bg-gradient-to-br from-primary-bg to-primary-secondary" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center p-16 bg-gradient-to-br from-primary-bg to-primary-secondary">
+                      <span className="text-4xl md:text-5xl font-black tracking-tight text-white text-center">{BRAND_NAME}</span>
+                    </div>
+                  )}
                 </div>
                 <div className="p-8">
                   <h3 className="text-2xl font-bold text-white mb-4">Access Anywhere</h3>

@@ -171,7 +171,7 @@ This page has its **own** inline hero (no `<BannerPlaceholder>`).
 - Replace the empty `<div className="image-placeholder size-12 …">` with an `<img>`.
 - Application form `onSubmit` currently shows `alert(…)` — wire it to your
   CRM endpoint (HubSpot, Salesforce, or `/api/ib-applications`).
-- `partners@swisdex.com` is a placeholder — update to a real inbox.
+- `partners@<your-domain>` is a placeholder — update to a real inbox.
 
 ---
 
@@ -190,8 +190,8 @@ The legacy landing pages (`Forex.jsx`, `Indices.jsx`, `Crypto.jsx`,
 `Commodities.jsx`, `AboutUs.jsx`, etc.) use `TradingPageTemplate` and
 existing brand assets. Logos / favicon already live at:
 
-- `public/images/swisdex-logo.png`
-- `public/images/swisdex_fevicon.png`
+- `public/images/<brand-logo>.png`
+- `public/images/<brand-favicon>.png`
 
 To brand-refresh those: drop replacement files at the same paths (same names).
 
@@ -232,7 +232,7 @@ That's it. The gradient fallback only renders when no `bannerSrc` is supplied.
 - [ ] All page banners dropped (see §1).
 - [ ] All inline `image-placeholder` divs replaced with `<img>` / `<video>` (§2–§8).
 - [ ] All forms wired to a real backend (not `alert(…)`).
-- [ ] `partners@swisdex.com`, `support@swisdex.com`, etc. replaced with monitored inboxes.
+- [ ] `partners@…`, `support@…`, etc. replaced with monitored inboxes on your brand domain.
 - [ ] Calculator pip values reviewed by trading desk.
 - [ ] AI-POWERED STAKING PROGRAM plan rates, minimums, and disclosure copy reviewed by compliance.
 - [ ] PDFs uploaded, blog posts wired to per-post routes.

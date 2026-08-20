@@ -3,6 +3,7 @@ import { Mail, MapPin, Send, MessageCircle, X } from 'lucide-react'
 import Button from '../components/Button'
 import Card from '../components/Card'
 import ScrollReveal, { ScrollRevealGroup, ScrollRevealItem } from '../components/animations/ScrollReveal'
+import { BRAND_NAME, BRAND_SUPPORT_EMAIL } from '@/lib/brand'
 
 /** Official WhatsApp glyph — lucide-react doesn't ship brand logos, so we
  *  inline the SVG. Inherits size + colour from className (currentColor). */
@@ -30,7 +31,7 @@ const Contact = () => {
   const [isChatOpen, setIsChatOpen] = useState(false)
   const [chatInput, setChatInput] = useState('')
   const [messages, setMessages] = useState([
-    { from: 'agent', text: 'Hi there! 👋 I\'m SwisBot, your SwisDex assistant. How can I help you today?', time: 'now' }
+    { from: 'agent', text: `Hi there! 👋 I'm your ${BRAND_NAME} assistant. How can I help you today?`, time: 'now' }
   ])
   const chatEndRef = useRef(null)
 
@@ -75,7 +76,7 @@ const Contact = () => {
   }
 
   /** POSTs to the gateway, which emails the submission to the support inbox
-   *  (CONTACT_INBOX_EMAIL → support@swisdex.com). The success modal only
+   *  (CONTACT_INBOX_EMAIL). The success modal only
    *  opens once the backend confirms delivery — previously it always showed,
    *  so failed messages looked sent. */
   const handleSubmit = async (e) => {
@@ -104,7 +105,7 @@ const Contact = () => {
         throw new Error(
           typeof data?.detail === 'string'
             ? data.detail
-            : "We couldn't send your message. Please email support@swisdex.com directly."
+            : `We couldn't send your message. Please email ${BRAND_SUPPORT_EMAIL} directly.`
         )
       }
       setSentTo(sender)
@@ -112,7 +113,7 @@ const Contact = () => {
       setFormData({ name: '', email: '', subject: '', message: '' })
     } catch (err) {
       setSubmitError(
-        err?.message || "We couldn't send your message. Please email support@swisdex.com directly."
+        err?.message || `We couldn't send your message. Please email ${BRAND_SUPPORT_EMAIL} directly.`
       )
     } finally {
       setSubmitting(false)
@@ -127,8 +128,8 @@ const Contact = () => {
     {
       icon: Mail,
       title: 'Email Us',
-      content: 'info@swisdex.com',
-      link: 'mailto:info@swisdex.com'
+      content: BRAND_SUPPORT_EMAIL,
+      link: `mailto:${BRAND_SUPPORT_EMAIL}`
     },
     {
       icon: WhatsAppIcon,
@@ -184,7 +185,7 @@ const Contact = () => {
               <div className="bg-white/[0.03] px-6 py-4 flex items-center gap-3">
                 <MapPin className="w-5 h-5 text-primary-accent" />
                 <div>
-                  <div className="text-white font-semibold text-sm">SwisDex UK Office</div>
+                  <div className="text-white font-semibold text-sm">{BRAND_NAME} UK Office</div>
                   <div className="text-text-secondary text-xs">
                     18 Young St, Edinburgh EH2 4JB, Scotland
                   </div>
@@ -199,7 +200,7 @@ const Contact = () => {
                 </a>
               </div>
               <iframe
-                title="SwisDex UK office location"
+                title={`${BRAND_NAME} UK office location`}
                 src="https://www.google.com/maps?q=18+Young+Street+Edinburgh+EH2+4JB&output=embed"
                 width="100%"
                 height="360"
@@ -294,7 +295,7 @@ const Contact = () => {
               <div>
                 <h2 className="text-3xl font-bold text-white mb-6">Our Office</h2>
                 <Card className="p-8 mb-6">
-                  <h3 className="text-xl font-semibold text-white mb-4">SwisDex Ltd</h3>
+                  <h3 className="text-xl font-semibold text-white mb-4">{BRAND_NAME}</h3>
                   <p className="text-text-secondary mb-4">
                     Office 23US, 18 Young St<br />
                     UNIT LGE 1/1<br />
@@ -306,7 +307,7 @@ const Contact = () => {
                       <span className="text-white font-semibold">WhatsApp:</span> +44 7737119978
                     </p>
                     <p className="text-text-secondary">
-                      <span className="text-white font-semibold">Email:</span> info@swisdex.com
+                      <span className="text-white font-semibold">Email:</span> {BRAND_SUPPORT_EMAIL}
                     </p>
                   </div>
                 </Card>
@@ -350,7 +351,7 @@ const Contact = () => {
                 Start Live Chat
               </Button>
               <a
-                href="mailto:info@swisdex.com"
+                href={`mailto:${BRAND_SUPPORT_EMAIL}`}
                 className="inline-flex items-center gap-2 px-6 py-3 rounded-xl border border-white/20 text-white font-semibold hover:bg-white/5 transition"
               >
                 <Mail className="w-5 h-5" />
@@ -446,7 +447,7 @@ const Contact = () => {
                   <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-400 rounded-full border-2 border-white"></div>
                 </div>
                 <div>
-                  <div className="font-semibold text-white">SwisBot — Support</div>
+                  <div className="font-semibold text-white">Live Support</div>
                   <div className="text-xs text-white/80">Online • Typically replies instantly</div>
                 </div>
               </div>

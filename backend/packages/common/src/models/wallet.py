@@ -189,7 +189,7 @@ class PromotionalExpense(Base):
 
 
 class CompanyExpense(Base):
-    """SwisDex operating-expense ledger (migration 0089).
+    """Broker operating-expense ledger (migration 0089).
 
     A Tally/Excel-style running book of the broker's own business expenses
     (rent, salaries, marketing, tools, …). Admin-managed CRUD; unrelated to

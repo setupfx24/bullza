@@ -1,0 +1,195 @@
+/* ─────────────────────────────────────────────────────────────────────
+   Brand marketing home — theme tokens, fonts, glass, marquee, fades.
+   Scoped to .brand-home so it does NOT leak into the trader dashboard
+   (which keeps its own dark theme).
+   ───────────────────────────────────────────────────────────────────── */
+
+@import "@fontsource/montserrat/300.css";
+@import "@fontsource/montserrat/400.css";
+@import "@fontsource/montserrat/500.css";
+@import "@fontsource/montserrat/600.css";
+@import "@fontsource/montserrat/700.css";
+@import "@fontsource/montserrat/800.css";
+
+.brand-home {
+  /* Belt-and-braces: never let any descendant cause horizontal page scroll on mobile. */
+  overflow-x: hidden;
+
+  /* ── Raw palette (HSL triplets, no hsl() so Tailwind alpha works) ── */
+  --ink:           0 0% 6%;
+  --cream:         0 0% 96%;
+  --brand-green:  99 55% 42%;       /* #55a630 — primary */
+  --brand-red:     0 100% 41%;      /* #d00000 — destructive */
+
+  --background:               var(--ink);
+  --foreground:               var(--cream);
+  --card:                     var(--ink);
+  --card-foreground:          var(--cream);
+  --primary:                  var(--brand-green);
+  --primary-foreground:       0 0% 100%;
+  --secondary:                var(--brand-red);
+  --secondary-foreground:     0 0% 100%;
+  --muted:                    0 0% 14%;
+  --muted-foreground:         0 0% 70%;
+  --accent:                   var(--brand-green);
+  --accent-foreground:        0 0% 100%;
+  --destructive:              var(--brand-red);
+  --destructive-foreground:   0 0% 100%;
+  --border:                   0 0% 90%;
+  --input:                    0 0% 90%;
+  --ring:                     var(--brand-green);
+  --radius:                   0.75rem;
+
+  --font-display: 'Montserrat', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  --font-body:    'Montserrat', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+
+  --gutter: clamp(16px, 4.2vw, 56px);
+  --max:    1440px;
+
+  /* Force dark even when html.theme-light is set on the trader-app side */
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
+  font-family: var(--font-body);
+  word-spacing: 0.14em;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+.brand-home .font-display { font-family: var(--font-display); }
+.brand-home .font-body    { font-family: var(--font-body); }
+
+/* Tailwind utilities used by the home (mapped to CSS vars so we don't
+   need to rebuild the trader's tailwind config). The pages still use
+   classes like `bg-background`, `text-foreground`, but we resolve them
+   here via direct CSS so they work on the existing Tailwind v3 setup. */
+.brand-home .bg-background          { background-color: hsl(var(--background)); }
+.brand-home .bg-background\/30      { background-color: hsl(var(--background) / 0.3); }
+.brand-home .bg-background\/40      { background-color: hsl(var(--background) / 0.4); }
+.brand-home .bg-background\/80      { background-color: hsl(var(--background) / 0.8); }
+.brand-home .text-background        { color: hsl(var(--background)); }
+.brand-home .text-foreground        { color: hsl(var(--foreground)); }
+.brand-home .text-foreground\/40    { color: hsl(var(--foreground) / 0.4); }
+.brand-home .text-foreground\/55    { color: hsl(var(--foreground) / 0.55); }
+.brand-home .text-foreground\/60    { color: hsl(var(--foreground) / 0.6); }
+.brand-home .text-foreground\/65    { color: hsl(var(--foreground) / 0.65); }
+.brand-home .text-foreground\/70    { color: hsl(var(--foreground) / 0.7); }
+.brand-home .text-foreground\/75    { color: hsl(var(--foreground) / 0.75); }
+.brand-home .text-foreground\/80    { color: hsl(var(--foreground) / 0.8); }
+.brand-home .text-foreground\/85    { color: hsl(var(--foreground) / 0.85); }
+.brand-home .bg-foreground          { background-color: hsl(var(--foreground)); }
+.brand-home .bg-primary             { background-color: hsl(var(--primary)); }
+.brand-home .bg-primary\/25         { background-color: hsl(var(--primary) / 0.25); }
+.brand-home .bg-primary\/60         { background-color: hsl(var(--primary) / 0.6); }
+.brand-home .text-primary           { color: hsl(var(--primary)); }
+.brand-home .text-primary\/70       { color: hsl(var(--primary) / 0.7); }
+.brand-home .from-primary           { --tw-gradient-from: hsl(var(--primary)); --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to, hsl(var(--primary)/0)); }
+.brand-home .border-border          { border-color: hsl(var(--border) / 0.18); }
+.brand-home .bg-border              { background-color: hsl(var(--border) / 0.18); }
+.brand-home .ring-ring              { --tw-ring-color: hsl(var(--ring)); }
+.brand-home .ring-offset-background { --tw-ring-offset-color: hsl(var(--background)); }
+.brand-home .from-secondary\/60     { --tw-gradient-from: hsl(var(--secondary) / 0.6); --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to, hsl(var(--secondary)/0)); }
+.brand-home .bg-foreground\/90      { background-color: hsl(var(--foreground) / 0.9); }
+
+/* ── Marquee animations (used by Testimonials + LiveTickerBar) ── */
+.brand-home {
+  --animate-marquee:     marquee 28s linear infinite;
+  --animate-marquee-rev: marquee-rev 32s linear infinite;
+}
+
+@keyframes brand-marquee {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
+@keyframes brand-marquee-rev {
+  from { transform: translateX(-50%); }
+  to   { transform: translateX(0); }
+}
+@keyframes brand-accordion-down {
+  from { height: 0; }
+  to   { height: var(--radix-accordion-content-height); }
+}
+@keyframes brand-accordion-up {
+  from { height: var(--radix-accordion-content-height); }
+  to   { height: 0; }
+}
+
+.brand-home {
+  --animate-marquee:        brand-marquee 28s linear infinite;
+  --animate-marquee-rev:    brand-marquee-rev 32s linear infinite;
+}
+
+.brand-home .marquee-mask {
+  -webkit-mask-image: linear-gradient(to right, transparent, black 8%, black 92%, transparent);
+          mask-image: linear-gradient(to right, transparent, black 8%, black 92%, transparent);
+}
+
+/* ── Liquid-glass surfaces ── */
+.brand-home .liquid-glass {
+  background: rgba(255, 255, 255, 0.01);
+  background-blend-mode: luminosity;
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  border: none;
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.1);
+  position: relative;
+  overflow: hidden;
+}
+.brand-home .liquid-glass::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1.4px;
+  background: linear-gradient(135deg,
+    rgba(85, 166, 48, 0.85) 0%,
+    rgba(255, 255, 255, 0.25) 35%,
+    rgba(255, 255, 255, 0)   55%,
+    rgba(255, 255, 255, 0.25) 70%,
+    rgba(208, 0, 0, 0.85) 100%);
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+          mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+          mask-composite: exclude;
+  pointer-events: none;
+}
+
+.brand-home .liquid-glass-strong {
+  background: rgba(255, 255, 255, 0.01);
+  background-blend-mode: luminosity;
+  backdrop-filter: blur(50px);
+  -webkit-backdrop-filter: blur(50px);
+  border: none;
+  box-shadow: 4px 4px 4px rgba(0, 0, 0, 0.05),
+              inset 0 1px 1px rgba(255, 255, 255, 0.15);
+  position: relative;
+  overflow: hidden;
+}
+.brand-home .liquid-glass-strong::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1.6px;
+  background: linear-gradient(135deg,
+    rgba(85, 166, 48, 1) 0%,
+    rgba(255, 255, 255, 0.35) 30%,
+    rgba(255, 255, 255, 0.05) 55%,
+    rgba(255, 255, 255, 0.35) 75%,
+    rgba(208, 0, 0, 1) 100%);
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+          mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+          mask-composite: exclude;
+  pointer-events: none;
+}
+
+.brand-home .gradient-fade-t {
+  background: linear-gradient(to top, transparent 0%, hsl(var(--background)) 100%);
+}
+.brand-home .gradient-fade-b {
+  background: linear-gradient(to bottom, transparent 0%, hsl(var(--background)) 100%);
+}
+
+/* Radix accordion height transitions */
+.brand-home [data-state='open'].brand-accordion-content { animation: brand-accordion-down 0.2s ease-out; }
+.brand-home [data-state='closed'].brand-accordion-content { animation: brand-accordion-up 0.2s ease-out; }

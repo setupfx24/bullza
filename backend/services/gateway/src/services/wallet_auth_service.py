@@ -40,6 +40,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from packages.common.src.config import get_settings
 from packages.common.src.models import User, WalletAuthNonce
 from packages.common.src.schemas import WalletNonceResponse
 
@@ -53,9 +54,10 @@ logger = logging.getLogger("wallet_auth_service")
 NONCE_TTL_SECONDS = 300
 ALLOWED_CHAIN_IDS = {1, 56, 137, 42161}  # mainnet, bsc, polygon, arbitrum
 SIWE_STATEMENT = (
-    "Sign in to SwisDex. This signature does not authorise any transaction."
+    f"Sign in to {get_settings().BRAND_NAME}. "
+    "This signature does not authorise any transaction."
 )
-WALLET_PLACEHOLDER_EMAIL_DOMAIN = "wallet.swisdex.local"
+WALLET_PLACEHOLDER_EMAIL_DOMAIN = "wallet.placeholder.local"
 
 
 # ─── Helpers ──────────────────────────────────────────────────────────────

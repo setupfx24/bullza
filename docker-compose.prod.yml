@@ -1,8 +1,15 @@
 # ============================================================
-# SwisDex — Production overrides
+# Broker platform — Production overrides
 # Usage: docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#
+# ⚠️  MIGRATION WARNING — the compose project name was renamed from
+# `swisdex` to `broker`. Volumes/containers/networks are namespaced by
+# project name: under the new name Docker creates EMPTY pg_data/ts_data
+# volumes and orphans the old swisdex_* ones. Existing deployments must
+# either export COMPOSE_PROJECT_NAME=swisdex or migrate the volumes
+# before switching. See the header of docker-compose.yml.
 # ============================================================
-name: swisdex
+name: broker
 
 services:
   # ── Infrastructure — restart policy only (no host ports needed) ──
@@ -29,8 +36,9 @@ services:
       - "127.0.0.1:8002:8000"
     restart: always
     environment:
-      CORS_ORIGINS: https://swisdex.com,https://trade.swisdex.com,https://admin.swisdex.com
-      COOKIE_DOMAIN: .swisdex.com
+      # Replace example.com with the tenant domain (or set in .env and use ${...}).
+      CORS_ORIGINS: ${CORS_ORIGINS:-https://example.com,https://trade.example.com,https://admin.example.com}
+      COOKIE_DOMAIN: ${COOKIE_DOMAIN:-.example.com}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
       # Mobile app stores its own tokens (no cookies), so it needs the
       # refresh token returned in the login JSON body. The web app keeps
@@ -55,13 +63,19 @@ services:
       dockerfile: Dockerfile
       args:
         NEXT_PUBLIC_APP_VERSION: ${APP_VERSION:-production}
-        NEXT_PUBLIC_WS_URL: wss://api.swisdex.com
+        NEXT_PUBLIC_WS_URL: ${NEXT_PUBLIC_WS_URL:-wss://api.example.com}
+        # White-label branding — baked into the bundle at build time (see lib/brand.ts).
+        NEXT_PUBLIC_BRAND_NAME: ${NEXT_PUBLIC_BRAND_NAME:-}
+        NEXT_PUBLIC_BRAND_SLUG: ${NEXT_PUBLIC_BRAND_SLUG:-}
+        NEXT_PUBLIC_BRAND_DOMAIN: ${NEXT_PUBLIC_BRAND_DOMAIN:-}
+        NEXT_PUBLIC_BRAND_LOGO: ${NEXT_PUBLIC_BRAND_LOGO:-}
+        NEXT_PUBLIC_BRAND_SUPPORT_EMAIL: ${NEXT_PUBLIC_BRAND_SUPPORT_EMAIL:-}
         # Marketing/app host split intentionally UNSET: with both hosts unset the
         # middleware no-ops and the whole app (marketing + dashboard + terminal)
-        # is served from one origin (swisdex.com). This is required for the PWA —
+        # is served from one origin (the apex domain). This is required for the PWA —
         # a single origin lets the installed app contain the terminal instead of
-        # redirecting to trade.swisdex.com and breaking out of standalone.
-        # trade.swisdex.com keeps working as a full alias. (client 2026-07-21)
+        # redirecting to the trade subdomain and breaking out of standalone.
+        # The trade subdomain keeps working as a full alias. (client 2026-07-21)
         # Baked into the bundle at build time so the Google Sign-In button can render.
         # Same value as backend GOOGLE_CLIENT_ID. Leave blank to hide the button.
         NEXT_PUBLIC_GOOGLE_CLIENT_ID: ${NEXT_PUBLIC_GOOGLE_CLIENT_ID:-}
@@ -76,7 +90,7 @@ services:
         NEXT_PUBLIC_CLOUDFLARE_TURNSTILE_SITE_KEY: ${NEXT_PUBLIC_CLOUDFLARE_TURNSTILE_SITE_KEY:-}
         # Support quick-contact channels rendered on /support above the
         # ticket list. Either may be empty — the button hides if so.
-        NEXT_PUBLIC_SUPPORT_EMAIL: ${NEXT_PUBLIC_SUPPORT_EMAIL:-support@swisdex.com}
+        NEXT_PUBLIC_SUPPORT_EMAIL: ${NEXT_PUBLIC_SUPPORT_EMAIL:-}
         NEXT_PUBLIC_SUPPORT_WHATSAPP: ${NEXT_PUBLIC_SUPPORT_WHATSAPP:-}
     ports:
       - "127.0.0.1:3012:3000"
@@ -84,7 +98,7 @@ services:
       INTERNAL_API_URL: http://gateway:8000/api/v1
       TRADER_API_PROXY_TARGET: http://gateway:8000
       # Browser WebSocket connects directly to api subdomain
-      NEXT_PUBLIC_WS_URL: wss://api.swisdex.com
+      NEXT_PUBLIC_WS_URL: ${NEXT_PUBLIC_WS_URL:-wss://api.example.com}
       # NEXT_PUBLIC_MARKETING_HOST / NEXT_PUBLIC_TRADE_HOST intentionally unset —
       # single-origin app for the PWA (see build args note above).
       # DO NOT set NEXT_PUBLIC_GATEWAY_URL — browser uses same-origin /api/v1 proxy (avoids CORS)

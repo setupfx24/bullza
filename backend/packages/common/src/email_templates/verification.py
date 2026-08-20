@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from ..config import get_settings
 from .base import render_layout
 
 
@@ -7,11 +8,14 @@ def render_verification_reminder(
     *,
     first_name: str | None,
     days_since_signup: int,
-    trader_app_url: str = "https://trade.swisdex.com",
+    trader_app_url: str = "",
 ) -> tuple[str, str, str]:
+    s = get_settings()
+    brand = (s.BRAND_NAME or "").strip() or "YourBrand"
+    trader_app_url = (trader_app_url or "").strip() or s.TRADER_APP_URL
     name = (first_name or "trader").strip() or "trader"
     intro = (
-        "It's been a few days since you joined SwisDex and your account "
+        f"It's been a few days since you joined {brand} and your account "
         "isn't fully verified yet. Verify now to remove deposit and "
         "withdrawal limits — it takes about 2 minutes."
     )
@@ -28,7 +32,7 @@ def render_verification_reminder(
       Approval is usually within 24 hours, often much sooner.
     </p>
     """
-    subject = "Finish setting up your SwisDex account"
+    subject = f"Finish setting up your {brand} account"
     html = render_layout(
         title="Complete your verification",
         intro=intro,
@@ -43,7 +47,7 @@ def render_verification_reminder(
     )
     text = (
         f"Hi {name},\n\n"
-        "Your SwisDex account isn't fully verified yet. "
+        f"Your {brand} account isn't fully verified yet. "
         "Verifying takes about 2 minutes and removes deposit / withdrawal limits.\n\n"
         "You'll need:\n"
         "  - Government-issued photo ID\n"

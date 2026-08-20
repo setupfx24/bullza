@@ -1,5 +1,7 @@
 'use client';
 
+import { BRAND_LOGO, BRAND_NAME } from '@/lib/brand';
+
 /**
  * Dedicated bank-deposit page (client 2026-06-23: "bank se deposit lenge tab
  * naya page khulna chahiye XM ki tarah"). Reuses the existing manual-deposit
@@ -162,9 +164,12 @@ export default function BankDepositPage() {
           chrome (client 2026-06-24: render like the NOWPayments checkout). */}
       <div className="sticky top-0 z-10 flex items-center justify-between border-b border-border-glass/60 bg-bg-base/95 backdrop-blur px-4 py-3">
         <div className="flex items-center gap-2 min-w-0">
-          {/* Two logo variants, swapped by theme (same as AppSidebar). */}
-          <img src="/images/swisdex_png5.png" alt="SwisDex" className="h-7 w-auto object-contain shrink-0 hidden dark:block" />
-          <img src="/images/swisdex_png.png" alt="SwisDex" className="h-7 w-auto object-contain shrink-0 dark:hidden" />
+          {/* Brand mark — tenant logo image when configured, wordmark text otherwise. */}
+          {BRAND_LOGO ? (
+            <img src={BRAND_LOGO} alt={BRAND_NAME} className="h-7 w-auto object-contain shrink-0" />
+          ) : (
+            <span className="text-base font-black tracking-tight text-text-primary select-none shrink-0">{BRAND_NAME}</span>
+          )}
           <span className="text-[11px] font-semibold text-text-secondary border-l border-border-primary pl-2 ml-1 hidden sm:inline">Secure Bank Deposit</span>
         </div>
         <button type="button" onClick={() => router.push('/wallet')} aria-label="Close" className="p-1.5 rounded-lg text-text-secondary hover:bg-bg-hover hover:text-text-primary transition-fast">

@@ -1,8 +1,9 @@
 import LandingHeader from '@/components/landing/LandingHeader'
 import LandingFooter from '@/components/landing/LandingFooter'
 import { Users, Target, Shield, Globe } from 'lucide-react'
+import { BRAND_NAME } from '@/lib/brand'
 
-export const metadata = { title: 'About Us — SwisDex' }
+export const metadata = { title: `About Us — ${BRAND_NAME}` }
 
 export default function AboutPage() {
   return (
@@ -13,11 +14,11 @@ export default function AboutPage() {
       <section className="bg-gradient-to-b from-white to-gray-50 pt-16 pb-20">
         <div className="max-w-7xl mx-auto px-6 lg:px-8 text-center">
           <h1 className="text-4xl lg:text-5xl font-extrabold text-gray-900 leading-tight mb-6">
-            About SwisDex<br />
+            About {BRAND_NAME}<br />
             <span className="text-blue-600">Revolutionizing Global Trading</span>
           </h1>
           <p className="text-lg text-gray-500 max-w-2xl mx-auto leading-relaxed">
-            SwisDex is a decentralized exchange paired with a regulated broker — combining on-chain insured trades, non-custodial wallets, institutional-grade tools, and transparent pricing for complete financial freedom.
+            {BRAND_NAME} is a decentralized exchange paired with a regulated broker — combining on-chain insured trades, non-custodial wallets, institutional-grade tools, and transparent pricing for complete financial freedom.
           </p>
         </div>
       </section>
@@ -30,10 +31,10 @@ export default function AboutPage() {
           </div>
           <div className="prose prose-lg max-w-none space-y-6">
             <p className="text-gray-500 leading-relaxed">
-              SwisDex was founded with a simple belief: trading should be accessible, transparent, and fair for everyone. We saw traders struggling with high fees, slow withdrawals, and limited access to global markets. We decided to change that.
+              {BRAND_NAME} was founded with a simple belief: trading should be accessible, transparent, and fair for everyone. We saw traders struggling with high fees, slow withdrawals, and limited access to global markets. We decided to change that.
             </p>
             <p className="text-gray-500 leading-relaxed">
-              Today, SwisDex serves thousands of traders across 150+ countries, providing them with the tools and freedom they deserve. We're not just a broker—we're a movement toward financial independence.
+              Today, {BRAND_NAME} serves thousands of traders across 150+ countries, providing them with the tools and freedom they deserve. We're not just a broker—we're a movement toward financial independence.
             </p>
             <p className="text-gray-500 leading-relaxed">
               Our commitment is simple: provide the best trading experience with zero compromises on security, speed, or transparency.

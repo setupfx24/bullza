@@ -4,6 +4,7 @@ import Button from '../components/Button'
 import Card from '../components/Card'
 import StatBox from '../components/StatBox'
 import ScrollReveal, { ScrollRevealGroup, ScrollRevealItem } from '../components/animations/ScrollReveal'
+import { BRAND_NAME } from '@/lib/brand'
 
 const ACCOUNT_TYPES = [
   {
@@ -88,7 +89,7 @@ const AboutUs = () => {
               }}
             >
               <span className="size-1.5 rounded-full" style={{ background: '#55a630' }} />
-              <span className="text-[11px] uppercase tracking-[0.22em] font-semibold text-white">About SwisDex</span>
+              <span className="text-[11px] uppercase tracking-[0.22em] font-semibold text-white">About {BRAND_NAME}</span>
             </span>
             <h1
               className="text-5xl md:text-6xl font-bold mb-6"
@@ -97,7 +98,7 @@ const AboutUs = () => {
                 textShadow: '0 4px 24px rgba(0,0,0,0.6), 0 1px 2px rgba(0,0,0,0.9)',
               }}
             >
-              Who We Are — SwisDex
+              Who We Are — {BRAND_NAME}
             </h1>
             <p className="text-xl max-w-3xl mx-auto" style={{ color: 'rgba(255,255,255,0.78)' }}>
               A globally regulated forex and CFD broker — and a decentralized exchange with on-chain insured trades — committed to transparency, innovation, and excellence.
@@ -111,10 +112,10 @@ const AboutUs = () => {
           <ScrollReveal variant="fadeUp">
             <div className="max-w-4xl mx-auto mb-16">
               <p className="text-lg text-text-secondary leading-relaxed mb-6">
-                Founded in 2010, SwisDex is a globally regulated forex and CFD broker headquartered at Office 23US, 18 Young St, UNIT LGE 1/1, Edinburgh EH2 4JB, Scotland, and a decentralized exchange offering on-chain insured trades and non-custodial wallet trading. With over 500,000 clients across 150+ countries, we've built our reputation on transparency, speed, and trust.
+                Founded in 2010, {BRAND_NAME} is a globally regulated forex and CFD broker headquartered at Office 23US, 18 Young St, UNIT LGE 1/1, Edinburgh EH2 4JB, Scotland, and a decentralized exchange offering on-chain insured trades and non-custodial wallet trading. With over 500,000 clients across 150+ countries, we've built our reputation on transparency, speed, and trust.
               </p>
               <p className="text-lg text-text-secondary leading-relaxed">
-                Our mission is to democratize access to global financial markets by providing cutting-edge technology, competitive pricing, and world-class support. Whether you're a beginner taking your first steps in trading or a seasoned professional, SwisDex provides the tools, platforms, and expertise you need to succeed.
+                Our mission is to democratize access to global financial markets by providing cutting-edge technology, competitive pricing, and world-class support. Whether you're a beginner taking your first steps in trading or a seasoned professional, {BRAND_NAME} provides the tools, platforms, and expertise you need to succeed.
               </p>
             </div>
           </ScrollReveal>
@@ -247,7 +248,7 @@ const AboutUs = () => {
       <section className="section-padding bg-gradient-hero">
         <div className="container-custom text-center">
           <ScrollReveal variant="fadeUp">
-            <h2 className="text-4xl font-bold text-white mb-6">Join the SwisDex Family</h2>
+            <h2 className="text-4xl font-bold text-white mb-6">Join the {BRAND_NAME} Family</h2>
             <p className="text-xl text-text-secondary mb-8 max-w-2xl mx-auto">
               Experience the difference of trading with a broker that puts your success first.
             </p>

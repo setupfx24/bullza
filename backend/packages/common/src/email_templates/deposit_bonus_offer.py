@@ -4,15 +4,19 @@ BonusOffer the admin has configured (typically 100% of first deposit);
 this email just nudges the user into the funnel."""
 from __future__ import annotations
 
+from ..config import get_settings
 from .base import render_layout
 
 
 def render_first_deposit_bonus_offer(
     *,
     first_name: str | None,
-    trader_app_url: str = "https://trade.swisdex.com",
+    trader_app_url: str = "",
     bonus_pct: int = 100,
 ) -> tuple[str, str, str]:
+    s = get_settings()
+    brand = (s.BRAND_NAME or "").strip() or "YourBrand"
+    trader_app_url = (trader_app_url or "").strip() or s.TRADER_APP_URL
     name = (first_name or "trader").strip() or "trader"
     # The layout HTML-escapes `intro`, so any tags here render as literal text
     # (the "<strong>...</strong>" the client saw). Keep intro plain — emphasis
@@ -22,7 +26,7 @@ def render_first_deposit_bonus_offer(
         "first deposit — but you haven't funded your wallet yet. "
         "Deposit any amount and we'll instantly match it up to the cap."
     )
-    body = """
+    body = f"""
     <p style="margin:0 0 12px;color:#1a1a1a;font-size:14px;line-height:1.6;">
       What you get:
     </p>
@@ -32,7 +36,7 @@ def render_first_deposit_bonus_offer(
       <li>Combine with the AI-POWERED STAKING PROGRAM product for capital-protected returns</li>
     </ul>
     <p style="margin:16px 0 0;color:#6b7280;font-size:13px;line-height:1.6;">
-      Bonuses follow SwisDex's standard offer terms. Larger deposits unlock
+      Bonuses follow {brand}'s standard offer terms. Larger deposits unlock
       additional tiered rewards.
     </p>
     """
@@ -50,7 +54,7 @@ def render_first_deposit_bonus_offer(
     )
     text = (
         f"Hi {name},\n\n"
-        f"You're eligible for a {bonus_pct}% bonus on your first deposit at SwisDex.\n\n"
+        f"You're eligible for a {bonus_pct}% bonus on your first deposit at {brand}.\n\n"
         f"Deposit at: {trader_app_url.rstrip('/')}/wallet\n"
         "Bonus credits instantly when your deposit is approved.\n"
     )

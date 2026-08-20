@@ -5,6 +5,8 @@
  * range (client 2026-06-19). jspdf is dynamically imported on export only.
  */
 
+import { BRAND_NAME, BRAND_SLUG } from '@/lib/brand';
+
 export type TransactionStatementRow = {
   created_at?: string | null;
   /** deposit | withdrawal | transfer | bonus | credit | fixed_return | … */
@@ -76,7 +78,7 @@ export async function downloadTransactionStatementPdf(
   doc.setTextColor(255, 255, 255);
   doc.setFontSize(11);
   doc.setFont('helvetica', 'bold');
-  doc.text('SwisDex', margin, 7);
+  doc.text(BRAND_NAME, margin, 7);
 
   doc.setTextColor(30, 30, 30);
   doc.setFontSize(16);
@@ -149,11 +151,11 @@ export async function downloadTransactionStatementPdf(
       doc.setFontSize(7);
       doc.setTextColor(140, 140, 140);
       doc.text(`Page ${data.pageNumber} of ${pageCount}`, pageW - margin - 28, doc.internal.pageSize.getHeight() - 6);
-      doc.text('SwisDex — for information only. Not tax or legal advice.', margin, doc.internal.pageSize.getHeight() - 6);
+      doc.text(`${BRAND_NAME} — for information only. Not tax or legal advice.`, margin, doc.internal.pageSize.getHeight() - 6);
     },
   });
 
   const safeDate = new Date().toISOString().slice(0, 10);
   const slug = (meta?.kindLabel || 'transactions').toLowerCase().replace(/\s+/g, '-');
-  doc.save(`swisdex-${slug}-statement-${safeDate}.pdf`);
+  doc.save(`${BRAND_SLUG}-${slug}-statement-${safeDate}.pdf`);
 }

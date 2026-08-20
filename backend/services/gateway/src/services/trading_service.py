@@ -26,7 +26,7 @@ from packages.common.src.database import AsyncSessionLocal
 from packages.common.src.redis_client import redis_client, PriceChannel
 from packages.common.src.notify import create_notification
 from packages.common.src.market_hours import is_market_open
-from packages.common.src import corecen_trade_client
+from packages.common.src.abook import enqueue_abook_event
 from packages.common.src.referral_bonus_campaign import check_and_award
 
 logger = logging.getLogger("trading_service")
@@ -579,53 +579,43 @@ async def place_order(
             device_info=ua_hdr[:2048] if ua_hdr else None,
         )
     )
+    # ── A-Book: queue the LP hedge-leg OPEN in the same transaction ────
+    # Durable outbox (abook_outbox_engine delivers with retry/backoff) —
+    # replaces the fire-and-forget task that silently dropped the hedge on
+    # a Corecen 5xx or a process restart. Demo accounts never route to LP;
+    # enqueue_abook_event also checks book_type internally.
+    if req.order_type == "market":
+        await db.flush()  # position.id must be assigned before enqueue
+        u_row = (await db.execute(select(User).where(User.id == user_id))).scalar_one_or_none()
+        _user_name = ""
+        if u_row:
+            _user_name = " ".join(filter(None, [u_row.first_name, u_row.last_name])) or ""
+        await enqueue_abook_event(
+            db,
+            user_id=user_id,
+            is_demo=bool(account.is_demo),
+            kind="open",
+            position_id=position.id,
+            payload={
+                "position_id": str(position.id),
+                "user_id": str(user_id),
+                "user_email": (getattr(u_row, "email", None) or ""),
+                "user_name": _user_name,
+                "symbol": instrument.symbol,
+                "side": req.side,
+                "volume": req.lots,
+                "open_price": fill_price,
+                "sl": req.stop_loss,
+                "tp": req.take_profit,
+                "leverage": account.leverage,
+                "contract_size": instrument.contract_size or 100000,
+                "trading_account_id": str(account.id),
+            },
+        )
     await db.commit()
 
     # Fire-and-forget: notification + IB commission run in background (don't block response)
     if req.order_type == "market":
-        # ── A-Book: forward trade to Corecen LP ──────────────────────────
-        _pos_id_for_lp = str(position.id)
-        _user_id_str = str(user_id)
-        _symbol = instrument.symbol
-        _side = req.side
-        _lots = float(req.lots)
-        _fill_price = float(fill_price)
-        _sl = float(req.stop_loss) if req.stop_loss else None
-        _tp = float(req.take_profit) if req.take_profit else None
-        _leverage = account.leverage
-        _contract_size = float(instrument.contract_size or 100000)
-        _acct_id_str = str(account.id)
-        _is_demo = bool(account.is_demo)
-
-        async def _maybe_forward_to_corecen():
-            # Demo account trades are always B-book — never forward to LP,
-            # regardless of the user's A/B book_type flag.
-            if _is_demo:
-                return
-            try:
-                async with AsyncSessionLocal() as bg_db:
-                    u = (await bg_db.execute(select(User).where(User.id == user_id))).scalar_one_or_none()
-                    if u and (u.book_type or "B") == "A":
-                        user_name = " ".join(filter(None, [u.first_name, u.last_name])) or ""
-                        await corecen_trade_client.forward_trade_open(
-                            position_id=_pos_id_for_lp,
-                            user_id=_user_id_str,
-                            user_email=u.email,
-                            user_name=user_name,
-                            symbol=_symbol,
-                            side=_side,
-                            volume=_lots,
-                            open_price=_fill_price,
-                            sl=_sl,
-                            tp=_tp,
-                            leverage=_leverage,
-                            contract_size=_contract_size,
-                            trading_account_id=_acct_id_str,
-                        )
-            except Exception as e:
-                logger.error("[A-BOOK] Failed to forward trade open to Corecen: %s", e)
-
-        asyncio.create_task(_maybe_forward_to_corecen())
 
         async def _post_order_tasks():
             async with AsyncSessionLocal() as bg_db:
@@ -1080,30 +1070,20 @@ async def modify_position(position_id: UUID, req, user_id: UUID, db: AsyncSessio
         updated = True
 
     if updated:
+        # ── A-Book: queue the SL/TP update (durable outbox), same txn ──
+        await enqueue_abook_event(
+            db,
+            user_id=user_id,
+            is_demo=bool(acct_row.is_demo),
+            kind="update",
+            position_id=position_id,
+            payload={
+                "position_id": str(position_id),
+                "sl": pos.stop_loss,
+                "tp": pos.take_profit,
+            },
+        )
         await db.commit()
-
-        # ── A-Book: forward SL/TP update to Corecen LP ──────────────────
-        _pos_id_str = str(position_id)
-        _new_sl = float(pos.stop_loss) if pos.stop_loss else None
-        _new_tp = float(pos.take_profit) if pos.take_profit else None
-        _is_demo = bool(acct_row.is_demo)
-
-        async def _maybe_forward_update_to_corecen():
-            if _is_demo:
-                return
-            try:
-                async with AsyncSessionLocal() as bg_db:
-                    u = (await bg_db.execute(select(User).where(User.id == user_id))).scalar_one_or_none()
-                    if u and (u.book_type or "B") == "A":
-                        await corecen_trade_client.forward_trade_update(
-                            position_id=_pos_id_str,
-                            sl=_new_sl,
-                            tp=_new_tp,
-                        )
-            except Exception as e:
-                logger.error("[A-BOOK] Failed to forward SL/TP update to Corecen: %s", e)
-
-        asyncio.create_task(_maybe_forward_update_to_corecen())
 
     return {
         "message": "Position modified",
@@ -1448,6 +1428,22 @@ async def close_position(position_id: UUID, req, user_id: UUID, db: AsyncSession
     except Exception as _re:
         logger.warning("referral payout after close failed: %s", _re)
 
+    # ── A-Book: queue the LP hedge-leg CLOSE in the same transaction ───
+    # (durable outbox — see the open-path comment in place_order).
+    await enqueue_abook_event(
+        db,
+        user_id=user_id,
+        is_demo=bool(account.is_demo),
+        kind="close",
+        position_id=pos.id,
+        payload={
+            "position_id": str(pos.id),
+            "close_price": close_price,
+            "pnl": result_profit,
+            "closed_by": detected_reason.upper() if detected_reason != "manual" else "USER",
+        },
+    )
+
     await db.commit()
 
     # Fire-and-forget: notification, Redis publish — don't block response
@@ -1478,29 +1474,6 @@ async def close_position(position_id: UUID, req, user_id: UUID, db: AsyncSession
             pass
 
     asyncio.create_task(_post_close_tasks())
-    # ── A-Book: forward close to Corecen LP ──────────────────────────
-    _close_price_f = float(close_price)
-    _result_profit_f = float(result_profit)
-    _close_reason = detected_reason.upper() if detected_reason != "manual" else "USER"
-    _is_demo = bool(account.is_demo)
-
-    async def _maybe_forward_close_to_corecen():
-        if _is_demo:
-            return
-        try:
-            async with AsyncSessionLocal() as bg_db:
-                u = (await bg_db.execute(select(User).where(User.id == user_id))).scalar_one_or_none()
-                if u and (u.book_type or "B") == "A":
-                    await corecen_trade_client.forward_trade_close(
-                        position_id=_pos_id,
-                        close_price=_close_price_f,
-                        pnl=_result_profit_f,
-                        closed_by=_close_reason,
-                    )
-        except Exception as e:
-            logger.error("[A-BOOK] Failed to forward trade close to Corecen: %s", e)
-
-    asyncio.create_task(_maybe_forward_close_to_corecen())
 
     return {
         "message": result_msg,

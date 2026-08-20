@@ -3,7 +3,8 @@
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { Search, Calendar, User, ArrowRight, ArrowUpRight, ArrowLeft } from 'lucide-react';
-import { BannerPlaceholder } from '@/swisdex/components/BannerPlaceholder';
+import { BannerPlaceholder } from '@/home/components/BannerPlaceholder';
+import { BRAND_NAME } from '@/lib/brand';
 
 interface Post {
   id: string;
@@ -49,7 +50,7 @@ export default function AcademyBlogsPage() {
   return (
     <main className="min-h-screen bg-background">
       <BannerPlaceholder
-        title="SwisDex Academy — Blog"
+        title={`${BRAND_NAME} Academy — Blog`}
         tagline="Market insights, strategy breakdowns, and platform tips from our trading desk."
       />
 

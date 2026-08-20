@@ -4,7 +4,7 @@
  * Full TradingView Charting Library chart — pro UI fed by OUR engine data so the
  * candles match the running P&L (unlike the Advanced Chart WIDGET, which streams
  * TradingView's public OANDA feed). Wires the licensed library in
- * `public/charting_library/` to `swisDexDatafeed` (history = gateway
+ * `public/charting_library/` to `brandDatafeed` (history = gateway
  * /instruments/{sym}/bars from the InfoWay BarAggregator; live = /ws/bars).
  *
  * Also draws a BUY/SELL position line on the chart for each open trade on the
@@ -16,10 +16,11 @@ import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useTradingStore, defaultContractSize, livePnlFor } from '@/stores/tradingStore';
 import { useUIStore } from '@/stores/uiStore';
-import { swisDexDatafeed } from '@/lib/charting/datafeed';
+import { brandDatafeed } from '@/lib/charting/datafeed';
+import { BRAND_LOGO, BRAND_NAME } from '@/lib/brand';
 import api from '@/lib/api/client';
 import toast from 'react-hot-toast';
-import { createBroker } from '@/lib/charting/broker';
+import { createBroker, disposeBroker } from '@/lib/charting/broker';
 
 // The licensed library attaches `TradingView` to window once the script runs.
 // Use `any` for the widget/chart — the bundled .d.ts is huge and we only touch
@@ -68,7 +69,7 @@ function loadChartingLibrary(): Promise<void> {
 
 // localStorage key for the persisted chart layout (drawings, studies,
 // settings, timeframe) — survives page refreshes.
-const CHART_SAVE_KEY = 'swisdex_chart_layout_v1';
+const CHART_SAVE_KEY = 'trader_chart_layout_v1';
 
 // Stale-price thresholds (ms): how long without a tick before a position
 // line's P&L is treated as stale. Crypto trades 24/7 (short), forex/metals
@@ -291,7 +292,7 @@ export default function ChartingLibraryChart() {
         symbol: initialSymbol,
         interval: '5',
         container: containerRef.current,
-        datafeed: swisDexDatafeed,
+        datafeed: brandDatafeed,
         library_path: '/charting_library/',
         locale: 'en',
         theme: theme === 'light' ? 'Light' : 'Dark',
@@ -329,7 +330,7 @@ export default function ChartingLibraryChart() {
           broker_factory: (host: any) => createBroker(host),
           broker_config: BROKER_CONFIG,
         } : {}),
-        // Faint SwisDex/symbol watermark in the chart background (restores the
+        // Faint brand/symbol watermark in the chart background (restores the
         // branding the old Advanced Chart widget showed) — client 2026-06-26.
         overrides: {
           'symbolWatermarkProperties.transparency': 84,
@@ -385,6 +386,9 @@ export default function ChartingLibraryChart() {
       widgetRef.current = null;
       appliedSymbolRef.current = '';
       linesRef.current.clear();
+      // Stop the broker's 1s host-update poller — it used to leak one
+      // interval per chart (re)mount for the lifetime of the tab.
+      disposeBroker();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [theme]);
@@ -1082,23 +1086,25 @@ export default function ChartingLibraryChart() {
   return (
     <div className="relative w-full h-full min-h-[320px]">
       <div ref={containerRef} className="w-full h-full min-h-[320px]" />
-      {/* SwisDex logo watermark — faint, centered, non-interactive. Sits over the
-          chart canvas but under the SL/TP overlay (DOM order). Theme-aware. */}
+      {/* Brand watermark — faint, centered, non-interactive. Sits over the
+          chart canvas but under the SL/TP overlay (DOM order). */}
       <div className="pointer-events-none absolute inset-0 flex items-center justify-center overflow-hidden">
-        <img
-          src="/images/swisdex_png5.png"
-          alt=""
-          aria-hidden
-          draggable={false}
-          className="w-40 h-40 md:w-56 md:h-56 object-contain opacity-[0.06] select-none hidden dark:block"
-        />
-        <img
-          src="/images/swisdex_png.png"
-          alt=""
-          aria-hidden
-          draggable={false}
-          className="w-40 h-40 md:w-56 md:h-56 object-contain opacity-[0.06] select-none dark:hidden"
-        />
+        {BRAND_LOGO ? (
+          <img
+            src={BRAND_LOGO}
+            alt=""
+            aria-hidden
+            draggable={false}
+            className="w-40 h-40 md:w-56 md:h-56 object-contain opacity-[0.06] select-none"
+          />
+        ) : (
+          <span
+            aria-hidden
+            className="font-black tracking-tight text-4xl md:text-6xl text-text-primary opacity-[0.06] select-none"
+          >
+            {BRAND_NAME}
+          </span>
+        )}
       </div>
       <div ref={overlayRef} className="pointer-events-none absolute inset-0 overflow-hidden" />
       {dialog &&

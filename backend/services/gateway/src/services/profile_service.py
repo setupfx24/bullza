@@ -133,7 +133,7 @@ async def update_profile(
         raise HTTPException(status_code=404, detail="User not found")
 
     # The "Try with Demo Account" button signs everyone in as the SHARED
-    # demo@swisdex.com user (User.is_demo=True). Letting any visitor mutate
+    # demo user (User.is_demo=True). Letting any visitor mutate
     # that row corrupts identity for every subsequent visitor — exactly the
     # bug where one user's "abhi" first_name leaked into a stranger's demo
     # session. Reject profile edits on the shared demo identity.
@@ -537,7 +537,7 @@ async def send_dashboard_access_email(
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    # Demo identity short-circuits — the shared demo@swisdex.com account
+    # Demo identity short-circuits — the shared demo account
     # must never be spammed via the dashboard email.
     if bool(getattr(user, "is_demo", False)):
         return {"message": "Skipped for demo account", "sent": False}
@@ -556,9 +556,7 @@ async def send_dashboard_access_email(
             return {"message": "Email not configured", "sent": False}
 
         st = get_settings()
-        trader_app_url = (
-            getattr(st, "TRADER_APP_URL", None) or "https://trade.swisdex.com"
-        ).rstrip("/")
+        trader_app_url = (getattr(st, "TRADER_APP_URL", None) or "").rstrip("/")
         dashboard_url = f"{trader_app_url}/accounts"
         subject, html, text = render_dashboard_access(
             first_name=user.first_name,

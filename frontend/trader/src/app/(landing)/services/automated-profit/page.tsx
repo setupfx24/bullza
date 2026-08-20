@@ -7,9 +7,10 @@ import {
   Repeat, Gift, Users, Activity, AlertTriangle,
   ChevronDown, CheckCircle2,
 } from 'lucide-react';
-import { BannerPlaceholder } from '@/swisdex/components/BannerPlaceholder';
-import { QuoteSection } from '@/swisdex/components/QuoteSection';
-import { FixedReturnRateTable } from '@/swisdex/components/FixedReturnRateTable';
+import { BannerPlaceholder } from '@/home/components/BannerPlaceholder';
+import { QuoteSection } from '@/home/components/QuoteSection';
+import { FixedReturnRateTable } from '@/home/components/FixedReturnRateTable';
+import { BRAND_NAME } from '@/lib/brand';
 
 const SIGNUP_HREF = '/auth/register';
 
@@ -33,7 +34,7 @@ export default function AutomatedProfitPage() {
               Set it once. <span className="text-primary">Compound monthly.</span>
             </h2>
             <p className="mt-4 text-foreground/70 text-sm sm:text-base leading-relaxed max-w-xl">
-              SwisDex Automated Profit plans are managed bot strategies with built-in capital protection,
+              {BRAND_NAME} Automated Profit plans are managed bot strategies with built-in capital protection,
               daily performance tracking, and flexible withdrawals. No charts to watch — open the dashboard
               once a week to see your returns.
             </p>
@@ -231,7 +232,7 @@ export default function AutomatedProfitPage() {
             deposit to prevent abuse of the welcome bonus.
           </FaqItem>
           <FaqItem q="Who runs the algorithms?">
-            The SwisDex quant desk — a team of senior systematic traders and ML engineers. Every strategy is
+            The {BRAND_NAME} quant desk — a team of senior systematic traders and ML engineers. Every strategy is
             walk-forward backtested for 5+ years, paper-traded for 90 days, and risk-capped for the first 60
             days of live deployment.
           </FaqItem>
@@ -276,7 +277,7 @@ export default function AutomatedProfitPage() {
                 </p>
                 <p>
                   Before you invest, ensure you understand the risks involved and seek independent professional
-                  advice if necessary. Only invest capital you can afford to lose entirely. SwisDex is not a
+                  advice if necessary. Only invest capital you can afford to lose entirely. {BRAND_NAME} is not a
                   bank deposit — your investment is not protected by deposit-insurance schemes.
                 </p>
               </div>
@@ -290,7 +291,7 @@ export default function AutomatedProfitPage() {
         <div className="liquid-glass-strong rounded-3xl p-8 sm:p-12 text-center">
           <h2 className="font-display uppercase text-2xl sm:text-3xl tracking-tight">Start Earning Passively</h2>
           <p className="mt-4 text-foreground/70 max-w-xl mx-auto text-sm sm:text-base">
-            Open a SwisDex account, pick your plan, and the bots take over. First deposit unlocks the welcome bonus.
+            Open a {BRAND_NAME} account, pick your plan, and the bots take over. First deposit unlocks the welcome bonus.
           </p>
           <div className="mt-7 flex flex-wrap justify-center gap-3">
             <Link href={SIGNUP_HREF} className="inline-flex items-center gap-2 rounded-full bg-primary text-white px-6 py-3 text-sm font-semibold uppercase tracking-wider hover:opacity-90">

@@ -10,7 +10,8 @@
  */
 import Link from 'next/link';
 import { Ban, ArrowUpRight, Globe, Mail, ShieldAlert } from 'lucide-react';
-import { BannerPlaceholder } from '@/swisdex/components/BannerPlaceholder';
+import { BannerPlaceholder } from '@/home/components/BannerPlaceholder';
+import { BRAND_NAME, BRAND_SUPPORT_EMAIL } from '@/lib/brand';
 
 const RESTRICTED = [
   'United States of America (USA)',
@@ -24,17 +25,17 @@ const RESTRICTED = [
 const SECTIONS = [
   {
     h: '1. Overview',
-    body: 'SwisDex Ltd ("Swisdex", "Company", "we", "our", or "us") operates a regulated multi-asset trading platform. Due to local laws, sanctions regimes, regulatory requirements, and risk-management policies, our services are not available to citizens or residents of certain jurisdictions.',
+    body: `${BRAND_NAME} ("${BRAND_NAME}", "Company", "we", "our", or "us") operates a regulated multi-asset trading platform. Due to local laws, sanctions regimes, regulatory requirements, and risk-management policies, our services are not available to citizens or residents of certain jurisdictions.`,
   },
   {
     h: '2. Restricted Jurisdictions',
-    body: 'Swisdex does not provide services to citizens, residents, or persons located in the following jurisdictions:',
+    body: `${BRAND_NAME} does not provide services to citizens, residents, or persons located in the following jurisdictions:`,
     list: RESTRICTED,
-    trailing: 'The services of Swisdex are not intended for distribution to, or use by, any person in any country or jurisdiction where such distribution or use would be contrary to local law or regulation.',
+    trailing: `The services of ${BRAND_NAME} are not intended for distribution to, or use by, any person in any country or jurisdiction where such distribution or use would be contrary to local law or regulation.`,
   },
   {
     h: '3. Client Responsibility',
-    body: 'It is your responsibility to ensure that opening a trading account with Swisdex and using our services is lawful in the jurisdiction in which you are a citizen, resident, or physically located. By opening an account you confirm that you are not a citizen, resident, or person physically located in any restricted jurisdiction.',
+    body: `It is your responsibility to ensure that opening a trading account with ${BRAND_NAME} and using our services is lawful in the jurisdiction in which you are a citizen, resident, or physically located. By opening an account you confirm that you are not a citizen, resident, or person physically located in any restricted jurisdiction.`,
   },
   {
     h: '4. Misrepresentation',
@@ -48,15 +49,15 @@ const SECTIONS = [
   },
   {
     h: '5. Updates to the Restricted List',
-    body: 'Swisdex reserves the right to add, remove, or modify the list of restricted jurisdictions at any time without prior notice. Updates will become effective immediately upon publication on the Swisdex website. Continued use of Swisdex services following any update constitutes acceptance of the revised list.',
+    body: `${BRAND_NAME} reserves the right to add, remove, or modify the list of restricted jurisdictions at any time without prior notice. Updates will become effective immediately upon publication on the ${BRAND_NAME} website. Continued use of ${BRAND_NAME} services following any update constitutes acceptance of the revised list.`,
   },
   {
     h: '6. Sanctions & Compliance',
-    body: 'In addition to the country list above, Swisdex maintains AML and sanctions-screening procedures that may restrict, suspend, or terminate services for individuals or entities listed on any applicable sanctions list (including, without limitation, OFAC, UN, EU, and UK lists), regardless of country of residence.',
+    body: `In addition to the country list above, ${BRAND_NAME} maintains AML and sanctions-screening procedures that may restrict, suspend, or terminate services for individuals or entities listed on any applicable sanctions list (including, without limitation, OFAC, UN, EU, and UK lists), regardless of country of residence.`,
   },
   {
     h: '7. Contact',
-    body: 'Questions about jurisdiction eligibility or sanctions compliance can be sent to compliance@swisdex.com. We aim to respond within five business days.',
+    body: `Questions about jurisdiction eligibility or sanctions compliance can be sent to ${BRAND_SUPPORT_EMAIL}. We aim to respond within five business days.`,
   },
 ];
 
@@ -65,14 +66,14 @@ export default function RestrictedCountriesPage() {
     <main className="min-h-screen" style={{ background: '#08090b', color: '#f5f5f5' }}>
       <BannerPlaceholder
         title="Restricted Countries"
-        tagline="Jurisdictions where SwisDex services are not offered."
+        tagline={`Jurisdictions where ${BRAND_NAME} services are not offered.`}
       />
 
       <section className="mx-auto max-w-[840px] px-[var(--gutter)] pt-10 pb-6">
         <div className="liquid-glass rounded-2xl px-5 py-4 flex items-center gap-3 text-sm text-foreground/70">
           <Globe className="size-4 text-primary shrink-0" />
           <span>
-            <span className="font-semibold text-foreground/90">Swisdex — Restricted Countries</span>{' '}
+            <span className="font-semibold text-foreground/90">{BRAND_NAME} — Restricted Countries</span>{' '}
             · Last updated: June 2026
           </span>
         </div>
@@ -129,7 +130,7 @@ export default function RestrictedCountriesPage() {
             </p>
           </div>
           <a
-            href="mailto:compliance@swisdex.com"
+            href={`mailto:${BRAND_SUPPORT_EMAIL}`}
             className="inline-flex items-center gap-2 rounded-full bg-primary text-white px-5 py-2.5 text-sm font-semibold uppercase tracking-wider hover:opacity-90 shrink-0"
           >
             <Mail className="size-4" /> Contact Compliance
@@ -143,7 +144,7 @@ export default function RestrictedCountriesPage() {
             Eligible to Trade?
           </h2>
           <p className="mt-4 text-foreground/70 max-w-xl mx-auto text-sm sm:text-base">
-            If your jurisdiction isn&apos;t on the restricted list, open a SwisDex account in minutes.
+            If your jurisdiction isn&apos;t on the restricted list, open a {BRAND_NAME} account in minutes.
           </p>
           <Link
             href="/auth/register"

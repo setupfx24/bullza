@@ -1,5 +1,7 @@
 'use client';
 
+import { BRAND_NAME } from '@/lib/brand';
+
 
 
 import { useState, useEffect, useMemo } from 'react';
@@ -368,7 +370,7 @@ function IBTab() {
 
     // Client 2026-06-19: only Super-IB-introduced (or no-referral) users may
     // self-apply. A user introduced by another IB/affiliate sees ONLY a
-    // "Contact SwisDex to become an IB" prompt — no self-apply / eligibility.
+    // "Contact the broker to become an IB" prompt — no self-apply / eligibility.
     if (status?.can_become_ib === false) {
       // Introduced by another IB (not the Super IB) → can't apply as a full IB,
       // but CAN self-apply as a Sub-IB. On approval they're linked under their
@@ -554,7 +556,7 @@ function IBTab() {
 
 
   // A Sub-IB (anyone not introduced directly by the Super IB) does NOT get the
-  // IB program section — only a prompt to apply to SwisDex (client 2026-06-23:
+  // IB program section — only a prompt to apply to the broker (client 2026-06-23:
   // "sub-sub wale ko IB section show ho raha hai").
   if (dashboard?.is_sub_ib) {
     return (
@@ -562,13 +564,13 @@ function IBTab() {
         <div className="text-2xl">🤝</div>
         <h3 className="text-sm font-semibold text-text-primary">You&apos;re a Sub-IB</h3>
         <p className="text-xxs text-text-tertiary">
-          The IB program is available to full IBs. To become a full IB, apply to SwisDex.
+          The IB program is available to full IBs. To become a full IB, apply to {BRAND_NAME}.
         </p>
         <a
           href="/support?topic=ib-upgrade"
           className="inline-block text-xs font-medium px-4 py-2 rounded-md bg-accent/15 text-accent border border-accent/30 hover:bg-accent/25"
         >
-          Apply to SwisDex to become an IB
+          Apply to {BRAND_NAME} to become an IB
         </a>
       </div>
     );

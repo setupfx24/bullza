@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { ArrowUpRight, CheckCircle2 } from 'lucide-react';
+import { BRAND_NAME } from '@/lib/brand';
 
 type Tier = {
   name: string;
@@ -79,7 +80,7 @@ export default function AccountTypesPage() {
           <span className="text-primary">Around You</span>
         </h1>
         <p className="mt-7 mx-auto max-w-2xl text-foreground/70 text-base sm:text-lg leading-relaxed">
-          From your first trade to your ten-thousandth — SwisDex has an account built for your level.
+          From your first trade to your ten-thousandth — {BRAND_NAME} has an account built for your level.
         </p>
       </section>
 

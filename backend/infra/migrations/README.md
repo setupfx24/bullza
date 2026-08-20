@@ -1,4 +1,4 @@
-# SwisDex — Alembic Migrations
+# Alembic Migrations
 
 Schema evolution is managed via Alembic. All migration files live in `versions/`.
 
@@ -12,7 +12,7 @@ current DB and the ORM models in `packages/common/src/models.py`.
 
 ```bash
 # From the backend/ root (where packages/ is visible)
-export DATABASE_URL=postgresql+asyncpg://swisdex:swisdex_dev@localhost:5432/swisdex
+export DATABASE_URL=postgresql+asyncpg://<db_user>:<db_password>@localhost:5432/<db_name>
 ```
 
 Alembic must be installed (it is included in `packages/common` dependencies):

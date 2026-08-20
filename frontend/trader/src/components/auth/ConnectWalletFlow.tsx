@@ -1,5 +1,7 @@
 'use client';
 
+import { BRAND_NAME } from '@/lib/brand';
+
 /**
  * Wallet sign-in / link orchestration. Runs inside <Web3Provider> so the
  * wagmi + RainbowKit hooks are available.
@@ -133,7 +135,7 @@ export default function ConnectWalletFlow({ variant = 'login', disabled }: Props
       } else if (status === 401 && lower.includes('signature')) {
         toast.error('Signature did not match the connected wallet.');
       } else if (status === 409) {
-        toast.error('This wallet is already linked to another SwisDex account.');
+        toast.error(`This wallet is already linked to another ${BRAND_NAME} account.`);
       } else if (status === 404 && variant === 'login') {
         // Shouldn't happen for login variant (auto-creates), but defensive.
         toast.error(detail || 'No account found for this wallet.');

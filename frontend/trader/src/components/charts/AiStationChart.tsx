@@ -8,11 +8,11 @@
  *     running P&L (updated in place, no flicker),
  *   - an exit flag + entry→exit connector for CLOSED trades.
  * NO stop-loss / take-profit lines. Strictly read-only: no broker, no order UI,
- * no drawing tools. Reuses the shared `swisDexDatafeed` unchanged, and does NOT
+ * no drawing tools. Reuses the shared `brandDatafeed` unchanged, and does NOT
  * import the live terminal's chart component, so production is never touched.
  */
 import { useEffect, useRef, useState } from 'react';
-import { swisDexDatafeed } from '@/lib/charting/datafeed';
+import { brandDatafeed } from '@/lib/charting/datafeed';
 import { useUIStore } from '@/stores/uiStore';
 
 export interface AiTrade {
@@ -84,7 +84,7 @@ export default function AiStationChart({ symbol, interval = '5', trades = [] }: 
         symbol,
         interval,
         container: containerRef.current,
-        datafeed: swisDexDatafeed,
+        datafeed: brandDatafeed,
         library_path: '/charting_library/',
         locale: 'en',
         theme: theme === 'light' ? 'Light' : 'Dark',

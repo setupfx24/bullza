@@ -2,6 +2,7 @@ import { Check, Moon } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import ScrollReveal from '../../components/animations/ScrollReveal'
 import SectionHeader from '../../components/SectionHeader'
+import { BRAND_NAME } from '@/lib/brand'
 
 const features = [
   'Zero overnight swap fees',
@@ -27,7 +28,7 @@ export default function IslamicAccountSection() {
               <div className="grid md:grid-cols-2 gap-8">
                 <div>
                   <p className="text-text-secondary leading-relaxed mb-6">
-                    SwisDex offers a fully Shariah-compliant trading account designed for traders who require swap-free trading.
+                    {BRAND_NAME} offers a fully Shariah-compliant trading account designed for traders who require swap-free trading.
                   </p>
 
                   <div className="space-y-3 mb-6">

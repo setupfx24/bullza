@@ -40,135 +40,58 @@ _cors_methods = [m.strip() for m in app_settings.CORS_ALLOW_METHODS.split(",") i
 _cors_headers = [h.strip() for h in app_settings.CORS_ALLOW_HEADERS.split(",") if h.strip()]
 
 
-async def _apply_startup_ddl():
-    """Idempotent ALTERs that unblock admin endpoints when manual migrations
-    haven't been run yet on a host (Render/Vercel/etc.). Safe to re-run."""
+async def _detect_schema_drift():
+    """Loud drift DETECTOR — no longer mutates schema at boot.
+
+    This function used to run a large block of self-healing DDL on every
+    start, which meant the real schema was defined in two places (Alembic
+    + here) and a missed migration was silently papered over. The DDL now
+    lives in migration 0104 (a no-op on databases that ran 0071–0078) and
+    `scripts/deploy.sh` blocks on `alembic upgrade head` before `up`.
+    Here we only probe a few sentinel objects and scream if they're
+    missing, so a host that skipped migrations fails loudly instead of
+    mysteriously 500-ing on random admin endpoints.
+    """
     from sqlalchemy import text
+    probes = {
+        "employees.extra_permissions": (
+            "SELECT 1 FROM information_schema.columns "
+            "WHERE table_name='employees' AND column_name='extra_permissions'"
+        ),
+        "system_settings": "SELECT to_regclass('system_settings')",
+        "rm_funding_requests": "SELECT to_regclass('rm_funding_requests')",
+        "orders.spread_revenue": (
+            "SELECT 1 FROM information_schema.columns "
+            "WHERE table_name='orders' AND column_name='spread_revenue'"
+        ),
+    }
     try:
-        async with engine.begin() as conn:
-            await conn.execute(text(
-                "ALTER TABLE employees ADD COLUMN IF NOT EXISTS extra_permissions JSONB DEFAULT '[]'::jsonb"
-            ))
-            # Book-management LP settings read/write this table. Create if the
-            # baseline migration hasn't been applied so GET/PUT don't 500.
-            await conn.execute(text("""
-                CREATE TABLE IF NOT EXISTS system_settings (
-                    key VARCHAR(100) PRIMARY KEY,
-                    value JSONB NOT NULL,
-                    description TEXT,
-                    updated_by UUID REFERENCES users(id),
-                    updated_at TIMESTAMPTZ DEFAULT now()
-                )
-            """))
-            # RM subsystem (migration 0071). Self-heal so the /rm endpoints work
-            # even on hosts where the migrate step wasn't run.
-            await conn.execute(text(
-                "ALTER TABLE users ADD COLUMN IF NOT EXISTS assigned_rm_id UUID REFERENCES users(id)"
-            ))
-            await conn.execute(text("""
-                CREATE TABLE IF NOT EXISTS rm_funding_requests (
-                    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-                    rm_id UUID NOT NULL REFERENCES users(id),
-                    user_id UUID NOT NULL REFERENCES users(id),
-                    amount NUMERIC(18,2) NOT NULL,
-                    currency VARCHAR(10) NOT NULL DEFAULT 'USD',
-                    method VARCHAR(40),
-                    note TEXT,
-                    proof_path TEXT,
-                    status VARCHAR(20) NOT NULL DEFAULT 'pending',
-                    approved_by UUID REFERENCES users(id),
-                    approved_at TIMESTAMPTZ,
-                    credited_by UUID REFERENCES users(id),
-                    credited_at TIMESTAMPTZ,
-                    rejected_by UUID REFERENCES users(id),
-                    rejected_at TIMESTAMPTZ,
-                    rejection_reason TEXT,
-                    deposit_id UUID REFERENCES deposits(id),
-                    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
-                )
-            """))
-            await conn.execute(text(
-                "CREATE INDEX IF NOT EXISTS ix_rm_funding_requests_status ON rm_funding_requests(status)"
-            ))
-            # Bonus promo-code flow (migration 0072).
-            await conn.execute(text(
-                "ALTER TABLE bonus_offers ADD COLUMN IF NOT EXISTS promo_code VARCHAR(40)"
-            ))
-            await conn.execute(text(
-                "ALTER TABLE bonus_offers ADD COLUMN IF NOT EXISTS code_visible BOOLEAN NOT NULL DEFAULT true"
-            ))
-            # User lifecycle statuses. The original init-db CHECK only allowed
-            # active/banned/blocked/pending_kyc/suspended, so terminate
-            # (status='terminated') and soft-delete (status='deleted') silently
-            # failed the commit — the account never changed. Drop the constraint
-            # (consistent with the project's move away from status CHECK
-            # constraints; statuses are validated in app code) so every
-            # lifecycle action persists.
-            await conn.execute(text(
-                "ALTER TABLE users DROP CONSTRAINT IF EXISTS users_status_check"
-            ))
-            # IB manual tier override (migration 0074, client spec 2026-06-16).
-            await conn.execute(text(
-                "ALTER TABLE ib_profiles ADD COLUMN IF NOT EXISTS tier_override VARCHAR(40)"
-            ))
-            # notifications.type CHECK was too narrow — type='bonus' (and
-            # others) violated it and 500'd features like Fixed-Return bonus.
-            # Drop it; type is validated in app code (migration 0075).
-            await conn.execute(text(
-                "ALTER TABLE notifications DROP CONSTRAINT IF EXISTS notifications_type_check"
-            ))
-            # employees.role CHECK predated rm/deposit_manager/withdrawal_manager
-            # — creating those employees 500'd. Role is validated in app code
-            # (employee_service.VALID_EMPLOYEE_ROLES). Drop it (migration 0076).
-            await conn.execute(text(
-                "ALTER TABLE employees DROP CONSTRAINT IF EXISTS employees_role_check"
-            ))
-            # Employee tasks + custom roles (migration 0077, client 2026-06-16).
-            await conn.execute(text("""
-                CREATE TABLE IF NOT EXISTS employee_custom_roles (
-                    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-                    name VARCHAR(40) UNIQUE NOT NULL,
-                    permissions JSONB NOT NULL DEFAULT '[]'::jsonb,
-                    created_by UUID REFERENCES users(id),
-                    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
-                )
-            """))
-            await conn.execute(text("""
-                CREATE TABLE IF NOT EXISTS employee_tasks (
-                    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-                    assigned_by UUID REFERENCES users(id),
-                    assigned_to UUID NOT NULL REFERENCES users(id),
-                    title VARCHAR(200) NOT NULL,
-                    description TEXT,
-                    due_date DATE,
-                    status VARCHAR(20) NOT NULL DEFAULT 'pending',
-                    undone_reason TEXT,
-                    completed_at TIMESTAMPTZ,
-                    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-                    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
-                )
-            """))
-            await conn.execute(text(
-                "CREATE INDEX IF NOT EXISTS ix_employee_tasks_assigned_to ON employee_tasks(assigned_to)"
-            ))
-            # Broker spread revenue per trade (migration 0078) — its own Finance
-            # Overview line, separate from commission.
-            await conn.execute(text(
-                "ALTER TABLE orders ADD COLUMN IF NOT EXISTS spread_revenue NUMERIC(18,8) DEFAULT 0"
-            ))
-    except Exception as e:
-        logger.warning("startup DDL skipped: %s", e)
+        async with engine.connect() as conn:
+            missing = []
+            for name, sql in probes.items():
+                row = (await conn.execute(text(sql))).scalar()
+                if not row:
+                    missing.append(name)
+        if missing:
+            logger.error(
+                "SCHEMA DRIFT: missing %s — run `alembic -c infra/migrations/alembic.ini "
+                "upgrade head` (deploy.sh does this automatically). Admin endpoints "
+                "touching these objects will 500 until migrations are applied.",
+                ", ".join(missing),
+            )
+    except Exception as e:  # noqa: BLE001 — a probe failure must not block boot
+        logger.warning("schema drift probe skipped: %s", e)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    await _apply_startup_ddl()
+    await _detect_schema_drift()
     yield
     await engine.dispose()
 
 
 app = FastAPI(
-    title="SwisDex Admin API",
+    title=f"{app_settings.BRAND_NAME} Admin API",
     version="1.0.0",
     lifespan=lifespan,
     docs_url="/docs" if app_settings.ENVIRONMENT == "development" else None,

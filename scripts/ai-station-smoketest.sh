@@ -2,7 +2,7 @@
 # AI Station end-to-end smoke test. Run against a RUNNING stack.
 #
 # Usage:
-#   ADMIN_COOKIE="swisdex_admin=<jwt>" \
+#   ADMIN_COOKIE="admin_access=<jwt>" \
 #   GATEWAY=http://127.0.0.1:8002 ADMIN=http://127.0.0.1:8003 \
 #   ./scripts/ai-station-smoketest.sh
 #
@@ -15,7 +15,7 @@ set -euo pipefail
 
 GATEWAY="${GATEWAY:-http://127.0.0.1:8002}"
 ADMIN="${ADMIN:-http://127.0.0.1:8003}"
-ADMIN_COOKIE="${ADMIN_COOKIE:?set ADMIN_COOKIE=swisdex_admin=<jwt>}"
+ADMIN_COOKIE="${ADMIN_COOKIE:?set ADMIN_COOKIE=admin_access=<jwt>}"
 SYMBOL="${SYMBOL:-EURUSD}"
 
 say() { printf '\n\033[1;36m== %s\033[0m\n' "$*"; }

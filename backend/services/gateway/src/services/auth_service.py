@@ -28,7 +28,7 @@ from packages.common.src.auth import (
 
 logger = logging.getLogger("auth_service")
 
-DEMO_SHARED_EMAIL = "demo@swisdex.com"
+DEMO_SHARED_EMAIL = f"demo@{get_settings().BRAND_DOMAIN}"
 # Client 2026-07-14: the demo playground must ALWAYS greet the visitor with
 # $100,000 — the shared account was drained to ~$0 by previous visitors'
 # trades because the balance was only set once at creation.
@@ -283,7 +283,7 @@ def _send_welcome_email(user: User, *, via_google: bool) -> None:
             trading_id = None
         subject, html, text = render_welcome(
             first_name=user.first_name,
-            trader_app_url=st.TRADER_APP_URL or "https://trade.swisdex.com",
+            trader_app_url=st.TRADER_APP_URL,
             via_google=via_google,
             username=user.email,
             trading_id=trading_id,
@@ -305,7 +305,7 @@ def _build_verify_url(user: User) -> str:
     even if a server-side bug accepted it on the wrong route."""
     from packages.common.src.auth import create_email_verify_token
     st = get_settings()
-    base = (st.TRADER_APP_URL or "https://trade.swisdex.com").rstrip("/")
+    base = (st.TRADER_APP_URL or "").rstrip("/")
     token, _exp = create_email_verify_token(
         str(user.id), expires_hours=EMAIL_VERIFY_EXPIRES_HOURS,
     )
@@ -456,7 +456,7 @@ async def _maybe_send_new_login_email(
             user_agent=ua,
             location=None,
             when_utc=when_utc,
-            trader_app_url=st.TRADER_APP_URL or "https://trade.swisdex.com",
+            trader_app_url=st.TRADER_APP_URL,
         )
         fire_and_forget(send_email(user.email, subject, html, text=text, category="support"))
     except Exception as e:
@@ -1336,7 +1336,9 @@ async def setup_2fa(user_id: UUID, request: Request, db: AsyncSession) -> dict:
     user = result.scalar_one_or_none()
     secret = pyotp.random_base32()
     totp = pyotp.TOTP(secret)
-    provisioning_uri = totp.provisioning_uri(name=user.email, issuer_name="SwisDex")
+    provisioning_uri = totp.provisioning_uri(
+        name=user.email, issuer_name=get_settings().BRAND_NAME,
+    )
     user.two_factor_secret = secret
 
     # Recovery codes — generate, hash, persist hashes, return plaintext to

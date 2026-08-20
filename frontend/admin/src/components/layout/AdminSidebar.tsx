@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { adminApi } from '@/lib/api';
+import { BRAND_NAME, BRAND_LOGO } from '@/lib/brand';
 import {
   LayoutDashboard, Users, CandlestickChart, Wallet, Landmark,
   Settings, Sliders, BarChart3, Gift, Image, HeadphonesIcon,
@@ -26,7 +27,7 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
   { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { label: 'Finance Overview', href: '/finance-overview', icon: BarChart3, perm: 'analytics.finance' },
-  { label: 'SwisDex Expenses', href: '/swisdex-expenses', icon: Receipt, perm: 'analytics.finance' },
+  { label: 'Company Expenses', href: '/company-expenses', icon: Receipt, perm: 'analytics.finance' },
   { label: 'Users', href: '/users', icon: Users, perm: 'users.view' },
   {
     label: 'Identity verification',
@@ -141,13 +142,22 @@ export default function AdminSidebar() {
       {/* Header */}
       <div className="flex items-center h-14 px-3 border-b border-border-primary/40">
         {collapsed ? (
-          <img src="/images/feb.png" alt="SwisDex" className="w-7 h-7 object-contain mx-auto" />
+          BRAND_LOGO ? (
+            <img src={BRAND_LOGO} alt={BRAND_NAME} className="w-7 h-7 object-contain mx-auto" />
+          ) : (
+            <span className="w-7 h-7 mx-auto flex items-center justify-center rounded-md bg-accent/15 text-accent font-bold text-sm shrink-0">
+              {BRAND_NAME.charAt(0).toUpperCase()}
+            </span>
+          )
         ) : (
           <Link href="/" className="flex items-center min-w-0">
-            {/* Two logo variants, swapped by theme (same as the trader app):
-                white wordmark on dark, dark/colour wordmark on light. */}
-            <img src="/images/swisdex_png5.png" alt="SwisDex" className="swisdex-logo-dark h-8 w-auto object-contain shrink-0" />
-            <img src="/images/swisdex_png.png" alt="SwisDex" className="swisdex-logo-light h-8 w-auto object-contain shrink-0" />
+            {/* Configurable logo image; falls back to styled brand text so a
+                fresh white-label build never ships previous-brand artwork. */}
+            {BRAND_LOGO ? (
+              <img src={BRAND_LOGO} alt={BRAND_NAME} className="h-8 w-auto object-contain shrink-0" />
+            ) : (
+              <span className="text-base font-bold tracking-tight text-text-primary truncate">{BRAND_NAME}</span>
+            )}
           </Link>
         )}
         <button

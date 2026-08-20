@@ -78,9 +78,9 @@ async def get_company_ib(db: AsyncSession) -> dict:
         return {**out, "user_id": str(user_row.id), "user_email": user_row.email}
 
     # Build a marketing-friendly link from the broker's public frontend
-    # URL (falls back to the canonical swisdex.com when env isn't set).
+    # URL (TRADER_APP_URL).
     from packages.common.src.config import get_settings as _gs
-    base_url = (_gs().TRADER_APP_URL or "https://swisdex.com").rstrip("/")
+    base_url = (_gs().TRADER_APP_URL or "").rstrip("/")
     link = f"{base_url}/auth/register?ref={ib_row.referral_code}"
 
     n = (await db.execute(

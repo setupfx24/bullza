@@ -1,5 +1,7 @@
 'use client';
 
+import { BRAND_LOGO, BRAND_NAME } from '@/lib/brand';
+
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Maximize2, Minimize2 } from 'lucide-react';
 import { useTradingStore } from '@/stores/tradingStore';
@@ -192,7 +194,7 @@ const TZ_OPTIONS: { value: string; label: string }[] = [
   { value: 'Australia/Sydney',        label: '(UTC+10) Sydney' },
   { value: 'Pacific/Auckland',        label: '(UTC+12) Auckland' },
 ];
-const TZ_STORAGE_KEY = 'swisdex.chart.tz';
+const TZ_STORAGE_KEY = 'trader.chart.tz';
 
 export default function AdvancedChart() {
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -323,7 +325,7 @@ export default function AdvancedChart() {
       ref={wrapRef}
       className="relative w-full h-full min-h-[200px] min-w-0 bg-bg-base"
     >
-      {/* SwisDex watermark — Vantage-broker-style faint logo centred on
+      {/* Brand watermark — Vantage-broker-style faint logo centred on
           the chart canvas. Sits ABOVE the TradingView iframe so it shows
           through the iframe's coloured background, with pointer-events
           disabled on the whole subtree so every drag / hover / drawing
@@ -336,16 +338,17 @@ export default function AdvancedChart() {
         aria-hidden="true"
         className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center select-none"
       >
-        <img
-          src="/images/swisdex_png5.png"
-          alt=""
-          className="pointer-events-none w-[40%] max-w-[480px] min-w-[200px] object-contain opacity-[0.07] hidden dark:block"
-        />
-        <img
-          src="/images/swisdex_png.png"
-          alt=""
-          className="pointer-events-none w-[40%] max-w-[480px] min-w-[200px] object-contain opacity-[0.10] dark:hidden"
-        />
+        {BRAND_LOGO ? (
+          <img
+            src={BRAND_LOGO}
+            alt=""
+            className="pointer-events-none w-[40%] max-w-[480px] min-w-[200px] object-contain opacity-[0.10] dark:opacity-[0.07]"
+          />
+        ) : (
+          <span className="pointer-events-none font-black tracking-tight text-4xl md:text-6xl text-text-primary opacity-[0.06]">
+            {BRAND_NAME}
+          </span>
+        )}
       </div>
 
       {/* Timezone picker — click to open dropdown of common timezones.

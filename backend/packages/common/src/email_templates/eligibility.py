@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from decimal import Decimal
 
+from ..config import get_settings
 from .base import render_layout, kv_table
 
 
@@ -25,16 +26,19 @@ def render_fr_insurance_eligibility(
     fr_min_rate_pct: float = 6.0,
     fr_max_rate_pct: float = 18.0,
     insurance_base_payout_pct: float = 80.0,
-    trader_app_url: str = "https://trade.swisdex.com",
+    trader_app_url: str = "",
 ) -> tuple[str, str, str]:
     """Pick subject/body based on flavor. The body links to the relevant
     product pages so the user can opt-in without admin involvement."""
+    s = get_settings()
+    brand = (s.BRAND_NAME or "").strip() or "YourBrand"
+    trader_app_url = (trader_app_url or "").strip() or s.TRADER_APP_URL
     name = (first_name or "trader").strip() or "trader"
 
     if flavor == "fr":
         title = "Your balance can be earning"
         intro = (
-            f"You're holding {_fmt_money(funded_balance)} on SwisDex. "
+            f"You're holding {_fmt_money(funded_balance)} on {brand}. "
             f"AI-POWERED STAKING PROGRAM turns it into {fr_min_rate_pct:.0f}–{fr_max_rate_pct:.0f}% "
             "annualized yield while you wait for the next setup."
         )
@@ -46,7 +50,7 @@ def render_fr_insurance_eligibility(
         ]) + f"""
         <p style="margin:16px 0 0;color:#6b7280;font-size:13px;line-height:1.6;">
           Cash on the sidelines costs you yield. Allocate any portion of your
-          balance to a AI-POWERED STAKING PROGRAM plan and SwisDex pays interest on the
+          balance to a AI-POWERED STAKING PROGRAM plan and {brand} pays interest on the
           allocated amount until you withdraw — no trading required.
         </p>
         """
@@ -81,7 +85,7 @@ def render_fr_insurance_eligibility(
         title = "Two products you haven't tried yet"
         intro = (
             f"You're sitting on {_fmt_money(funded_balance)} and trading "
-            "regularly. SwisDex has two complementary products that work "
+            f"regularly. {brand} has two complementary products that work "
             "well for accounts like yours."
         )
         body = f"""
@@ -120,7 +124,7 @@ def render_fr_insurance_eligibility(
         cta_url = f"{trader_app_url.rstrip('/')}/fixed-return"
         secondary_cta_label = "Enable Insurance"
         secondary_cta_url = f"{trader_app_url.rstrip('/')}/insurance"
-        subject = "Two SwisDex products that fit your account"
+        subject = f"Two {brand} products that fit your account"
 
         html = render_layout(
             title=title, intro=intro, body_html=body,

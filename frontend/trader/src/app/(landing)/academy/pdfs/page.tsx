@@ -3,7 +3,8 @@
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { FileText, Download, ArrowUpRight, Mail } from 'lucide-react';
-import { BannerPlaceholder } from '@/swisdex/components/BannerPlaceholder';
+import { BannerPlaceholder } from '@/home/components/BannerPlaceholder';
+import { BRAND_NAME } from '@/lib/brand';
 
 type Cat = 'Guides' | 'E-books' | 'Reports';
 
@@ -38,7 +39,7 @@ export default function AcademyPdfsPage() {
   return (
     <main className="min-h-screen bg-background">
       <BannerPlaceholder
-        title="SwisDex Academy — PDFs"
+        title={`${BRAND_NAME} Academy — PDFs`}
         tagline="Downloadable guides, e-books, and quarterly research — read offline, refer back any time."
       />
 

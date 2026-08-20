@@ -3,6 +3,7 @@ import { Download, Monitor, Smartphone, Tablet, Check } from 'lucide-react'
 import Button from '../components/Button'
 import Card from '../components/Card'
 import ScrollReveal, { ScrollRevealGroup, ScrollRevealItem } from '../components/animations/ScrollReveal'
+import { BRAND_NAME } from '@/lib/brand'
 
 const MT4 = () => {
   const features = [
@@ -111,7 +112,7 @@ const MT4 = () => {
           <ScrollReveal variant="fadeUp">
             <h2 className="text-4xl font-bold text-white mb-6">Ready to Start Trading on MT4?</h2>
             <p className="text-xl text-text-secondary mb-8 max-w-2xl mx-auto">
-              Download MetaTrader 4 and connect to your SwisDex account in minutes.
+              Download MetaTrader 4 and connect to your {BRAND_NAME} account in minutes.
             </p>
             <Link to="/accounts/demo">
               <Button variant="primary">Open Account Now</Button>

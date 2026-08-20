@@ -1,8 +1,10 @@
 """Corecen Broker API client — forwards A-Book trades to Corecen LP.
 
-When an SwisDex user with book_type='A' opens, closes, or modifies a
-position, this client pushes the event to Corecen's broker API so Corecen
-can route it to the real LP.
+When a user with book_type='A' opens, closes, or modifies a position, the
+event is pushed to Corecen's broker API so Corecen can route it to the
+real LP. Do NOT call the forward_* helpers directly from trade paths —
+enqueue via packages.common.src.abook.enqueue_abook_event instead; the
+gateway's abook_outbox_engine is the single (retrying) sender.
 
 Endpoints used:
   POST /api/v1/broker-api/trades/push   — open trade

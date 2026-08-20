@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { adminApi } from '@/lib/api';
+import { broadcastLogout } from '@/lib/session-manager';
 
 interface Admin {
   id: string;
@@ -28,7 +29,7 @@ interface AuthState {
 
 /**
  * Auth state lives in memory only — the JWT itself is in the httpOnly
- * `swisdex_admin` cookie set by the server, which JS cannot read. That
+ * `admin_access` cookie set by the server, which JS cannot read. That
  * removes the XSS-exfil class of attack the previous localStorage path
  * was open to.
  *
@@ -65,6 +66,7 @@ export const useAuthStore = create<AuthState>()((set) => ({
       /* ignore — clear state anyway */
     }
     adminApi.clearToken();
+    broadcastLogout(); // other tabs bounce to /login too
     set({ admin: null, isAuthenticated: false });
     if (typeof window !== 'undefined') window.location.href = '/login';
   },

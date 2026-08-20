@@ -10,12 +10,13 @@
  */
 import Link from 'next/link';
 import { TriangleAlert, ArrowUpRight, ShieldAlert, Mail } from 'lucide-react';
-import { BannerPlaceholder } from '@/swisdex/components/BannerPlaceholder';
+import { BannerPlaceholder } from '@/home/components/BannerPlaceholder';
+import { BRAND_NAME, BRAND_SUPPORT_EMAIL } from '@/lib/brand';
 
 const SECTIONS = [
   {
     h: '1. General Risk Warning',
-    body: 'Please note that forex trading and trading in other leveraged products involves a significant level of risk and is not suitable for all investors. Trading in financial instruments may result in losses as well as profits, and your losses can be greater than your initial invested capital. Before undertaking any such transactions, you should ensure that you fully understand the risks involved and seek independent advice if necessary. Swisdex does not provide investment advice.',
+    body: `Please note that forex trading and trading in other leveraged products involves a significant level of risk and is not suitable for all investors. Trading in financial instruments may result in losses as well as profits, and your losses can be greater than your initial invested capital. Before undertaking any such transactions, you should ensure that you fully understand the risks involved and seek independent advice if necessary. ${BRAND_NAME} does not provide investment advice.`,
   },
   {
     h: '2. Leverage Risk',
@@ -43,7 +44,7 @@ const SECTIONS = [
   },
   {
     h: '6. Counterparty & Platform Risk',
-    body: 'Trades placed on the Swisdex platform are subject to the operational performance of the platform and its third-party liquidity providers. Internet connectivity, platform outages, hardware faults, and force-majeure events may temporarily prevent the execution or modification of orders.',
+    body: `Trades placed on the ${BRAND_NAME} platform are subject to the operational performance of the platform and its third-party liquidity providers. Internet connectivity, platform outages, hardware faults, and force-majeure events may temporarily prevent the execution or modification of orders.`,
   },
   {
     h: '7. Bonus & Promotion Risks',
@@ -51,15 +52,15 @@ const SECTIONS = [
   },
   {
     h: '8. Regulatory & Jurisdictional Risk',
-    body: 'Services may be restricted, modified, or withdrawn in your jurisdiction at any time due to changes in local laws or regulatory guidance. See our Restricted Countries page for the current list of jurisdictions where Swisdex services are not available.',
+    body: `Services may be restricted, modified, or withdrawn in your jurisdiction at any time due to changes in local laws or regulatory guidance. See our Restricted Countries page for the current list of jurisdictions where ${BRAND_NAME} services are not available.`,
   },
   {
     h: '9. No Investment Advice',
-    body: 'Information provided on the Swisdex website, the trading platform, or through any Swisdex communication channel is for general informational purposes only and does not constitute investment, financial, tax, or legal advice. Clients should consult independent professional advisers before making any trading decision.',
+    body: `Information provided on the ${BRAND_NAME} website, the trading platform, or through any ${BRAND_NAME} communication channel is for general informational purposes only and does not constitute investment, financial, tax, or legal advice. Clients should consult independent professional advisers before making any trading decision.`,
   },
   {
     h: '10. Acknowledgement',
-    body: 'By opening and funding a Swisdex account you confirm that you have read, understood, and accept this Risk Warning, alongside our Terms & Conditions, Privacy Policy, and Risk Disclaimer. You acknowledge that you are trading at your own risk.',
+    body: `By opening and funding a ${BRAND_NAME} account you confirm that you have read, understood, and accept this Risk Warning, alongside our Terms & Conditions, Privacy Policy, and Risk Disclaimer. You acknowledge that you are trading at your own risk.`,
   },
 ];
 
@@ -124,7 +125,7 @@ export default function RiskWarningPage() {
             </p>
           </div>
           <a
-            href="mailto:support@swisdex.com"
+            href={`mailto:${BRAND_SUPPORT_EMAIL}`}
             className="inline-flex items-center gap-2 rounded-full bg-primary text-white px-5 py-2.5 text-sm font-semibold uppercase tracking-wider hover:opacity-90 shrink-0"
           >
             <Mail className="size-4" /> Contact Support

@@ -5,7 +5,8 @@ import Link from 'next/link';
 import {
   ArrowUpRight, Users, Zap, Wallet, CheckCircle2, ChevronDown,
 } from 'lucide-react';
-import { BannerPlaceholder } from '@/swisdex/components/BannerPlaceholder';
+import { BannerPlaceholder } from '@/home/components/BannerPlaceholder';
+import { BRAND_NAME } from '@/lib/brand';
 
 const SIGNUP_HREF = '/auth/register';
 
@@ -295,7 +296,7 @@ export default function ReferralPage() {
       {/* Why refer */}
       <section className="mx-auto max-w-[1200px] px-[var(--gutter)] py-12 sm:py-16">
         <div className="text-center mb-10">
-          <h2 className="font-display uppercase text-2xl sm:text-3xl md:text-4xl tracking-tight">Why Refer Friends to SwisDex</h2>
+          <h2 className="font-display uppercase text-2xl sm:text-3xl md:text-4xl tracking-tight">Why Refer Friends to {BRAND_NAME}</h2>
         </div>
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
           {[
@@ -317,12 +318,12 @@ export default function ReferralPage() {
         <h2 className="text-center font-display uppercase text-2xl sm:text-3xl tracking-tight mb-8">FAQ</h2>
         <div className="space-y-3">
           <FaqItem q="How do I get my referral link?">
-            Open a SwisDex account, head to the Dashboard → Referrals tab, and your unique link is ready to copy
+            Open a {BRAND_NAME} account, head to the Dashboard → Referrals tab, and your unique link is ready to copy
             and share. You can also generate QR codes and tracked landing pages from the same screen.
           </FaqItem>
           <FaqItem q="When do I get paid?">
             The moment your referred friend completes their 3rd trade after activation, the bounty for that
-            referral is paid instantly to your SwisDex wallet. You can withdraw it immediately or use it as
+            referral is paid instantly to your {BRAND_NAME} wallet. You can withdraw it immediately or use it as
             trading equity.
           </FaqItem>
           <FaqItem q="What counts as an active referral for the tier ladder?">
@@ -342,7 +343,7 @@ export default function ReferralPage() {
         <div className="liquid-glass-strong rounded-3xl p-8 sm:p-12 text-center">
           <h2 className="font-display uppercase text-2xl sm:text-3xl tracking-tight">Start Earning From Day One</h2>
           <p className="mt-4 text-foreground/70 max-w-xl mx-auto text-sm sm:text-base">
-            Open a SwisDex account, grab your referral link, and share it with one friend today.
+            Open a {BRAND_NAME} account, grab your referral link, and share it with one friend today.
             Their first $5 bounty could land in your wallet by the end of the week.
           </p>
           <Link href={SIGNUP_HREF} className="mt-7 inline-flex items-center gap-2 rounded-full bg-primary text-white px-6 py-3 text-sm font-semibold uppercase tracking-wider hover:opacity-90">

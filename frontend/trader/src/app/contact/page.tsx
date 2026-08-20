@@ -1,8 +1,9 @@
 import LandingHeader from '@/components/landing/LandingHeader'
 import LandingFooter from '@/components/landing/LandingFooter'
 import { Phone, Mail, MessageCircle, MapPin, Clock } from 'lucide-react'
+import { BRAND_NAME, BRAND_SUPPORT_EMAIL } from '@/lib/brand'
 
-export const metadata = { title: 'Contact Us — SwisDex' }
+export const metadata = { title: `Contact Us — ${BRAND_NAME}` }
 
 export default function ContactPage() {
   return (
@@ -28,7 +29,7 @@ export default function ContactPage() {
           <div className="grid md:grid-cols-3 gap-8 mb-16">
             {[
               { icon: Phone, title: 'WhatsApp', value: '+44 7737 119978', desc: 'Available 24/7' },
-              { icon: Mail, title: 'Email', value: 'info@swisdex.com', desc: 'Response within 1 hour' },
+              { icon: Mail, title: 'Email', value: BRAND_SUPPORT_EMAIL, desc: 'Response within 1 hour' },
               { icon: MessageCircle, title: 'Live Chat', value: 'Chat with us', desc: 'Instant support' },
             ].map(({ icon: Icon, title, value, desc }) => (
               <div key={title} className="bg-gray-50 rounded-xl p-8 border border-gray-200 text-center hover:shadow-md transition-shadow">
@@ -111,7 +112,7 @@ export default function ContactPage() {
             {[
               {
                 city: 'Scotland Office',
-                address: 'SwisDex Office 23US, 18 Young St, UNIT LGE 1/1, Edinburgh EH2 4JB, Scotland',
+                address: `${BRAND_NAME} Office 23US, 18 Young St, UNIT LGE 1/1, Edinburgh EH2 4JB, Scotland`,
                 hours: 'Mon-Fri: 9:00 AM - 6:00 PM GMT',
               },
               {

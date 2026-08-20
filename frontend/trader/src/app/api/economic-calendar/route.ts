@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { BRAND_NAME } from '@/lib/brand';
 import {
   getMockCalendarEventsForRange,
   type EconomicCalendarApiResponse,
@@ -57,7 +58,7 @@ async function fetchOne(url: string, signal: AbortSignal): Promise<string | null
     // good citizen and never block on a slow upstream during a render.
     const res = await fetch(url, {
       signal,
-      headers: { 'user-agent': 'SwisDex-Calendar/1.0' },
+      headers: { 'user-agent': `${BRAND_NAME}-Calendar/1.0` },
       next: { revalidate: 900 },
     });
     if (!res.ok) return null;

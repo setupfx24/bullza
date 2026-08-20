@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom'
 import { Copy, Users, TrendingUp, Shield, BarChart2, Settings, Check, ArrowRight } from 'lucide-react'
 import Button from '../components/Button'
 import ScrollReveal, { ScrollRevealGroup, ScrollRevealItem } from '../components/animations/ScrollReveal'
+import { BRAND_NAME } from '@/lib/brand'
 
 const features = [
   { icon: Users, title: 'Follow Top Traders', desc: 'Browse verified traders ranked by performance, risk score, and consistency. Choose who to follow with full transparency.' },
@@ -13,7 +14,7 @@ const features = [
 ]
 
 const steps = [
-  { step: '01', title: 'Open an Account', desc: 'Register and fund your SwisDex trading account.' },
+  { step: '01', title: 'Open an Account', desc: `Register and fund your ${BRAND_NAME} trading account.` },
   { step: '02', title: 'Browse Traders', desc: 'Explore the leaderboard and filter by performance, risk, and strategy.' },
   { step: '03', title: 'Allocate & Copy', desc: 'Set your investment amount and start copying trades automatically.' },
   { step: '04', title: 'Monitor & Adjust', desc: 'Track performance in real time. Pause, stop, or switch traders anytime.' },
@@ -85,7 +86,7 @@ const CopyTrading = () => {
           <div className="glass-card p-8 md:p-12">
             <div className="grid md:grid-cols-2 gap-8 items-center">
               <ScrollReveal variant="fadeLeft">
-                <h2 className="text-3xl font-bold text-white mb-4">Why Copy Trade with SwisDex?</h2>
+                <h2 className="text-3xl font-bold text-white mb-4">Why Copy Trade with {BRAND_NAME}?</h2>
                 <div className="space-y-3">
                   {['No hidden fees on copy trading', 'Transparent trader statistics', 'Full control over risk settings', 'Real-time trade replication', 'Works on all account types', 'Withdraw anytime — no lock-in'].map((item) => (
                     <div key={item} className="flex items-center gap-3">

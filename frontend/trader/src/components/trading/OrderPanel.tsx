@@ -115,7 +115,7 @@ export default function OrderPanel() {
   const execPrice = tick ? (side === 'buy' ? userAsk : userBid) : 0;
   const lotsNum = parseFloat(lots) || 0;
 
-  // Stale bid/ask detection — the price stream (priceSocket) can stall
+  // Stale bid/ask detection — the price stream (wsManager) can stall
   // "half-open" and freeze the panel at an old quote (prod incident 2026-07-09).
   // Mirror the chart's watchdog: if `tick` (prices[selectedSymbol]) hasn't
   // changed within the market threshold, flag it so the boxes dim + show a

@@ -3,8 +3,9 @@ import { Shield, Lock, Zap, Award, Users, TrendingUp } from 'lucide-react'
 import Button from '../components/Button'
 import Card from '../components/Card'
 import ScrollReveal, { ScrollRevealGroup, ScrollRevealItem } from '../components/animations/ScrollReveal'
+import { BRAND_NAME } from '@/lib/brand'
 
-const WhySwisDex = () => {
+const WhyTrustEdgeFX = () => {
   const pillars = [
     {
       icon: Shield,
@@ -43,7 +44,7 @@ const WhySwisDex = () => {
       name: 'David Martinez',
       role: 'Professional Trader',
       rating: 5,
-      text: 'Best execution speeds I\'ve experienced. SwisDex has transformed my trading with their reliable platform and tight spreads.'
+      text: `Best execution speeds I've experienced. ${BRAND_NAME} has transformed my trading with their reliable platform and tight spreads.`
     },
     {
       name: 'Sophie Anderson',
@@ -65,10 +66,10 @@ const WhySwisDex = () => {
         <div className="container-custom text-center">
           <ScrollReveal variant="fadeUp">
             <h1 className="text-5xl md:text-6xl font-bold text-white mb-6">
-              Why Thousands Choose SwisDex
+              Why Thousands Choose {BRAND_NAME}
             </h1>
             <p className="text-xl text-text-secondary max-w-3xl mx-auto">
-              Discover what makes SwisDex the preferred choice for traders worldwide.
+              Discover what makes {BRAND_NAME} the preferred choice for traders worldwide.
             </p>
           </ScrollReveal>
         </div>
@@ -102,7 +103,7 @@ const WhySwisDex = () => {
               What Our Traders Say
             </h2>
             <p className="text-text-secondary text-center mb-12 max-w-2xl mx-auto">
-              Don't just take our word for it. Here's what our clients have to say about their experience with SwisDex.
+              Don't just take our word for it. Here's what our clients have to say about their experience with {BRAND_NAME}.
             </p>
           </ScrollReveal>
           <ScrollRevealGroup className="grid grid-cols-1 md:grid-cols-3 gap-8">
@@ -134,7 +135,7 @@ const WhySwisDex = () => {
                 Regulatory Compliance
               </h2>
               <p className="text-text-secondary text-lg mb-8">
-                SwisDex Ltd is authorized and regulated by the Financial Conduct Authority (FCA) in the UK (License No. 123456) and the Cyprus Securities and Exchange Commission (CySEC) (License No. 789/12).
+                {BRAND_NAME} is authorized and regulated by the Financial Conduct Authority (FCA) in the UK (License No. 123456) and the Cyprus Securities and Exchange Commission (CySEC) (License No. 789/12).
               </p>
               <div className="grid md:grid-cols-2 gap-6">
                 <div className="glass-card p-6">
@@ -154,7 +155,7 @@ const WhySwisDex = () => {
       <section className="section-padding bg-gradient-hero">
         <div className="container-custom text-center">
           <ScrollReveal variant="fadeUp">
-            <h2 className="text-4xl font-bold text-white mb-6">Experience the SwisDex Difference</h2>
+            <h2 className="text-4xl font-bold text-white mb-6">Experience the {BRAND_NAME} Difference</h2>
             <p className="text-xl text-text-secondary mb-8 max-w-2xl mx-auto">
               Join over 500,000 traders who trust us with their trading journey.
             </p>
@@ -168,4 +169,4 @@ const WhySwisDex = () => {
   )
 }
 
-export default WhySwisDex
+export default WhyTrustEdgeFX

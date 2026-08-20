@@ -1,7 +1,7 @@
 """Sign-up verification email — focused, single-purpose.
 
 Earlier versions bundled welcome / onboarding content (capability bullets,
-credentials block, "Why Trade with SwisDex" list) into this email so the
+credentials block, "Why Trade with us" list) into this email so the
 trader got one rich message instead of two back-to-back. The client
 flagged that the welcome flavour buried the verify CTA and felt
 mismatched for the moment — at signup the user just needs to confirm
@@ -15,6 +15,7 @@ The signed token in `verify_url` is a JWT with type=email_verify and a
 """
 from __future__ import annotations
 
+from ..config import get_settings
 from .base import render_layout
 
 
@@ -25,10 +26,11 @@ def render_verify_email(
     expires_hours: int = 24,
 ) -> tuple[str, str, str]:
     name = (first_name or "there").strip() or "there"
+    brand = (get_settings().BRAND_NAME or "").strip() or "YourBrand"
 
     intro = (
         f"Hi {name}, click the button below to confirm this is your email "
-        "address and activate your SwisDex account."
+        f"address and activate your {brand} account."
     )
 
     body_html = (
@@ -38,7 +40,7 @@ def render_verify_email(
         '</p>'
     )
 
-    subject = "Verify your SwisDex email address"
+    subject = f"Verify your {brand} email address"
     html = render_layout(
         title="Verify your email address",
         intro=intro,
@@ -46,19 +48,19 @@ def render_verify_email(
         cta_label="Verify My Account",
         cta_url=verify_url,
         footer_note=(
-            "If you didn't sign up for SwisDex, you can safely ignore this "
+            f"If you didn't sign up for {brand}, you can safely ignore this "
             f"email — the link will expire in {expires_hours} hours and no "
             "account will be activated."
         ),
     )
 
     text = (
-        "Verify your SwisDex email address\n\n"
+        f"Verify your {brand} email address\n\n"
         f"Hi {name},\n\n"
         "Click the link below to confirm this is your email address and "
-        "activate your SwisDex account.\n\n"
+        f"activate your {brand} account.\n\n"
         f"  {verify_url}\n\n"
         f"This link will expire in {expires_hours} hours.\n\n"
-        "If you didn't sign up for SwisDex, you can safely ignore this email.\n"
+        f"If you didn't sign up for {brand}, you can safely ignore this email.\n"
     )
     return subject, html, text

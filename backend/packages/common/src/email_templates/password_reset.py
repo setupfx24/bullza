@@ -1,14 +1,18 @@
 from __future__ import annotations
 
+from ..config import get_settings
 from .base import render_layout
 
 
 def render_password_reset(
     *,
     reset_link: str,
-    app_name: str = "SwisDex",
+    app_name: str = "",
     expires_in_minutes: int = 15,
 ) -> tuple[str, str, str]:
+    app_name = (app_name or "").strip() or (
+        (get_settings().BRAND_NAME or "").strip() or "YourBrand"
+    )
     subject = f"Reset your {app_name} password"
     body = f"""
     <p style="margin:0 0 12px;color:#1a1a1a;font-size:14px;line-height:1.6;">

@@ -10,7 +10,8 @@
  */
 import Link from 'next/link';
 import { Lock, ArrowUpRight, ShieldCheck, Mail } from 'lucide-react';
-import { BannerPlaceholder } from '@/swisdex/components/BannerPlaceholder';
+import { BannerPlaceholder } from '@/home/components/BannerPlaceholder';
+import { BRAND_NAME, BRAND_SUPPORT_EMAIL } from '@/lib/brand';
 
 /**
  * Each section has a heading + body. `body` can mix prose paragraphs,
@@ -27,10 +28,10 @@ type Section = {
 };
 
 const INTRO: Section = {
-  h: 'Privacy Policy of Swisdex',
+  h: `Privacy Policy of ${BRAND_NAME}`,
   lead: [
-    'At Swisdex ("Swisdex", "Company", "we", "our", or "us"), protecting your privacy and personal information is one of our highest priorities. We are committed to collecting, processing, storing, and protecting your personal data responsibly and in accordance with applicable data protection laws and industry best practices.',
-    'By accessing our website, opening an account, or using any Swisdex products and services, you consent to the collection and processing of your personal information as described in this Privacy Policy.',
+    `At ${BRAND_NAME} ("${BRAND_NAME}", "Company", "we", "our", or "us"), protecting your privacy and personal information is one of our highest priorities. We are committed to collecting, processing, storing, and protecting your personal data responsibly and in accordance with applicable data protection laws and industry best practices.`,
+    `By accessing our website, opening an account, or using any ${BRAND_NAME} products and services, you consent to the collection and processing of your personal information as described in this Privacy Policy.`,
   ],
 };
 
@@ -38,7 +39,7 @@ const SECTIONS: Section[] = [
   {
     h: '1. Privacy Protection',
     lead: [
-      'Swisdex maintains appropriate administrative, technical, and organizational measures designed to protect personal information from unauthorized access, misuse, loss, alteration, or disclosure.',
+      `${BRAND_NAME} maintains appropriate administrative, technical, and organizational measures designed to protect personal information from unauthorized access, misuse, loss, alteration, or disclosure.`,
       'Client information is stored securely and accessed only by authorized personnel who require such information for legitimate business, compliance, or support purposes.',
       'While we implement reasonable security safeguards, no method of transmission over the internet or electronic storage system can be guaranteed to be completely secure.',
       'Clients are responsible for maintaining the confidentiality of their account credentials, passwords, and authentication devices.',
@@ -46,7 +47,7 @@ const SECTIONS: Section[] = [
   },
   {
     h: '2. Personal Information We Collect',
-    lead: ['When opening an account or using Swisdex services, we may collect the following information:'],
+    lead: [`When opening an account or using ${BRAND_NAME} services, we may collect the following information:`],
     subs: [
       { title: 'Identity Information', bullets: ['Full Name', 'Date of Birth', 'Nationality', 'Government Identification Details', 'Passport or National ID Copies', 'Selfie Verification Images'] },
       { title: 'Contact Information', bullets: ['Email Address', 'Telephone Number', 'Residential Address'] },
@@ -57,14 +58,14 @@ const SECTIONS: Section[] = [
   },
   {
     h: '3. How We Use Your Personal Information',
-    lead: ['Swisdex may process your personal information for the following purposes:'],
+    lead: [`${BRAND_NAME} may process your personal information for the following purposes:`],
     subs: [
       { title: 'Account Registration and Management', lead: 'To:', bullets: ['Open and maintain trading accounts', 'Verify identity', 'Provide customer support', 'Manage account security'] },
       { title: 'Compliance and Regulatory Requirements', lead: 'To:', bullets: ['Perform KYC verification', 'Conduct AML screening', 'Prevent fraud and financial crime', 'Comply with legal obligations'] },
       { title: 'Service Delivery', lead: 'To:', bullets: ['Process deposits and withdrawals', 'Facilitate trading activities', 'Operate client accounts', 'Provide platform functionality'] },
       { title: 'Risk Management', lead: 'To:', bullets: ['Monitor suspicious activity', 'Protect account security', 'Prevent abuse of promotions and bonuses', 'Detect unauthorized transactions'] },
       { title: 'Communication', lead: 'To:', bullets: ['Respond to inquiries', 'Send service-related notifications', 'Deliver security alerts', 'Provide account updates'] },
-      { title: 'Marketing Communications', lead: 'Subject to applicable laws and your preferences, Swisdex may send information regarding:', bullets: ['New products', 'Platform updates', 'Promotions', 'Educational content', 'Market insights'], trailing: 'Clients may opt out of marketing communications at any time.' },
+      { title: 'Marketing Communications', lead: `Subject to applicable laws and your preferences, ${BRAND_NAME} may send information regarding:`, bullets: ['New products', 'Platform updates', 'Promotions', 'Educational content', 'Market insights'], trailing: 'Clients may opt out of marketing communications at any time.' },
     ],
   },
   {
@@ -80,7 +81,7 @@ const SECTIONS: Section[] = [
   {
     h: '5. KYC and AML Compliance',
     lead: [
-      'Swisdex is committed to maintaining robust Know Your Customer (KYC) and Anti-Money Laundering (AML) procedures.',
+      `${BRAND_NAME} is committed to maintaining robust Know Your Customer (KYC) and Anti-Money Laundering (AML) procedures.`,
       'Clients may be required to provide:',
     ],
     bullets: ['Government-issued identification', 'Proof of address', 'Selfie verification', 'Source of funds documentation', 'Additional compliance information'],
@@ -89,7 +90,7 @@ const SECTIONS: Section[] = [
   {
     h: '6. Disclosure of Personal Information',
     lead: [
-      'Swisdex does not sell client personal information.',
+      `${BRAND_NAME} does not sell client personal information.`,
       'Personal information may be shared only when necessary with:',
     ],
     subs: [
@@ -102,17 +103,17 @@ const SECTIONS: Section[] = [
   },
   {
     h: '7. Cryptocurrency Transactions',
-    lead: ['As Swisdex operates a crypto-funded trading environment:'],
+    lead: [`As ${BRAND_NAME} operates a crypto-funded trading environment:`],
     bullets: [
       'Deposit and withdrawal transactions may be recorded on public blockchain networks.',
       'Blockchain transactions are transparent and may be publicly visible.',
-      'Swisdex cannot control information recorded on public blockchains.',
+      `${BRAND_NAME} cannot control information recorded on public blockchains.`,
     ],
     trailing: ['Clients are responsible for protecting the privacy of their own cryptocurrency wallets and addresses.'],
   },
   {
     h: '8. Cookies and Website Analytics',
-    lead: ['Swisdex may use:'],
+    lead: [`${BRAND_NAME} may use:`],
     bullets: ['Cookies', 'Analytics tools', 'Pixel tags', 'Session tracking technologies'],
     trailing: [
       'These technologies help us:',
@@ -124,12 +125,12 @@ const SECTIONS: Section[] = [
     h: '9. International Data Transfers',
     lead: [
       'Personal information may be processed or stored in countries outside the client\'s country of residence.',
-      'Where international transfers occur, Swisdex will take reasonable measures to ensure that personal information receives an appropriate level of protection consistent with applicable privacy requirements.',
+      `Where international transfers occur, ${BRAND_NAME} will take reasonable measures to ensure that personal information receives an appropriate level of protection consistent with applicable privacy requirements.`,
     ],
   },
   {
     h: '10. Data Retention',
-    lead: ['Swisdex retains personal information only for as long as necessary to:'],
+    lead: [`${BRAND_NAME} retains personal information only for as long as necessary to:`],
     bullets: ['Provide services', 'Comply with legal obligations', 'Resolve disputes', 'Prevent fraud', 'Meet regulatory requirements'],
     trailing: ['Client records, communications, transaction histories, and verification documents may be retained for a minimum period required by applicable AML and compliance regulations.'],
   },
@@ -137,7 +138,7 @@ const SECTIONS: Section[] = [
     h: '11. Your Rights',
     lead: ['Depending on applicable laws, clients may have the right to:'],
     subs: [
-      { title: 'Access', lead: 'Request a copy of personal information held by Swisdex.' },
+      { title: 'Access', lead: `Request a copy of personal information held by ${BRAND_NAME}.` },
       { title: 'Correction', lead: 'Request correction of inaccurate or incomplete information.' },
       { title: 'Deletion', lead: 'Request deletion of personal information where legally permitted.' },
       { title: 'Restriction', lead: 'Request limitations on certain processing activities.' },
@@ -148,22 +149,22 @@ const SECTIONS: Section[] = [
   },
   {
     h: '12. Security Measures',
-    lead: ['Swisdex implements security controls designed to protect personal information, including:'],
+    lead: [`${BRAND_NAME} implements security controls designed to protect personal information, including:`],
     bullets: ['Secure data storage', 'Access control procedures', 'Encryption technologies where appropriate', 'Internal compliance monitoring', 'Security audits and reviews'],
     trailing: ['Despite these measures, clients should understand that no electronic system is completely immune from security risks.'],
   },
   {
     h: '13. Legal Disclosure',
-    lead: ['Swisdex may disclose personal information when required to:'],
+    lead: [`${BRAND_NAME} may disclose personal information when required to:`],
     bullets: ['Comply with legal obligations', 'Respond to lawful requests', 'Protect company rights', 'Prevent fraud', 'Investigate suspicious activity', 'Enforce contractual agreements'],
     trailing: ['Such disclosures will only occur when legally justified.'],
   },
   {
     h: '14. Changes to This Privacy Policy',
     lead: [
-      'Swisdex reserves the right to modify this Privacy Policy at any time.',
-      'Updated versions will become effective upon publication on the Swisdex website.',
-      'Continued use of Swisdex services following any update constitutes acceptance of the revised Privacy Policy.',
+      `${BRAND_NAME} reserves the right to modify this Privacy Policy at any time.`,
+      `Updated versions will become effective upon publication on the ${BRAND_NAME} website.`,
+      `Continued use of ${BRAND_NAME} services following any update constitutes acceptance of the revised Privacy Policy.`,
     ],
   },
 ];
@@ -180,7 +181,7 @@ export default function PrivacyPage() {
         <div className="liquid-glass rounded-2xl px-5 py-4 flex items-center gap-3 text-sm text-foreground/70">
           <Lock className="size-4 text-primary shrink-0" />
           <span>
-            <span className="font-semibold text-foreground/90">Swisdex — Privacy Policy</span>{' '}
+            <span className="font-semibold text-foreground/90">{BRAND_NAME} — Privacy Policy</span>{' '}
             · Last updated: June 2026
           </span>
         </div>
@@ -241,16 +242,16 @@ export default function PrivacyPage() {
               border: '1px solid hsl(99 55% 42% / 0.35)',
             }}
           >
-            <p className="font-semibold text-foreground">Swisdex Support Team</p>
+            <p className="font-semibold text-foreground">{BRAND_NAME} Support Team</p>
             <p className="text-foreground/75">
               Email:{' '}
-              <a href="mailto:support@swisdex.com" className="text-primary hover:underline">
-                support@swisdex.com
+              <a href={`mailto:${BRAND_SUPPORT_EMAIL}`} className="text-primary hover:underline">
+                {BRAND_SUPPORT_EMAIL}
               </a>
             </p>
           </div>
           <p className="mt-4 text-sm sm:text-[15px] leading-relaxed text-foreground/75">
-            Swisdex is committed to protecting client privacy and maintaining the highest standards of data security and confidentiality.
+            {BRAND_NAME} is committed to protecting client privacy and maintaining the highest standards of data security and confidentiality.
           </p>
         </section>
 
@@ -271,7 +272,7 @@ export default function PrivacyPage() {
             </p>
           </div>
           <a
-            href="mailto:support@swisdex.com"
+            href={`mailto:${BRAND_SUPPORT_EMAIL}`}
             className="inline-flex items-center gap-2 rounded-full bg-primary text-white px-5 py-2.5 text-sm font-semibold uppercase tracking-wider hover:opacity-90 shrink-0"
           >
             <Mail className="size-4" /> Contact Support
@@ -285,7 +286,7 @@ export default function PrivacyPage() {
             Your Data, Your Control
           </h2>
           <p className="mt-4 text-foreground/70 max-w-xl mx-auto text-sm sm:text-base">
-            Open a SwisDex account confident that we treat your personal data with the same care we
+            Open a {BRAND_NAME} account confident that we treat your personal data with the same care we
             apply to your trading capital.
           </p>
           <Link

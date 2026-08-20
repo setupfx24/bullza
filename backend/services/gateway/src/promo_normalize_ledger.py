@@ -7,7 +7,7 @@ For every User with is_promotional=true:
      realistic description ('Deposit/Withdrawal via Bank transfer').
   2. Any 'seed' wording left in descriptions is scrubbed:
      'seeded $X' -> 'funded $X', '(seed)' suffix stripped.
-  3. Fake '@swisdex-promo.local' emails are renamed to numbered gmail
+  3. Fake '@promo-demo.local' emails are renamed to numbered gmail
      addresses (same style the prospertech downline already uses, e.g.
      aarti.deshmukh63@gmail.com), deterministic + collision-checked, so the
      showcase Affiliates/Referral pages show believable emails.
@@ -29,7 +29,7 @@ from packages.common.src.models import Transaction, User
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)-5s %(message)s")
 logger = logging.getLogger("promo-normalize")
 
-FAKE_DOMAIN = "@swisdex-promo.local"
+FAKE_DOMAIN = "@promo-demo.local"
 GENERIC_ADJ_DESCRIPTIONS = {"wallet reconciliation", "admin adjustment", "balance adjustment", ""}
 
 

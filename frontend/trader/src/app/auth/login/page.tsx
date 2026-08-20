@@ -1,5 +1,7 @@
 'use client';
 
+import { BRAND_LOGO, BRAND_NAME } from '@/lib/brand';
+
 import { Suspense, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
@@ -142,7 +144,15 @@ function LoginContent() {
     try {
       await login(email, password, totpCode || undefined);
       toast.success('Welcome back!');
-      router.push('/dashboard');
+      // Honor ?next= from the middleware auth gate. Same-origin relative
+      // paths only — anything else falls back to the dashboard.
+      const nextParam = typeof window !== 'undefined'
+        ? new URLSearchParams(window.location.search).get('next')
+        : null;
+      const safeNext = nextParam && nextParam.startsWith('/') && !nextParam.startsWith('//')
+        ? nextParam
+        : '/dashboard';
+      router.push(safeNext);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : '';
       const code = (err as { code?: string })?.code;
@@ -292,19 +302,17 @@ function LoginContent() {
                 {activeStep === 1 && (
                   <form className="auth-form" onSubmit={handleSignIn} noValidate>
                     <motion.div {...fadeUp(0.25)} className="flex justify-center mb-1">
-                      {/* Theme-aware swap so the white-bg friendly logo
-                          renders on light mode and the original raster
-                          on dark mode. */}
-                      <img
-                        src="/images/swisdex_png5.png"
-                        alt="SwisDex"
-                        className="w-12 h-12 object-contain hidden dark:block"
-                      />
-                      <img
-                        src="/images/swisdex_png.png"
-                        alt="SwisDex"
-                        className="w-12 h-12 object-contain dark:hidden"
-                      />
+                      {BRAND_LOGO ? (
+                        <img
+                          src={BRAND_LOGO}
+                          alt={BRAND_NAME}
+                          className="w-12 h-12 object-contain"
+                        />
+                      ) : (
+                        <span className="text-2xl font-black tracking-tight text-text-primary select-none">
+                          {BRAND_NAME}
+                        </span>
+                      )}
                     </motion.div>
                     <motion.div {...fadeUp(0.3)}>
                       <h2 className="auth-form__title">Sign In</h2>

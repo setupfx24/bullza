@@ -6,7 +6,7 @@
 @tailwind components;
 @tailwind utilities;
 
-/* react-day-picker — themed to match SwisDex green + the dark inline-CSS
+/* react-day-picker — themed to match brand green + the dark inline-CSS
    used in ProfileCompleteGate. Only the DOBPicker mounts this widget so
    any visual regression here is scoped to that one input. Client request
    "show only current month days" is satisfied by showOutsideDays={false}
@@ -306,7 +306,7 @@ html, body {
    Splash / loading screen — shown on every full page load + refresh.
    See src/components/SplashScreen.tsx (mounted in the root layout).
    ────────────────────────────────────────────────────────────────────── */
-.swisdex-splash {
+.brand-splash {
   position: fixed;
   inset: 0;
   z-index: 99999;
@@ -317,23 +317,23 @@ html, body {
   overflow: hidden;
   transition: opacity 0.6s ease, visibility 0.6s ease;
 }
-.swisdex-splash--hidden {
+.brand-splash--hidden {
   opacity: 0;
   visibility: hidden;
   pointer-events: none;
 }
 /* Background aura — soft, blurred, low-opacity logo glow */
-.swisdex-splash__bg {
+.brand-splash__bg {
   position: absolute;
   width: min(640px, 120vw);
   height: auto;
   object-fit: contain;
   opacity: 0.10;
   filter: blur(36px) saturate(1.2);
-  animation: swisdex-splash-aura 3s ease-in-out infinite;
+  animation: brand-splash-aura 3s ease-in-out infinite;
   pointer-events: none;
 }
-.swisdex-splash__inner {
+.brand-splash__inner {
   position: relative;
   z-index: 1;
   display: flex;
@@ -341,41 +341,52 @@ html, body {
   align-items: center;
   gap: 28px;
 }
-.swisdex-splash__logo {
+.brand-splash__logo {
   width: min(240px, 60vw);
   height: auto;
   animation:
-    swisdex-splash-pop 1s cubic-bezier(0.22, 1, 0.36, 1) both,
-    swisdex-splash-breathe 2.2s ease-in-out 1s infinite;
+    brand-splash-pop 1s cubic-bezier(0.22, 1, 0.36, 1) both,
+    brand-splash-breathe 2.2s ease-in-out 1s infinite;
 }
-.swisdex-splash__ring {
+/* Text wordmark fallback — rendered when no BRAND_LOGO image is
+   configured so a fresh white-label build never ships old artwork. */
+.brand-splash__wordmark {
+  width: auto;
+  display: inline-block;
+  font-size: clamp(30px, 8vw, 48px);
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  color: #ffffff;
+  white-space: nowrap;
+}
+.brand-splash__ring {
   width: 34px;
   height: 34px;
   border-radius: 50%;
   border: 3px solid rgba(85, 166, 48, 0.22);
   border-top-color: #55a630;
-  animation: swisdex-splash-spin 0.8s linear infinite;
+  animation: brand-splash-spin 0.8s linear infinite;
 }
-@keyframes swisdex-splash-pop {
+@keyframes brand-splash-pop {
   0%   { opacity: 0; transform: scale(0.82); filter: blur(10px); }
   100% { opacity: 1; transform: scale(1);    filter: blur(0); }
 }
-@keyframes swisdex-splash-breathe {
+@keyframes brand-splash-breathe {
   0%, 100% { transform: scale(1); }
   50%      { transform: scale(1.04); }
 }
-@keyframes swisdex-splash-spin {
+@keyframes brand-splash-spin {
   to { transform: rotate(360deg); }
 }
-@keyframes swisdex-splash-aura {
+@keyframes brand-splash-aura {
   0%, 100% { opacity: 0.08; transform: scale(1); }
   50%      { opacity: 0.16; transform: scale(1.08); }
 }
 /* Respect reduced-motion: skip the spin/breathe, keep a simple fade. */
 @media (prefers-reduced-motion: reduce) {
-  .swisdex-splash__logo,
-  .swisdex-splash__ring,
-  .swisdex-splash__bg { animation: none !important; }
+  .brand-splash__logo,
+  .brand-splash__ring,
+  .brand-splash__bg { animation: none !important; }
 }
 
 /* Google Translate Element — hide all default UI (we drive it via our
@@ -727,10 +738,10 @@ html {
 @keyframes flashRed { 0% { background-color: rgba(239,68,68,0.2); } 100% { background-color: transparent; } }
 
 /* react-hot-toast — library defaults are washed-out white squares; reskin
- * to the SwisDex dark surface with proper padding, gap, and typography so
+ * to the app dark surface with proper padding, gap, and typography so
  * single-line errors don't wrap mid-word and the icon doesn't crash into
  * the text. */
-.swisdex-hot-toast {
+.brand-hot-toast {
   background: var(--toast-bg) !important;
   color: var(--toast-fg) !important;
   border: 1px solid var(--toast-border) !important;
@@ -751,27 +762,27 @@ html {
 
 /* The internal status icon (✓ / ✕) — give it a soft circular halo so it
  * reads as a status badge rather than a punched-out hole. */
-.swisdex-hot-toast > div[role="status"] {
+.brand-hot-toast > div[role="status"] {
   flex-shrink: 0;
   margin-right: 2px;
 }
 
 /* The text container — react-hot-toast wraps content in a child div; make
  * sure long error strings flow nicely instead of orphaning a single word. */
-.swisdex-hot-toast > div:not([role="status"]) {
+.brand-hot-toast > div:not([role="status"]) {
   flex: 1 1 auto;
   margin: 0 !important;
   word-break: break-word;
 }
 
 /* Tighten the close-button (×) for toasts that ship with one. */
-.swisdex-hot-toast button {
+.brand-hot-toast button {
   flex-shrink: 0;
   color: var(--toast-fg) !important;
   opacity: 0.55;
   transition: opacity 0.15s ease;
 }
-.swisdex-hot-toast button:hover {
+.brand-hot-toast button:hover {
   opacity: 1;
 }
 
@@ -987,7 +998,7 @@ html[data-page="accounts"] div:has(> header.h-\[65px\]) {
 }
 
 /* ───────────────────────────────────────────────────────────── */
-/* SwisDex brand logo — the PNG ships with white / light lettering
+/* Brand logo — the PNG ships with white / light lettering
    on a transparent background, so it disappears against the white
    card when the user flips to light theme (client report
    2026-06-01: "user dashboard light theme me logo dikh nahi raha").
@@ -998,7 +1009,7 @@ html[data-page="accounts"] div:has(> header.h-\[65px\]) {
    dark canvas regardless of the surrounding page theme. No filter,
    colours preserved exactly as designed.                            */
 /* ───────────────────────────────────────────────────────────── */
-[data-theme="light"] img[src*="swisdex_png5"] {
+[data-theme="light"] img.brand-logo-chip {
   background-color: #0a0a0a;
   border-radius: 6px;
   padding: 4px 6px;

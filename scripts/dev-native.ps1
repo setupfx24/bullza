@@ -1,4 +1,4 @@
-# SwisDex native local dev — everything hot-reloads, no Docker rebuilds.
+# Native local dev — everything hot-reloads, no Docker rebuilds.
 # Infra (postgres/timescaledb/redis) runs in Docker with host ports
 # 5434/5435/6381 (see docker-compose.local-infra.yml + backend/.env).
 # All app code runs natively in separate PowerShell windows.

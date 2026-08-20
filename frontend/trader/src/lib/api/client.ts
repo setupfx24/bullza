@@ -49,7 +49,7 @@ class ApiClient {
     if (typeof window !== 'undefined') {
       try {
         localStorage.removeItem('token');
-        localStorage.removeItem('swisdex-auth');
+        localStorage.removeItem('trader-auth');
       } catch {
         /* ignore */
       }

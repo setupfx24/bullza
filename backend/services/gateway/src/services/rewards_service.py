@@ -552,7 +552,7 @@ async def _maybe_send_tier_upgrade_email(
         return
     from packages.common.src.email_templates import render_tier_upgraded
     from packages.common.src.config import get_settings as _gs
-    app_url = (_gs().TRADER_APP_URL or "https://trade.swisdex.com")
+    app_url = _gs().TRADER_APP_URL
     prev_label = LEVEL_LABELS[old_level - 1] if 0 < old_level <= len(LEVEL_LABELS) else None
     perks = [
         "Higher daily mission caps",
@@ -582,7 +582,7 @@ async def _send_mission_email(db: AsyncSession, user_id, mission: "RewardsMissio
         return
     from packages.common.src.email_templates import render_mission_completed
     from packages.common.src.config import get_settings as _gs
-    app_url = (_gs().TRADER_APP_URL or "https://trade.swisdex.com")
+    app_url = _gs().TRADER_APP_URL
     title = (mission.title or mission.slug or "Mission").strip()
     subject, html, text = render_mission_completed(
         first_name=user.first_name,

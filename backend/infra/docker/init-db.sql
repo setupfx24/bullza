@@ -1,4 +1,9 @@
--- SwisDex Main Database Schema
+-- Main Database Schema (white-label broker platform)
+--
+-- NOTE: this script only runs when the postgres container starts with an
+-- EMPTY data volume (docker-entrypoint-initdb.d). The role/database it runs
+-- against come from the POSTGRES_USER/POSTGRES_DB env vars in compose, so
+-- existing deployments are unaffected by any renames here.
 
 -- Extensions
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
@@ -787,6 +792,8 @@ INSERT INTO account_groups (name, description, leverage_default, is_demo) VALUES
     ('Islamic', 'Swap-free Islamic account', 100, FALSE),
     ('Demo', 'Demo practice account', 100, TRUE);
 
--- Seed super admin (password: SwisDexAdmin2025! — change in production)
+-- Seed super admin (password: ChangeMeAdmin2025! — change in production).
+-- Fresh installs only (see note at top). Alembic migration 0002 also seeds
+-- a super admin from ADMIN_EMAIL / ADMIN_PASSWORD env vars — prefer those.
 INSERT INTO users (email, password_hash, first_name, last_name, role, status, kyc_status)
-VALUES ('admin@swisdex.com', '$2b$12$OV1PUf7jA8E22RQ184o0n.KkEjbSriZbLaDqO4SJGj/bjleK37Zh2', 'Super', 'Admin', 'super_admin', 'active', 'approved');
+VALUES ('admin@example.com', '$2b$12$qHlw9.HNly7rW9riVxVlXupn1yjylZWtI2MrT9Qr74lYDs18DnLT.', 'Super', 'Admin', 'super_admin', 'active', 'approved');

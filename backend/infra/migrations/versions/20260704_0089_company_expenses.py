@@ -1,4 +1,4 @@
-"""SwisDex company expense ledger — a Tally/Excel-style running expense book.
+"""Company expense ledger — a Tally/Excel-style running expense book.
 
 Admin records general business expenses (Date, Name, Amount, Reason, Result)
 and the rows persist as a ledger. Separate from `promotional_expenses`

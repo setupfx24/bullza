@@ -299,7 +299,7 @@ export default function TradingTerminalPage() {
   // state. (client 2026-07-11)
   useEffect(() => {
     try {
-      const saved = JSON.parse(localStorage.getItem('swisdex-chart-tabs') || '[]');
+      const saved = JSON.parse(localStorage.getItem('trader-chart-tabs') || '[]');
       if (Array.isArray(saved) && saved.length) {
         setChartTabs((prev) => Array.from(new Set([
           ...saved.filter((s: unknown): s is string => typeof s === 'string'),
@@ -310,7 +310,7 @@ export default function TradingTerminalPage() {
   }, []);
   useEffect(() => {
     if (chartTabs.length === 0) return;
-    try { localStorage.setItem('swisdex-chart-tabs', JSON.stringify(chartTabs)); } catch { /* ignore */ }
+    try { localStorage.setItem('trader-chart-tabs', JSON.stringify(chartTabs)); } catch { /* ignore */ }
   }, [chartTabs]);
 
   const removeTab = (e: React.MouseEvent, symbol: string) => {

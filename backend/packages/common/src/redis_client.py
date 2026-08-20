@@ -1,7 +1,10 @@
+import logging
 import os
 
 import redis.asyncio as aioredis
 from .config import get_settings
+
+logger = logging.getLogger(__name__)
 
 settings = get_settings()
 
@@ -71,15 +74,22 @@ async def acquire_leader_lock(key: str, ttl_seconds: int) -> bool:
     engine: the next tick from any worker re-acquires it. Pick a TTL
     comfortably larger than the engine's tick interval.
 
-    Never raises — on a Redis hiccup it returns True (fail-open) so the
-    engine keeps running on a single-worker deployment rather than
-    silently halting. Duplicate-execution risk only exists with N>1
-    workers, where Redis is up anyway.
+    Never raises — on a Redis hiccup it returns False (fail-CLOSED) and
+    the engine skips that tick. Skipping a tick is recoverable (the next
+    tick catches up); the alternative — every worker believing it is the
+    leader during a Redis outage — re-creates the exact double-execution
+    bugs this lock exists to prevent (double overnight fees, double
+    SL/TP closes). The engines are Redis-dependent for prices anyway, so
+    little useful work is lost during the outage.
     """
     try:
         return bool(await redis_client.set(key, "1", ex=ttl_seconds, nx=True))
-    except Exception:
-        return True
+    except Exception as exc:  # noqa: BLE001
+        logger.error(
+            "leader lock %s unavailable (Redis error: %s) — skipping tick (fail-closed)",
+            key, exc,
+        )
+        return False
 
 
 async def publish_price(

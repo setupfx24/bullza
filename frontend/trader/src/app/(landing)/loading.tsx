@@ -6,6 +6,8 @@
  * Pairs with TopLoader (a thin progress bar at the top of every route)
  * for the link-click → route-ready visual chain.
  */
+import { BRAND_NAME } from '@/lib/brand';
+
 export default function LandingLoading() {
   return (
     <div
@@ -33,11 +35,11 @@ export default function LandingLoading() {
             className="absolute inset-0 grid place-items-center font-display text-[#55a630] font-bold text-xl"
             aria-hidden="true"
           >
-            S
+            {BRAND_NAME.charAt(0)}
           </span>
         </div>
         <div className="font-display uppercase tracking-[0.25em] text-xs text-white/70">
-          SwisDex
+          {BRAND_NAME}
         </div>
       </div>
     </div>

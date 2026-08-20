@@ -1,7 +1,8 @@
 import Link from 'next/link'
 import { Facebook, Instagram, Linkedin, Youtube, Mail, Cookie } from 'lucide-react'
 import ScrollReveal from './animations/ScrollReveal'
-import { openCookieSettings } from '@/swisdex/components/CookieConsent'
+import { openCookieSettings } from '@/home/components/CookieConsent'
+import { BRAND_NAME, BRAND_DOMAIN, BRAND_LOGO, BRAND_SUPPORT_EMAIL, BRAND_COPYRIGHT } from '@/lib/brand'
 
 const columns = {
   Trading: [
@@ -41,15 +42,13 @@ const columns = {
 }
 
 const socials = [
-  { icon: Facebook,  href: 'https://www.facebook.com/profile.php?id=61589880747321', label: 'Facebook' },
-  { icon: Instagram, href: 'https://www.instagram.com/swisdex/',                     label: 'Instagram' },
-  { icon: Linkedin,  href: 'https://www.linkedin.com/in/swis-dex-a62208410/',        label: 'LinkedIn' },
-  { icon: Youtube,   href: 'https://youtube.com/@swisdex-u7q',                       label: 'YouTube' },
+  { icon: Facebook,  href: `https://${BRAND_DOMAIN}`, label: 'Facebook' },
+  { icon: Instagram, href: `https://${BRAND_DOMAIN}`, label: 'Instagram' },
+  { icon: Linkedin,  href: `https://${BRAND_DOMAIN}`, label: 'LinkedIn' },
+  { icon: Youtube,   href: `https://${BRAND_DOMAIN}`, label: 'YouTube' },
 ]
 
 export default function Footer() {
-  const year = new Date().getFullYear()
-
   return (
     <footer
       className="relative"
@@ -66,25 +65,28 @@ export default function Footer() {
           {/* Brand block — spans more on mobile */}
           <div className="col-span-2 lg:col-span-2">
             <ScrollReveal variant="fadeLeft">
-              <Link href="/" className="inline-block mb-5" aria-label="SwisDex home">
-                <img src="/images/swisdex_png5.png" alt="SwisDex" className="h-10 w-auto hidden dark:block" />
-                <img src="/images/swisdex_png.png" alt="SwisDex" className="h-10 w-auto dark:hidden" />
+              <Link href="/" className="inline-block mb-5" aria-label={`${BRAND_NAME} home`}>
+                {BRAND_LOGO ? (
+                  <img src={BRAND_LOGO} alt={BRAND_NAME} className="h-10 w-auto" />
+                ) : (
+                  <span className="text-2xl font-black tracking-tight" style={{ color: 'var(--fx-text)' }}>{BRAND_NAME}</span>
+                )}
               </Link>
               <p className="text-sm leading-relaxed max-w-sm mb-6" style={{ color: 'var(--fx-text-2)' }}>
-                SwisDex is an institutional-grade forex, CFD broker, and decentralized exchange
+                {BRAND_NAME} is an institutional-grade forex, CFD broker, and decentralized exchange
                 built for serious traders. It offers fast execution, low spreads, transparent
                 pricing, insured trades, and fully automated trading with no human intervention.
               </p>
               <p className="text-sm leading-relaxed max-w-sm mb-6" style={{ color: 'var(--fx-text-2)' }}>
-                SwisDex also provides staking with fixed monthly income, anytime withdrawals,
+                {BRAND_NAME} also provides staking with fixed monthly income, anytime withdrawals,
                 and a rewarding IB (Introducing Broker) program with profit-sharing opportunities
                 for partners and affiliates.
               </p>
 
               <div className="flex items-center gap-2 text-sm mb-5" style={{ color: 'var(--fx-text-3)' }}>
                 <Mail size={14} style={{ color: 'var(--fx-gold-light)' }} />
-                <a href="mailto:info@swisdex.com" className="hover:underline" style={{ color: 'var(--fx-text-2)' }}>
-                  info@swisdex.com
+                <a href={`mailto:${BRAND_SUPPORT_EMAIL}`} className="hover:underline" style={{ color: 'var(--fx-text-2)' }}>
+                  {BRAND_SUPPORT_EMAIL}
                 </a>
               </div>
 
@@ -167,7 +169,7 @@ export default function Footer() {
               instruments may result in losses as well as profits and your losses can be greater than
               your initial invested capital. Before undertaking any such transactions, you should
               ensure that you fully understand the risks involved and seek independent advice if
-              necessary. SwisDex does not provide investment advice.
+              necessary. {BRAND_NAME} does not provide investment advice.
             </p>
           </div>
 
@@ -179,8 +181,8 @@ export default function Footer() {
               Restricted Regions
             </h3>
             <p className="text-xs md:text-[13px] leading-relaxed" style={{ color: 'var(--fx-text-3)' }}>
-              SwisDex Ltd does not provide services for citizens/residents of the USA, Cuba, Iraq,
-              Myanmar, North Korea, and Sudan. The services of SwisDex Ltd are not intended for
+              {BRAND_NAME} does not provide services for citizens/residents of the USA, Cuba, Iraq,
+              Myanmar, North Korea, and Sudan. The services of {BRAND_NAME} are not intended for
               distribution to, or use by, any person in any country or jurisdiction where such
               distribution or use would be contrary to local law or regulation.
             </p>
@@ -222,7 +224,7 @@ export default function Footer() {
           style={{ borderTop: '1px solid var(--fx-line)' }}
         >
           <p className="text-xs" style={{ color: 'var(--fx-text-3)' }}>
-            © {year} SwisDex Ltd. All rights reserved. · Founded in 2010
+            {BRAND_COPYRIGHT} · Founded in 2010
           </p>
           {/* Cookie Settings — surfaces the consent modal even after
               the user has already accepted/saved a preference, so the

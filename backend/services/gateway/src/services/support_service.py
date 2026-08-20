@@ -106,7 +106,7 @@ async def create_ticket(
                 support_to,
                 subject=f"New support ticket: {subject}",
                 html=(
-                    "<p>A new support ticket was submitted on SwisDex.</p>"
+                    f"<p>A new support ticket was submitted on {escape(get_settings().BRAND_NAME)}.</p>"
                     f"<p><b>From:</b> {escape(who)}<br>"
                     f"<b>Priority:</b> {escape(priority or 'normal')}<br>"
                     f"<b>Subject:</b> {escape(subject or '')}</p>"

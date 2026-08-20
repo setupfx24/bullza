@@ -1,4 +1,5 @@
 import type { MetadataRoute } from 'next';
+import { BRAND_NAME } from '@/lib/brand';
 
 // Web App Manifest — makes the trader app installable as a PWA.
 // Next serves this at /manifest.webmanifest and auto-links it from <head>.
@@ -6,9 +7,9 @@ import type { MetadataRoute } from 'next';
 // iOS full-screen is driven separately by the appleWebApp meta in layout.tsx.
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: 'SwisDex — Trading Platform',
-    short_name: 'SwisDex',
-    description: 'SwisDex — professional forex and CFD trading platform',
+    name: `${BRAND_NAME} — Trading Platform`,
+    short_name: BRAND_NAME,
+    description: `${BRAND_NAME} — professional forex and CFD trading platform`,
     start_url: '/dashboard',
     scope: '/',
     display: 'standalone',

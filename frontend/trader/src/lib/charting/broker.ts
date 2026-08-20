@@ -17,6 +17,18 @@ const ConnectionStatus = { Connected: 1, Connecting: 2, Disconnected: 3, Error: 
 
 let _host: any = null;
 let _currentAccountId = '';
+// The 1s host-update poller. Module-level so a re-created broker (chart
+// remount, symbol/account switch) clears the previous timer instead of
+// stacking a new one each time — the old code leaked one interval per
+// terminal (re)mount for the lifetime of the tab.
+let _pollTimer: ReturnType<typeof setInterval> | null = null;
+
+/** Stop the broker's host-update poller. Call from the chart's cleanup. */
+export function disposeBroker() {
+  if (_pollTimer) clearInterval(_pollTimer);
+  _pollTimer = null;
+  _host = null;
+}
 
 function getActiveAccount() {
   return useTradingStore.getState().activeAccount;
@@ -53,7 +65,8 @@ export function createBroker(host: any): any {
   // lines on the chart. Tracking by id-set diff so the full update only
   // fires on real change, not every tick.
   const prevPosIds = new Set<string>();
-  setInterval(() => {
+  if (_pollTimer) clearInterval(_pollTimer);
+  _pollTimer = setInterval(() => {
     try {
       if (!getActiveAccount()) return;
       const positions = getPositions();

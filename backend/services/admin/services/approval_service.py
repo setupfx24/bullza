@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import json
 import uuid
+from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Any, Optional
 
@@ -149,6 +150,15 @@ async def fetch_pending(db: AsyncSession, request_id: uuid.UUID) -> dict:
         raise HTTPException(status_code=404, detail="Approval request not found")
     if rec["status"] != "pending":
         raise HTTPException(status_code=409, detail=f"Request is {rec['status']}")
+    # The pending LIST hides expired rows, but approve/reject hit this path
+    # directly by id — without this check a stale request id remained
+    # approvable forever (risk review 2026-08-20).
+    exp = rec.get("expires_at")
+    if exp is not None:
+        if exp.tzinfo is None:
+            exp = exp.replace(tzinfo=timezone.utc)
+        if exp <= datetime.now(timezone.utc):
+            raise HTTPException(status_code=409, detail="Request has expired")
     return dict(rec)
 
 

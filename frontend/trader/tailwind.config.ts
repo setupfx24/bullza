@@ -64,7 +64,7 @@ const config: Config = {
           purple: '#9775FA',
           pink: '#F06595',
         },
-        /* Landing-page palette — SwisDex gold-on-black brand */
+        /* Landing-page palette — brand gold-on-black */
         'primary': {
           bg: '#08090b',
           secondary: '#101114',

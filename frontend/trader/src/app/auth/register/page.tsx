@@ -1,5 +1,7 @@
 'use client';
 
+import { BRAND_LOGO, BRAND_NAME } from '@/lib/brand';
+
 import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence, MotionConfig } from 'framer-motion';
@@ -293,16 +295,17 @@ function RegisterContent() {
               >
                 <form className="auth-form" onSubmit={handleSubmit} noValidate>
                   <motion.div {...fadeUp(0.25)} className="flex justify-center mb-1">
-                    <img
-                      src="/images/swisdex_png5.png"
-                      alt="SwisDex"
-                      className="w-12 h-12 object-contain hidden dark:block"
-                    />
-                    <img
-                      src="/images/swisdex_png.png"
-                      alt="SwisDex"
-                      className="w-12 h-12 object-contain dark:hidden"
-                    />
+                    {BRAND_LOGO ? (
+                      <img
+                        src={BRAND_LOGO}
+                        alt={BRAND_NAME}
+                        className="w-12 h-12 object-contain"
+                      />
+                    ) : (
+                      <span className="text-2xl font-black tracking-tight text-text-primary select-none">
+                        {BRAND_NAME}
+                      </span>
+                    )}
                   </motion.div>
                   <motion.div {...fadeUp(0.3)}>
                     <h2 className="auth-form__title">Sign Up Account</h2>

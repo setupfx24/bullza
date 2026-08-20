@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect } from 'react'
 import { X, Shield, User, Mail, Phone, ArrowRight } from 'lucide-react'
+import { BRAND_NAME } from '@/lib/brand'
 
 const PopupContext = createContext()
 
@@ -71,7 +72,7 @@ export const PopupProvider = ({ children }) => {
                     <Shield className="w-6 h-6 text-white" />
                   </div>
                   <div>
-                    <h2 className="text-2xl font-bold text-white">Get Started with SwisDex</h2>
+                    <h2 className="text-2xl font-bold text-white">Get Started with {BRAND_NAME}</h2>
                   </div>
                 </div>
                 <p className="text-text-secondary mb-6">Fill in your details and our team will get you trading in minutes.</p>

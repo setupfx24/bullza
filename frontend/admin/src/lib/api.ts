@@ -47,7 +47,7 @@ export function formatApiErrorDetail(detail: unknown): string {
   }
 }
 
-// Auth token now lives in an httpOnly cookie (`swisdex_admin`) set by
+// Auth token now lives in an httpOnly cookie (`admin_access`) set by
 // /admin/auth/login. JS cannot read or write it — that's the whole point;
 // it removes the XSS-exfil exposure that the localStorage path had. The
 // keys below are kept only for one-shot cleanup of legacy storage on load.
@@ -96,7 +96,7 @@ class AdminApi {
       method,
       headers,
       body: body ? JSON.stringify(body) : undefined,
-      credentials: 'include', // send/receive the swisdex_admin cookie
+      credentials: 'include', // send/receive the admin_access cookie
     });
 
     if (res.status === 401) {

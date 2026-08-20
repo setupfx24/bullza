@@ -293,7 +293,7 @@ const DEFAULT_WATCHLIST = [
 ];
 
 const DEFAULT_SYMBOL = 'XAUUSD';
-const SYMBOL_STORAGE_KEY = 'swisdex-selected-symbol';
+const SYMBOL_STORAGE_KEY = 'trader-selected-symbol';
 
 function getPersistedSymbol(): string {
   if (typeof window === 'undefined') return DEFAULT_SYMBOL;
@@ -404,7 +404,11 @@ export const useTradingStore = create<TradingState>()((set, get) => ({
           return r ? { ...mapped, current_price: r.cp, profit: r.pnl } : mapped;
         }),
       });
-    } catch {}
+    } catch (e) {
+      // Silent-failure fix: a persistently failing refresh used to be
+      // invisible — positions just froze. Log so it shows in devtools.
+      console.warn('[tradingStore] refreshPositions failed:', e);
+    }
   },
 
   refreshPendingOrders: async () => {
@@ -428,7 +432,9 @@ export const useTradingStore = create<TradingState>()((set, get) => ({
           created_at: String(o.created_at ?? ''),
         })),
       });
-    } catch {}
+    } catch (e) {
+      console.warn('[tradingStore] refreshPendingOrders failed:', e);
+    }
   },
 
   refreshAccount: async () => {
@@ -453,7 +459,9 @@ export const useTradingStore = create<TradingState>()((set, get) => ({
           },
         });
       }
-    } catch {}
+    } catch (e) {
+      console.warn('[tradingStore] refreshAccount failed:', e);
+    }
   },
 
   updatePrice: (tick) => set((state) => {

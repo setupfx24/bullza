@@ -69,9 +69,9 @@ TRADE_CAPITAL = Decimal("1800")
 
 # Demo downline (referred by the target). Also flagged promotional.
 DOWNLINE = [
-    ("amardeep.ref1@swisdex-promo.local", "Rahul", "Verma"),
-    ("amardeep.ref2@swisdex-promo.local", "Priya", "Sharma"),
-    ("amardeep.ref3@swisdex-promo.local", "Arjun", "Mehta"),
+    ("amardeep.ref1@promo-demo.local", "Rahul", "Verma"),
+    ("amardeep.ref2@promo-demo.local", "Priya", "Sharma"),
+    ("amardeep.ref3@promo-demo.local", "Arjun", "Mehta"),
 ]
 REFERRAL_BOUNTY_EACH = Decimal("10")   # credited to target.referral_commission_balance
 IB_COMMISSION_EACH = Decimal("25")     # credited to target.ib_commission_balance

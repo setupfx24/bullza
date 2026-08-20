@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom'
 import { Users, DollarSign, BarChart2, Award, Globe, Headphones, Check, ArrowRight, TrendingUp } from 'lucide-react'
 import Button from '../components/Button'
 import ScrollReveal, { ScrollRevealGroup, ScrollRevealItem } from '../components/animations/ScrollReveal'
+import { BRAND_NAME } from '@/lib/brand'
 
 const benefits = [
   { icon: DollarSign, title: 'Competitive Commissions', desc: 'Earn up to $12 per lot with our tiered rebate structure. The more clients you refer, the higher your earnings.' },
@@ -28,7 +29,7 @@ const IBManagement = () => {
               IB Management Program
             </h1>
             <p className="text-xl text-text-secondary max-w-3xl mx-auto mb-8">
-              Partner with SwisDex and earn competitive commissions by introducing new clients. Build your brokerage business with our support.
+              Partner with {BRAND_NAME} and earn competitive commissions by introducing new clients. Build your brokerage business with our support.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Link to="/company/contact"><Button variant="primary">Become an IB</Button></Link>

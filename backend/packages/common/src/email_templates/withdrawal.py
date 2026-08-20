@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from decimal import Decimal
 
+from ..config import get_settings
 from .base import render_layout, kv_table
 
 
@@ -18,8 +19,11 @@ def render_withdrawal_requested(
     method: str | None = None,
     destination: str | None = None,
     request_id: str | None = None,
-    trader_app_url: str = "https://trade.swisdex.com",
+    trader_app_url: str = "",
 ) -> tuple[str, str, str]:
+    s = get_settings()
+    trader_app_url = (trader_app_url or "").strip() or s.TRADER_APP_URL
+    support_email = f"support@{(s.BRAND_DOMAIN or '').strip() or 'example.com'}"
     name = (first_name or "trader").strip() or "trader"
     rows: list[tuple[str, str]] = [
         ("Amount", _fmt_money(amount, currency)),
@@ -63,7 +67,7 @@ def render_withdrawal_requested(
         "",
         f"Track in wallet: {trader_app_url.rstrip('/')}/wallet",
         "",
-        "Didn't make this request? Email support@swisdex.com immediately.",
+        f"Didn't make this request? Email {support_email} immediately.",
     ]
     return subject, html, "\n".join(text_lines)
 
@@ -77,8 +81,9 @@ def render_withdrawal_approved(
     destination: str | None = None,
     transaction_hash: str | None = None,
     request_id: str | None = None,
-    trader_app_url: str = "https://trade.swisdex.com",
+    trader_app_url: str = "",
 ) -> tuple[str, str, str]:
+    trader_app_url = (trader_app_url or "").strip() or get_settings().TRADER_APP_URL
     name = (first_name or "trader").strip() or "trader"
     rows: list[tuple[str, str]] = [
         ("Amount", _fmt_money(amount, currency)),
@@ -138,8 +143,11 @@ def render_withdrawal_rejected(
     currency: str = "USD",
     reason: str | None = None,
     request_id: str | None = None,
-    trader_app_url: str = "https://trade.swisdex.com",
+    trader_app_url: str = "",
 ) -> tuple[str, str, str]:
+    s = get_settings()
+    trader_app_url = (trader_app_url or "").strip() or s.TRADER_APP_URL
+    support_email = f"support@{(s.BRAND_DOMAIN or '').strip() or 'example.com'}"
     name = (first_name or "trader").strip() or "trader"
     rows: list[tuple[str, str]] = [
         ("Amount", _fmt_money(amount, currency)),
@@ -163,7 +171,7 @@ def render_withdrawal_rejected(
         intro=f"Hi {name}, we couldn't process this withdrawal — see details below.",
         body_html=body,
         cta_label="Contact Support",
-        cta_url="mailto:support@swisdex.com",
+        cta_url=f"mailto:{support_email}",
     )
     text_lines = [
         f"Hi {name},",
@@ -180,6 +188,6 @@ def render_withdrawal_rejected(
     text_lines += [
         "",
         "Your funds have been returned to your main wallet. Submit a new request",
-        "once the issue is resolved, or email support@swisdex.com for help.",
+        f"once the issue is resolved, or email {support_email} for help.",
     ]
     return subject, html, "\n".join(text_lines)

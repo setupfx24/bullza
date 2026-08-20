@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom'
 import { Bell, ShieldCheck, Target, TrendingUp, Award, Layers } from 'lucide-react'
 import Button from '../components/Button'
 import ScrollReveal, { ScrollRevealGroup, ScrollRevealItem } from '../components/animations/ScrollReveal'
+import { BRAND_NAME } from '@/lib/brand'
 
 const PropTrading = () => {
   return (
@@ -33,7 +34,7 @@ const PropTrading = () => {
 
             <p className="mt-6 text-xl text-text-secondary max-w-3xl mx-auto">
               Prove your skills, get funded, and trade with our capital — keep up to 90% of the profits with zero personal risk.
-              The SwisDex Prop Program is launching in <span className="text-primary-accent font-semibold">Q3 2026</span>.
+              The {BRAND_NAME} Prop Program is launching in <span className="text-primary-accent font-semibold">Q3 2026</span>.
               Join the early-access list to be the first to take the challenge.
             </p>
 
@@ -99,7 +100,7 @@ const PropTrading = () => {
           <ScrollReveal variant="fadeUp">
             <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">Be First in Line</h2>
             <p className="text-text-secondary max-w-2xl mx-auto mb-8">
-              Open a SwisDex account today — your trading history counts toward your early-access tier when the Prop Program goes live.
+              Open a {BRAND_NAME} account today — your trading history counts toward your early-access tier when the Prop Program goes live.
             </p>
             <Link to="/auth/register">
               <Button variant="primary">Open Account</Button>

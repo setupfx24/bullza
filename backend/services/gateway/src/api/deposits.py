@@ -17,6 +17,7 @@ from packages.common.src.schemas import (
     WithdrawalRequest,
 )
 from packages.common.src.auth import get_current_user
+from packages.common.src.config import get_settings
 from packages.common.src.rate_limit import check_rate_limit
 from ..services import wallet_service
 
@@ -388,7 +389,7 @@ async def create_rm_request(
     # logging into the platform. No HTML styling for plaintext mode +
     # a quick HTML version too.
     subject = (
-        f"[SwisDex] {side.title()} request — {full_name} — "
+        f"[{get_settings().BRAND_NAME}] {side.title()} request — {full_name} — "
         f"${float(amount):,.2f}"
     )
     payout_block = (

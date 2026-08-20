@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# SwisDex — daily backup of Postgres + TimescaleDB + uploads/.
+# Daily backup of Postgres + TimescaleDB + uploads/.
 #
 # Runs on the host (NOT inside a container) and shells into the running
 # postgres / timescaledb containers via `docker compose exec` to take
@@ -11,12 +11,12 @@
 # All artefacts are encrypted with GPG before being written to disk —
 # unencrypted dumps never touch persistent storage. Two modes:
 #
-#   * BACKUP_GPG_RECIPIENT=ops@swisdex.com  (preferred — public-key)
+#   * BACKUP_GPG_RECIPIENT=ops@example.com  (preferred — public-key)
 #       Each artefact is encrypted to that key. The corresponding private
 #       key lives only in your password manager / HSM. Backups can be
 #       written by the host but only decrypted by an authorised operator.
 #
-#   * BACKUP_GPG_PASSPHRASE_FILE=/etc/swisdex/backup.pass  (fallback)
+#   * BACKUP_GPG_PASSPHRASE_FILE=/etc/broker/backup.pass  (fallback)
 #       Symmetric encryption with AES-256. Simpler bootstrap; the file
 #       must be 0600 root:root and SHOULD be a long random string stored
 #       independently of the host (1Password / Bitwarden secure note).
@@ -29,7 +29,9 @@
 set -euo pipefail
 
 # ─── Config (overridable via env or .env) ─────────────────────────────
-COMPOSE_DIR="${SWISDEX_DIR:-/opt/swisdex}"
+# APP_DIR is the canonical variable; legacy SWISDEX_DIR still honoured as
+# a fallback so already-installed cron entries keep working.
+COMPOSE_DIR="${APP_DIR:-${SWISDEX_DIR:-/opt/broker}}"
 DEST="${BACKUP_LOCAL_DIR:-${COMPOSE_DIR}/backups}"
 RETAIN_DAYS="${BACKUP_RETENTION_DAYS:-14}"
 RCLONE_REMOTE="${BACKUP_RCLONE_REMOTE:-}"
@@ -80,7 +82,7 @@ cd "$COMPOSE_DIR"
 DUMP="$DEST/postgres-$STAMP.sql.gz.gpg"
 log "dumping postgres → $DUMP"
 docker compose -f docker-compose.yml -f docker-compose.prod.yml \
-  exec -T postgres pg_dumpall -U "${POSTGRES_USER:-swisdex}" \
+  exec -T postgres pg_dumpall -U "${POSTGRES_USER:-broker}" \
   | gzip | encrypt_to "$DUMP"
 chmod 600 "$DUMP"
 
@@ -100,7 +102,7 @@ if docker compose -f docker-compose.yml -f docker-compose.prod.yml ps -q timesca
    && [[ -n "$(docker compose -f docker-compose.yml -f docker-compose.prod.yml ps -q timescaledb)" ]]; then
   log "dumping timescaledb → $TS"
   docker compose -f docker-compose.yml -f docker-compose.prod.yml \
-    exec -T timescaledb pg_dumpall -U "${TIMESCALE_USER:-swisdex}" \
+    exec -T timescaledb pg_dumpall -U "${TIMESCALE_USER:-broker}" \
     | gzip | encrypt_to "$TS"
   chmod 600 "$TS"
 else

@@ -116,6 +116,23 @@ async def approve(
             )
         return {"message": "Approved and executed", "request_id": str(request_id), "result": result}
 
+    # Credit grants/removals execute on the second sign-off too — credit
+    # counts toward equity and margin level, so it carries the same risk
+    # as a balance mutation (risk review 2026-08-20).
+    if action in ("give_credit", "take_credit"):
+        from services import user_service
+        from packages.common.src.admin_schemas import CreditRequest
+        tid = uuid.UUID(str(rec["target_id"]))
+        payload = rec["payload"] or {}
+        body = CreditRequest(
+            account_id=payload.get("account_id"),
+            amount=float(payload.get("amount") or 0),
+            description=payload.get("description"),
+        )
+        fn = user_service.give_credit if action == "give_credit" else user_service.take_credit
+        result = await fn(tid, body, admin.id, ip, db, approval_request_id=request_id)
+        return {"message": "Approved and executed", "request_id": str(request_id), "result": result}
+
     await write_audit_log(
         db, admin.id, "approval_grant", "admin_approval_request", request_id,
         new_values={"action": rec["action"], "target_id": str(rec["target_id"])},

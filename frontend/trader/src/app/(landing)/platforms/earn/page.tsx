@@ -6,6 +6,7 @@
  */
 import Link from 'next/link';
 import { Sparkles, Coins, Trophy, Gift, Target, Gamepad2, ArrowRight, Check } from 'lucide-react';
+import { BRAND_NAME } from '@/lib/brand';
 
 export default function EarnMarketingPage() {
   return (
@@ -21,7 +22,7 @@ export default function EarnMarketingPage() {
           <span className="fx-gold-text">Trading.</span>
         </h1>
         <p className="mt-6 max-w-2xl text-base md:text-lg leading-relaxed" style={{ color: 'var(--fx-text-2)' }}>
-          Your activity on SwisDex turns into rewards, progression, and real
+          Your activity on {BRAND_NAME} turns into rewards, progression, and real
           benefits. Trade. Engage. Progress. Earn.
         </p>
         <div className="mt-8 flex flex-wrap gap-3">

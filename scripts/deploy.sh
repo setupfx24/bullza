@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# SwisDex production deploy — the ONLY blessed deploy path.
+# Production deploy — the ONLY blessed deploy path.
 #
 # Pulls main, rebuilds images with the prod compose overlay, and brings
 # everything up bound on 127.0.0.1:<prod-port>. nginx upstreams in
-# /etc/nginx/sites-enabled/swisdex.conf must match the prod port table
+# /etc/nginx/sites-enabled/broker.conf must match the prod port table
 # printed below.
 #
 # Refuses to run if docker-compose.prod.yml is missing — that prevents
@@ -56,7 +56,7 @@ done
 
 COMPOSE=(docker compose -f docker-compose.yml -f docker-compose.prod.yml)
 
-echo "==> SwisDex prod deploy"
+echo "==> prod deploy"
 echo "    Repo:    $REPO_ROOT"
 echo "    Compose: docker-compose.yml + docker-compose.prod.yml"
 echo
@@ -101,7 +101,7 @@ fi
 # the build. Otherwise, if the operator had done `docker compose down`
 # before invoking this script with --service X, only X would come back
 # up and admin-frontend / admin-api / engines would stay down (the
-# 2026-05-14 admin.swisdex.com outage). Compose is idempotent here:
+# 2026-05-14 admin-panel outage). Compose is idempotent here:
 # already-running containers with unchanged image/config are not touched,
 # so this is safe to run regardless of prior state.
 echo "==> docker compose up -d  (full stack — --service only scopes build)"

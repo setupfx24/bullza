@@ -6,6 +6,7 @@
  */
 import Link from 'next/link';
 import { Zap, Lock, Sparkles, ArrowRight, Check, Coins } from 'lucide-react';
+import { BRAND_NAME } from '@/lib/brand';
 
 export default function StakingMarketingPage() {
   return (
@@ -22,7 +23,7 @@ export default function StakingMarketingPage() {
           <span className="fx-gold-text">Earn Structured Rewards.</span>
         </h1>
         <p className="mt-6 max-w-2xl text-base md:text-lg leading-relaxed" style={{ color: 'var(--fx-text-2)' }}>
-          Participate in the SwisDex protocol by providing liquidity — with
+          Participate in the {BRAND_NAME} protocol by providing liquidity — with
           flexible access or long-term benefits. Your capital. Your control.
           Your choice.
         </p>
@@ -40,7 +41,7 @@ export default function StakingMarketingPage() {
       <section className="fx-container relative z-10 py-12">
         <div className="rounded-xl border border-[#55a630]/20 p-6 md:p-8 bg-[rgba(255,255,255,0.02)] max-w-3xl">
           <h2 className="text-xl md:text-2xl font-bold mb-3" style={{ color: 'var(--fx-text)' }}>
-            What is Staking in SwisDex?
+            What is Staking in {BRAND_NAME}?
           </h2>
           <p className="text-sm md:text-base leading-relaxed mb-4" style={{ color: 'var(--fx-text-2)' }}>
             Staking means providing liquidity to the protocol through a smart

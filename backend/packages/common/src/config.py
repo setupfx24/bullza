@@ -10,14 +10,22 @@ _INSECURE_DEFAULTS: dict[str, set[str]] = {
     "JWT_SECRET":         {"dev-secret-change-in-production", "", "changeme"},
     "USER_JWT_SECRET":    {"dev-secret-change-in-production", "", "changeme"},
     "ADMIN_JWT_SECRET":   {"admin-secret-change-in-production", "dev-secret-change-in-production", "", "changeme"},
-    "ADMIN_PASSWORD":     {"SwisDexAdmin2025!", "admin", "password", ""},
+    "ADMIN_PASSWORD":     {"SwisDexAdmin2025!", "ChangeMeAdmin2025!", "ChangeMeAdmin2026!", "admin", "password", ""},
 }
 
 
 class Settings(BaseSettings):
     ENVIRONMENT: str = "development"
-    DATABASE_URL: str = "postgresql+asyncpg://swisdex:swisdex_dev@localhost:5432/swisdex"
-    TIMESCALE_URL: str = "postgresql+asyncpg://swisdex:swisdex_dev@localhost:5433/marketdata"
+
+    # ─── White-label branding ────────────────────────────────────────────
+    # Display name and public domain used across emails, notifications and
+    # any server-rendered copy. Set BRAND_NAME / BRAND_DOMAIN in .env when
+    # deploying for a tenant; everything brand-visible flows from here.
+    BRAND_NAME: str = "YourBrand"
+    BRAND_DOMAIN: str = "example.com"
+
+    DATABASE_URL: str = "postgresql+asyncpg://broker:broker_dev@localhost:5432/broker"
+    TIMESCALE_URL: str = "postgresql+asyncpg://broker:broker_dev@localhost:5433/marketdata"
     REDIS_URL: str = "redis://localhost:6379/0"
 
     JWT_SECRET: str = "dev-secret-change-in-production"
@@ -49,7 +57,7 @@ class Settings(BaseSettings):
     COOKIE_SAMESITE: str = "strict"  # lax | strict | none
     # If None, Secure flag follows the incoming request (HTTPS / X-Forwarded-Proto).
     COOKIE_SECURE: bool | None = None
-    # Cookie Domain attribute. Set to a parent domain (e.g. ".swisdex.com") to share
+    # Cookie Domain attribute. Set to a parent domain (e.g. ".example.com") to share
     # the auth session across the apex and subdomains (trade.*, etc.). Leave empty to
     # let the browser set a host-only cookie (works for single-host dev/local setups).
     COOKIE_DOMAIN: str = ""
@@ -63,8 +71,8 @@ class Settings(BaseSettings):
     ADMIN_JWT_ALGORITHM: str = "HS256"
     ADMIN_JWT_EXPIRY_HOURS: int = 8
 
-    ADMIN_EMAIL: str = "admin@swisdex.com"
-    ADMIN_PASSWORD: str = "SwisDexAdmin2025!"
+    ADMIN_EMAIL: str = "admin@example.com"
+    ADMIN_PASSWORD: str = "ChangeMeAdmin2026!"
     USER_JWT_SECRET: str = "dev-secret-change-in-production"
     USER_JWT_ALGORITHM: str = "HS256"
 
@@ -78,16 +86,16 @@ class Settings(BaseSettings):
     # Email branding — used by the shared layout in email_templates/base.py.
     # EMAIL_LOGO_URL must be an absolute https URL because email clients
     # cannot resolve relative paths or render images from blob/data URIs.
-    # If empty, the layout falls back to the styled "SwisDex" wordmark text.
+    # If empty, the layout falls back to the styled BRAND_NAME wordmark text.
     # The email header renders on a DARK band (email_templates/base.py), so the
-    # logo must be the WHITE-lettered asset (swisdex_png5.png). A dark header is
+    # logo must be a WHITE-lettered asset. A dark header is
     # the only reliable choice across clients: Gmail's dark mode forcibly
     # darkens light backgrounds (which made the old dark-lettered logo on a
     # white header vanish), but it never lightens an already-dark background —
     # so a white logo on a dark header stays visible in both light and dark
     # mode. Override in .env if a tenant ships a custom logo. Must be an
     # absolute https URL because email clients can't resolve relative paths.
-    EMAIL_LOGO_URL: str = "https://swisdex.com/images/swisdex_png5.png"
+    EMAIL_LOGO_URL: str = ""
 
     # Mobile app store links — when set, the email footer renders the
     # "Get the app" section with App Store + Google Play badges. Leave
@@ -95,8 +103,8 @@ class Settings(BaseSettings):
     # whole section. The badges themselves are served from EMAIL_*_BADGE_URL.
     IOS_APP_URL: str = ""
     ANDROID_APP_URL: str = ""
-    EMAIL_IOS_BADGE_URL: str = "https://swisdex.com/images/email/app-store-badge.png"
-    EMAIL_ANDROID_BADGE_URL: str = "https://swisdex.com/images/email/google-play-badge.png"
+    EMAIL_IOS_BADGE_URL: str = ""
+    EMAIL_ANDROID_BADGE_URL: str = ""
 
     # Optional SMTP — required for password-reset emails in non-dev. If SMTP_HOST is empty, reset links are only logged in development.
     SMTP_HOST: str = ""
@@ -104,11 +112,11 @@ class Settings(BaseSettings):
     SMTP_USER: str = ""
     SMTP_PASSWORD: str = ""
     SMTP_FROM: str = ""
-    # Display name shown in the user's inbox (e.g. "SwisDex <noreply@…>").
+    # Display name shown in the user's inbox (e.g. "YourBrand <noreply@…>").
     # We wrap whatever address SMTP_FROM holds with this display name, so
-    # the inbox preview reads "SwisDex" even if the mail provider's
-    # underlying account is named differently.
-    MAIL_FROM_NAME: str = "SwisDex"
+    # the inbox preview reads as the brand even if the mail provider's
+    # underlying account is named differently. Empty ⇒ falls back to BRAND_NAME.
+    MAIL_FROM_NAME: str = ""
     SMTP_USE_TLS: bool = True
     # Comma-separated exact addresses that must NEVER be emailed — team test
     # accounts whose mailbox doesn't exist (e.g. ib1@gmail.com). Every mail to
@@ -119,7 +127,7 @@ class Settings(BaseSettings):
     # Destination inbox for the public website contact form
     # (POST /api/v1/public/contact). Comma-separated to fan out to more
     # than one mailbox.
-    CONTACT_INBOX_EMAIL: str = "support@swisdex.com"
+    CONTACT_INBOX_EMAIL: str = "support@example.com"
 
     # ─── Per-category From aliases (Hostinger / any SMTP) ────────────────
     # SMTP authenticates as SMTP_USER (the mailbox owner) but the visible
@@ -214,16 +222,16 @@ class Settings(BaseSettings):
     # the market-data service stops running its own AllTick / simulator feed and
     # consumes ticks pushed from Corecen via POST /api/lp/prices/batch (HMAC).
     CORECEN_LP_ENABLED: bool = False
-    # HMAC credentials — must match SWISDEX_API_KEY / SWISDEX_API_SECRET in the Corecen .env.
+    # HMAC credentials — must match the broker API key/secret pair in the Corecen .env.
     CORECEN_LP_API_KEY: str = ""
     CORECEN_LP_API_SECRET: str = ""
     # Reject pushes older than this many ms (same tolerance as Corecen's HMAC middleware).
     CORECEN_LP_TIMESTAMP_TOLERANCE_MS: int = 60_000
 
     # Corecen Broker API (A-Book trade forwarding). When an A-Book user opens/closes
-    # a position, SwisDex pushes the trade to Corecen's broker API for LP routing.
+    # a position, the platform pushes the trade to Corecen's broker API for LP routing.
     # These credentials are the API key/secret registered in Corecen's admin panel
-    # for the SwisDex broker account.
+    # for this broker's account.
     CORECEN_BROKER_API_URL: str = ""       # e.g. https://api.corecen.com
     CORECEN_BROKER_API_KEY: str = ""       # ck_... from Corecen broker API keys
     CORECEN_BROKER_API_SECRET: str = ""    # cs_... from Corecen broker API keys
@@ -256,7 +264,7 @@ class Settings(BaseSettings):
     NOWPAYMENTS_API_KEY: str = ""
     NOWPAYMENTS_IPN_SECRET: str = ""    # IPN HMAC secret from dashboard
     NOWPAYMENTS_SANDBOX: bool = False
-    NOWPAYMENTS_CALLBACK_BASE_URL: str = ""  # e.g. "https://api.swisdex.com"
+    NOWPAYMENTS_CALLBACK_BASE_URL: str = ""  # e.g. "https://api.example.com"
     # Automatic crypto WITHDRAWALS (payouts) use the /v1/payout API, which needs
     # a JWT obtained from the account login (separate from the x-api-key used for
     # deposits). Disable whitelisting + 2FA on the NOWPayments dashboard for

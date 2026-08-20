@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from decimal import Decimal
 
+from ..config import get_settings
 from .base import render_layout, kv_table
 
 
@@ -43,13 +44,16 @@ def render_statement_digest(
     fr_interest_credited: Decimal | float = 0,
     insurance_refunds: Decimal | float = 0,
     currency: str = "USD",
-    trader_app_url: str = "https://trade.swisdex.com",
+    trader_app_url: str = "",
 ) -> tuple[str, str, str]:
+    s = get_settings()
+    brand = (s.BRAND_NAME or "").strip() or "YourBrand"
+    trader_app_url = (trader_app_url or "").strip() or s.TRADER_APP_URL
     name = (first_name or "trader").strip() or "trader"
     cadence = "weekly" if period_kind == "weekly" else "monthly"
 
     intro = (
-        f"Your {cadence} SwisDex statement for {period_label}. Numbers "
+        f"Your {cadence} {brand} statement for {period_label}. Numbers "
         "below are based on activity settled to your trading and main "
         "wallet during the period."
     )
@@ -92,7 +96,7 @@ def render_statement_digest(
     </p>
     """
 
-    subject = f"Your SwisDex {cadence} statement — {period_label}"
+    subject = f"Your {brand} {cadence} statement — {period_label}"
     html = render_layout(
         title=f"{cadence.title()} statement",
         intro=intro,
@@ -104,7 +108,7 @@ def render_statement_digest(
     text_lines = [
         f"Hi {name},",
         "",
-        f"Your {cadence} SwisDex statement for {period_label}.",
+        f"Your {cadence} {brand} statement for {period_label}.",
         "",
         f"Realized P/L:        {_fmt_money(realized_pnl, currency)}",
         f"Trades closed:       {_fmt_int(trades_closed)}",

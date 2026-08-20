@@ -3,7 +3,7 @@
 @tailwind utilities;
 
 /* ============================================================
-   SwisDex — Landing Design System
+   Landing Design System
    Brand: gold mandala on near-black. Premium institutional.
    Tokens are scoped under .landing-root so they never leak
    into the trader app shell.

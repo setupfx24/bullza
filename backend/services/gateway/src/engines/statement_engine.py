@@ -204,7 +204,7 @@ async def send_due_statements(db: AsyncSession) -> tuple[int, int]:
 
     weekly_start, weekly_end, weekly_label = _week_window(now)
     monthly_start, monthly_end, monthly_label = _month_window(now)
-    app_url = (get_settings().TRADER_APP_URL or "https://trade.swisdex.com")
+    app_url = get_settings().TRADER_APP_URL
 
     weekly_cutoff = now - timedelta(days=WEEKLY_RESEND_DAYS)
     monthly_cutoff = now - timedelta(days=MONTHLY_RESEND_DAYS)

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# SwisDex — restore Postgres (and optionally uploads + timescaledb) from
+# Restore Postgres (and optionally uploads + timescaledb) from
 # backup files produced by scripts/backup.sh.
 #
 # Usage:
@@ -20,7 +20,8 @@ set -euo pipefail
 DUMP="${1:?dump path required}"
 UPLOADS="${2:-}"
 TS_DUMP="${3:-}"
-COMPOSE_DIR="${SWISDEX_DIR:-/opt/swisdex}"
+# APP_DIR is canonical; legacy SWISDEX_DIR honoured as fallback.
+COMPOSE_DIR="${APP_DIR:-${SWISDEX_DIR:-/opt/broker}}"
 GPG_RECIPIENT="${BACKUP_GPG_RECIPIENT:-}"
 GPG_PASS_FILE="${BACKUP_GPG_PASSPHRASE_FILE:-}"
 
@@ -60,7 +61,7 @@ echo "[restore] starting postgres alone"
 docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d postgres
 for i in $(seq 1 30); do
   if docker compose -f docker-compose.yml -f docker-compose.prod.yml exec -T postgres \
-       pg_isready -U "${POSTGRES_USER:-swisdex}" >/dev/null 2>&1; then
+       pg_isready -U "${POSTGRES_USER:-broker}" >/dev/null 2>&1; then
     break
   fi
   sleep 1
@@ -69,7 +70,7 @@ done
 echo "[restore] decrypting + piping $DUMP → psql"
 decrypt_stream "$DUMP" | gunzip -c | \
   docker compose -f docker-compose.yml -f docker-compose.prod.yml \
-    exec -T postgres psql -U "${POSTGRES_USER:-swisdex}" -d postgres -v ON_ERROR_STOP=1
+    exec -T postgres psql -U "${POSTGRES_USER:-broker}" -d postgres -v ON_ERROR_STOP=1
 
 # ─── TimescaleDB (optional) ───────────────────────────────────────────
 if [[ -n "$TS_DUMP" ]]; then
@@ -77,7 +78,7 @@ if [[ -n "$TS_DUMP" ]]; then
   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d timescaledb
   for i in $(seq 1 30); do
     if docker compose -f docker-compose.yml -f docker-compose.prod.yml exec -T timescaledb \
-         pg_isready -U "${TIMESCALE_USER:-swisdex}" >/dev/null 2>&1; then
+         pg_isready -U "${TIMESCALE_USER:-broker}" >/dev/null 2>&1; then
       break
     fi
     sleep 1
@@ -85,7 +86,7 @@ if [[ -n "$TS_DUMP" ]]; then
   echo "[restore] decrypting + piping $TS_DUMP → timescale psql"
   decrypt_stream "$TS_DUMP" | gunzip -c | \
     docker compose -f docker-compose.yml -f docker-compose.prod.yml \
-      exec -T timescaledb psql -U "${TIMESCALE_USER:-swisdex}" -d postgres -v ON_ERROR_STOP=1
+      exec -T timescaledb psql -U "${TIMESCALE_USER:-broker}" -d postgres -v ON_ERROR_STOP=1
 fi
 
 # ─── Uploads (optional) ───────────────────────────────────────────────

@@ -14,6 +14,7 @@ import { clsx } from 'clsx';
 import Link from 'next/link';
 import { Info, Calculator, Search, ChevronDown, X, ArrowUpRight } from 'lucide-react';
 import { usdPipValuePerLot, usdMarginPerLot, suggestedLotSize } from '@/lib/trading/riskMath';
+import { BRAND_NAME } from '@/lib/brand';
 
 type CalcTab = 'margin' | 'pnl' | 'lotsize' | 'swap';
 
@@ -294,7 +295,7 @@ export default function CalculatorPage() {
         </h2>
         <p className="mt-3 text-foreground/65 max-w-xl mx-auto text-sm sm:text-base">
           Margin, profit/loss, lot size and swap — the same calculators you get
-          inside your SwisDex account. Enter your numbers to plan a trade.
+          inside your {BRAND_NAME} account. Enter your numbers to plan a trade.
         </p>
       </div>
 

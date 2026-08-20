@@ -1,5 +1,7 @@
 'use client';
 
+import { BRAND_NAME } from '@/lib/brand';
+
 /**
  * Linked-wallet section for the profile / security page.
  *
@@ -48,7 +50,7 @@ export default function LinkedWalletCard() {
 
   const handleUnlink = async () => {
     if (!canUnlink || unlinking) return;
-    if (!confirm('Unlink this wallet from your SwisDex account?')) return;
+    if (!confirm(`Unlink this wallet from your ${BRAND_NAME} account?`)) return;
     setUnlinking(true);
     try {
       await api.delete('/profile/wallet/link');
@@ -76,7 +78,7 @@ export default function LinkedWalletCard() {
           </h3>
           <p className="text-text-tertiary text-xs mt-0.5 leading-relaxed">
             {linked
-              ? 'Sign in to SwisDex by signing a message with this wallet — no password needed.'
+              ? `Sign in to ${BRAND_NAME} by signing a message with this wallet — no password needed.`
               : 'Link a Web3 wallet (MetaMask, Trust, Rainbow, Coinbase, OKX, …) to sign in without a password.'}
           </p>
         </div>

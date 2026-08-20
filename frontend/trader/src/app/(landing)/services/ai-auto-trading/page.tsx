@@ -6,7 +6,8 @@ import {
   ArrowUpRight, Cpu, Activity, Zap, ShieldCheck, BarChart3,
   Layers, Brain, Gauge, ChevronDown,
 } from 'lucide-react';
-import { BannerPlaceholder } from '@/swisdex/components/BannerPlaceholder';
+import { BannerPlaceholder } from '@/home/components/BannerPlaceholder';
+import { BRAND_NAME } from '@/lib/brand';
 
 const SIGNUP_HREF = '/auth/register';
 
@@ -30,7 +31,7 @@ export default function AiAutoTradingPage() {
             </h2>
             <p className="mt-4 text-foreground/70 text-sm sm:text-base leading-relaxed max-w-xl">
               Built on a multi-strategy ensemble — trend-following, mean-reversion, breakout, and volatility
-              arbitrage — the SwisDex AI engine continuously scans 40+ instruments and acts in milliseconds
+              arbitrage — the {BRAND_NAME} AI engine continuously scans 40+ instruments and acts in milliseconds
               when a high-probability setup forms.
             </p>
             <div className="mt-7 flex flex-wrap gap-3">

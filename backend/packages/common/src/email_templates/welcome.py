@@ -12,6 +12,7 @@ from __future__ import annotations
 
 from html import escape
 
+from ..config import get_settings
 from .base import render_layout
 
 
@@ -37,12 +38,15 @@ def render_welcome(
     trading_id: str | None = None,
 ) -> tuple[str, str, str]:
     name = (first_name or "trader").strip() or "trader"
+    s = get_settings()
+    brand = (s.BRAND_NAME or "").strip() or "YourBrand"
+    support_email = f"support@{(s.BRAND_DOMAIN or '').strip() or 'example.com'}"
 
     intro = (
-        "Thank you for choosing SwisDex. We are excited to welcome you to "
+        f"Thank you for choosing {brand}. We are excited to welcome you to "
         "a growing community of active crypto and derivatives traders using "
         "one of the most advanced decentralized trading ecosystems available "
-        "today. At SwisDex, your funds remain in your wallet while our "
+        f"today. At {brand}, your funds remain in your wallet while our "
         "infrastructure handles seamless and secure trade execution."
     )
     if via_google:
@@ -100,7 +104,7 @@ def render_welcome(
         )
         + _bullet(
             "Introducing Broker (IB)",
-            "Become an Introducing Broker and earn per-lot commissions on the clients you bring to SwisDex.",
+            f"Become an Introducing Broker and earn per-lot commissions on the clients you bring to {brand}.",
         )
         + _bullet(
             "PAMM & MAM Investing",
@@ -120,7 +124,7 @@ def render_welcome(
         if username:
             credentials_html += (
                 '<p style="margin:0 0 6px;color:#6b7280;font-size:13px;">'
-                "To access your SwisDex Dashboard:"
+                f"To access your {escape(brand)} Dashboard:"
                 '</p>'
                 '<p style="margin:0 0 14px;color:#1a1a1a;font-size:14px;">'
                 f'<strong style="color:#1a1a1a;">Username:</strong> '
@@ -146,7 +150,7 @@ def render_welcome(
         )
     why_html = (
         '<p style="margin:28px 0 10px;color:#1a1a1a;font-size:14px;font-weight:700;">'
-        "Why Trade with SwisDex"
+        f"Why Trade with {escape(brand)}"
         '</p>'
         '<ul style="margin:0 0 8px;padding:0 0 0 18px;">'
         + li("Decentralized wallet-based trading")
@@ -166,7 +170,7 @@ def render_welcome(
         '</p>'
         '<p style="margin:14px 0 0;color:#1a1a1a;font-size:13px;line-height:1.6;">'
         "Best regards,<br>"
-        '<strong>The SwisDex Broker House Team</strong>'
+        f'<strong>The {escape(brand)} Broker House Team</strong>'
         '</p>'
         '<p style="margin:18px 0 0;color:#6b7280;font-size:11px;line-height:1.6;">'
         "Trading digital assets and leveraged products involves risk and may "
@@ -176,7 +180,7 @@ def render_welcome(
 
     body_html = experience_html + products_html + credentials_html + why_html + closing
 
-    subject = "Welcome to SwisDex"
+    subject = f"Welcome to {brand}"
     html = render_layout(
         hero_eyebrow="Welcome to the Future of Decentralized Trading",
         title=f"Dear {name},",
@@ -185,13 +189,13 @@ def render_welcome(
         cta_label="Open Dashboard",
         cta_url=f"{trader_app_url.rstrip('/')}/accounts",
         footer_note=(
-            "If you didn't create this account, contact support@swisdex.com immediately."
+            f"If you didn't create this account, contact {support_email} immediately."
         ),
     )
     text = (
         "Welcome to the Future of Decentralized Trading\n\n"
         f"Dear {name},\n\n"
-        "Thank you for choosing SwisDex. We are excited to welcome you to a "
+        f"Thank you for choosing {brand}. We are excited to welcome you to a "
         "growing community of active crypto and derivatives traders.\n\n"
         "Here's what you're about to experience:\n"
         "  • Powerful Web & Mobile Trading Platform — fast, responsive tools for every level.\n"
@@ -212,7 +216,7 @@ def render_welcome(
         text += f"Trading ID: {trading_id}\n"
     text += (
         f"\nOpen your dashboard: {trader_app_url.rstrip('/')}/accounts\n\n"
-        "Why Trade with SwisDex:\n"
+        f"Why Trade with {brand}:\n"
         "  • Decentralized wallet-based trading\n"
         "  • Fast order execution\n"
         "  • Demo & live trading accounts\n"
@@ -222,7 +226,7 @@ def render_welcome(
         "  • 24/7 support assistance\n"
         "  • Daily market insights and platform updates\n\n"
         "Best regards,\n"
-        "The SwisDex Broker House Team\n\n"
-        "Didn't create this account? Email support@swisdex.com immediately.\n"
+        f"The {brand} Broker House Team\n\n"
+        f"Didn't create this account? Email {support_email} immediately.\n"
     )
     return subject, html, text

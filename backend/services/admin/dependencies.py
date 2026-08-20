@@ -14,12 +14,12 @@ from packages.common.src.database import get_db
 from packages.common.src.models import User, Employee
 
 # Bearer header is auto_error=False because we now also accept the
-# `swisdex_admin` httpOnly cookie set by /admin/auth/login. One of the
+# `admin_access` httpOnly cookie set by /admin/auth/login. One of the
 # two must be present for protected routes.
 security = HTTPBearer(auto_error=False)
 settings = get_settings()
 
-ADMIN_COOKIE_NAME = "swisdex_admin"
+ADMIN_COOKIE_NAME = "admin_access"
 
 # High-trust permissions deliberately held by NO employee role below.
 # Because super_admin bypasses the permission check entirely, gating an

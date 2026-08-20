@@ -1,5 +1,7 @@
 'use client';
 
+import { BRAND_DOMAIN, BRAND_SLUG } from '@/lib/brand';
+
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Copy, Download, Link2, Loader2, X } from 'lucide-react';
@@ -77,7 +79,7 @@ export default function ShareTradeModal({ open, onClose, position, leverage = 10
     try {
       const dataUrl = await toPng(cardRef.current, { pixelRatio: 2, cacheBust: true });
       const link = document.createElement('a');
-      link.download = `swisdex-${position.symbol}-${position.side}.png`;
+      link.download = `${BRAND_SLUG}-${position.symbol}-${position.side}.png`;
       link.href = dataUrl;
       link.click();
       toast.success('Image downloaded');
@@ -113,7 +115,7 @@ export default function ShareTradeModal({ open, onClose, position, leverage = 10
                 displayMode={displayMode}
                 pipSize={pipSize}
                 status="active"
-                shortUrl={shareUrl ?? 'swisdex.com/s/xxxxxx'}
+                shortUrl={shareUrl ?? `${BRAND_DOMAIN}/s/xxxxxx`}
               />
             </div>
           </div>

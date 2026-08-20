@@ -1,5 +1,7 @@
 'use client';
 
+import { BRAND_DOMAIN, BRAND_NAME } from '@/lib/brand';
+
 import { useState, useEffect, useCallback } from 'react';
 import { clsx } from 'clsx';
 import toast from 'react-hot-toast';
@@ -222,7 +224,7 @@ export default function ProfilePage() {
   const isDemo = !!useTradingStore((s) => s.activeAccount?.is_demo);
   const displayFirst = isDemo ? 'Demo' : (profile?.first_name ?? '');
   const displayLast = isDemo ? 'Account' : (profile?.last_name ?? '');
-  const displayEmail = isDemo ? 'demo@swisdex.com' : (profile?.email ?? '');
+  const displayEmail = isDemo ? `demo@${BRAND_DOMAIN}` : (profile?.email ?? '');
   const initials = isDemo
     ? 'DA'
     : (`${(profile?.first_name?.[0] ?? '').toUpperCase()}${(profile?.last_name?.[0] ?? '').toUpperCase()}` || 'U');
@@ -249,7 +251,7 @@ export default function ProfilePage() {
             <div className="relative z-10 px-4 sm:px-6 py-5 sm:py-7">
               <h1 className="text-xl sm:text-2xl font-bold text-text-primary tracking-tight">Settings</h1>
               <p className="text-sm text-text-secondary mt-1 max-w-2xl">
-                Profile, security, notifications, and active sessions — aligned with SwisDex.
+                Profile, security, notifications, and active sessions — aligned with {BRAND_NAME}.
               </p>
             </div>
           </section>

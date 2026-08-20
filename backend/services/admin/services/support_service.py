@@ -233,10 +233,12 @@ async def assign_ticket(
             _ordered = sorted(ticket.messages, key=lambda mm: mm.created_at or datetime.min)
             first_msg = (_ordered[0].message or "") if _ordered else ""
         if assignee.email:
+            from packages.common.src.config import get_settings as _gs
+            _brand = _escape(_gs().BRAND_NAME)
             _subj = ticket.subject or "Support ticket"
             _n = len(ticket_attachments)
             _html = (
-                "<p>A support ticket has been <b>assigned to you</b> on SwisDex.</p>"
+                f"<p>A support ticket has been <b>assigned to you</b> on {_brand}.</p>"
                 f"<p><b>Subject:</b> {_escape(_subj)}<br>"
                 f"<b>From:</b> {_escape(submitter_email or 'user')}<br>"
                 f"<b>Priority:</b> {_escape(ticket.priority or 'medium')}<br>"

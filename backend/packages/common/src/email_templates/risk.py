@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from decimal import Decimal
 
+from ..config import get_settings
 from .base import render_layout, kv_table
 
 
@@ -19,8 +20,9 @@ def render_margin_call(
     used_margin: Decimal | float,
     free_margin: Decimal | float,
     currency: str = "USD",
-    trader_app_url: str = "https://trade.swisdex.com",
+    trader_app_url: str = "",
 ) -> tuple[str, str, str]:
+    trader_app_url = (trader_app_url or "").strip() or get_settings().TRADER_APP_URL
     name = (first_name or "trader").strip() or "trader"
     rows: list[tuple[str, str]] = [
         ("Account", account_number),
@@ -75,8 +77,9 @@ def render_stop_out(
     realized_pnl: Decimal | float,
     new_equity: Decimal | float,
     currency: str = "USD",
-    trader_app_url: str = "https://trade.swisdex.com",
+    trader_app_url: str = "",
 ) -> tuple[str, str, str]:
+    trader_app_url = (trader_app_url or "").strip() or get_settings().TRADER_APP_URL
     name = (first_name or "trader").strip() or "trader"
     pnl_label = _fmt_money(realized_pnl, currency)
     if float(realized_pnl or 0) > 0:

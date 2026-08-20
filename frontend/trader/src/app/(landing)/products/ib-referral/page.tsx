@@ -6,7 +6,8 @@ import {
   Users, BarChart3, Wallet, Zap, Headphones, Award, Layers, Share2,
   ChevronDown, ArrowUpRight, Crown, Gem, Sparkles,
 } from 'lucide-react';
-import { BannerPlaceholder } from '@/swisdex/components/BannerPlaceholder';
+import { BannerPlaceholder } from '@/home/components/BannerPlaceholder';
+import { BRAND_NAME } from '@/lib/brand';
 
 /**
  * IB Account Type tier grid — per the client spec sheet delivered 2026-06.
@@ -42,7 +43,7 @@ export default function IbReferralPage() {
     <main className="min-h-screen bg-background">
       <BannerPlaceholder
         title="Become an Introducing Broker"
-        tagline="Refer traders to SwisDex and earn lifetime per-lot commissions — up to $15 per standard lot, paid instantly."
+        tagline={`Refer traders to ${BRAND_NAME} and earn lifetime per-lot commissions — up to $15 per standard lot, paid instantly.`}
       />
 
       {/* How it works */}
@@ -165,7 +166,7 @@ export default function IbReferralPage() {
       {/* Benefits grid */}
       <section id="benefits" className="mx-auto max-w-[1200px] px-[var(--gutter)] py-12 sm:py-16">
         <div className="text-center mb-10">
-          <h2 className="font-display uppercase text-2xl sm:text-3xl md:text-4xl tracking-tight">Why Partner With SwisDex</h2>
+          <h2 className="font-display uppercase text-2xl sm:text-3xl md:text-4xl tracking-tight">Why Partner With {BRAND_NAME}</h2>
         </div>
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
           {[
@@ -225,7 +226,7 @@ export default function IbReferralPage() {
         <h2 className="text-center font-display uppercase text-2xl sm:text-3xl tracking-tight mb-8">FAQ</h2>
         <div className="space-y-3">
           <FaqItem q="Do I need a trading account to become an IB?">
-            Yes. You need a SwisDex account to join the IB program — that's how your unique referral link, commissions, and payouts are tied to you. Opening the account is free and you don't have to place a trade; we still recommend funding a small demo so you understand the product you are recommending.
+            Yes. You need a {BRAND_NAME} account to join the IB program — that's how your unique referral link, commissions, and payouts are tied to you. Opening the account is free and you don't have to place a trade; we still recommend funding a small demo so you understand the product you are recommending.
           </FaqItem>
           <FaqItem q="When are commissions paid?">
             Commissions are paid instantly — the moment your referral closes a lot, the rebate hits your wallet. Payouts go to your preferred method — crypto, bank wire, or local rails.

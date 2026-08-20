@@ -8,6 +8,37 @@ import toast from 'react-hot-toast';
 
 const STAFF_ROLES = new Set(['admin', 'super_admin', 'employee', 'manager', 'support']);
 
+/**
+ * Public (no-auth) route check — SINGLE source of truth.
+ * Previously this expression was duplicated verbatim in the redirect
+ * effect and the pre-init render branch, so every new public route had
+ * to be added twice (and drift silently broke one path or the other).
+ * Keep in sync with PROTECTED_PREFIXES in src/middleware.ts, which
+ * enforces the same boundary server-side.
+ */
+function isPublicPath(pathname: string | null): boolean {
+  const p = pathname || '';
+  if (p.startsWith('/auth')) return true;
+  if (p.startsWith('/s/')) return true;
+  if (
+    p === '/' ||
+    p === '/markets' ||
+    p === '/account-types' ||
+    p === '/how-it-works' ||
+    p === '/bonus' ||
+    p.startsWith('/academy') ||
+    p.startsWith('/risk-management') ||
+    p.startsWith('/products') ||
+    p.startsWith('/services') ||
+    p.startsWith('/company') ||
+    p.startsWith('/education')
+  ) return true;
+  if (['/trading/forex', '/trading/commodities', '/trading/indices', '/trading/crypto'].includes(p)) return true;
+  if (['/platforms/web', '/platforms/copy-trading', '/platforms/prop-trading', '/platforms/ib-management', '/platforms/super-admin'].includes(p)) return true;
+  if (['/accounts/standard', '/accounts/pro', '/accounts/demo'].includes(p)) return true;
+  return ['/privacy', '/terms', '/risk', '/about', '/contact', '/platforms', '/white-label'].includes(p);
+}
+
 function MaintenanceScreen() {
   return (
     <div style={{
@@ -72,23 +103,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (isInitialized) {
       const isAuthPage = pathname?.startsWith('/auth');
-      const isLandingPage =
-        pathname === '/' ||
-        pathname === '/markets' ||
-        pathname === '/account-types' ||
-        pathname === '/how-it-works' ||
-        pathname === '/bonus' ||
-        pathname?.startsWith('/academy') ||
-        pathname?.startsWith('/risk-management') ||
-        pathname?.startsWith('/products') ||
-        pathname?.startsWith('/services') ||
-        pathname?.startsWith('/company') ||
-        pathname?.startsWith('/education') ||
-        ['/trading/forex', '/trading/commodities', '/trading/indices', '/trading/crypto'].includes(pathname || '') ||
-        ['/platforms/web', '/platforms/copy-trading', '/platforms/prop-trading', '/platforms/ib-management', '/platforms/super-admin'].includes(pathname || '') ||
-        ['/accounts/standard', '/accounts/pro', '/accounts/demo'].includes(pathname || '');
       const isSharePage = pathname?.startsWith('/s/');
-      const isPublic = isLandingPage || isSharePage || pathname === '/privacy' || pathname === '/terms' || pathname === '/risk' || pathname === '/about' || pathname === '/contact' || pathname === '/platforms' || pathname === '/white-label';
+      const isPublic = isPublicPath(pathname);
 
       if (!isAuthenticated && !isAuthPage && !isPublic) {
         router.push('/auth/login');
@@ -102,24 +118,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   /* Skip loading screen for landing & auth pages — render immediately */
   if (!isInitialized) {
-    const isAuthPage = pathname?.startsWith('/auth');
-    const isLanding =
-      pathname === '/' ||
-      pathname === '/markets' ||
-      pathname === '/account-types' ||
-      pathname === '/how-it-works' ||
-      pathname === '/bonus' ||
-      pathname?.startsWith('/academy') ||
-      pathname?.startsWith('/risk-management') ||
-      pathname?.startsWith('/products') ||
-      pathname?.startsWith('/services') ||
-      pathname?.startsWith('/company') ||
-      pathname?.startsWith('/education') ||
-      ['/trading/forex', '/trading/commodities', '/trading/indices', '/trading/crypto'].includes(pathname || '') ||
-      ['/platforms/web', '/platforms/copy-trading', '/platforms/prop-trading', '/platforms/ib-management', '/platforms/super-admin'].includes(pathname || '') ||
-      ['/accounts/standard', '/accounts/pro', '/accounts/demo'].includes(pathname || '');
-    const isSharePage = pathname?.startsWith('/s/');
-    const isPublicPage = isLanding || isAuthPage || isSharePage || pathname === '/privacy' || pathname === '/terms' || pathname === '/risk' || pathname === '/about' || pathname === '/contact' || pathname === '/platforms' || pathname === '/white-label';
+    const isPublicPage = isPublicPath(pathname);
 
     /* Already know maintenance is ON from persisted store → block immediately */
     if (!isPublicPage && maintenance) return <MaintenanceScreen />;

@@ -62,15 +62,15 @@ REF_COMM_TARGET = Decimal("120")
 
 # 9 new downline (ref4..ref12). ib amounts sum to 134 (75 existing + 134 = 209).
 NEW_DOWNLINE = [
-    ("amardeep.ref4@swisdex-promo.local",  "Sanjay",  "Patel",   Decimal("18"), 58),
-    ("amardeep.ref5@swisdex-promo.local",  "Neha",    "Gupta",   Decimal("16"), 52),
-    ("amardeep.ref6@swisdex-promo.local",  "Vikram",  "Singh",   Decimal("14"), 46),
-    ("amardeep.ref7@swisdex-promo.local",  "Anjali",  "Nair",    Decimal("20"), 40),
-    ("amardeep.ref8@swisdex-promo.local",  "Rohit",   "Joshi",   Decimal("12"), 34),
-    ("amardeep.ref9@swisdex-promo.local",  "Kavya",   "Reddy",   Decimal("10"), 28),
-    ("amardeep.ref10@swisdex-promo.local", "Manish",  "Kulkarni",Decimal("16"), 20),
-    ("amardeep.ref11@swisdex-promo.local", "Pooja",   "Iyer",    Decimal("14"), 14),
-    ("amardeep.ref12@swisdex-promo.local", "Deepak",  "Chauhan", Decimal("14"), 8),
+    ("amardeep.ref4@promo-demo.local",  "Sanjay",  "Patel",   Decimal("18"), 58),
+    ("amardeep.ref5@promo-demo.local",  "Neha",    "Gupta",   Decimal("16"), 52),
+    ("amardeep.ref6@promo-demo.local",  "Vikram",  "Singh",   Decimal("14"), 46),
+    ("amardeep.ref7@promo-demo.local",  "Anjali",  "Nair",    Decimal("20"), 40),
+    ("amardeep.ref8@promo-demo.local",  "Rohit",   "Joshi",   Decimal("12"), 34),
+    ("amardeep.ref9@promo-demo.local",  "Kavya",   "Reddy",   Decimal("10"), 28),
+    ("amardeep.ref10@promo-demo.local", "Manish",  "Kulkarni",Decimal("16"), 20),
+    ("amardeep.ref11@promo-demo.local", "Pooja",   "Iyer",    Decimal("14"), 14),
+    ("amardeep.ref12@promo-demo.local", "Deepak",  "Chauhan", Decimal("14"), 8),
 ]
 
 # Insurance: number of CLAIMED (loss) + EXPIRED (profit) policies to attach to

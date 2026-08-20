@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from decimal import Decimal
 
+from ..config import get_settings
 from .base import render_layout, kv_table
 
 
@@ -18,8 +19,11 @@ def render_deposit_confirmed(
     method: str | None = None,
     reference: str | None = None,
     new_balance: Decimal | float | None = None,
-    trader_app_url: str = "https://trade.swisdex.com",
+    trader_app_url: str = "",
 ) -> tuple[str, str, str]:
+    s = get_settings()
+    trader_app_url = (trader_app_url or "").strip() or s.TRADER_APP_URL
+    support_email = f"support@{(s.BRAND_DOMAIN or '').strip() or 'example.com'}"
     name = (first_name or "trader").strip() or "trader"
     rows: list[tuple[str, str]] = [
         ("Amount", _fmt_money(amount, currency)),
@@ -40,7 +44,7 @@ def render_deposit_confirmed(
         cta_label="View Wallet",
         cta_url=f"{trader_app_url.rstrip('/')}/wallet",
         footer_note=(
-            "If you didn't make this deposit, contact support@swisdex.com immediately."
+            f"If you didn't make this deposit, contact {support_email} immediately."
         ),
     )
     text_lines = [
@@ -60,6 +64,6 @@ def render_deposit_confirmed(
         "",
         f"View your wallet: {trader_app_url.rstrip('/')}/wallet",
         "",
-        "Didn't make this deposit? Email support@swisdex.com immediately.",
+        f"Didn't make this deposit? Email {support_email} immediately.",
     ]
     return subject, html, "\n".join(text_lines)

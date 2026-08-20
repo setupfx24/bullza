@@ -2,6 +2,7 @@ import { Clock, BarChart } from 'lucide-react'
 import Card from '../components/Card'
 import Button from '../components/Button'
 import ScrollReveal, { ScrollRevealGroup, ScrollRevealItem } from '../components/animations/ScrollReveal'
+import { BRAND_NAME } from '@/lib/brand'
 
 const Tutorials = () => {
   const courses = [
@@ -31,7 +32,7 @@ const Tutorials = () => {
     },
     {
       title: 'Algorithmic & Copy Trading',
-      description: 'Learn to set up automated strategies and copy trading on SwisDex.',
+      description: `Learn to set up automated strategies and copy trading on ${BRAND_NAME}.`,
       duration: '5 hours',
       level: 'Advanced',
       lessons: 25,
@@ -115,7 +116,7 @@ const Tutorials = () => {
           <ScrollReveal variant="fadeUp">
             <div className="glass-card p-12 text-center max-w-4xl mx-auto">
               <h2 className="text-3xl md:text-4xl font-bold text-white mb-6">
-                Why Learn with SwisDex?
+                Why Learn with {BRAND_NAME}?
               </h2>
               <div className="grid md:grid-cols-3 gap-8 mb-8">
                 <div>

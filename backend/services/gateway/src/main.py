@@ -1,4 +1,4 @@
-"""SwisDex Gateway — REST + WebSocket API Server."""
+"""Trading Gateway — REST + WebSocket API Server."""
 import asyncio
 import json
 import logging
@@ -38,6 +38,7 @@ from .engines.eligibility_nudge_engine import eligibility_nudge_engine
 from .engines.statement_engine import statement_engine
 from .engines.payout_engine import payout_engine
 from .engines.nowpayments_reconcile_engine import nowpayments_reconcile_engine
+from .engines.abook_outbox_engine import abook_outbox_engine
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)-5s [%(name)s] %(message)s")
 logger = logging.getLogger("gateway")
@@ -102,7 +103,9 @@ async def lifespan(app: FastAPI):
     await statement_engine.start()
     await payout_engine.start()
     await nowpayments_reconcile_engine.start()
+    await abook_outbox_engine.start()
     yield
+    await abook_outbox_engine.stop()
     await nowpayments_reconcile_engine.stop()
     await payout_engine.stop()
     await statement_engine.stop()
@@ -121,7 +124,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="SwisDex Gateway",
+    title=f"{settings.BRAND_NAME} Gateway",
     version="1.0.0",
     description="Forex CFD B-Book Trading Platform API",
     lifespan=lifespan,
@@ -164,7 +167,7 @@ app.include_router(webhooks.router, prefix="/api/v1/webhooks", tags=["Webhooks"]
 app.include_router(lp_receiver.router, prefix="/api/lp", tags=["LP Receiver"])
 app.include_router(share.router, prefix="/api/v1", tags=["Share Trade"])
 app.include_router(share.public_router, prefix="/api/v1/public", tags=["Public Share"])
-# Public — no JWT. Website contact form → CONTACT_INBOX_EMAIL (support@swisdex.com).
+# Public — no JWT. Website contact form → CONTACT_INBOX_EMAIL.
 app.include_router(contact.public_router, prefix="/api/v1/public", tags=["Contact Form"])
 app.include_router(insurance.router, prefix="/api/v1/insurance", tags=["Trade Insurance"])
 app.include_router(rewards.router, prefix="/api/v1/rewards", tags=["Rewards"])
@@ -465,37 +468,8 @@ async def trade_stream(websocket: WebSocket, account_id: str, token: str | None 
         await pubsub.close()
 
 
-@app.websocket("/ws/admin")
-async def admin_stream(websocket: WebSocket, token: str | None = Query(default=None)):
-    token = _ws_token(websocket, token)
-    user = _verify_ws_token(token)
-    if not user or user["role"] not in ("admin", "super_admin"):
-        await websocket.close(code=4003, reason="Admin access required")
-        return
-
-    await websocket.accept()
-    pubsub = redis_client.pubsub()
-    await pubsub.subscribe("admin:trades", "admin:deposits", "admin:alerts")
-
-    try:
-        ping_interval = 30
-        last_ping = asyncio.get_event_loop().time()
-        while True:
-            message = await pubsub.get_message(ignore_subscribe_messages=True, timeout=0.1)
-            if message and message["type"] == "message":
-                await websocket.send_text(json.dumps({
-                    "channel": message["channel"],
-                    "data": message["data"],
-                }))
-
-            now = asyncio.get_event_loop().time()
-            if now - last_ping >= ping_interval:
-                await websocket.send_json({"type": "ping"})
-                last_ping = now
-
-            await asyncio.sleep(0.01)
-    except WebSocketDisconnect:
-        pass
-    finally:
-        await pubsub.unsubscribe("admin:trades", "admin:deposits", "admin:alerts")
-        await pubsub.close()
+# NOTE: the former /ws/admin endpoint was removed (2026-08-20 review) —
+# it subscribed to admin:trades / admin:deposits / admin:alerts, channels
+# that no producer anywhere in the codebase publishes to, and the admin
+# frontend never opened the socket. Re-add alongside real producers if an
+# admin live feed is ever built.

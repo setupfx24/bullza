@@ -17,6 +17,8 @@
  * below "Good" is rejected at submit time.
  */
 
+import { BRAND_NAME } from '@/lib/brand';
+
 /** Top weak passwords + obvious sequence patterns. Lower-cased on check.
  *  Kept short on purpose — full breach corpus belongs on the server.   */
 const COMMON_WEAK_PASSWORDS = new Set([
@@ -28,8 +30,21 @@ const COMMON_WEAK_PASSWORDS = new Set([
   'qazwsxedc', '1q2w3e4r', '1qaz2wsx', 'q1w2e3r4', 'master123', 'shadow123',
   'dragon123', 'trustno1', 'startrek', 'starwars', 'superman', 'batman123',
   'pakistan', 'india123', 'hello123', 'changeme', 'demo1234', 'test1234',
-  'guest123', 'user1234', 'root1234', 'swisdex123', 'swisdex2025', 'swisdex2026',
+  'guest123', 'user1234', 'root1234',
 ]);
+
+// Brand-derived weak passwords ("<brand>123", "<brand>2025", "<brand>2026") —
+// derived from BRAND_NAME so every white-label build blocks its own brand name
+// as a password base without hardcoding any brand literal. Skipped for very
+// short names where the suffix would dominate the string.
+{
+  const b = BRAND_NAME.toLowerCase().replace(/\s+/g, '');
+  if (b.length >= 4) {
+    for (const suffix of ['123', '2025', '2026']) {
+      COMMON_WEAK_PASSWORDS.add(`${b}${suffix}`);
+    }
+  }
+}
 
 export type Strength = 0 | 1 | 2 | 3 | 4;
 

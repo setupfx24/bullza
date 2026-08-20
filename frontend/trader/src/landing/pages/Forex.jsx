@@ -1,4 +1,5 @@
 import TradingPageTemplate from '../components/TradingPageTemplate'
+import { BRAND_NAME } from '@/lib/brand'
 
 const Forex = () => {
   const data = {
@@ -12,7 +13,7 @@ const Forex = () => {
     ],
     about: {
       title: 'What is Forex Trading?',
-      description: 'Forex (foreign exchange) is the world\'s largest and most liquid financial market, with over $6 trillion traded daily. Trade major, minor, and exotic currency pairs with SwisDex and benefit from tight spreads, fast execution, and advanced trading tools. Whether you\'re a beginner or professional trader, our platform provides everything you need to succeed in the forex market.'
+      description: `Forex (foreign exchange) is the world's largest and most liquid financial market, with over $6 trillion traded daily. Trade major, minor, and exotic currency pairs with ${BRAND_NAME} and benefit from tight spreads, fast execution, and advanced trading tools. Whether you're a beginner or professional trader, our platform provides everything you need to succeed in the forex market.`
     },
     instruments: [
       { symbol: 'EUR/USD', spread: '0.0 pips', leverage: '1:500', margin: '0.2%' },

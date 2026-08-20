@@ -313,7 +313,7 @@ export default function EmployeesPage() {
                         <div className="flex items-center justify-end gap-1.5">
                           <button onClick={async () => {
                             try {
-                              // Backend sets the swisdex_admin httpOnly cookie on the response;
+                              // Backend sets the admin_access httpOnly cookie on the response;
                               // hard-reload makes the next page boot with the impersonated session.
                               const res = await adminApi.post<{ access_token: string; employee_email: string; employee_role: string }>(`/employees/${emp.id}/login-as`);
                               toast.success(`Logging in as ${res.employee_email} (${res.employee_role})`);

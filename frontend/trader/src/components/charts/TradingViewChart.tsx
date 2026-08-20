@@ -1,5 +1,7 @@
 'use client';
 
+import { BRAND_SLUG } from '@/lib/brand';
+
 import { useMemo, memo } from 'react';
 import { usePathname } from 'next/navigation';
 import { clsx } from 'clsx';
@@ -19,7 +21,7 @@ function buildWidgetEmbedUrl(
 ): string {
   const tvSymbol = toTradingViewSymbol(symbol);
   // Use the viewer's resolved timezone. Default fallback = Asia/Kolkata
-  // for SwisDex's India-based audience when the browser returns 'UTC'.
+  // for the platform's India-based audience when the browser returns 'UTC'.
   // ALIAS map normalises legacy IANA names (e.g. Asia/Calcutta →
   // Asia/Kolkata) — TradingView only honours the canonical form, and
   // without this remap the clock silently falls back to UTC. Mirrors
@@ -60,7 +62,7 @@ function buildWidgetEmbedUrl(
     enabled_features: '[]',
     disabled_features: '[]',
     locale: 'en',
-    utm_source: typeof window !== 'undefined' ? window.location.hostname || 'swisdex' : 'swisdex',
+    utm_source: typeof window !== 'undefined' ? window.location.hostname || BRAND_SLUG : BRAND_SLUG,
     utm_medium: 'widget',
     utm_campaign: 'chart',
     utm_term: tvSymbol,

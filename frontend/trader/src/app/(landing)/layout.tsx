@@ -5,17 +5,17 @@ import { usePathname } from 'next/navigation'
 import { PopupProvider } from '@/landing/components/PopupContext'
 import ScrollProgress from '@/landing/components/animations/ScrollProgress'
 import Footer from '@/landing/components/Footer'
-import { Navbar as SwisDexNavbar } from '@/swisdex/components/Navbar'
-import { ChatBot } from '@/swisdex/components/ChatBot'
-import { ScrollToTopButton } from '@/swisdex/components/ScrollToTopButton'
-import { TrustBadges } from '@/swisdex/components/TrustBadges'
-import { AppStoreButtons } from '@/swisdex/components/AppStoreButtons'
-import '@/swisdex/styles.css'
+import { Navbar as HomeNavbar } from '@/home/components/Navbar'
+import { ChatBot } from '@/home/components/ChatBot'
+import { ScrollToTopButton } from '@/home/components/ScrollToTopButton'
+import { TrustBadges } from '@/home/components/TrustBadges'
+import { AppStoreButtons } from '@/home/components/AppStoreButtons'
+import '@/home/styles.css'
 import '@/landing/landing.css'
 
 /**
  * Landing layout — wraps every page under (landing). The home page (/)
- * brings its own self-contained chrome (see /swisdex/HomePage), so we
+ * brings its own self-contained chrome (see src/home/HomePage), so we
  * skip the legacy Navbar/Footer + scrub the body padding on that exact
  * path. All inner pages (about, contact, how-it-works, etc.) keep the
  * existing landing chrome unchanged.
@@ -52,8 +52,8 @@ export default function LandingLayout({ children }: { children: React.ReactNode 
   return (
     <PopupProvider>
       <ScrollProgress />
-      <div className="swisdex-home landing-root min-h-screen">
-        <SwisDexNavbar />
+      <div className="brand-home landing-root min-h-screen">
+        <HomeNavbar />
         {children}
         <AppStoreButtons />
         <TrustBadges />

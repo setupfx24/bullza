@@ -1,4 +1,4 @@
-# Stop all native SwisDex dev processes + infra containers.
+# Stop all native dev processes + infra containers.
 # Kills processes listening on the dev ports, then stops the DB/redis containers.
 
 $ports = 8000, 8001, 3000, 3001

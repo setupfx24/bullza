@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { SwisDexWordmark } from '@/components/layout/SwisDexWordmark';
+import { BrandWordmark } from '@/components/layout/BrandWordmark';
 import {
   Search,
   LayoutTemplate,
@@ -91,7 +91,7 @@ export default function TerminalLeftRail({
     >
       <div className="flex flex-col items-center gap-0.5 pt-2 pb-1 px-1.5">
         <div className="mb-1 flex justify-center w-full">
-          <SwisDexWordmark href="/accounts" variant="rail" />
+          <BrandWordmark href="/accounts" variant="rail" />
         </div>
         <RailBtn title="Search symbols" onClick={onFocusSymbolSearch}>
           <Search size={17} strokeWidth={1.75} />
@@ -100,14 +100,14 @@ export default function TerminalLeftRail({
 
       <div className="flex-1 flex flex-col items-center px-1.5 overflow-y-auto overflow-x-hidden min-h-0 py-1">
         <RailBtn
-          title="Buy / Sell — order panel"
+          title="Buy / Sell â€” order panel"
           active={!terminalMarketsOpen && !chartExpanded && !terminalNewsOpen}
           onClick={onPanelsSelectOrder}
         >
           <LayoutTemplate size={17} strokeWidth={1.75} />
         </RailBtn>
         <RailBtn
-          title="Live news — TradingView timeline"
+          title="Live news â€” TradingView timeline"
           active={terminalNewsOpen && !chartExpanded}
           onClick={onPanelsSelectNews}
         >

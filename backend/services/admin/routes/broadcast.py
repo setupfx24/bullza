@@ -226,7 +226,7 @@ async def send_maintenance_broadcast(
             "sample_subject": (body.subject or "").strip() or f"Scheduled maintenance — {body.window_label}",
         }
 
-    app_url = (get_settings().TRADER_APP_URL or "https://trade.swisdex.com")
+    app_url = get_settings().TRADER_APP_URL
     sent_count = 0
     for idx, u in enumerate(recipients):
         try:

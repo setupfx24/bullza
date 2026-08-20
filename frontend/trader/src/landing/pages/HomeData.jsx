@@ -8,6 +8,7 @@ import {
   Wallet, CircleDollarSign, QrCode, Moon,
   Award, BarChart2
 } from 'lucide-react'
+import { BRAND_NAME } from '@/lib/brand'
 
 export const whyFeatures = [
   { icon: <Droplet size={20} />, title: 'Institutional-Grade Liquidity', desc: 'We connect traders to deep liquidity pools sourced from premium financial institutions, ensuring minimal slippage and competitive pricing.', color: 'text-primary-accent', bg: 'bg-primary-accent/10' },
@@ -85,8 +86,8 @@ export const stats = [
 ]
 
 export const testimonials = [
-  { quote: "SwisDex provides one of the fastest executions I've experienced. The platform is clean and the spreads are consistently tight.", author: 'Michael R.', role: 'Professional Forex Trader', rating: 5 },
-  { quote: "Clean platform, tight spreads, and reliable support. I've been trading with SwisDex for over a year and the experience has been excellent.", author: 'Emma Wilson', role: 'Active Forex Trader', rating: 5 },
+  { quote: `${BRAND_NAME} provides one of the fastest executions I've experienced. The platform is clean and the spreads are consistently tight.`, author: 'Michael R.', role: 'Professional Forex Trader', rating: 5 },
+  { quote: `Clean platform, tight spreads, and reliable support. I've been trading with ${BRAND_NAME} for over a year and the experience has been excellent.`, author: 'Emma Wilson', role: 'Active Forex Trader', rating: 5 },
   { quote: "The ECN Raw account is perfect for my scalping strategy. Zero requotes and lightning-fast execution every time.", author: 'David L.', role: 'Scalp Trader', rating: 5 },
 ]
 

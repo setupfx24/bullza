@@ -7,7 +7,8 @@
  */
 import Link from 'next/link';
 import { Wallet, ArrowUpRight, ShieldCheck, Mail } from 'lucide-react';
-import { BannerPlaceholder } from '@/swisdex/components/BannerPlaceholder';
+import { BannerPlaceholder } from '@/home/components/BannerPlaceholder';
+import { BRAND_NAME, BRAND_SUPPORT_EMAIL } from '@/lib/brand';
 
 /** Section shape — supports flat prose paragraphs, bullet lists, and
  *  numbered sub-clauses (3.1, 3.2, etc.) so the layout can mirror the
@@ -23,18 +24,18 @@ const SECTIONS: Section[] = [
   {
     h: '1. Introduction',
     blocks: [
-      { kind: 'p', text: 'This Deposit & Withdrawal Policy governs all funding and withdrawal transactions conducted through Swisdex ("Swisdex", "Company", "we", "our", or "us").' },
-      { kind: 'p', text: "By opening an account and using Swisdex services, clients agree to comply with this Deposit & Withdrawal Policy, as well as the Company's Terms & Conditions, AML Policy, and KYC requirements." },
+      { kind: 'p', text: `This Deposit & Withdrawal Policy governs all funding and withdrawal transactions conducted through ${BRAND_NAME} ("${BRAND_NAME}", "Company", "we", "our", or "us").` },
+      { kind: 'p', text: `By opening an account and using ${BRAND_NAME} services, clients agree to comply with this Deposit & Withdrawal Policy, as well as the Company's Terms & Conditions, AML Policy, and KYC requirements.` },
     ],
   },
   {
     h: '2. Supported Payment Methods',
     blocks: [
-      { kind: 'p', text: 'Swisdex currently supports Cryptocurrency Deposits and Withdrawals Only.' },
+      { kind: 'p', text: `${BRAND_NAME} currently supports Cryptocurrency Deposits and Withdrawals Only.` },
       { kind: 'p', text: 'Supported cryptocurrencies may include, but are not limited to:' },
-      { kind: 'bullets', items: ['Bitcoin (BTC)', 'Ethereum (ETH)', 'Tether (USDT)', 'USD Coin (USDC)', 'Other cryptocurrencies approved by Swisdex'] },
-      { kind: 'p', text: 'Swisdex does not currently support:' },
-      { kind: 'bullets', items: ['Bank Transfers', 'Credit Cards', 'Debit Cards', 'Third-Party Payment Processors not approved by Swisdex'] },
+      { kind: 'bullets', items: ['Bitcoin (BTC)', 'Ethereum (ETH)', 'Tether (USDT)', 'USD Coin (USDC)', `Other cryptocurrencies approved by ${BRAND_NAME}`] },
+      { kind: 'p', text: `${BRAND_NAME} does not currently support:` },
+      { kind: 'bullets', items: ['Bank Transfers', 'Credit Cards', 'Debit Cards', `Third-Party Payment Processors not approved by ${BRAND_NAME}`] },
       { kind: 'p', text: 'The list of supported cryptocurrencies may be updated at any time without prior notice.' },
     ],
   },
@@ -42,7 +43,7 @@ const SECTIONS: Section[] = [
     h: '3. Cryptocurrency Deposits',
     blocks: [
       { kind: 'sub', n: '3.1', title: 'Deposit Wallet Address', blocks: [
-        { kind: 'p', text: 'Clients must send cryptocurrency only to the wallet address generated inside their Swisdex Client Portal.' },
+        { kind: 'p', text: `Clients must send cryptocurrency only to the wallet address generated inside their ${BRAND_NAME} Client Portal.` },
       ] },
       { kind: 'sub', n: '3.2', title: 'Deposit Confirmation', blocks: [
         { kind: 'p', text: 'Deposits are credited after the required blockchain network confirmations are completed.' },
@@ -64,10 +65,10 @@ const SECTIONS: Section[] = [
     h: '4. Cryptocurrency Withdrawals',
     blocks: [
       { kind: 'sub', n: '4.1', title: 'Withdrawal Requests', blocks: [
-        { kind: 'p', text: 'Withdrawal requests must be submitted through the official Swisdex Client Portal.' },
+        { kind: 'p', text: `Withdrawal requests must be submitted through the official ${BRAND_NAME} Client Portal.` },
       ] },
       { kind: 'sub', n: '4.2', title: 'Security Verification', blocks: [
-        { kind: 'p', text: 'Swisdex may require:' },
+        { kind: 'p', text: `${BRAND_NAME} may require:` },
         { kind: 'bullets', items: ['KYC Verification', 'Identity Verification', 'Security Confirmation', 'Additional compliance checks'] },
         { kind: 'p', text: 'before processing withdrawals.' },
       ] },
@@ -78,7 +79,7 @@ const SECTIONS: Section[] = [
       ] },
       { kind: 'sub', n: '4.4', title: 'Withdrawal Wallet Ownership', blocks: [
         { kind: 'p', text: 'Clients are responsible for providing the correct wallet address.' },
-        { kind: 'p', text: 'Swisdex is not responsible for losses resulting from:' },
+        { kind: 'p', text: `${BRAND_NAME} is not responsible for losses resulting from:` },
         { kind: 'bullets', items: ['Incorrect wallet addresses', 'Unsupported wallets', 'Wrong blockchain networks', 'User input errors'] },
         { kind: 'p', text: 'Transactions confirmed on the blockchain cannot be reversed.' },
       ] },
@@ -90,13 +91,13 @@ const SECTIONS: Section[] = [
       { kind: 'p', text: 'Before deposits are available for trading and before withdrawals are approved, clients may be required to complete identity verification procedures.' },
       { kind: 'p', text: 'Required documents may include:' },
       { kind: 'bullets', items: ['Government-issued Photo ID', 'Proof of Address', 'Selfie Verification', 'Additional documents requested by Compliance'] },
-      { kind: 'p', text: 'Swisdex reserves the right to restrict account functionality until verification requirements are completed.' },
+      { kind: 'p', text: `${BRAND_NAME} reserves the right to restrict account functionality until verification requirements are completed.` },
     ],
   },
   {
     h: '6. Anti-Money Laundering (AML)',
     blocks: [
-      { kind: 'p', text: 'Swisdex maintains strict AML and Counter-Terrorist Financing procedures.' },
+      { kind: 'p', text: `${BRAND_NAME} maintains strict AML and Counter-Terrorist Financing procedures.` },
       { kind: 'p', text: 'The Company reserves the right to:' },
       { kind: 'bullets', items: ['Request proof of source of funds', 'Request blockchain transaction evidence', 'Delay transactions pending compliance review', 'Reject suspicious transactions', 'Freeze accounts involved in unlawful activities', 'Report suspicious activity to relevant authorities where required'] },
     ],
@@ -104,7 +105,7 @@ const SECTIONS: Section[] = [
   {
     h: '7. Third-Party Payments',
     blocks: [
-      { kind: 'p', text: 'Swisdex does not permit third-party deposits or withdrawals.' },
+      { kind: 'p', text: `${BRAND_NAME} does not permit third-party deposits or withdrawals.` },
       { kind: 'p', text: 'The registered account holder must be the beneficial owner of all funds transferred to and from the trading account.' },
       { kind: 'p', text: 'Any suspected third-party transaction may result in:' },
       { kind: 'bullets', items: ['Transaction rejection', 'Account suspension', 'Compliance review', 'Account closure'] },
@@ -113,14 +114,14 @@ const SECTIONS: Section[] = [
   {
     h: '8. Withdrawal Restrictions',
     blocks: [
-      { kind: 'p', text: 'Swisdex reserves the right to decline or delay withdrawals in the following circumstances:' },
+      { kind: 'p', text: `${BRAND_NAME} reserves the right to decline or delay withdrawals in the following circumstances:` },
       { kind: 'bullets', items: ['Incomplete KYC verification', 'Ongoing AML review', 'Security concerns', 'Suspected fraud', 'Violation of Terms & Conditions', 'Account disputes', "Technical issues beyond the Company's control"] },
     ],
   },
   {
     h: '9. Internal Transfers',
     blocks: [
-      { kind: 'p', text: 'Transfers between client accounts may be permitted only upon approval by Swisdex Compliance and Operations Departments.' },
+      { kind: 'p', text: `Transfers between client accounts may be permitted only upon approval by ${BRAND_NAME} Compliance and Operations Departments.` },
       { kind: 'p', text: 'Additional verification may be required before approval.' },
     ],
   },
@@ -145,7 +146,7 @@ const SECTIONS: Section[] = [
   {
     h: '11. Fees',
     blocks: [
-      { kind: 'p', text: 'Swisdex may charge withdrawal fees, blockchain network fees, or processing fees where applicable.' },
+      { kind: 'p', text: `${BRAND_NAME} may charge withdrawal fees, blockchain network fees, or processing fees where applicable.` },
       { kind: 'p', text: 'Current fees are displayed within the Client Portal and may change without prior notice.' },
     ],
   },
@@ -153,9 +154,9 @@ const SECTIONS: Section[] = [
     h: '12. Disputes and Complaints',
     blocks: [
       { kind: 'p', text: 'Any dispute relating to deposits, withdrawals, refunds, or payment processing must be submitted in writing to:' },
-      { kind: 'p', text: 'Email: support@swisdex.com' },
+      { kind: 'p', text: `Email: ${BRAND_SUPPORT_EMAIL}` },
       { kind: 'p', text: 'Subject: Deposit & Withdrawal Complaint' },
-      { kind: 'p', text: 'Complaints will be handled according to the Swisdex Complaints and Dispute Resolution Policy.' },
+      { kind: 'p', text: `Complaints will be handled according to the ${BRAND_NAME} Complaints and Dispute Resolution Policy.` },
     ],
   },
   {
@@ -163,15 +164,15 @@ const SECTIONS: Section[] = [
     blocks: [
       { kind: 'p', text: 'Cryptocurrency transactions are irreversible and subject to blockchain network risks, volatility, and technical limitations.' },
       { kind: 'p', text: 'Clients are responsible for verifying wallet addresses, network selections, and transaction details before submitting any transfer.' },
-      { kind: 'p', text: 'Swisdex shall not be liable for losses resulting from client errors, blockchain failures, or third-party wallet service disruptions.' },
+      { kind: 'p', text: `${BRAND_NAME} shall not be liable for losses resulting from client errors, blockchain failures, or third-party wallet service disruptions.` },
     ],
   },
   {
     h: '14. Policy Updates',
     blocks: [
-      { kind: 'p', text: 'Swisdex reserves the right to amend, modify, or replace this Deposit & Withdrawal Policy at any time.' },
-      { kind: 'p', text: 'Any updates will become effective immediately upon publication on the Swisdex website.' },
-      { kind: 'p', text: 'Continued use of Swisdex services constitutes acceptance of any revised policy.' },
+      { kind: 'p', text: `${BRAND_NAME} reserves the right to amend, modify, or replace this Deposit & Withdrawal Policy at any time.` },
+      { kind: 'p', text: `Any updates will become effective immediately upon publication on the ${BRAND_NAME} website.` },
+      { kind: 'p', text: `Continued use of ${BRAND_NAME} services constitutes acceptance of any revised policy.` },
     ],
   },
 ];
@@ -201,14 +202,14 @@ export default function DepositWithdrawalPage() {
     <main className="min-h-screen" style={{ background: '#08090b', color: '#f5f5f5' }}>
       <BannerPlaceholder
         title="Deposit & Withdrawal Policy"
-        tagline="The rules for funding and withdrawing from your SwisDex account."
+        tagline={`The rules for funding and withdrawing from your ${BRAND_NAME} account.`}
       />
 
       <section className="mx-auto max-w-[840px] px-[var(--gutter)] pt-10 pb-6">
         <div className="liquid-glass rounded-2xl px-5 py-4 flex items-center gap-3 text-sm text-foreground/70">
           <Wallet className="size-4 text-primary shrink-0" />
           <span>
-            <span className="font-semibold text-foreground/90">Swisdex — Deposit & Withdrawal Policy</span>{' '}
+            <span className="font-semibold text-foreground/90">{BRAND_NAME} — Deposit & Withdrawal Policy</span>{' '}
             · Last updated: June 2026
           </span>
         </div>
@@ -242,7 +243,7 @@ export default function DepositWithdrawalPage() {
             </p>
           </div>
           <a
-            href="mailto:support@swisdex.com"
+            href={`mailto:${BRAND_SUPPORT_EMAIL}`}
             className="inline-flex items-center gap-2 rounded-full bg-primary text-white px-5 py-2.5 text-sm font-semibold uppercase tracking-wider hover:opacity-90 shrink-0"
           >
             <Mail className="size-4" /> Contact Support
@@ -256,7 +257,7 @@ export default function DepositWithdrawalPage() {
             Fund Your Account
           </h2>
           <p className="mt-4 text-foreground/70 max-w-xl mx-auto text-sm sm:text-base">
-            Open a SwisDex account and deposit via supported cryptocurrencies in minutes.
+            Open a {BRAND_NAME} account and deposit via supported cryptocurrencies in minutes.
           </p>
           <Link
             href="/auth/register"

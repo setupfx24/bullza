@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from html import escape
 
+from ..config import get_settings
 from .base import render_layout, kv_table
 
 
@@ -21,10 +22,15 @@ def render_maintenance_notice(
     impacted_services: list[str], # e.g. ["Trading", "Deposits", "Withdrawals"]
     reason: str | None = None,   # short admin-supplied explanation
     custom_message_html: str | None = None,  # raw HTML override block
-    trader_app_url: str = "https://trade.swisdex.com",
+    trader_app_url: str = "",
     subject_override: str | None = None,  # admin-set email subject line
     title_override: str | None = None,    # admin-set heading inside the email
 ) -> tuple[str, str, str]:
+    s = get_settings()
+    brand = (s.BRAND_NAME or "").strip() or "YourBrand"
+    domain = (s.BRAND_DOMAIN or "").strip() or "example.com"
+    support_email = f"support@{domain}"
+    trader_app_url = (trader_app_url or "").strip() or s.TRADER_APP_URL
     name = (first_name or "trader").strip() or "trader"
 
     rows: list[tuple[str, str]] = [
@@ -36,7 +42,7 @@ def render_maintenance_notice(
         rows.append(("Reason", reason))
 
     intro = (
-        "Heads up — SwisDex will be unavailable for a short maintenance "
+        f"Heads up — {brand} will be unavailable for a short maintenance "
         "window. Close or hedge positions you don't want held through the "
         "outage. Stop-loss and take-profit orders remain server-side and "
         "will continue to trigger on the matching engine when service "
@@ -52,12 +58,12 @@ def render_maintenance_notice(
           {custom_message_html}
         </div>
         """
-    body += """
+    body += f"""
     <p style="margin:16px 0 0;color:#6b7280;font-size:13px;line-height:1.6;">
-      Status updates will be posted on swisdex.com/status throughout the
+      Status updates will be posted on {escape(domain)}/status throughout the
       maintenance. Need help right after? Reach
-      <a href="mailto:support@swisdex.com" style="color:#55a630;text-decoration:none;">
-        support@swisdex.com</a>.
+      <a href="mailto:{escape(support_email, quote=True)}" style="color:#55a630;text-decoration:none;">
+        {escape(support_email)}</a>.
     </p>
     """
 
@@ -79,7 +85,7 @@ def render_maintenance_notice(
     text_lines = [
         f"Hi {name},",
         "",
-        "SwisDex will be unavailable for a short maintenance window:",
+        f"{brand} will be unavailable for a short maintenance window:",
         f"  Window:            {window_label}",
         f"  Expected duration: {expected_duration}",
         f"  Services impacted: {', '.join(impacted_services) if impacted_services else 'All'}",
@@ -91,6 +97,6 @@ def render_maintenance_notice(
         f"Close or hedge positions you don't want held through the outage.",
         f"Check positions: {trader_app_url.rstrip('/')}/trading",
         "",
-        "Support: support@swisdex.com",
+        f"Support: {support_email}",
     ]
     return subject, html, "\n".join(text_lines)

@@ -3,8 +3,8 @@
 @tailwind utilities;
 
 /* ═══════════════════════════════════════════════════════════
-   SwisDex Admin — Dark-first premium theme
-   Matches trader dashboard: SwisDex green (#55a630) accent, glassmorphism,
+   Admin — Dark-first premium theme
+   Matches trader dashboard: green (#55a630) accent, glassmorphism,
    skeuomorphic buttons, smooth animations.
    ═══════════════════════════════════════════════════════════ */
 
@@ -38,14 +38,14 @@
 
 /* —— Light theme —— */
 /* Logo per theme (match the trader app, client 2026-06-24): the white
-   wordmark (swisdex_png5) shows on the dark theme, and the dark/colour
-   wordmark (swisdex_png) shows on the light theme — no dark chip / filter. */
-.swisdex-logo-light { display: none; }
-.swisdex-logo-dark { display: block; }
-html.light .swisdex-logo-dark,
-[data-theme='light'] .swisdex-logo-dark { display: none; }
-html.light .swisdex-logo-light,
-[data-theme='light'] .swisdex-logo-light { display: block; }
+   wordmark shows on the dark theme, and the dark/colour wordmark shows
+   on the light theme — no dark chip / filter. */
+.brand-logo-light { display: none; }
+.brand-logo-dark { display: block; }
+html.light .brand-logo-dark,
+[data-theme='light'] .brand-logo-dark { display: none; }
+html.light .brand-logo-light,
+[data-theme='light'] .brand-logo-light { display: block; }
 
 html.light, [data-theme='light'] {
   color-scheme: light;

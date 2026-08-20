@@ -6,6 +6,7 @@ import { useAuthStore } from '@/stores/authStore';
 import { Lock, Mail, Loader2, AlertCircle, Eye, EyeOff, ShieldCheck } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuthRehydrated } from '@/hooks/useAuthRehydrated';
+import { BRAND_NAME, BRAND_LOGO } from '@/lib/brand';
 import './auth.css';
 
 const STEPS = [
@@ -98,10 +99,19 @@ export default function LoginPage() {
           <div className="auth-right">
             <form className="auth-form" onSubmit={handleSubmit} noValidate>
               <div className="flex justify-center mb-2">
-                <img src="/images/feb.png" alt="SwisDex" className="w-16 h-16 object-contain" />
+                {BRAND_LOGO ? (
+                  <img src={BRAND_LOGO} alt={BRAND_NAME} className="w-16 h-16 object-contain" />
+                ) : (
+                  <span
+                    className="flex items-center justify-center w-16 h-16 rounded-2xl font-bold text-2xl"
+                    style={{ background: 'rgba(85,166,48,0.12)', color: 'var(--auth-accent)' }}
+                  >
+                    {BRAND_NAME.charAt(0).toUpperCase()}
+                  </span>
+                )}
               </div>
               <div>
-                <h2 className="auth-form__title">SwisDex Admin</h2>
+                <h2 className="auth-form__title">{BRAND_NAME} Admin</h2>
                 <p className="auth-form__subtitle">Broker administration panel — secure access only.</p>
               </div>
 
@@ -193,7 +203,7 @@ export default function LoginPage() {
               </button>
 
               <p className="auth-footer" style={{ marginTop: '0.5rem' }}>
-                SwisDex Admin v1.0 &middot; Secure Access Only
+                {BRAND_NAME} Admin v1.0 &middot; Secure Access Only
               </p>
             </form>
           </div>

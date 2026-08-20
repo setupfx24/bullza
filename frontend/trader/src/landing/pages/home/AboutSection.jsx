@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import { ArrowRight, Shield, Zap, Target } from 'lucide-react'
 import ScrollReveal from '../../components/animations/ScrollReveal'
+import { BRAND_NAME, BRAND_LOGO } from '@/lib/brand'
 
 const pillars = [
   { icon: <Shield size={14} />, label: 'Transparency' },
@@ -18,11 +19,17 @@ export default function AboutSection() {
           <ScrollReveal variant="fadeLeft">
             <div className="relative">
               <div className="relative rounded-lg overflow-hidden aspect-square w-full max-w-md mx-auto border border-white/[0.08]">
-                <img
-                  src="/images/swisdex_png5.png"
-                  alt="SwisDex Trading"
-                  className="w-full h-full object-contain p-12 bg-gradient-to-br from-primary-bg to-primary-secondary"
-                />
+                {BRAND_LOGO ? (
+                  <img
+                    src={BRAND_LOGO}
+                    alt={`${BRAND_NAME} Trading`}
+                    className="w-full h-full object-contain p-12 bg-gradient-to-br from-primary-bg to-primary-secondary"
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center p-12 bg-gradient-to-br from-primary-bg to-primary-secondary">
+                    <span className="text-4xl font-black tracking-tight text-white text-center">{BRAND_NAME}</span>
+                  </div>
+                )}
                 <div className="absolute inset-0 bg-gradient-to-t from-primary-bg/80 via-transparent to-transparent" />
 
                 {/* Overlay chips */}
@@ -53,7 +60,7 @@ export default function AboutSection() {
           <ScrollReveal variant="fadeRight" delay={0.2}>
             <div className="inline-flex items-center gap-2 mb-5">
               <div className="w-5 h-px bg-primary-accent" />
-              <span className="text-primary-accent text-xs font-bold uppercase tracking-[0.2em]">About SwisDex</span>
+              <span className="text-primary-accent text-xs font-bold uppercase tracking-[0.2em]">About {BRAND_NAME}</span>
               <div className="w-5 h-px bg-primary-accent" />
             </div>
 
@@ -69,13 +76,13 @@ export default function AboutSection() {
 
             <div className="space-y-4 mb-8">
               <p className="text-text-secondary leading-relaxed">
-                SwisDex was founded with a clear vision — to give traders around the world access to professional-grade trading infrastructure, transparent pricing, and reliable support.
+                {BRAND_NAME} was founded with a clear vision — to give traders around the world access to professional-grade trading infrastructure, transparent pricing, and reliable support.
               </p>
               <p className="text-text-secondary leading-relaxed">
                 Our platform combines advanced technology with deep liquidity to deliver a seamless trading experience powered by global financial expertise.
               </p>
               <p className="text-text-secondary leading-relaxed">
-                From beginners entering financial markets to professional algorithmic traders, SwisDex provides the tools, speed, and reliability needed to trade with confidence in global markets.
+                From beginners entering financial markets to professional algorithmic traders, {BRAND_NAME} provides the tools, speed, and reliability needed to trade with confidence in global markets.
               </p>
             </div>
 

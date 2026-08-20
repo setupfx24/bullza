@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { BRAND_DOMAIN, BRAND_NAME } from '@/lib/brand';
 
 /**
  * GET /api/market-news
@@ -87,7 +88,7 @@ async function fetchSource(src: { name: string; url: string }, signal: AbortSign
       signal,
       headers: {
         // Some feeds 403 a missing UA; present a normal one.
-        'user-agent': 'Mozilla/5.0 (compatible; SwisDex-News/1.0; +https://swisdex.com)',
+        'user-agent': `Mozilla/5.0 (compatible; ${BRAND_NAME}-News/1.0; +https://${BRAND_DOMAIN})`,
         accept: 'application/rss+xml, application/atom+xml, application/xml, text/xml, */*',
       },
       // Shared 5-minute server cache — headlines don't need to be sub-minute.

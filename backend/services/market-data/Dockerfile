@@ -10,10 +10,10 @@ RUN pip install -e /app/packages/common
 
 COPY backend/services/market-data /app/services/market_data
 
-RUN groupadd --system --gid 1001 swisdex && \
-    useradd  --system --uid 1001 --gid swisdex --home /app --shell /bin/false swisdex && \
-    chown -R swisdex:swisdex /app
-USER swisdex
+RUN groupadd --system --gid 1001 app && \
+    useradd  --system --uid 1001 --gid app --home /app --shell /bin/false app && \
+    chown -R app:app /app
+USER app
 
 ENV PYTHONPATH=/app
 

@@ -8,6 +8,7 @@ import { User, LogOut, Loader2, Menu, X } from 'lucide-react';
 import ThemeToggle from '@/components/ThemeToggle';
 import AdminNotificationBell from '@/components/notifications/AdminNotificationBell';
 import { useAuthRehydrated } from '@/hooks/useAuthRehydrated';
+import { createIdleSessionController, subscribeAdminAuthChannel } from '@/lib/session-manager';
 
 type Gate = 'boot' | 'ready' | 'redirect';
 
@@ -44,7 +45,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     };
 
     const run = async () => {
-      // Cookie-only: probe /auth/me to see whether the swisdex_admin
+      // Cookie-only: probe /auth/me to see whether the admin_access
       // cookie still grants access. No client-side token to inspect.
       if (useAuthStore.getState().admin) {
         finish('ready');
@@ -72,6 +73,22 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       runId.current += 1;
     };
   }, [mounted, authRehydrated, admin, router]);
+
+  // Idle session timeout + multi-tab logout sync. The controller existed
+  // in lib/session-manager but was never wired up (risk review 2026-08-20),
+  // so the documented 15-minute admin idle logout wasn't actually enforced.
+  useEffect(() => {
+    if (gate !== 'ready') return;
+    const ctl = createIdleSessionController({
+      isActive: () => !!useAuthStore.getState().admin,
+      onIdle: () => { void useAuthStore.getState().logout(); },
+    });
+    const unsub = subscribeAdminAuthChannel({
+      onRemoteLogout: () => { window.location.replace('/login'); },
+      onRemoteLogin: () => { /* cookie-based auth — nothing to sync */ },
+    });
+    return () => { ctl.destroy(); unsub(); };
+  }, [gate]);
 
   if (!mounted || !authRehydrated || gate !== 'ready') {
     return (

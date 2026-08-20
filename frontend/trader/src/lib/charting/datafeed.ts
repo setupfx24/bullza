@@ -7,6 +7,7 @@
  *
  * Modelled after setupfx24's SetupfxDatafeed — fast, no backend bar dependency.
  */
+import { BRAND_NAME } from '@/lib/brand';
 import type {
   Bar,
   DatafeedConfiguration,
@@ -113,7 +114,7 @@ const CONFIG: DatafeedConfiguration = {
   supported_resolutions: SUPPORTED_RESOLUTIONS,
   exchanges: [
     { value: '', name: 'All', desc: 'All exchanges' },
-    { value: 'SwisDex', name: 'SwisDex', desc: 'SwisDex' },
+    { value: BRAND_NAME, name: BRAND_NAME, desc: BRAND_NAME },
   ],
   symbols_types: [
     { name: 'All', value: '' },
@@ -223,7 +224,7 @@ function segmentToSymbolType(segment: string | undefined): string {
 
 /* ═══════════ DATAFEED ═══════════ */
 
-export const swisDexDatafeed: IBasicDataFeed = {
+export const brandDatafeed: IBasicDataFeed = {
   onReady: (cb) => {
     setTimeout(() => cb(CONFIG), 0);
   },
@@ -243,7 +244,7 @@ export const swisDexDatafeed: IBasicDataFeed = {
       .map((i) => ({
         symbol: i.symbol, full_name: i.symbol,
         description: i.display_name || i.symbol,
-        exchange: 'SwisDex', ticker: i.symbol,
+        exchange: BRAND_NAME, ticker: i.symbol,
         type: segmentToSymbolType(i.segment) || 'forex',
       }));
     onResult(result);
@@ -259,7 +260,7 @@ export const swisDexDatafeed: IBasicDataFeed = {
       description: inst?.display_name || sym,
       type: segmentToSymbolType(inst?.segment) || 'forex',
       session: '24x7', timezone: 'Etc/UTC',
-      exchange: 'SwisDex', listed_exchange: 'SwisDex',
+      exchange: BRAND_NAME, listed_exchange: BRAND_NAME,
       format: 'price', pricescale: Math.pow(10, digits), minmov: 1,
       has_intraday: true, has_daily: true,
       // false on purpose: the library BUILDS 1W/1M/3M/6M/12M from our 1D bars.

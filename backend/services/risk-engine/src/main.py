@@ -20,11 +20,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from packages.common.src.database import AsyncSessionLocal
 from packages.common.src.models import (
     Position, PositionStatus, TradingAccount, Instrument,
-    OrderSide, SwapConfig, Notification, Transaction, User, TradeHistory,
+    OrderSide, SwapConfig, Notification, User,
 )
 from packages.common.src.redis_client import redis_client, PriceChannel
 from packages.common.src.config import get_settings
-from packages.common.src import corecen_trade_client
+from packages.common.src.position_close import close_position_atomic
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)-5s [%(name)s] %(message)s")
 logger = logging.getLogger("risk-engine")
@@ -176,7 +176,21 @@ class RiskEngine:
 
                         elif margin_level <= Decimal(str(margin_call)):
                             acct_key = str(account.id)
-                            if acct_key not in self._margin_call_sent:
+                            # Dedupe across restarts too: the in-memory set
+                            # alone re-alerted every account on each engine
+                            # restart. Redis SETNX (6h TTL) is the shared
+                            # marker; the local set stays as a same-process
+                            # fast path and a Redis-outage fallback.
+                            first_alert = acct_key not in self._margin_call_sent
+                            if first_alert:
+                                try:
+                                    first_alert = bool(await redis_client.set(
+                                        f"margin_call_sent:{acct_key}", "1",
+                                        ex=6 * 3600, nx=True,
+                                    ))
+                                except Exception:
+                                    pass  # Redis down — in-memory dedupe only
+                            if first_alert:
                                 self._margin_call_sent.add(acct_key)
                                 notif = Notification(
                                     user_id=account.user_id,
@@ -203,7 +217,12 @@ class RiskEngine:
                                         db=db,
                                     )
                         else:
-                            self._margin_call_sent.discard(str(account.id))
+                            if str(account.id) in self._margin_call_sent:
+                                self._margin_call_sent.discard(str(account.id))
+                                try:
+                                    await redis_client.delete(f"margin_call_sent:{account.id}")
+                                except Exception:
+                                    pass
 
                     await db.commit()
 
@@ -213,133 +232,59 @@ class RiskEngine:
             await asyncio.sleep(1)
 
     async def _execute_stop_out(self, account: TradingAccount, positions: list[Position], db: AsyncSession):
-        """Close positions until margin level is restored above stop-out."""
+        """Close positions worst-first until margin level is restored above
+        stop-out. Per-position close math (P&L conversion, margin release,
+        NBP, TradeHistory + Transaction, notification, publish, A-Book
+        outbox) lives in the shared close core."""
         logger.warning(f"Stop-out triggered for account {account.account_number}")
+
+        from packages.common.src.trading_service import quote_to_account_pnl_async
+        from packages.common.src.settings_store import get_float_setting as _gfs
 
         closed_count = 0
         realized_pnl = Decimal("0")
 
-        sorted_positions = sorted(positions, key=lambda p: p.profit)
-
-        for pos in sorted_positions:
+        # Fresh mark-to-market for the liquidation order — the persisted
+        # pos.profit is whatever last got flushed and mis-ordered the
+        # queue on stale data.
+        candidates: list[tuple[Decimal, Position, Decimal]] = []
+        for pos in positions:
             tick_data = await redis_client.get(PriceChannel.tick_key(pos.instrument.symbol))
             if not tick_data:
                 continue
-
             tick = json.loads(tick_data)
             close_price = Decimal(str(tick["bid"])) if pos.side == OrderSide.BUY else Decimal(str(tick["ask"]))
-
             if pos.side == OrderSide.BUY:
-                profit = (close_price - pos.open_price) * pos.lots * pos.instrument.contract_size
+                pnl = (close_price - pos.open_price) * pos.lots * pos.instrument.contract_size
             else:
-                profit = (pos.open_price - close_price) * pos.lots * pos.instrument.contract_size
-            from packages.common.src.trading_service import (
-                quote_to_account_pnl_async,
-                convert_to_account_currency,
-            )
-            profit = await quote_to_account_pnl_async(
-                profit,
+                pnl = (pos.open_price - close_price) * pos.lots * pos.instrument.contract_size
+            pnl = await quote_to_account_pnl_async(
+                pnl,
                 getattr(pos.instrument, "base_currency", None),
                 getattr(pos.instrument, "quote_currency", None),
                 close_price,
                 symbol=getattr(pos.instrument, "symbol", None),
             )
+            candidates.append((pnl, pos, close_price))
 
-            pos.status = PositionStatus.CLOSED
-            pos.close_price = close_price
-            pos.profit = profit
-            pos.closed_at = datetime.now(timezone.utc)
+        candidates.sort(key=lambda t: t[0])  # worst loss first
 
-            # Record the closed trade so it shows in Closed Positions / history —
-            # mirrors the manual-close path in gateway trading_service. Without
-            # this, a stop-out silently vanished from the trader's history
-            # (client 2026-07-02).
-            db.add(TradeHistory(
-                position_id=pos.id,
-                account_id=pos.account_id,
-                instrument_id=pos.instrument_id,
-                side=pos.side,
-                lots=pos.lots,
-                open_price=pos.open_price,
-                close_price=close_price,
-                swap=pos.swap or Decimal("0"),
-                commission=pos.commission or Decimal("0"),
-                profit=profit,
-                close_reason="stop_out",
-                opened_at=pos.created_at,
-                closed_at=pos.closed_at,
-            ))
-
-            account.balance += profit
-            # Release margin in account currency to mirror the USD-converted
-            # value used on open. Otherwise stop-outs under-release on JPY
-            # crosses, leaving phantom margin_used after every liquidation.
-            margin_release_raw = (pos.lots * pos.instrument.contract_size * pos.open_price) / Decimal(str(account.leverage))
-            margin_release = await convert_to_account_currency(
-                margin_release_raw,
-                getattr(pos.instrument, "quote_currency", None),
+        for _pnl, pos, close_price in candidates:
+            profit = await close_position_atomic(
+                db, pos, close_price=close_price, reason="stop_out", account=account,
             )
-            account.margin_used = max(Decimal("0"), account.margin_used - margin_release)
-            account.equity = account.balance + account.credit
-            account.free_margin = account.equity - account.margin_used
+            if profit is None:
+                continue  # another closer won the race on this position
 
             closed_count += 1
             realized_pnl += profit
-
-            await redis_client.publish(f"account:{account.id}", json.dumps({
-                "type": "stop_out",
-                "position_id": str(pos.id),
-                "symbol": pos.instrument.symbol,
-                "profit": str(profit),
-            }))
-
             logger.info(f"Stop-out closed {pos.instrument.symbol} {pos.side.value}, profit: {profit}")
 
-            # ── A-Book: forward stop-out close to Corecen LP ─────────────
-            # Pass Decimal through; Corecen client narrows at JSON boundary.
-            _pos_id = str(pos.id)
-            _cp = close_price
-            _pnl = profit
-            _is_demo = bool(account.is_demo)
-
-            async def _forward_stopout(pid=_pos_id, cp=_cp, pnl=_pnl, is_demo=_is_demo):
-                # Demo account stop-outs never hit LP.
-                if is_demo:
-                    return
-                try:
-                    async with AsyncSessionLocal() as bg_db:
-                        u = (await bg_db.execute(
-                            select(User).where(User.id == account.user_id)
-                        )).scalar_one_or_none()
-                        if u and (u.book_type or "B") == "A":
-                            await corecen_trade_client.forward_trade_close(
-                                position_id=pid, close_price=cp,
-                                pnl=pnl, closed_by="STOP_OUT",
-                            )
-                except Exception as exc:
-                    logger.error("[A-BOOK] Stop-out close forward failed: %s", exc)
-
-            asyncio.create_task(_forward_stopout())
-
+            # Stop as soon as margin is restored — partial liquidation.
             margin_level = (account.equity / account.margin_used * 100) if account.margin_used > 0 else Decimal("9999")
-            from packages.common.src.settings_store import get_float_setting as _gfs
             _so = await _gfs("stop_out_level", settings.STOP_OUT_LEVEL)
             if margin_level > Decimal(str(_so)):
                 break
-
-        # ── Negative Balance Protection ──────────────────────────────────
-        # After liquidating, the broker absorbs any residual loss — a trader can
-        # NEVER owe money / go below zero (client 2026-06-19; standard at
-        # regulated brokers). A fast/gapping market can close the last position
-        # below break-even, so clamp a negative balance back to 0.
-        if account.balance < Decimal("0"):
-            logger.warning(
-                "NBP: absorbing %.2f negative balance on account %s after stop-out",
-                float(-account.balance), account.account_number,
-            )
-            account.balance = Decimal("0")
-        account.equity = account.balance + (account.credit or Decimal("0"))
-        account.free_margin = account.equity - (account.margin_used or Decimal("0"))
 
         # After the stop-out loop ends — email the user a summary. Skipped on
         # demo accounts, and on the no-op case where nothing was actually
@@ -383,7 +328,7 @@ class RiskEngine:
                 used_margin=used_margin,
                 free_margin=free_margin,
                 currency=account.currency or "USD",
-                trader_app_url=getattr(st, "TRADER_APP_URL", None) or "https://trade.swisdex.com",
+                trader_app_url=getattr(st, "TRADER_APP_URL", None) or "http://localhost:3000",
             )
             fire_and_forget(send_email(user.email, subject, html, text=text, category="account"))
         except Exception as e:
@@ -417,7 +362,7 @@ class RiskEngine:
                 realized_pnl=realized_pnl,
                 new_equity=new_equity,
                 currency=account.currency or "USD",
-                trader_app_url=getattr(st, "TRADER_APP_URL", None) or "https://trade.swisdex.com",
+                trader_app_url=getattr(st, "TRADER_APP_URL", None) or "http://localhost:3000",
             )
             fire_and_forget(send_email(user.email, subject, html, text=text, category="account"))
         except Exception as e:
@@ -429,10 +374,22 @@ class RiskEngine:
         while self._running:
             try:
                 async with AsyncSessionLocal() as db:
+                    # Demo and promotional/showcase positions are NOT house
+                    # risk — counting them overstated exposure:summary vs the
+                    # admin risk board (which filters them) and the two views
+                    # disagreed. Filter at the source.
                     result = await db.execute(
                         select(Position)
+                        .join(TradingAccount, Position.account_id == TradingAccount.id)
+                        .join(User, TradingAccount.user_id == User.id)
                         .options(selectinload(Position.instrument))  # avoid per-position lazy load (N+1)
-                        .where(Position.status == PositionStatus.OPEN)
+                        .where(
+                            Position.status == PositionStatus.OPEN,
+                            TradingAccount.is_demo.isnot(True),
+                            TradingAccount.is_promotional.isnot(True),
+                            User.is_demo.isnot(True),
+                            User.is_promotional.isnot(True),
+                        )
                     )
                     positions = result.scalars().all()
 
@@ -476,9 +433,28 @@ class RiskEngine:
             await asyncio.sleep(5)
 
     async def _swap_calculator(self):
-        """Calculate and apply swap charges at rollover time (daily at 21:00 UTC)."""
-        logger.info("Swap calculator started")
+        """LEGACY SwapConfig-based rollover (daily 21:00 UTC) — DISABLED by default.
+
+        The gateway's overnight_fee_engine is the canonical daily financing
+        charge (per Trading_Mechanism.docx: 0.01%/day on the borrowed
+        portion, idempotent via positions.last_swap_at, NBP-protected).
+        Running this legacy calculator alongside it charged positions
+        TWICE per day (risk review 2026-08-20). It also had no restart
+        idempotency and no negative-balance protection. Re-enable only via
+        the `legacy_swap_calculator_enabled` system setting if per-
+        instrument SwapConfig rates must apply INSTEAD of the overnight
+        fee — never both.
+        """
+        logger.info("Swap calculator started (legacy — disabled unless legacy_swap_calculator_enabled)")
+        from packages.common.src.settings_store import get_bool_setting
         while self._running:
+            try:
+                if not await get_bool_setting("legacy_swap_calculator_enabled", False):
+                    await asyncio.sleep(300)
+                    continue
+            except Exception:
+                await asyncio.sleep(300)
+                continue
             now = datetime.now(timezone.utc)
             if now.hour == 21 and now.minute == 0:
                 try:

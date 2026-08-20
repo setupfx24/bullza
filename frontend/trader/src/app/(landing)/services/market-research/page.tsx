@@ -6,7 +6,8 @@ import {
   ArrowUpRight, TrendingUp, Newspaper, LineChart, FileText, Bell,
   Globe2, Calendar, ChevronDown,
 } from 'lucide-react';
-import { BannerPlaceholder } from '@/swisdex/components/BannerPlaceholder';
+import { BannerPlaceholder } from '@/home/components/BannerPlaceholder';
+import { BRAND_NAME } from '@/lib/brand';
 
 const SIGNUP_HREF = '/auth/register';
 
@@ -29,7 +30,7 @@ export default function MarketResearchPage() {
               Sharper decisions. <span className="text-primary">Backed by data.</span>
             </h2>
             <p className="mt-4 text-foreground/70 text-sm sm:text-base leading-relaxed max-w-xl">
-              The SwisDex research desk publishes a pre-market brief at 06:00 GMT, intraday updates on
+              The {BRAND_NAME} research desk publishes a pre-market brief at 06:00 GMT, intraday updates on
               major catalysts, and a weekly outlook every Sunday. Every report includes specific
               entries, invalidation levels, and a defined risk/reward.
             </p>
@@ -122,7 +123,7 @@ export default function MarketResearchPage() {
             can subscribe to any combination of desks (FX, Crypto, Metals, Indices).
           </FaqItem>
           <FaqItem q="Is the research free?">
-            Yes — daily briefs, weekly outlooks, and catalyst alerts are included with every funded SwisDex
+            Yes — daily briefs, weekly outlooks, and catalyst alerts are included with every funded {BRAND_NAME}
             account. There is no separate subscription fee.
           </FaqItem>
           <FaqItem q="Are these recommendations to trade?">

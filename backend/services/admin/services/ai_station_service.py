@@ -284,7 +284,7 @@ async def list_trades(db: AsyncSession, *, status=None, user_id=None, signal_id=
                       limit=200, offset=0) -> list:
     q = select(AiStationTrade)
     # Never show showcase followers' mirrored trades in the admin panel —
-    # promotional and demo followers (e.g. demo@swisdex.com, the promo accounts)
+    # promotional and demo followers (the shared demo login, the promo accounts)
     # are display-only showcase, not real activity. (client 2026-07-28)
     _excl_users = select(User.id).where(
         or_(User.is_promotional == True, User.is_demo == True)  # noqa: E712

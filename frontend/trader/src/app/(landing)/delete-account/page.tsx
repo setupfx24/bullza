@@ -10,21 +10,22 @@
  */
 import Link from 'next/link';
 import { Trash2, Mail, ShieldCheck, Clock, ArrowUpRight } from 'lucide-react';
-import { BannerPlaceholder } from '@/swisdex/components/BannerPlaceholder';
+import { BannerPlaceholder } from '@/home/components/BannerPlaceholder';
+import { BRAND_NAME, BRAND_SUPPORT_EMAIL } from '@/lib/brand';
 
-const SUPPORT_EMAIL = 'support@swisdex.com';
+const SUPPORT_EMAIL = `${BRAND_SUPPORT_EMAIL}`;
 const SUBJECT = 'Account Deletion Request';
 
 export default function DeleteAccountPage() {
   const mailto = `mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent(SUBJECT)}&body=${encodeURIComponent(
-    'I would like to permanently delete my SwisDex account and associated data.\n\nRegistered email: \nRegistered phone (if any): \nReason (optional): ',
+    `I would like to permanently delete my ${BRAND_NAME} account and associated data.\n\nRegistered email: \nRegistered phone (if any): \nReason (optional): `,
   )}`;
 
   return (
     <main className="min-h-screen bg-background">
       <BannerPlaceholder
         title="Delete Your Account"
-        tagline="Request permanent deletion of your SwisDex account and personal data. This page explains how, what is removed, and what we are required to keep."
+        tagline={`Request permanent deletion of your ${BRAND_NAME} account and personal data. This page explains how, what is removed, and what we are required to keep.`}
       />
 
       <section className="mx-auto max-w-[820px] px-[var(--gutter)] py-12 sm:py-16 space-y-10">
@@ -34,7 +35,7 @@ export default function DeleteAccountPage() {
             <Trash2 className="size-5 text-primary" /> How to request deletion
           </h2>
           <p className="mt-3 text-foreground/70 text-sm sm:text-base leading-relaxed">
-            You can request deletion of your SwisDex account and associated personal data in either of these ways:
+            You can request deletion of your {BRAND_NAME} account and associated personal data in either of these ways:
           </p>
           <ol className="mt-4 space-y-3 text-sm sm:text-base text-foreground/80">
             <li className="flex gap-3">

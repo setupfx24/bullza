@@ -78,7 +78,7 @@ async def send_due_eligibility_nudges(db: AsyncSession) -> int:
     now = datetime.now(timezone.utc)
     resend_cutoff = now - timedelta(days=RESEND_DAYS)
     activity_cutoff = now - timedelta(days=ACTIVITY_WINDOW_DAYS)
-    app_url = (get_settings().TRADER_APP_URL or "https://trade.swisdex.com")
+    app_url = get_settings().TRADER_APP_URL
 
     # Filter at the SQL level so we don't pull every user every tick.
     # Only verified non-demo users with KYC approved and balance over

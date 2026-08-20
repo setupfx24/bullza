@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from decimal import Decimal
 
+from ..config import get_settings
 from .base import render_layout, kv_table
 
 
@@ -17,8 +18,9 @@ def render_mission_completed(
     reward_xp: int | None,
     reward_amount: Decimal | float | None,
     reward_currency: str = "USD",
-    trader_app_url: str = "https://trade.swisdex.com",
+    trader_app_url: str = "",
 ) -> tuple[str, str, str]:
+    trader_app_url = (trader_app_url or "").strip() or get_settings().TRADER_APP_URL
     name = (first_name or "trader").strip() or "trader"
     rows: list[tuple[str, str]] = [("Mission", mission_title)]
     if reward_xp:
@@ -61,8 +63,9 @@ def render_tier_upgraded(
     new_tier: str,
     previous_tier: str | None,
     perks: list[str] | None = None,
-    trader_app_url: str = "https://trade.swisdex.com",
+    trader_app_url: str = "",
 ) -> tuple[str, str, str]:
+    trader_app_url = (trader_app_url or "").strip() or get_settings().TRADER_APP_URL
     name = (first_name or "trader").strip() or "trader"
     perks = perks or []
     perks_html = ""

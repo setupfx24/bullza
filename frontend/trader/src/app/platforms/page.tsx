@@ -1,8 +1,9 @@
 import LandingHeader from '@/components/landing/LandingHeader'
 import LandingFooter from '@/components/landing/LandingFooter'
 import { Monitor, Smartphone, Globe, Zap, BarChart3, Shield } from 'lucide-react'
+import { BRAND_NAME } from '@/lib/brand'
 
-export const metadata = { title: 'Trading Platforms — SwisDex' }
+export const metadata = { title: `Trading Platforms — ${BRAND_NAME}` }
 
 export default function PlatformsPage() {
   return (

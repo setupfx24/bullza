@@ -1,0 +1,92 @@
+name: CI
+
+# First CI for this repo (2026-08-20). Gates: backend byte-compiles and
+# unit tests pass; both frontends typecheck. Deploys stay manual
+# (scripts/deploy.sh) — this exists so a broken build can't reach the
+# server's `git pull` unnoticed.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - name: Install shared package + test deps
+        working-directory: backend
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e packages/common
+          pip install -r services/gateway/requirements.txt
+          pip install -r tests/requirements.txt
+      - name: Byte-compile all backend sources
+        working-directory: backend
+        run: python -m compileall -q packages services
+      - name: Unit tests
+        run: pytest backend/tests -c backend/tests/pytest.ini -q
+
+  frontend-trader:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: frontend/trader/package-lock.json
+      - name: Install
+        working-directory: frontend/trader
+        run: npm ci
+      - name: Typecheck
+        working-directory: frontend/trader
+        run: npx tsc --noEmit
+
+  frontend-admin:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: frontend/admin/package-lock.json
+      - name: Install
+        working-directory: frontend/admin
+        run: npm ci
+      - name: Typecheck
+        working-directory: frontend/admin
+        run: npx tsc --noEmit
+
+  brand-guard:
+    # White-label guard: the previous brand name must never re-enter the
+    # codebase. Legacy-migration references are explicitly allowlisted.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: No stray brand references
+        run: |
+          hits=$(grep -rin swisdex \
+            --exclude-dir=.git \
+            --exclude-dir=node_modules \
+            --exclude-dir=charting_library \
+            --exclude-dir=versions \
+            --exclude=ci.yml \
+            . \
+            | grep -v 'COMPOSE_PROJECT_NAME=swisdex' \
+            | grep -v 'SWISDEX_DIR' \
+            | grep -v 'swisdex_pg_data\|swisdex_ts_data' \
+            | grep -v 'SwisDexAdmin2025' \
+            | grep -v '^\./docker-compose' \
+            || true)
+          if [ -n "$hits" ]; then
+            echo "$hits"
+            echo "::error::Legacy brand references found (see above)"
+            exit 1
+          fi

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from decimal import Decimal
 
+from ..config import get_settings
 from .base import render_layout, kv_table
 
 
@@ -38,8 +39,9 @@ def render_deposit_failed(
     method: str | None = None,
     reason_code: str,
     reference: str | None = None,
-    trader_app_url: str = "https://trade.swisdex.com",
+    trader_app_url: str = "",
 ) -> tuple[str, str, str]:
+    trader_app_url = (trader_app_url or "").strip() or get_settings().TRADER_APP_URL
     name = (first_name or "trader").strip() or "trader"
     human = _HUMAN_REASON.get(reason_code, f"The deposit was rejected ({reason_code}).")
     rows: list[tuple[str, str]] = [

@@ -23,6 +23,8 @@ from __future__ import annotations
 import re
 from typing import Iterable
 
+from .config import get_settings
+
 
 class PasswordTooWeak(ValueError):
     """Raised when a candidate password fails policy. Use the .reason
@@ -45,7 +47,7 @@ COMMON_WEAK_PASSWORDS: frozenset[str] = frozenset({
     "qazwsxedc", "1q2w3e4r", "1qaz2wsx", "q1w2e3r4", "master123", "shadow123",
     "dragon123", "trustno1", "startrek", "starwars", "superman", "batman123",
     "pakistan", "india123", "hello123", "changeme", "demo1234", "test1234",
-    "guest123", "user1234", "root1234", "swisdex123", "swisdex2025", "swisdex2026",
+    "guest123", "user1234", "root1234",
 })
 
 _LOWER_RE  = re.compile(r"[a-z]")
@@ -72,6 +74,14 @@ def validate_password(password: str, disallow: Iterable[str] = ()) -> None:
 
     if pw.lower() in COMMON_WEAK_PASSWORDS:
         raise PasswordTooWeak("This password is too common — pick something unique")
+
+    # Brand-derived passwords ("<brand>123", "<brand>2026", …) are as
+    # guessable as the classic entries above. Reject any password containing
+    # the configured brand name — only when the name is long enough (>= 4
+    # chars) for the substring match to be meaningful.
+    brand = (get_settings().BRAND_NAME or "").strip().lower()
+    if len(brand) >= 4 and brand in pw.lower():
+        raise PasswordTooWeak("Don't use the platform name in your password")
 
     class_count = sum([
         bool(_LOWER_RE.search(pw)),

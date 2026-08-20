@@ -28,7 +28,7 @@ const config: Config = {
           tertiary: 'rgb(var(--c-text-tertiary) / <alpha-value>)',
           inverse: 'rgb(var(--c-text-inverse) / <alpha-value>)',
         },
-        /* SwisDex gold accent — matches trader */
+        /* Brand accent — matches trader */
         buy: {
           DEFAULT: '#55a630',
           light: '#7dc24f',

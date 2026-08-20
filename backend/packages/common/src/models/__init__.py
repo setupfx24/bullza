@@ -75,6 +75,7 @@ from .vip import VipPass
 from .share import SharedTrade
 from .rm import RMFundingRequest, RmManualRequest
 from .referral_bonus_campaign import ReferralBonusCampaign, ReferralBonusClaim
+from .abook import ABookOutbox
 
 
 __all__ = [
@@ -125,4 +126,6 @@ __all__ = [
     "RMFundingRequest", "RmManualRequest",
     # referral bonus campaigns
     "ReferralBonusCampaign", "ReferralBonusClaim",
+    # A-Book LP forwarding outbox
+    "ABookOutbox",
 ]

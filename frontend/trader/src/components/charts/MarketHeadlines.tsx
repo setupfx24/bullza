@@ -3,7 +3,7 @@
 /**
  * Live forex/market news headlines from /api/market-news (ForexLive / FXStreet
  * RSS — ForexFactory has no public news feed). Replaces the TradingView news
- * timeline embed with a SwisDex-themed, in-house list.
+ * timeline embed with a brand-themed, in-house list.
  */
 import { useCallback, useEffect, useState } from 'react';
 import { clsx } from 'clsx';

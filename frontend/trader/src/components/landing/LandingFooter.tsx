@@ -1,12 +1,13 @@
 import Link from 'next/link'
 import { Phone, Cookie } from 'lucide-react'
-import { openCookieSettings } from '@/swisdex/components/CookieConsent'
+import { openCookieSettings } from '@/home/components/CookieConsent'
+import { BRAND_NAME, BRAND_LOGO, BRAND_COPYRIGHT } from '@/lib/brand'
 
 /**
  * Dark-themed landing footer.
  *
  * Used by the deprecated app-root pages (/about, /contact, /platforms,
- * /white-label). Matches the rest of the SwisDex dark site palette so
+ * /white-label). Matches the rest of the brand dark site palette so
  * the footer never looks like a white island under a dark page. The
  * canonical landing chrome lives in src/landing/components/Footer.jsx
  * — drop this file once those four pages are migrated into the
@@ -39,8 +40,14 @@ export default function LandingFooter() {
       <div className="max-w-7xl mx-auto px-6 lg:px-8">
         <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-10 mb-10">
           <div className="lg:col-span-2">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/images/swisdex_png.png" alt="SwisDex" className="h-10 w-auto mb-4" />
+            {BRAND_LOGO ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={BRAND_LOGO} alt={BRAND_NAME} className="h-10 w-auto mb-4" />
+            ) : (
+              <span className="block font-black tracking-tight text-2xl mb-4" style={{ color: 'rgba(255,255,255,0.95)' }}>
+                {BRAND_NAME}
+              </span>
+            )}
             <p className="text-sm leading-relaxed mb-3 max-w-sm" style={{ color: 'rgba(255,255,255,0.6)' }}>
               Professional multi-asset trading platform. Licensed under Investment Dealer Licence
               No. MAK21098161, St. Lucia.
@@ -50,7 +57,7 @@ export default function LandingFooter() {
                 Scotland Office:
               </span>
               <br />
-              SwisDex Office 23US, 18 Young St, UNIT LGE 1/1, Edinburgh EH2 4JB,
+              {BRAND_NAME} Office 23US, 18 Young St, UNIT LGE 1/1, Edinburgh EH2 4JB,
               Scotland, United Kingdom
             </p>
           </div>
@@ -117,7 +124,7 @@ export default function LandingFooter() {
           style={{ borderTop: '1px solid rgba(255,255,255,0.08)' }}
         >
           <p className="text-sm" style={{ color: 'rgba(255,255,255,0.4)' }}>
-            &copy; {new Date().getFullYear()} SwisDex. All rights reserved.
+            {BRAND_COPYRIGHT}
           </p>
           <div className="flex items-center gap-5 text-sm" style={{ color: 'rgba(255,255,255,0.55)' }}>
             <Link href="/privacy" className="hover:text-[#55a630] transition-colors">Privacy Policy</Link>

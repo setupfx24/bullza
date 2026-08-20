@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from decimal import Decimal
 
+from ..config import get_settings
 from .base import render_layout, kv_table
 
 
@@ -18,8 +19,9 @@ def render_bonus_credited(
     currency: str = "USD",
     new_bonus_balance: Decimal | float | None = None,
     expires_at: str | None = None,
-    trader_app_url: str = "https://trade.swisdex.com",
+    trader_app_url: str = "",
 ) -> tuple[str, str, str]:
+    trader_app_url = (trader_app_url or "").strip() or get_settings().TRADER_APP_URL
     name = (first_name or "trader").strip() or "trader"
     rows: list[tuple[str, str]] = [
         ("Bonus", bonus_label),

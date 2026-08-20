@@ -6,7 +6,8 @@ import {
   ArrowUpRight, BookOpen, Video, FileText, Users, Award, GraduationCap,
   Layers, ChevronDown,
 } from 'lucide-react';
-import { BannerPlaceholder } from '@/swisdex/components/BannerPlaceholder';
+import { BannerPlaceholder } from '@/home/components/BannerPlaceholder';
+import { BRAND_NAME } from '@/lib/brand';
 
 const SIGNUP_HREF = '/auth/register';
 
@@ -15,7 +16,7 @@ export default function EducationPage() {
     <main className="min-h-screen bg-background">
       <BannerPlaceholder
         title="Educational Resources"
-        tagline="Beginner to advanced — a structured trading curriculum built by professional traders. Free with every SwisDex account."
+        tagline={`Beginner to advanced — a structured trading curriculum built by professional traders. Free with every ${BRAND_NAME} account.`}
       />
 
       {/* Curriculum tracks */}
@@ -85,16 +86,16 @@ export default function EducationPage() {
       {/* Benefits */}
       <section className="mx-auto max-w-[1200px] px-[var(--gutter)] py-12 sm:py-16">
         <div className="text-center mb-10">
-          <h2 className="font-display uppercase text-2xl sm:text-3xl md:text-4xl tracking-tight">Why Train With SwisDex</h2>
+          <h2 className="font-display uppercase text-2xl sm:text-3xl md:text-4xl tracking-tight">Why Train With {BRAND_NAME}</h2>
         </div>
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
           {[
             { icon: GraduationCap, title: 'Built by Working Traders', body: 'Every module is authored by an active trader with 10+ years of P&L on the screen — not a YouTube guru.' },
-            { icon: Award,         title: 'Earn a Certificate',       body: 'Finish a track and pass the assessment to receive a SwisDex Academy certificate of completion.' },
+            { icon: Award,         title: 'Earn a Certificate',       body: `Finish a track and pass the assessment to receive a ${BRAND_NAME} Academy certificate of completion.` },
             { icon: Layers,        title: 'Progressive Curriculum',   body: 'Concepts build on each other. You unlock advanced material only after mastering the prerequisites.' },
-            { icon: Video,         title: 'Practical Demos',          body: 'Every concept is shown live on the SwisDex platform — no abstract theory, all chart and order ticket.' },
+            { icon: Video,         title: 'Practical Demos',          body: `Every concept is shown live on the ${BRAND_NAME} platform — no abstract theory, all chart and order ticket.` },
             { icon: Users,         title: 'Community Discord',        body: 'Discuss setups, share journals, and learn from peers. Moderated by the analyst desk.' },
-            { icon: BookOpen,      title: 'Always Free',              body: 'No paywalls, no upgrades, no upsells. Every funded SwisDex account unlocks the full library.' },
+            { icon: BookOpen,      title: 'Always Free',              body: `No paywalls, no upgrades, no upsells. Every funded ${BRAND_NAME} account unlocks the full library.` },
           ].map(({ icon: Icon, title, body }) => (
             <article key={title} className="liquid-glass rounded-2xl p-6">
               <div className="size-11 rounded-xl bg-primary/25 flex items-center justify-center mb-4"><Icon className="size-5 text-primary" /></div>
@@ -110,7 +111,7 @@ export default function EducationPage() {
         <h2 className="text-center font-display uppercase text-2xl sm:text-3xl tracking-tight mb-8">FAQ</h2>
         <div className="space-y-3">
           <FaqItem q="Is the Academy really free?">
-            Yes. The full library — videos, PDFs, blogs, webinars — is included with every SwisDex account. No
+            Yes. The full library — videos, PDFs, blogs, webinars — is included with every {BRAND_NAME} account. No
             separate subscription or upgrade required. You also keep access if you withdraw and close your account.
           </FaqItem>
           <FaqItem q="Do I need a funded account to access it?">

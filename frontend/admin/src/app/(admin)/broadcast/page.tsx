@@ -366,7 +366,7 @@ export default function BroadcastPage() {
           </div>
           <div>
             <label className="block text-xxs text-text-tertiary uppercase mb-1">Button link (optional)</label>
-            <input value={anCtaUrl} onChange={(e) => setAnCtaUrl(e.target.value)} placeholder="https://trade.swisdex.com/bonus"
+            <input value={anCtaUrl} onChange={(e) => setAnCtaUrl(e.target.value)} placeholder="https://trade.example.com/bonus"
               className="w-full px-3 py-2 text-xs bg-bg-tertiary border border-border-primary rounded-md focus:outline-none focus:border-accent" />
           </div>
         </div>

@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic';
  *
  * Critical: this proxy MUST forward `Cookie` (request) and `Set-Cookie`
  * (response) headers. The admin app's auth uses an httpOnly cookie
- * (`swisdex_admin`) — without bidirectional cookie forwarding, login
+ * (`admin_access`) — without bidirectional cookie forwarding, login
  * succeeds at admin-api but the cookie never reaches the browser, then
  * /auth/me returns 401, and the SPA boots into a redirect loop.
  *

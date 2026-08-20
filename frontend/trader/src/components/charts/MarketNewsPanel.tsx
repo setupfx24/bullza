@@ -5,7 +5,7 @@
  * TradingView news timeline embed. Two tabs:
  *   • Events    — ForexFactory economic calendar (via /api/economic-calendar)
  *   • Headlines — live forex news (via /api/market-news)
- * Both are SwisDex-themed and self-hosted (no third-party iframe).
+ * Both are brand-themed and self-hosted (no third-party iframe).
  */
 import { useState } from 'react';
 import { clsx } from 'clsx';

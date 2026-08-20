@@ -5,7 +5,7 @@ Client 2026-07-11:
   - Each friend on the trader /referral page shows "0 / 3" trades → give every
     downline a real trading account + a RANDOM number of CLOSED trades
     (minimum 3) so it reads e.g. "5 / 3" (qualified/green).
-  - The @swisdex-promo.local emails look fake → rename each downline to a
+  - The @promo-demo.local emails look fake → rename each downline to a
     believable name-based personal email (gmail/outlook/yahoo/rediff).
 
 All downline accounts stay is_promotional=True so they're excluded from the
@@ -150,7 +150,7 @@ async def run(execute: bool):
             name = f"{child.first_name} {child.last_name}".strip()
 
             # ── 1. Realistic email ────────────────────────────────────────
-            if "@swisdex-promo.local" in (child.email or ""):
+            if "@promo-demo.local" in (child.email or ""):
                 desired = EMAIL_MAP.get(name)
                 if desired:
                     new_email = await unique_email(db, desired)

@@ -3,6 +3,8 @@
  * Uses dynamic import so jspdf is not loaded until export.
  */
 
+import { BRAND_NAME, BRAND_SLUG } from '@/lib/brand';
+
 export type TradeStatementRow = {
   close_time?: string | null;
   open_time?: string | null;
@@ -108,7 +110,7 @@ export async function downloadTradeStatementPdf(
   doc.setTextColor(255, 255, 255);
   doc.setFontSize(11);
   doc.setFont('helvetica', 'bold');
-  doc.text('SwisDex', margin, 7);
+  doc.text(BRAND_NAME, margin, 7);
 
   doc.setTextColor(30, 30, 30);
   doc.setFontSize(16);
@@ -255,7 +257,7 @@ export async function downloadTradeStatementPdf(
         doc.internal.pageSize.getHeight() - 6,
       );
       doc.text(
-        'SwisDex — for information only. Not tax or legal advice.',
+        `${BRAND_NAME} — for information only. Not tax or legal advice.`,
         margin,
         doc.internal.pageSize.getHeight() - 6,
       );
@@ -263,5 +265,5 @@ export async function downloadTradeStatementPdf(
   });
 
   const safeDate = new Date().toISOString().slice(0, 10);
-  doc.save(`swisdex-trade-statement-${safeDate}.pdf`);
+  doc.save(`${BRAND_SLUG}-trade-statement-${safeDate}.pdf`);
 }

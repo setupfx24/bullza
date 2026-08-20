@@ -12,10 +12,10 @@ COPY backend/services/gateway /app/services/gateway
 
 # Run as non-root. Uploads dir is bind-mounted in compose; chown the
 # in-image copy so the bind-mount inherits ownership where it can.
-RUN groupadd --system --gid 1001 swisdex && \
-    useradd  --system --uid 1001 --gid swisdex --home /app --shell /bin/false swisdex && \
-    mkdir -p /app/uploads && chown -R swisdex:swisdex /app
-USER swisdex
+RUN groupadd --system --gid 1001 app && \
+    useradd  --system --uid 1001 --gid app --home /app --shell /bin/false app && \
+    mkdir -p /app/uploads && chown -R app:app /app
+USER app
 
 ENV PYTHONPATH=/app
 

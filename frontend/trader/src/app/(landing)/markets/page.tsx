@@ -2,7 +2,8 @@
 
 import Link from 'next/link';
 import { ArrowUpRight, Repeat, BarChart3, Coins, Bitcoin, LineChart } from 'lucide-react';
-import { LiveChartSection } from '@/swisdex/components/LiveChartSection';
+import { LiveChartSection } from '@/home/components/LiveChartSection';
+import { BRAND_NAME } from '@/lib/brand';
 
 const MARKETS = [
   { title: 'Forex',       href: '/trading/forex',       Icon: Repeat,    blurb: 'Trade 60+ currency pairs — majors, minors, exotics. Tight spreads, deep liquidity, 24/7.' },
@@ -37,8 +38,8 @@ export default function MarketsPage() {
           <span className="text-primary">Every Market.</span>
         </h2>
         <p className="mt-7 mx-auto max-w-2xl text-foreground/70 text-base sm:text-lg leading-relaxed">
-          SwisDex gives you direct access to the world's most traded financial instruments —
-          from a single SwisDex login. Open Standard, ECN, Pro, IB, or Demo accounts as you need them.
+          {BRAND_NAME} gives you direct access to the world's most traded financial instruments —
+          from a single {BRAND_NAME} login. Open Standard, ECN, Pro, IB, or Demo accounts as you need them.
         </p>
       </section>
 

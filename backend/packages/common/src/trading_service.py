@@ -130,8 +130,13 @@ async def convert_to_account_currency(
     if reverse is not None:
         return amount * reverse
 
-    logger.warning(
-        "No FX rate available for %s→%s; returning raw amount %s", fc, ac, amount,
+    # ERROR, not warning: booking a raw quote-currency number as account
+    # currency mis-values margin/P&L (e.g. JPY treated as USD ≈ 150× off).
+    # Only reachable when the FX leg's tick is absent from Redis — pair
+    # this alert with the feed health checks.
+    logger.error(
+        "No FX rate available for %s→%s; returning RAW amount %s (mis-valued!)",
+        fc, ac, amount,
     )
     return amount
 

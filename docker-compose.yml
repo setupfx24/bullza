@@ -1,20 +1,30 @@
-# SwisDex stack (project name → container/volume prefix).
-name: swisdex
+# Broker stack (project name → container/volume prefix).
+#
+# ⚠️  MIGRATION WARNING — the compose project name was renamed from
+# `swisdex` to `broker`. Docker namespaces volumes/containers/networks by
+# project name, so on an EXISTING deployment `docker compose up` under the
+# new name will create EMPTY pg_data/ts_data volumes and orphan the old
+# ones (swisdex_pg_data, swisdex_ts_data, ...). Existing deployments must
+# either:
+#   1) export COMPOSE_PROJECT_NAME=swisdex   (keeps using the old volumes), or
+#   2) migrate the volumes to the new names before switching.
+# Fresh installs need nothing.
+name: broker
 
 services:
   postgres:
     image: postgres:16-alpine
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-swisdex}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-swisdex_dev}
-      POSTGRES_DB: ${POSTGRES_DB:-swisdex}
+      POSTGRES_USER: ${POSTGRES_USER:-broker}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-broker_dev}
+      POSTGRES_DB: ${POSTGRES_DB:-broker}
     # No host port binding — all services connect via Docker network (postgres:5432)
-    # For local dev access: docker compose exec postgres psql -U swisdex
+    # For local dev access: docker compose exec postgres psql -U broker
     volumes:
       - pg_data:/var/lib/postgresql/data
       - ./backend/infra/docker/init-db.sql:/docker-entrypoint-initdb.d/init.sql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U swisdex"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-broker}"]
       interval: 5s
       timeout: 3s
       retries: 5
@@ -22,15 +32,15 @@ services:
   timescaledb:
     image: timescale/timescaledb:latest-pg16
     environment:
-      POSTGRES_USER: ${TIMESCALE_USER:-swisdex}
-      POSTGRES_PASSWORD: ${TIMESCALE_PASSWORD:-swisdex_dev}
+      POSTGRES_USER: ${TIMESCALE_USER:-broker}
+      POSTGRES_PASSWORD: ${TIMESCALE_PASSWORD:-broker_dev}
       POSTGRES_DB: ${TIMESCALE_DB:-marketdata}
     # No host port binding — all services connect via Docker network (timescaledb:5432)
     volumes:
       - ts_data:/var/lib/postgresql/data
       - ./backend/infra/docker/init-timescale.sql:/docker-entrypoint-initdb.d/init.sql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U swisdex"]
+      test: ["CMD-SHELL", "pg_isready -U ${TIMESCALE_USER:-broker}"]
       interval: 5s
       timeout: 3s
       retries: 5
@@ -76,7 +86,7 @@ services:
     environment:
       # Override: shared backend/.env uses REDIS_URL for gateway (db 0); admin service must use db 1
       REDIS_URL: redis://redis:6379/1
-      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-swisdex}:${POSTGRES_PASSWORD:-swisdex_dev}@postgres:5432/${POSTGRES_DB:-swisdex}
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-broker}:${POSTGRES_PASSWORD:-broker_dev}@postgres:5432/${POSTGRES_DB:-broker}
       ADMIN_JWT_SECRET: ${ADMIN_JWT_SECRET:?Set ADMIN_JWT_SECRET in .env}
       JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env}
       BANNERS_UPLOAD_DIR: /app/uploads/banners
@@ -185,6 +195,12 @@ services:
         NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID: ${NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID:-}
         NEXT_PUBLIC_MARKETING_HOST: ${NEXT_PUBLIC_MARKETING_HOST:-}
         NEXT_PUBLIC_TRADE_HOST: ${NEXT_PUBLIC_TRADE_HOST:-}
+        # White-label branding — also baked in at build time (see lib/brand.ts).
+        NEXT_PUBLIC_BRAND_NAME: ${NEXT_PUBLIC_BRAND_NAME:-}
+        NEXT_PUBLIC_BRAND_SLUG: ${NEXT_PUBLIC_BRAND_SLUG:-}
+        NEXT_PUBLIC_BRAND_DOMAIN: ${NEXT_PUBLIC_BRAND_DOMAIN:-}
+        NEXT_PUBLIC_BRAND_LOGO: ${NEXT_PUBLIC_BRAND_LOGO:-}
+        NEXT_PUBLIC_BRAND_SUPPORT_EMAIL: ${NEXT_PUBLIC_BRAND_SUPPORT_EMAIL:-}
     ports:
       # Host 3010 if 3000 is already taken (local Next/other apps).
       # Loopback-only — see admin-api ports note (compose merge exposure).
@@ -202,6 +218,14 @@ services:
     build:
       context: ./frontend/admin
       dockerfile: Dockerfile
+      args:
+        # NEXT_PUBLIC_* vars are baked into the JS bundle at build time —
+        # they MUST be passed as build args (runtime environment has no
+        # effect on the static bundle). White-label branding (see lib/brand.ts).
+        NEXT_PUBLIC_BRAND_NAME: ${NEXT_PUBLIC_BRAND_NAME:-}
+        NEXT_PUBLIC_BRAND_DOMAIN: ${NEXT_PUBLIC_BRAND_DOMAIN:-}
+        NEXT_PUBLIC_BRAND_LOGO: ${NEXT_PUBLIC_BRAND_LOGO:-}
+        NEXT_PUBLIC_BRAND_SUPPORT_EMAIL: ${NEXT_PUBLIC_BRAND_SUPPORT_EMAIL:-}
     ports:
       # Loopback-only — see admin-api ports note (compose merge exposure).
       - "127.0.0.1:3011:3001"
@@ -225,7 +249,7 @@ services:
       postgres:
         condition: service_healthy
     environment:
-      DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://swisdex:swisdex_dev@postgres:5432/swisdex}
+      DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://broker:broker_dev@postgres:5432/broker}
     volumes:
       - ./backend:/app
     profiles:

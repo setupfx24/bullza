@@ -82,8 +82,9 @@ def _get_frontend_url() -> str:
     from packages.common.src.config import get_settings
     s = get_settings()
     origins = [o.strip() for o in s.CORS_ORIGINS.split(",") if o.strip()]
+    brand_domain = (s.BRAND_DOMAIN or "").strip()
     for o in origins:
-        if "swisdex.com" in o:
+        if brand_domain and brand_domain in o:
             return o
     for o in origins:
         if ":3000" in o:
@@ -158,7 +159,7 @@ async def _can_self_apply_ib(db: AsyncSession, user_id: UUID) -> bool:
     """Per client 2026-06-19: only a user introduced by the Super IB (SDA05)
     — or one who signed up with NO referral at all (they attach under the
     Super IB) — may self-apply to become a full IB. A user introduced by any
-    other IB/affiliate is shown only a "Contact SwisDex to become an IB"
+    other IB/affiliate is shown only a "Contact the broker to become an IB"
     prompt instead of the self-apply flow."""
     introducer_id = await _get_introducer_user_id(db, user_id)
     if introducer_id is None:
@@ -285,7 +286,7 @@ async def ib_status(user_id: UUID, db: AsyncSession) -> dict:
         "is_eligible": total_deposits >= min_deposit and kyc_ok,
     }
     # Whether this user may use the self-apply flow at all, or only see the
-    # "Contact SwisDex to become an IB" prompt (client 2026-06-19).
+    # "Contact the broker to become an IB" prompt (client 2026-06-19).
     can_become_ib = await _can_self_apply_ib(db, user_id)
 
     if application:
@@ -322,12 +323,14 @@ async def apply_ib(user_id: UUID, application_data: dict | None, db: AsyncSessio
         raise HTTPException(status_code=400, detail="You already have a pending application")
 
     # Only Super-IB-introduced (or no-referral) users may self-apply
-    # (client 2026-06-19). Everyone else must contact SwisDex.
+    # (client 2026-06-19). Everyone else must contact the broker.
     if not await _can_self_apply_ib(db, user_id):
+        from packages.common.src.config import get_settings as _gs
+        brand = _gs().BRAND_NAME
         raise HTTPException(
             status_code=403,
-            detail="Direct IB applications are open only to users introduced by SwisDex. "
-                   "Please contact SwisDex to become an IB.",
+            detail=f"Direct IB applications are open only to users introduced by {brand}. "
+                   f"Please contact {brand} to become an IB.",
         )
 
     # KYC gate (client 2026-06-29): must be KYC-approved before becoming an IB.
@@ -535,7 +538,7 @@ async def ib_dashboard(user_id: UUID, db: AsyncSession) -> dict:
     return {
         # Client spec 2026-06-16: only someone introduced by the Super IB
         # (SDA05) is a full IB; everyone else is a Sub-IB. The frontend shows
-        # the matching dashboard and a "Contact SwisDex" upgrade for sub-IBs.
+        # the matching dashboard and a "Contact the broker" upgrade for sub-IBs.
         "ib_type": ib_type,                 # 'super_ib' | 'ib' | 'sub_ib'
         "is_sub_ib": ib_type == "sub_ib",
         "can_request_ib_upgrade": ib_type == "sub_ib",

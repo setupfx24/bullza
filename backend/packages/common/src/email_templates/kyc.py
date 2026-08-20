@@ -3,6 +3,7 @@ from __future__ import annotations
 import re
 from html import escape
 
+from ..config import get_settings
 from .base import render_layout, kv_table
 
 
@@ -17,12 +18,15 @@ def _reason_points(reason: str) -> list[str]:
 def render_kyc_approved(
     *,
     first_name: str | None,
-    trader_app_url: str = "https://trade.swisdex.com",
+    trader_app_url: str = "",
 ) -> tuple[str, str, str]:
+    s = get_settings()
+    brand = (s.BRAND_NAME or "").strip() or "YourBrand"
+    trader_app_url = (trader_app_url or "").strip() or s.TRADER_APP_URL
     name = (first_name or "trader").strip() or "trader"
-    body = """
+    body = f"""
     <p style="margin:0 0 12px;color:#1a1a1a;font-size:14px;line-height:1.6;">
-      Your account is fully unlocked. You can now avail all SwisDex features:
+      Your account is fully unlocked. You can now avail all {escape(brand)} features:
     </p>
     <ul style="margin:0;padding-left:20px;color:#1a1a1a;font-size:14px;line-height:1.7;">
       <li><strong>Trade Insurance</strong> — protect a position so a covered loss is partly refunded</li>
@@ -43,7 +47,7 @@ def render_kyc_approved(
     )
     text = (
         f"Hi {name},\n\n"
-        "Your KYC has been approved. You can now avail all SwisDex features:\n"
+        f"Your KYC has been approved. You can now avail all {brand} features:\n"
         "  - Trade Insurance — protect a position against a covered loss\n"
         "  - Deposit Bonus — qualifying deposits earn a bonus\n"
         "  - Referral Rewards — earn when people you invite join and trade\n"
@@ -59,8 +63,9 @@ def render_kyc_rejected(
     *,
     first_name: str | None,
     reason: str | None = None,
-    trader_app_url: str = "https://trade.swisdex.com",
+    trader_app_url: str = "",
 ) -> tuple[str, str, str]:
+    trader_app_url = (trader_app_url or "").strip() or get_settings().TRADER_APP_URL
     name = (first_name or "trader").strip() or "trader"
     points = _reason_points(reason) if reason else []
     if len(points) > 1:

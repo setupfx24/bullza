@@ -73,93 +73,11 @@ async def compute_welcome_bonus(
     welcome_bonus_cap_usd) are set, we synthesise a one-bracket list
     covering the full range so old configs keep working.
     """
-    from packages.common.src.settings_store import (
-        get_bool_setting, get_float_setting, get_system_setting,
-    )
-
-    enabled = await get_bool_setting("welcome_bonus_enabled", False)
-    if not enabled:
-        return Decimal("0"), ""
-
-    raw_brackets = await get_system_setting("welcome_bonus_brackets", None)
-    brackets: list[dict] = []
-    if isinstance(raw_brackets, list):
-        brackets = raw_brackets
-    else:
-        # Legacy single-rule fallback — wraps the old keys into one bracket
-        # spanning $0..∞ so previously-configured tenants don't break on
-        # upgrade. Removed automatically once admin saves the new UI form.
-        legacy_value = float(await get_float_setting("welcome_bonus_value", 0.0))
-        if legacy_value > 0:
-            legacy_type = (str(await get_system_setting(
-                "welcome_bonus_type", "percentage"
-            ) or "percentage")).strip().lower()
-            legacy_cap = float(await get_float_setting("welcome_bonus_cap_usd", 0.0))
-            brackets = [{
-                "min_deposit": 0,
-                "max_deposit": None,
-                "type": legacy_type,
-                "value": legacy_value,
-                "cap_usd": legacy_cap,
-            }]
-
-    if not brackets:
-        return Decimal("0"), ""
-
-    # Find the first matching bracket. We don't pre-sort — admin defines
-    # the order they want; the first match wins. Empty / malformed rows
-    # are skipped silently.
-    for row in brackets:
-        try:
-            min_d = Decimal(str(row.get("min_deposit") or 0))
-        except (TypeError, ValueError):
-            continue
-        max_raw = row.get("max_deposit")
-        try:
-            max_d = (
-                None if max_raw is None or max_raw == ""
-                else Decimal(str(max_raw))
-            )
-        except (TypeError, ValueError):
-            max_d = None
-        if deposit_amount < min_d:
-            continue
-        if max_d is not None and deposit_amount > max_d:
-            continue
-
-        try:
-            value = Decimal(str(row.get("value") or 0))
-        except (TypeError, ValueError):
-            continue
-        if value <= 0:
-            continue
-        btype = (str(row.get("type") or "percentage")).strip().lower()
-        try:
-            cap = Decimal(str(row.get("cap_usd") or 0))
-        except (TypeError, ValueError):
-            cap = Decimal("0")
-
-        if btype == "percentage":
-            amount = (deposit_amount * value / Decimal("100")).quantize(Decimal("0.01"))
-            range_label = (
-                f"${min_d}+" if max_d is None else f"${min_d} – ${max_d}"
-            )
-            label = f"Welcome bonus {range_label} ({value}% of deposit)"
-        else:
-            amount = value.quantize(Decimal("0.01"))
-            range_label = (
-                f"${min_d}+" if max_d is None else f"${min_d} – ${max_d}"
-            )
-            label = f"Welcome bonus {range_label} (flat ${value})"
-
-        if cap > 0 and amount > cap:
-            amount = cap
-            label += f" — capped at ${cap}"
-
-        return amount, label
-
-    # No bracket matched — deposit fell outside every configured range.
-    return Decimal("0"), ""
+    # Implementation moved to packages.common.src.welcome_bonus so the
+    # admin add-fund path (user_service) shares the EXACT same bracket
+    # math instead of a hand-synchronized copy.
+    from packages.common.src.welcome_bonus import compute_welcome_bonus as _shared
+    return await _shared(deposit_amount)
 
 
 async def is_first_deposit_bonus_eligible(
@@ -213,7 +131,7 @@ def _send_bonus_emails_for_user(
             return
         from packages.common.src.email_templates import render_bonus_credited
         st = get_settings()
-        app_url = (getattr(st, "TRADER_APP_URL", None) or "https://trade.swisdex.com")
+        app_url = getattr(st, "TRADER_APP_URL", None) or ""
         for offer_name, bonus_amount in applied_bonuses:
             subject, html, text = render_bonus_credited(
                 first_name=user_row.first_name,
@@ -245,7 +163,7 @@ def _send_deposit_failed_email(
             return
         from packages.common.src.email_templates import render_deposit_failed
         st = get_settings()
-        app_url = (getattr(st, "TRADER_APP_URL", None) or "https://trade.swisdex.com")
+        app_url = getattr(st, "TRADER_APP_URL", None) or ""
         subject, html, text = render_deposit_failed(
             first_name=user_row.first_name,
             amount=deposit.amount,
@@ -402,7 +320,7 @@ async def create_deposit(req, user_id: UUID, db: AsyncSession) -> dict:
                 amount=req.amount,
                 crypto_currency=crypto_currency,
                 order_id=str(deposit.id),
-                description=f"SwisDex deposit ${float(req.amount):,.2f}",
+                description=f"{get_settings().BRAND_NAME} deposit ${float(req.amount):,.2f}",
             )
             deposit.transaction_id = ox["track_id"]
             payment_url = ox["payment_url"]
@@ -425,7 +343,7 @@ async def create_deposit(req, user_id: UUID, db: AsyncSession) -> dict:
                 amount=req.amount,
                 crypto_currency=crypto_currency,
                 order_id=str(deposit.id),
-                description=f"SwisDex deposit ${float(req.amount):,.2f}",
+                description=f"{get_settings().BRAND_NAME} deposit ${float(req.amount):,.2f}",
             )
             deposit.transaction_id = np["invoice_id"]
             payment_url = np["payment_url"]
@@ -772,7 +690,7 @@ async def handle_oxapay_webhook(
                     method="Crypto (OxaPay)",
                     reference=str(deposit.id),
                     new_balance=user_row.main_wallet_balance,
-                    trader_app_url=(_gs().TRADER_APP_URL or "https://trade.swisdex.com"),
+                    trader_app_url=(_gs().TRADER_APP_URL or ""),
                 )
                 fire_and_forget(send_email(user_row.email, subject, html, text=text, category="account"))
                 _send_bonus_emails_for_user(user_row, applied_bonuses)
@@ -849,7 +767,7 @@ async def create_wallet_deposit(
             amount_usd=amount,
             crypto_currency=crypto_currency,
             order_id=str(deposit.id),
-            description=f"SwisDex deposit ${float(amount):,.2f}",
+            description=f"{get_settings().BRAND_NAME} deposit ${float(amount):,.2f}",
         )
     except Exception as e:
         logger.exception("NOWPayments create_direct_payment failed for deposit %s", deposit.id)
@@ -1180,7 +1098,7 @@ async def handle_nowpayments_webhook(
                     method="Crypto (NOWPayments)",
                     reference=str(deposit.id),
                     new_balance=user_row.main_wallet_balance,
-                    trader_app_url=(_gs().TRADER_APP_URL or "https://trade.swisdex.com"),
+                    trader_app_url=(_gs().TRADER_APP_URL or ""),
                 )
                 fire_and_forget(send_email(user_row.email, subject, html, text=text, category="account"))
                 _send_bonus_emails_for_user(user_row, applied_bonuses)
@@ -1467,7 +1385,7 @@ async def create_withdrawal(req, user_id: UUID, db: AsyncSession) -> dict:
                 method=req.method,
                 destination=destination_str,
                 request_id=str(withdrawal.id),
-                trader_app_url=(_gs().TRADER_APP_URL or "https://trade.swisdex.com"),
+                trader_app_url=(_gs().TRADER_APP_URL or ""),
             )
             fire_and_forget(send_email(user_row.email, subject, html, text=text, category="account"))
     except Exception as _e:

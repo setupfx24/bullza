@@ -6,6 +6,8 @@
  * jspdf is dynamically imported so it's only pulled when an admin exports.
  */
 
+import { BRAND_NAME } from '@/lib/brand';
+
 export type AdminReportColumn = {
   header: string;
   /** mm width; omit to let autotable auto-size. */
@@ -78,7 +80,7 @@ export async function downloadAdminReportPdf(
   doc.setTextColor(255, 255, 255);
   doc.setFontSize(11);
   doc.setFont('helvetica', 'bold');
-  doc.text('SwisDex — Admin', margin, 7);
+  doc.text(s(`${BRAND_NAME} - Admin`), margin, 7);
 
   doc.setTextColor(30, 30, 30);
   doc.setFontSize(16);
@@ -129,11 +131,12 @@ export async function downloadAdminReportPdf(
       doc.setFontSize(7);
       doc.setTextColor(140, 140, 140);
       doc.text(`Page ${data.pageNumber} of ${pageCount}`, pageW - margin - 28, doc.internal.pageSize.getHeight() - 6);
-      doc.text('SwisDex Admin — confidential. For internal use only.', margin, doc.internal.pageSize.getHeight() - 6);
+      doc.text(s(`${BRAND_NAME} Admin - confidential. For internal use only.`), margin, doc.internal.pageSize.getHeight() - 6);
     },
   });
 
   const safeDate = new Date().toISOString().slice(0, 10);
-  const slug = (meta?.filename || title).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-  doc.save(`swisdex-${slug}-${safeDate}.pdf`);
+  const slugify = (v: string) => v.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  const slug = slugify(meta?.filename || title);
+  doc.save(`${slugify(BRAND_NAME)}-${slug}-${safeDate}.pdf`);
 }

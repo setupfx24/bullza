@@ -12,22 +12,23 @@ import ProfileCompleteGate from '@/components/profile/ProfileCompleteGate';
 import TopLoader from '@/components/TopLoader';
 import GoogleTranslate from '@/components/GoogleTranslate';
 import SplashScreen from '@/components/SplashScreen';
-import { CookieConsent } from '@/swisdex/components/CookieConsent';
+import { CookieConsent } from '@/home/components/CookieConsent';
+import { BRAND_NAME } from '@/lib/brand';
 
 export const metadata: Metadata = {
-  title: 'SwisDex',
-  description: 'SwisDex — professional forex and CFD trading platform',
+  title: BRAND_NAME,
+  description: `${BRAND_NAME} — professional forex and CFD trading platform`,
   /* Favicons are served via Next.js file conventions:
      src/app/icon.png and src/app/apple-icon.png. Adding manual
      metadata.icons here would override that — leave them out. */
   // PWA: the manifest (src/app/manifest.ts) is auto-linked by Next.
-  applicationName: 'SwisDex',
+  applicationName: BRAND_NAME,
   // iOS reads these, NOT the manifest — this is what makes "Add to Home
   // Screen" open the app FULL-SCREEN (standalone) with its own title/icon
   // instead of inside Safari. apple-icon.png supplies the home-screen icon.
   appleWebApp: {
     capable: true,
-    title: 'SwisDex',
+    title: BRAND_NAME,
     // 'default' = a solid status bar with content BELOW it. Deliberately not
     // 'black-translucent': that flows content under the notch, and only the
     // terminal pads for safe-area-inset-top — other pages (dashboard, wallet)
@@ -56,7 +57,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <head>
         <script
           dangerouslySetInnerHTML={{
-            __html: `(function(){try{var L='swisdex-ui',N='swisdex-ui';var o=localStorage.getItem(L),n=localStorage.getItem(N);if(o&&!n){localStorage.setItem(N,o);localStorage.removeItem(L);}var s=localStorage.getItem(N);var t='dark';if(s){var j=JSON.parse(s);t=(j&&j.state&&j.state.theme)||(j&&j.theme)||'dark';}var d=document.documentElement;d.setAttribute('data-theme',t);d.classList.add(t==='light'?'theme-light':'theme-dark');if(t==='light'){d.style.backgroundColor='#ffffff';d.style.color='#111827';}else{d.style.backgroundColor='#0a0a0a';d.style.color='#ffffff';}}catch(e){document.documentElement.setAttribute('data-theme','light');document.documentElement.style.backgroundColor='#ffffff';document.documentElement.style.color='#111827';}})();`,
+            __html: `(function(){try{var L='trader-ui',N='trader-ui';var o=localStorage.getItem(L),n=localStorage.getItem(N);if(o&&!n){localStorage.setItem(N,o);localStorage.removeItem(L);}var s=localStorage.getItem(N);var t='dark';if(s){var j=JSON.parse(s);t=(j&&j.state&&j.state.theme)||(j&&j.theme)||'dark';}var d=document.documentElement;d.setAttribute('data-theme',t);d.classList.add(t==='light'?'theme-light':'theme-dark');if(t==='light'){d.style.backgroundColor='#ffffff';d.style.color='#111827';}else{d.style.backgroundColor='#0a0a0a';d.style.color='#ffffff';}}catch(e){document.documentElement.setAttribute('data-theme','light');document.documentElement.style.backgroundColor='#ffffff';document.documentElement.style.color='#111827';}})();`,
           }}
         />
 
@@ -87,14 +88,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             </Suspense>
             <Toaster
               position="top-center"
-              containerClassName="swisdex-toaster"
+              containerClassName="brand-toaster"
               gutter={10}
               // Drop the stack below the sticky app header (~64px) so toasts
               // don't overlap the Bonus / Affiliates / wallet pills up top.
               containerStyle={{ top: 76, zIndex: 99999 }}
               toastOptions={{
                 duration: 2500,
-                className: 'swisdex-hot-toast',
+                className: 'brand-hot-toast',
                 style: {
                   background: 'var(--toast-bg)',
                   color: 'var(--toast-fg)',
@@ -102,21 +103,21 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 },
                 success: {
                   duration: 2200,
-                  className: 'swisdex-hot-toast',
+                  className: 'brand-hot-toast',
                   // White check on a gold disc reads as "good" instantly on
                   // dark surface without losing the brand accent.
                   iconTheme: { primary: '#55a630', secondary: '#1a1408' },
                 },
                 error: {
                   duration: 4000,
-                  className: 'swisdex-hot-toast',
+                  className: 'brand-hot-toast',
                   // White X on a saturated red disc — high contrast on the
                   // dark toast background, no fade-out into the BG colour.
                   iconTheme: { primary: '#ef4444', secondary: '#ffffff' },
                 },
                 loading: {
                   duration: Infinity,
-                  className: 'swisdex-hot-toast',
+                  className: 'brand-hot-toast',
                   iconTheme: { primary: '#55a630', secondary: 'var(--toast-bg)' },
                 },
               }}

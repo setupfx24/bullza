@@ -2,12 +2,13 @@
 
 /**
  * Risk Disclaimer — public legal page.
- * Linked from footer; previously 404'd. Boilerplate adapted to SwisDex's
+ * Linked from footer; previously 404'd. Boilerplate adapted to the platform's
  * product mix (forex, CFDs, crypto, fixed-return-insurance plans).
  */
 import Link from 'next/link';
 import { ArrowUpRight, ShieldAlert, TriangleAlert, Info, Mail } from 'lucide-react';
-import { BannerPlaceholder } from '@/swisdex/components/BannerPlaceholder';
+import { BannerPlaceholder } from '@/home/components/BannerPlaceholder';
+import { BRAND_NAME, BRAND_SUPPORT_EMAIL } from '@/lib/brand';
 
 const SECTIONS = [
   {
@@ -22,7 +23,7 @@ const SECTIONS = [
     h: '2. Leverage',
     p: `Leverage allows you to control a position size larger than your account balance — and
     amplifies both gains and losses. A relatively small adverse market move can wipe out your
-    margin and trigger a stop-out. SwisDex offers leverage up to 1:1000 across most pairs;
+    margin and trigger a stop-out. ${BRAND_NAME} offers leverage up to 1:1000 across most pairs;
     leverage is a tool, not free capital. Size positions to your stop-loss, not to the maximum
     leverage available.`,
   },
@@ -44,7 +45,7 @@ const SECTIONS = [
     h: '5. Crypto-Asset Risks',
     p: `Crypto-assets are subject to regulatory uncertainty, smart-contract risk, exchange-rate
     risk, and operational risk from custodians and bridges. On-chain transactions are
-    irreversible. SwisDex DEX trades settle through smart-contracts that have been audited but
+    irreversible. ${BRAND_NAME} DEX trades settle through smart-contracts that have been audited but
     are not guaranteed to be free of exploits. Do not deposit crypto you cannot afford to lose.`,
   },
   {
@@ -78,24 +79,24 @@ const SECTIONS = [
   {
     h: '10. Tax Treatment',
     p: `The tax treatment of trading profits, swap interest, and bonus equity varies by
-    jurisdiction. You are responsible for declaring and paying any applicable tax. SwisDex does
+    jurisdiction. You are responsible for declaring and paying any applicable tax. ${BRAND_NAME} does
     not provide tax advice — consult a qualified tax adviser for your situation.`,
   },
   {
     h: '11. No Investment Advice',
-    p: `Information published on swisdex.com, in market commentary, and inside the platform is
+    p: `Information published on our website, in market commentary, and inside the platform is
     general in nature and does not constitute personalised investment advice. We do not consider
     your individual objectives, financial situation, or needs.`,
   },
   {
     h: '12. Jurisdictional Restrictions',
-    p: `SwisDex Services are not available to residents of jurisdictions where the offering of
+    p: `${BRAND_NAME} Services are not available to residents of jurisdictions where the offering of
     CFD, forex, or crypto-derivative trading is prohibited under local law. You are responsible
     for ensuring your use of the Services complies with the laws of your jurisdiction.`,
   },
   {
     h: '13. Acknowledgement',
-    p: `By opening a SwisDex account you confirm you have read, understood, and accepted this Risk
+    p: `By opening a ${BRAND_NAME} account you confirm you have read, understood, and accepted this Risk
     Disclaimer alongside our Terms of Service and Privacy Policy. You trade at your own risk.`,
   },
 ];
@@ -151,7 +152,7 @@ export default function RiskPage() {
             </p>
           </div>
           <a
-            href="mailto:info@swisdex.com"
+            href={`mailto:${BRAND_SUPPORT_EMAIL}`}
             className="inline-flex items-center gap-2 rounded-full bg-primary text-white px-5 py-2.5 text-sm font-semibold uppercase tracking-wider hover:opacity-90 shrink-0"
           >
             <Mail className="size-4" /> Risk Queries

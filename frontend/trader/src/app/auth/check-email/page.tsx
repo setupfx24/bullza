@@ -1,5 +1,7 @@
 'use client';
 
+import { BRAND_NAME } from '@/lib/brand';
+
 /**
  * /auth/check-email — landing page after a successful sign-up.
  *
@@ -58,7 +60,7 @@ function CheckEmailContent() {
               <p className="auth-form__subtitle" style={{ marginBottom: 18, fontSize: 15, lineHeight: 1.55 }}>
                 An email has been sent to{' '}
                 <strong style={{ color: 'var(--text-primary, #fff)' }}>{email || 'your inbox'}</strong>.
-                Please verify your email address to complete your SwisDex registration
+                Please verify your email address to complete your {BRAND_NAME} registration
                 and start trading.
               </p>
               <p className="auth-form__subtitle" style={{ fontSize: 13, marginBottom: 28, opacity: 0.72, lineHeight: 1.55 }}>

@@ -12,6 +12,7 @@
  */
 import Link from 'next/link';
 import { ArrowUpRight, ShieldCheck, Zap, Lock, ScrollText, Check } from 'lucide-react';
+import { BRAND_NAME } from '@/lib/brand';
 
 // Two coverage tiers shown on the order ticket. Per the client, both cards
 // carry the SAME bullet list — only the headline cover % and the promo flag
@@ -69,7 +70,7 @@ export default function InsurancePage() {
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src="/images/insurance_banner1.png"
-          alt="SwisDex Trade Insurance — protect every position"
+          alt={`${BRAND_NAME} Trade Insurance — protect every position`}
           className="w-full rounded-3xl max-h-[420px] object-cover"
           style={{ border: '1px solid rgba(255,255,255,0.06)' }}
         />
@@ -179,7 +180,7 @@ export default function InsurancePage() {
             Trade With Built-In Protection
           </h2>
           <p className="mt-4 text-foreground/70 max-w-xl mx-auto text-sm sm:text-base">
-            Open a SwisDex account and tap Insurance on any order to lock in cover for that trade.
+            Open a {BRAND_NAME} account and tap Insurance on any order to lock in cover for that trade.
           </p>
           <Link
             href="/auth/register"

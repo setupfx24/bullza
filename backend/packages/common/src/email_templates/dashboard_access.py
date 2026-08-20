@@ -13,6 +13,7 @@ from __future__ import annotations
 
 from html import escape
 
+from ..config import get_settings
 from .base import render_layout
 
 
@@ -22,9 +23,10 @@ def render_dashboard_access(
     dashboard_url: str,
 ) -> tuple[str, str, str]:
     name = (first_name or "trader").strip() or "trader"
+    brand = (get_settings().BRAND_NAME or "").strip() or "YourBrand"
 
     intro = (
-        "Your profile is complete and your SwisDex dashboard is ready. "
+        f"Your profile is complete and your {brand} dashboard is ready. "
         "Click the button below to jump straight in — your trading "
         "accounts, deposits, and rewards are all one tap away."
     )
@@ -63,7 +65,7 @@ def render_dashboard_access(
         '</p>'
     )
 
-    subject = "Your SwisDex dashboard is ready"
+    subject = f"Your {brand} dashboard is ready"
     html = render_layout(
         hero_eyebrow="Profile Complete",
         title=f"Welcome aboard, {name}",
@@ -72,14 +74,14 @@ def render_dashboard_access(
         cta_label="Open Dashboard",
         cta_url=dashboard_url,
         footer_note=(
-            "You're receiving this email because you completed the SwisDex "
+            f"You're receiving this email because you completed the {brand} "
             "profile setup. If this wasn't you, please contact support."
         ),
     )
 
     text = (
         f"Welcome aboard, {name}\n\n"
-        "Your profile is complete and your SwisDex dashboard is ready.\n"
+        f"Your profile is complete and your {brand} dashboard is ready.\n"
         "Open it here:\n\n"
         f"  {dashboard_url}\n\n"
         "What you can do next:\n"
@@ -87,6 +89,6 @@ def render_dashboard_access(
         "  - Fund your wallet with a crypto or manual deposit\n"
         "  - Browse markets and place your first trade\n"
         "  - Complete KYC to unlock higher leverage and withdrawal limits\n\n"
-        "If you didn't complete a SwisDex profile, please contact support.\n"
+        f"If you didn't complete a {brand} profile, please contact support.\n"
     )
     return subject, html, text

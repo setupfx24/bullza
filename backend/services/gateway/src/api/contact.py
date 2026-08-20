@@ -2,7 +2,7 @@
 
 Unauthenticated by design (visitors have no account), so the endpoint is
 rate limited per IP and per submitted email address. Destination mailbox
-is CONTACT_INBOX_EMAIL (default support@swisdex.com); comma-separated to
+is CONTACT_INBOX_EMAIL (defaults to the brand support address); comma-separated to
 fan out to several mailboxes.
 """
 from __future__ import annotations
@@ -62,7 +62,10 @@ async def submit_contact(req: ContactRequest, request: Request):
         )
         raise HTTPException(
             status_code=503,
-            detail="We couldn't send your message right now. Please email support@swisdex.com directly.",
+            detail=(
+                "We couldn't send your message right now. Please email "
+                f"support@{get_settings().BRAND_DOMAIN} directly."
+            ),
         )
 
     when_utc = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M")
@@ -86,7 +89,10 @@ async def submit_contact(req: ContactRequest, request: Request):
     if not delivered:
         raise HTTPException(
             status_code=502,
-            detail="We couldn't send your message right now. Please email support@swisdex.com directly.",
+            detail=(
+                "We couldn't send your message right now. Please email "
+                f"support@{get_settings().BRAND_DOMAIN} directly."
+            ),
         )
 
     # Acknowledgement to the visitor is best-effort — a bounce here must not

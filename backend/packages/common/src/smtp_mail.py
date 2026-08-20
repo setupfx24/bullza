@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 # drop the logo to a remote <img> that image-blocking clients then hid). Read
 # from disk first; the URL fetch below is only a fallback.
 _LOCAL_LOGO_PATH = os.path.join(
-    os.path.dirname(__file__), "email_templates", "swisdex_logo.png",
+    os.path.dirname(__file__), "email_templates", "brand_logo.png",
 )
 
 
@@ -49,7 +49,7 @@ def _get_local_logo_bytes() -> Optional[tuple[bytes, str]]:
 # a broken logo before. Failures are NOT cached so a transient fetch error
 # just falls back to the remote URL and retries next send.
 _LOGO_CACHE: dict[str, tuple[bytes, str]] = {}
-_LOGO_CID = "swisdexlogo"
+_LOGO_CID = "brandlogo"
 
 
 def _get_logo_bytes(url: str) -> Optional[tuple[bytes, str]]:
@@ -58,7 +58,10 @@ def _get_logo_bytes(url: str) -> Optional[tuple[bytes, str]]:
     if url in _LOGO_CACHE:
         return _LOGO_CACHE[url]
     try:
-        req = urllib.request.Request(url, headers={"User-Agent": "SwisDex-Mailer/1.0"})
+        req = urllib.request.Request(
+            url,
+            headers={"User-Agent": f"{get_settings().BRAND_NAME}-Mailer/1.0"},
+        )
         with urllib.request.urlopen(req, timeout=10) as resp:  # noqa: S310 (trusted config URL)
             data = resp.read()
             ctype = (resp.headers.get("Content-Type") or "").lower()
@@ -88,8 +91,8 @@ def smtp_configured() -> bool:
 # RFC 6761) plus our own demo-account domain. Sending to these always produces
 # a "Undelivered Mail Returned to Sender" bounce that lands back in the sender
 # inbox and, in volume, hurts sender reputation (real mail starts landing in
-# spam). The demo downline seeded for the promo account use
-# `@swisdex-promo.local`, which is why the inbox filled with bounces. We drop
+# spam). The demo downline seeded for the promo account use a reserved
+# `.local` domain, which is why the inbox filled with bounces. We drop
 # these at the single send choke point instead of attempting delivery.
 _UNDELIVERABLE_SUFFIXES = (
     ".local", ".localhost", ".invalid", ".test", ".example",
@@ -97,12 +100,18 @@ _UNDELIVERABLE_SUFFIXES = (
 )
 
 
-# Platform-reserved addresses that never have a real mailbox — the shared
-# demo login account chief among them. Suppressed unconditionally so no
-# lifecycle email (statements, reminders, margin mails) ever bounces off them.
-_ALWAYS_SUPPRESSED = {
-    "demo@swisdex.com",
-}
+# Platform-reserved local parts that never have a real mailbox — the shared
+# demo login account chief among them. Suppressed unconditionally (on the
+# brand domain) so no lifecycle email (statements, reminders, margin mails)
+# ever bounces off them.
+_ALWAYS_SUPPRESSED_LOCAL_PARTS = ("demo",)
+
+
+def _always_suppressed() -> set:
+    domain = (get_settings().BRAND_DOMAIN or "").strip().lower()
+    if not domain:
+        return set()
+    return {f"{lp}@{domain}" for lp in _ALWAYS_SUPPRESSED_LOCAL_PARTS}
 
 
 def _suppressed_addresses() -> set:
@@ -117,7 +126,7 @@ def _suppressed_addresses() -> set:
         raw = (getattr(get_settings(), "EMAIL_SUPPRESSION_LIST", "") or "")
     except Exception:  # noqa: BLE001 — never let config issues break sending
         raw = ""
-    return _ALWAYS_SUPPRESSED | {a.strip().lower() for a in raw.split(",") if a.strip()}
+    return _always_suppressed() | {a.strip().lower() for a in raw.split(",") if a.strip()}
 
 
 def _is_undeliverable(to_email: str) -> bool:
@@ -137,16 +146,23 @@ def _is_undeliverable(to_email: str) -> bool:
 # Display names per category — surfaces a useful sender label in the
 # inbox preview even when the underlying mailbox is the generic support
 # account. Override globally with MAIL_FROM_NAME (legacy behaviour).
-_CATEGORY_DISPLAY_NAMES: dict[str, str] = {
-    "account":    "SwisDex Account",
-    "insure":     "SwisDex Insurance",
-    "affiliates": "SwisDex Affiliates",
-    "voucher":    "SwisDex Rewards",
-    "stacking":   "SwisDex Earn",
-    "info":       "SwisDex",
-    "support":    "SwisDex Support",
-    "default":    "SwisDex",
+# Suffixes are appended to the configured BRAND_NAME at send time.
+_CATEGORY_DISPLAY_SUFFIXES: dict[str, str] = {
+    "account":    "Account",
+    "insure":     "Insurance",
+    "affiliates": "Affiliates",
+    "voucher":    "Rewards",
+    "stacking":   "Earn",
+    "info":       "",
+    "support":    "Support",
+    "default":    "",
 }
+
+
+def _category_display_name(cat: str) -> str:
+    brand = (get_settings().BRAND_NAME or "").strip() or "YourBrand"
+    suffix = _CATEGORY_DISPLAY_SUFFIXES.get(cat, _CATEGORY_DISPLAY_SUFFIXES["default"])
+    return f"{brand} {suffix}".strip()
 
 
 def _category_address(category: str) -> str | None:
@@ -188,14 +204,16 @@ def _from_address(category: str = "default") -> str:
 
     if cat_addr:
         raw = cat_addr
-        name = _CATEGORY_DISPLAY_NAMES.get(cat) or _CATEGORY_DISPLAY_NAMES["default"]
+        name = _category_display_name(cat)
     else:
         raw = (s.SMTP_FROM or s.SMTP_USER or "").strip()
         if not raw:
             raise ValueError("SMTP_FROM or SMTP_USER must be set when SMTP_HOST is set")
         # Legacy single-address path keeps the global display name so we
-        # don't silently break existing branding.
-        name = (getattr(s, "MAIL_FROM_NAME", None) or "SwisDex").strip()
+        # don't silently break existing branding. MAIL_FROM_NAME defaults to
+        # "" and falls back to the configured brand name.
+        name = ((getattr(s, "MAIL_FROM_NAME", None) or "").strip()
+                or (s.BRAND_NAME or "").strip() or "YourBrand")
 
     # Strip any pre-existing 'Name <addr>' wrapping — keep just the address.
     if "<" in raw and raw.endswith(">"):
@@ -265,9 +283,12 @@ def _send_sync(to_email: str, subject: str, html: str, text: Optional[str], cate
     logo_bytes: Optional[tuple[bytes, str]] = None
     logo_url = (getattr(s, "EMAIL_LOGO_URL", "") or "").strip()
     if logo_url and logo_url in html:
-        # Prefer the bundled logo (no network) and only fetch the URL if it's
-        # missing from the image — guarantees the inline logo on every send.
-        logo_bytes = _get_local_logo_bytes() or _get_logo_bytes(logo_url)
+        # Fetch the TENANT's configured logo first (cached after the first
+        # send); the bundled file is only a fallback for a fetch failure.
+        # The old priority preferred the bundled file, which shipped the
+        # previous brand's artwork in every mail of a white-label tenant
+        # that had configured its own EMAIL_LOGO_URL.
+        logo_bytes = _get_logo_bytes(logo_url) or _get_local_logo_bytes()
         if logo_bytes:
             html = html.replace(logo_url, f"cid:{_LOGO_CID}")
 
@@ -343,7 +364,7 @@ async def send_email(
     if not to_email or "@" not in to_email:
         logger.warning("Skipping email — bad recipient %r", to_email)
         return False
-    # Demo / reserved domains (e.g. the @swisdex-promo.local downline) never
+    # Demo / reserved domains (e.g. the seeded `.local` promo downline) never
     # deliver — sending only generates bounce-backs to the sender inbox. Skip
     # silently (info log, not warning) so demo data doesn't pollute the queue.
     if _is_undeliverable(to_email):
@@ -390,9 +411,10 @@ def _strip_tags(html: str) -> str:
 
 
 async def send_password_reset_email(
-    to_email: str, reset_link: str, *, app_name: str = "SwisDex",
+    to_email: str, reset_link: str, *, app_name: str = "",
 ) -> bool:
     from .email_templates import render_password_reset
+    app_name = (app_name or "").strip() or get_settings().BRAND_NAME
     subject, html, text = render_password_reset(app_name=app_name, reset_link=reset_link)
     # Password reset is a support-style transactional flow.
     return await send_email(to_email, subject, html, text=text, category="support")

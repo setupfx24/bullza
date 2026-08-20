@@ -83,7 +83,7 @@ export default function TopBar() {
           </button>
         )}
 
-        {/* Brand wordmark removed — sidebar already shows the SwisDex logo
+        {/* Brand wordmark removed — sidebar already shows the brand logo
             in the same row, and rendering it twice felt noisy in the
             trading terminal. The active account badge below now becomes
             the left-anchor on the terminal page. */}

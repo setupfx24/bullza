@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { BRAND_LOGO, BRAND_NAME } from '@/lib/brand';
 
 /**
  * Full-screen branded splash shown on every full page load / refresh.
@@ -27,19 +28,24 @@ export default function SplashScreen() {
   if (removed) return null;
 
   return (
-    <div className={`swisdex-splash${hidden ? ' swisdex-splash--hidden' : ''}`} aria-hidden="true">
-      {/* Soft background aura — feb.png, blurred + low opacity */}
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src="/images/feb.png" alt="" className="swisdex-splash__bg" />
+    <div className={`brand-splash${hidden ? ' brand-splash--hidden' : ''}`} aria-hidden="true">
+      {BRAND_LOGO ? (
+        <>
+          {/* Soft background aura — brand logo, blurred + low opacity */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={BRAND_LOGO} alt="" className="brand-splash__bg" />
 
-      <div className="swisdex-splash__inner">
-        {/* Theme-aware swap: original raster on dark mode, white-bg
-            variant on light mode. */}
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/images/swisdex_png5.png" alt="SwisDex" className="swisdex-splash__logo hidden dark:block" />
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/images/swisdex_png.png" alt="SwisDex" className="swisdex-splash__logo dark:hidden" />
-      </div>
+          <div className="brand-splash__inner">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={BRAND_LOGO} alt={BRAND_NAME} className="brand-splash__logo" />
+          </div>
+        </>
+      ) : (
+        /* No logo configured — styled text wordmark fallback. */
+        <div className="brand-splash__inner">
+          <span className="brand-splash__logo brand-splash__wordmark">{BRAND_NAME}</span>
+        </div>
+      )}
     </div>
   );
 }

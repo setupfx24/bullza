@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from html import escape
 
+from ..config import get_settings
 from .base import render_layout, kv_table
 
 
@@ -73,7 +74,11 @@ def render_contact_inquiry(
         body_html=body,
         cta_label="Reply to sender",
         cta_url=f"mailto:{email}",
-        footer_note="Replying to this email goes to the SwisDex inbox, not the sender — use the button above to reply directly.",
+        footer_note=(
+            f"Replying to this email goes to the "
+            f"{(get_settings().BRAND_NAME or '').strip() or 'YourBrand'} inbox, "
+            "not the sender — use the button above to reply directly."
+        ),
         hero_eyebrow="Website Contact Form",
     )
     text = "\n".join([
@@ -101,6 +106,9 @@ def render_contact_ack(
     site isn't the only confirmation they get."""
     label = subject_label(subject)
     first = (name or "there").strip().split(" ")[0] or "there"
+    s = get_settings()
+    brand = (s.BRAND_NAME or "").strip() or "YourBrand"
+    domain = (s.BRAND_DOMAIN or "").strip() or "example.com"
 
     body = f"""
     <p style="margin:0 0 16px;color:#1a1a1a;font-size:14px;line-height:1.6;">
@@ -119,12 +127,16 @@ def render_contact_ack(
     </div>
     """
 
-    email_subject = "We've received your message — SwisDex Support"
+    email_subject = f"We've received your message — {brand} Support"
     html = render_layout(
         title="Thanks for getting in touch",
         intro=f"Hi {first}, this is confirmation that your message reached us.",
         body_html=body,
-        footer_note="You're receiving this because a message was submitted with this email address on swisdex.com. If that wasn't you, you can ignore this email.",
+        footer_note=(
+            "You're receiving this because a message was submitted with this "
+            f"email address on {domain}. If that wasn't you, you can ignore "
+            "this email."
+        ),
     )
     text = "\n".join([
         f"Hi {first},",
@@ -137,6 +149,6 @@ def render_contact_ack(
         "Your message:",
         (message or "").strip(),
         "",
-        "— SwisDex Support",
+        f"— {brand} Support",
     ])
     return email_subject, html, text
