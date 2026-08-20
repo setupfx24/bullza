@@ -7,6 +7,7 @@ import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import AppSidebar from './AppSidebar';
 import AppHeader from './AppHeader';
+import TopNavMenu from './TopNavMenu';
 import KycLoginPrompt from '@/components/kyc/KycLoginPrompt';
 
 export default function DashboardShell({
@@ -30,6 +31,8 @@ export default function DashboardShell({
       
     >
       <AppSidebar />
+      {/* Slide-down nav panel driven by the header hamburger. */}
+      <TopNavMenu />
       <div
         className={cn(
           'flex min-w-0 flex-1 flex-col bg-bg-base transition-[margin] duration-200',

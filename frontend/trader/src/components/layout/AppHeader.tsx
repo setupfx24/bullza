@@ -8,7 +8,7 @@ import { useAuthStore } from '@/stores/authStore';
 import { useTradingStore } from '@/stores/tradingStore';
 import { NotificationBell } from '@/components/NotificationListener';
 import api from '@/lib/api/client';
-import { ChevronDown, Wallet, Gift, Users, Menu } from 'lucide-react';
+import { ChevronDown, Wallet, Gift, Users, Menu, X } from 'lucide-react';
 
 function formatUsd(n: number) {
   return new Intl.NumberFormat('en-US', {
@@ -19,7 +19,7 @@ function formatUsd(n: number) {
 }
 
 export default function AppHeader() {
-  const { toggleSidebar } = useShellStore();
+  const { topMenuOpen, toggleTopMenu } = useShellStore();
   const { user, logout } = useAuthStore();
   const router = useRouter();
   const [balance, setBalance] = useState(0);
@@ -85,16 +85,18 @@ export default function AppHeader() {
       <header
         className="h-[56px] sm:h-[65px] flex items-center justify-between px-3 sm:px-5 rounded-xl bg-bg-secondary border border-border-primary"
       >
-        {/* LEFT — hamburger toggles the sidebar. The brand mark already
-            lives at the top of the sidebar itself, so we don't repeat it
-            inside the content header. */}
+        {/* LEFT — hamburger opens the slide-down menu panel (TopNavMenu).
+            It used to collapse the left sidebar; the menu now drops in
+            from the top instead. The brand mark already lives at the top
+            of the sidebar, so we don't repeat it in the content header. */}
         <button
           type="button"
-          onClick={toggleSidebar}
+          onClick={toggleTopMenu}
           className="shrink-0 w-10 h-10 flex items-center justify-center rounded-lg border border-border-primary text-text-secondary hover:text-text-primary hover:bg-bg-hover transition-colors"
-          aria-label="Toggle menu"
+          aria-label={topMenuOpen ? 'Close menu' : 'Open menu'}
+          aria-expanded={topMenuOpen}
         >
-          <Menu size={20} />
+          {topMenuOpen ? <X size={20} /> : <Menu size={20} />}
         </button>
 
         {/* RIGHT — Bonus/Referral chips + balance + bell + user */}
