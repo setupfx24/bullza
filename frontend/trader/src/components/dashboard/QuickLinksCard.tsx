@@ -6,7 +6,7 @@ import { PanelCard } from './PanelCard';
 
 /**
  * Quick links — the reference's compact link-list card, pointing ONLY at
- * existing platform sections (routes already in AppSidebar).
+ * existing platform sections (routes already in the app navigation).
  */
 const LINKS = [
   { href: '/wallet', label: 'Wallet & transfers', Icon: Wallet },

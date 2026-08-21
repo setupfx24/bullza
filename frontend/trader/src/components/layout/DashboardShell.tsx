@@ -2,10 +2,8 @@
 
 import Link from 'next/link';
 import { MessageSquare } from 'lucide-react';
-import { useShellStore } from '@/stores/shellStore';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
-import AppSidebar from './AppSidebar';
 import AppHeader from './AppHeader';
 import TopNavMenu from './TopNavMenu';
 import KycLoginPrompt from '@/components/kyc/KycLoginPrompt';
@@ -19,7 +17,6 @@ export default function DashboardShell({
   className?: string;
   mainClassName?: string;
 }) {
-  const { sidebarOpen } = useShellStore();
   const pathname = usePathname();
 
   return (
@@ -30,15 +27,11 @@ export default function DashboardShell({
       )}
       
     >
-      <AppSidebar />
-      {/* Slide-down nav panel driven by the header hamburger. */}
+      {/* Navigation lives entirely in the header hamburger's slide-down
+          panel now — the left sidebar was removed so the content spans
+          the full width (matches the redesign reference). */}
       <TopNavMenu />
-      <div
-        className={cn(
-          'flex min-w-0 flex-1 flex-col bg-bg-base transition-[margin] duration-200',
-          sidebarOpen && 'lg:ml-[260px]',
-        )}
-      >
+      <div className="flex min-w-0 flex-1 flex-col bg-bg-base">
         <AppHeader />
         <main
           key={pathname}

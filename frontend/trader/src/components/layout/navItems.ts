@@ -11,9 +11,7 @@ export type NavEntry = LeafItem | GroupItem;
 
 /**
  * Single source of truth for the authenticated app's navigation.
- * Consumed by both AppSidebar (desktop rail) and TopNavMenu (the
- * slide-down panel the header hamburger opens) so the two can never
- * drift apart.
+ * Consumed by TopNavMenu (the header hamburger's slide-down panel).
  */
 export const NAV_ITEMS: NavEntry[] = [
   { label: 'Dashboard', href: '/dashboard', icon: Home },

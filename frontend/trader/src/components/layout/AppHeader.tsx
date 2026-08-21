@@ -7,6 +7,7 @@ import { useShellStore } from '@/stores/shellStore';
 import { useAuthStore } from '@/stores/authStore';
 import { useTradingStore } from '@/stores/tradingStore';
 import { NotificationBell } from '@/components/NotificationListener';
+import { BrandWordmark } from '@/components/layout/BrandWordmark';
 import api from '@/lib/api/client';
 import { ChevronDown, Wallet, Gift, Users, Menu, X } from 'lucide-react';
 
@@ -85,19 +86,26 @@ export default function AppHeader() {
       <header
         className="h-[56px] sm:h-[65px] flex items-center justify-between px-3 sm:px-5 rounded-xl bg-bg-secondary border border-border-primary"
       >
-        {/* LEFT — hamburger opens the slide-down menu panel (TopNavMenu).
-            It used to collapse the left sidebar; the menu now drops in
-            from the top instead. The brand mark already lives at the top
-            of the sidebar, so we don't repeat it in the content header. */}
-        <button
-          type="button"
-          onClick={toggleTopMenu}
-          className="shrink-0 w-10 h-10 flex items-center justify-center rounded-lg border border-border-primary text-text-secondary hover:text-text-primary hover:bg-bg-hover transition-colors"
-          aria-label={topMenuOpen ? 'Close menu' : 'Open menu'}
-          aria-expanded={topMenuOpen}
-        >
-          {topMenuOpen ? <X size={20} /> : <Menu size={20} />}
-        </button>
+        {/* LEFT — hamburger opens the slide-down menu panel (TopNavMenu),
+            plus the brand mark. The mark used to live at the top of the
+            left sidebar; with that removed, the header is now the only
+            place it appears. */}
+        <div className="flex items-center gap-2.5 min-w-0">
+          <button
+            type="button"
+            onClick={toggleTopMenu}
+            className="shrink-0 w-10 h-10 flex items-center justify-center rounded-lg border border-border-primary text-text-secondary hover:text-text-primary hover:bg-bg-hover transition-colors"
+            aria-label={topMenuOpen ? 'Close menu' : 'Open menu'}
+            aria-expanded={topMenuOpen}
+          >
+            {topMenuOpen ? <X size={20} /> : <Menu size={20} />}
+          </button>
+          <BrandWordmark
+            href="/dashboard"
+            className="hidden sm:flex items-center min-w-0"
+            textClassName="text-base"
+          />
+        </div>
 
         {/* RIGHT — Bonus/Referral chips + balance + bell + user */}
         <div className="flex items-center gap-1.5 sm:gap-3">
