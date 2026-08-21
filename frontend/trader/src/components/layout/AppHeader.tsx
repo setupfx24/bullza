@@ -7,6 +7,7 @@ import { useShellStore } from '@/stores/shellStore';
 import { useAuthStore } from '@/stores/authStore';
 import { useTradingStore } from '@/stores/tradingStore';
 import { NotificationBell } from '@/components/NotificationListener';
+import { ThemeToggle } from '@/components/ui/ThemeToggle';
 import { BrandWordmark } from '@/components/layout/BrandWordmark';
 import api from '@/lib/api/client';
 import { ChevronDown, Wallet, Gift, Users, Menu, X } from 'lucide-react';
@@ -139,6 +140,11 @@ export default function AppHeader() {
             <span className="text-[#E85D3D] text-xs sm:text-sm font-medium truncate max-w-[90px] sm:max-w-none">{formatUsd(balance)}</span>
             <ChevronDown size={12} className="text-[#E85D3D]/60 shrink-0 hidden sm:block" />
           </Link>
+
+          {/* Light / vantablack theme switch. Lives in the header because
+              it is the only persistent chrome left after the sidebar was
+              removed. */}
+          <ThemeToggle compact />
 
           {/* Notification bell */}
           <NotificationBell />

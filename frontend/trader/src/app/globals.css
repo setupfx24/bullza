@@ -76,57 +76,63 @@
 /* CSS VARIABLES — DARK (Vantablack) THEME */
 /* ======================================= */
 
-/* Dark theme — aligned with crucial-ui (SetupFX): #0a0a0a base, #111 cards, #E85D3D accent */
+/* Dark theme — vantablack: pure #000 canvas, near-black surfaces, coral accent */
 [data-theme="dark"], .theme-dark {
-  --bg-page: #050707;
-  --bg-base: #0a0a0a;
-  --bg-primary: #0a0a0a;
-  --bg-secondary: #111111;
-  --bg-tertiary: #0d0d0d;
-  --bg-hover: #161616;
-  --bg-active: #1f1f1f;
-  --bg-input: #111111;
-  --bg-card: #111111;
-  --bg-card-nested: #0d0d0d;
-  --bg-glass: rgba(17, 17, 17, 0.72);
-  --bg-glass-light: rgba(13, 13, 13, 0.55);
-  --bg-glass-heavy: rgba(10, 10, 10, 0.92);
+  /* Vantablack — a true #000 canvas. Surfaces lift in tiny steps
+     (0 → 6 → 10 → 18) so cards read as distinct planes without ever
+     turning grey; borders carry most of the separation at this depth. */
+  --bg-page: #000000;
+  --bg-base: #000000;
+  --bg-primary: #000000;
+  --bg-secondary: #060606;
+  --bg-tertiary: #030303;
+  --bg-hover: #121212;
+  --bg-active: #1c1c1c;
+  --bg-input: #070707;
+  --bg-card: #0a0a0a;
+  --bg-card-nested: #050505;
+  --bg-glass: rgba(10, 10, 10, 0.72);
+  --bg-glass-light: rgba(6, 6, 6, 0.55);
+  --bg-glass-heavy: rgba(0, 0, 0, 0.92);
 
-  --border-primary: #2a2a2a;
-  --border-secondary: #1f1f1f;
-  --border-accent: #2a2a2a;
-  --border-glass: rgba(255, 255, 255, 0.06);
-  --border-glass-bright: rgba(255, 255, 255, 0.08);
+  /* Slightly brighter than the old greys: on pure black a #2a2a2a edge
+     nearly disappears, so borders do the structural work here. */
+  --border-primary: #232323;
+  --border-secondary: #161616;
+  --border-accent: #2e2e2e;
+  --border-glass: rgba(255, 255, 255, 0.07);
+  --border-glass-bright: rgba(255, 255, 255, 0.11);
 
   --text-primary: #ffffff;
   --text-secondary: #b0b0b0;
   --text-tertiary: #8a8a8a;
   --text-inverse: #000000;
 
-  --scrollbar-track: #0a0a0a;
-  --scrollbar-thumb: #2a2a2a;
-  --scrollbar-hover: #3a3a3a;
+  --scrollbar-track: #000000;
+  --scrollbar-thumb: #232323;
+  --scrollbar-hover: #333333;
 
-  --input-bg: #111111;
-  --input-border: #1f1f1f;
-  --input-shadow: inset 0 2px 6px rgba(0,0,0,0.5), inset 0 0 0 1px rgba(0,0,0,0.2), 0 1px 0 rgba(255,255,255,0.02);
+  --input-bg: #070707;
+  --input-border: #1c1c1c;
+  --input-shadow: inset 0 2px 6px rgba(0,0,0,0.65), inset 0 0 0 1px rgba(0,0,0,0.3), 0 1px 0 rgba(255,255,255,0.02);
   --input-focus-border: rgba(232, 93, 61, 0.55);
-  --input-focus-shadow: inset 0 2px 6px rgba(0,0,0,0.5), inset 0 0 0 1px rgba(232, 93, 61, 0.12), 0 0 0 3px rgba(232, 93, 61, 0.12);
+  --input-focus-shadow: inset 0 2px 6px rgba(0,0,0,0.65), inset 0 0 0 1px rgba(232, 93, 61, 0.12), 0 0 0 3px rgba(232, 93, 61, 0.12);
   --input-placeholder: #555555;
 
   --selection-bg: rgba(232, 93, 61, 0.22);
 
   --noise-opacity: 0.012;
-  --emboss-bg: rgba(0, 0, 0, 0.5);
+  --emboss-bg: rgba(0, 0, 0, 0.6);
   --emboss-shadow: 0 1px 0 rgba(255, 255, 255, 0.03);
 
   /* react-hot-toast — always dark surface (readable on charts + light UI) */
-  --toast-bg: #111111;
+  --toast-bg: #0a0a0a;
   --toast-fg: #f0f0f0;
   --toast-border: rgba(232, 93, 61, 0.28);
 
   color-scheme: dark;
 }
+
 
 /* ======================================= */
 /* CSS VARIABLES — LIGHT (White-Black)     */
@@ -194,45 +200,55 @@
 /* ======================================= */
 
 .theme-dark {
-  --bg-base: #0a0a0a;
-  --bg-primary: #0a0a0a;
-  --bg-secondary: #111111;
-  --bg-tertiary: #0d0d0d;
-  --bg-hover: #161616;
-  --bg-active: #1f1f1f;
-  --bg-input: #111111;
-  --bg-card: #111111;
-  --bg-card-nested: #0d0d0d;
-  --bg-glass: rgba(17, 17, 17, 0.72);
-  --bg-glass-light: rgba(13, 13, 13, 0.55);
-  --bg-glass-heavy: rgba(10, 10, 10, 0.92);
-  --border-primary: #2a2a2a;
-  --border-secondary: #1f1f1f;
-  --border-accent: #2a2a2a;
-  --border-glass: rgba(255, 255, 255, 0.06);
-  --border-glass-bright: rgba(255, 255, 255, 0.08);
+  /* Mirrors the vantablack [data-theme="dark"] palette above. This wrapper
+     class is applied by ThemeProvider; it sits later in the file at equal
+     specificity, so any value it omits — or declares stale — wins. Keep the
+     two blocks in lockstep. */
+  --bg-page: #000000;
+  --bg-base: #000000;
+  --bg-primary: #000000;
+  --bg-secondary: #060606;
+  --bg-tertiary: #030303;
+  --bg-hover: #121212;
+  --bg-active: #1c1c1c;
+  --bg-input: #070707;
+  --bg-card: #0a0a0a;
+  --bg-card-nested: #050505;
+  --bg-glass: rgba(10, 10, 10, 0.72);
+  --bg-glass-light: rgba(6, 6, 6, 0.55);
+  --bg-glass-heavy: rgba(0, 0, 0, 0.92);
+  --border-primary: #232323;
+  --border-secondary: #161616;
+  --border-accent: #2e2e2e;
+  --border-glass: rgba(255, 255, 255, 0.07);
+  --border-glass-bright: rgba(255, 255, 255, 0.11);
   --text-primary: #ffffff;
   --text-secondary: #b0b0b0;
   --text-tertiary: #8a8a8a;
   --text-inverse: #000000;
-  --scrollbar-track: #0a0a0a;
-  --scrollbar-thumb: #2a2a2a;
-  --scrollbar-hover: #3a3a3a;
-  --input-bg: #111111;
-  --input-border: #1f1f1f;
+  --scrollbar-track: #000000;
+  --scrollbar-thumb: #232323;
+  --scrollbar-hover: #333333;
+  --input-bg: #070707;
+  --input-border: #1c1c1c;
   --input-focus-border: rgba(232, 93, 61, 0.55);
-  --input-focus-shadow: inset 0 2px 6px rgba(0,0,0,0.5), 0 0 0 3px rgba(232, 93, 61, 0.12);
+  --input-focus-shadow: inset 0 2px 6px rgba(0,0,0,0.65), 0 0 0 3px rgba(232, 93, 61, 0.12);
   --selection-bg: rgba(232, 93, 61, 0.22);
-  --toast-bg: #111111;
+  --toast-bg: #0a0a0a;
   --toast-fg: #f0f0f0;
   --toast-border: rgba(232, 93, 61, 0.28);
   color-scheme: dark;
 }
 
+
 .theme-light {
-  --bg-base: #ffffff;
+  /* Mirrors the [data-theme="light"] palette above — this wrapper sits later
+     at equal specificity, so a stale value here wins. Keep both in lockstep.
+     (--bg-page/--bg-base were stale white and overrode the warm canvas.) */
+  --bg-page: #edece7;
+  --bg-base: #f4f3ef;
   --bg-primary: #ffffff;
-  --bg-secondary: #f9fafb;
+  --bg-secondary: #faf9f7;
   --bg-tertiary: #f3f4f6;
   --bg-hover: #f3f4f6;
   --bg-active: #e5e7eb;

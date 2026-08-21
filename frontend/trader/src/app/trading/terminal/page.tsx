@@ -6,7 +6,7 @@ import dynamic from 'next/dynamic';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { clsx } from 'clsx';
 import { Maximize2, Minimize2, Search, ShieldCheck, X } from 'lucide-react';
-import { useUIStore } from '@/stores/uiStore';
+import { useUIStore, WATCHLIST_LAYOUT } from '@/stores/uiStore';
 import { TERMINAL_RESIZE, maxBottomPanelHeightPx } from '@/lib/terminalLayout';
 import PanelResizeHandle from '@/components/trading/PanelResizeHandle';
 import { useTradingStore, InstrumentInfo } from '@/stores/tradingStore';
@@ -57,16 +57,20 @@ export default function TradingTerminalPage() {
     setOrderPanelWidth,
     setBottomPanelHeight,
     toggleTerminalMarkets,
+    watchlistWidth,
+    setWatchlistWidth,
   } = useUIStore();
 
   useDocumentTitle();
 
   const [opW, setOpW] = useState(orderPanelWidth);
+  /** Left instruments panel width (persisted as watchlistWidth). */
+  const [wlW, setWlW] = useState(watchlistWidth);
   const [bpH, setBpH] = useState(bottomPanelHeight);
   const [isMobile, setIsMobile] = useState(false);
 
   /** Snapshot at pointer-down: stable clamps while store updates mid-drag. */
-  const layoutDragStartRef = useRef({ op: 0, bp: 0, vw: 0, colH: 0 });
+  const layoutDragStartRef = useRef({ op: 0, bp: 0, wl: 0, vw: 0, colH: 0 });
   const centerColumnRef = useRef<HTMLDivElement>(null);
   const bottomRestoreRef = useRef(320);
   const [activeSpace, setActiveSpace] = useState<TerminalSpaceId>('balanced');
@@ -83,6 +87,7 @@ export default function TradingTerminalPage() {
     layoutDragStartRef.current = {
       op: s.orderPanelWidth,
       bp: s.bottomPanelHeight,
+      wl: s.watchlistWidth,
       vw: typeof window !== 'undefined' ? window.innerWidth : 0,
       colH: Math.max(120, col),
     };
@@ -105,6 +110,21 @@ export default function TradingTerminalPage() {
     [setOrderPanelWidth, terminalMarketsOpen],
   );
 
+  /** Between the instruments panel and the chart: drag right widens it. */
+  const onInstrumentsDrag = useCallback(
+    (dx: number) => {
+      const { wl, op, vw } = layoutDragStartRef.current;
+      const maxWl = Math.min(
+        WATCHLIST_LAYOUT.max,
+        vw - op - TERMINAL_RESIZE.handlesSlack - TERMINAL_RESIZE.chartMinWidth,
+      );
+      const next = Math.max(WATCHLIST_LAYOUT.min, Math.min(maxWl, wl + dx));
+      setWlW(next);
+      setWatchlistWidth(next);
+    },
+    [setWatchlistWidth],
+  );
+
   const onBottomDrag = useCallback(
     (dy: number) => {
       const { bp, colH } = layoutDragStartRef.current;
@@ -119,6 +139,10 @@ export default function TradingTerminalPage() {
   useEffect(() => {
     setOpW(orderPanelWidth);
   }, [orderPanelWidth]);
+
+  useEffect(() => {
+    setWlW(watchlistWidth);
+  }, [watchlistWidth]);
 
   /** Auto-size the right rail when switching to/from Markets view. */
   const orderWidthBeforeMarketsRef = useRef<number | null>(null);
@@ -701,6 +725,25 @@ export default function TradingTerminalPage() {
         terminalCalcOpen={terminalCalcOpen}
         onPanelsSelectCalc={onPanelsSelectCalc}
       />
+      {/* Left instruments panel — the markets list lives here permanently
+          instead of swapping into the right rail, so the trader can pick a
+          symbol without losing the order ticket. Hidden below lg where the
+          mobile layout (separate branch above) takes over. */}
+      <div
+        className="hidden lg:flex shrink-0 flex-col h-full min-h-0 overflow-hidden bg-bg-base border-r border-border-primary"
+        style={{ width: wlW }}
+      >
+        <InstrumentsTable onViewNews={onPanelsSelectNews} />
+      </div>
+      <div className="hidden lg:block">
+        <PanelResizeHandle
+          axis="vertical"
+          hitSize={TERMINAL_RESIZE.handleHitPx}
+          onDragStart={snapshotLayout}
+          onDrag={onInstrumentsDrag}
+        />
+      </div>
+
       <div
         ref={centerColumnRef}
         className="flex-1 flex flex-col overflow-hidden min-w-0 min-h-0 relative z-0"
@@ -812,11 +855,11 @@ export default function TradingTerminalPage() {
                     type="button"
                     onClick={() => {
                       setTerminalNewsOpen(false);
-                      setTerminalMarketsOpen(true);
+                      setTerminalMarketsOpen(false);
                     }}
                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border-primary bg-card text-[11px] font-bold uppercase tracking-wide text-accent hover:bg-accent/10 hover:border-accent/40 transition-colors"
                   >
-                    ← Markets
+                    ← Order
                   </button>
                   <span className="text-[11px] font-bold uppercase tracking-wider text-text-tertiary">Live News</span>
                   <button
@@ -833,19 +876,6 @@ export default function TradingTerminalPage() {
                 <div className="flex-1 min-h-0">
                   <MarketNewsPanel className="h-full" />
                 </div>
-              </div>
-            ) : terminalMarketsOpen ? (
-              <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
-                <InstrumentsTable
-                  onExitMarkets={() => {
-                    setTerminalMarketsOpen(false);
-                    setTerminalNewsOpen(false);
-                  }}
-                  onViewNews={() => {
-                    setTerminalMarketsOpen(false);
-                    setTerminalNewsOpen(true);
-                  }}
-                />
               </div>
             ) : (
               <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
