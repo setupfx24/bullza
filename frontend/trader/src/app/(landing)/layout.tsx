@@ -10,6 +10,7 @@ import { ChatBot } from '@/home/components/ChatBot'
 import { ScrollToTopButton } from '@/home/components/ScrollToTopButton'
 import { TrustBadges } from '@/home/components/TrustBadges'
 import { AppStoreButtons } from '@/home/components/AppStoreButtons'
+import '@/marketing/tokens.css'
 import '@/home/styles.css'
 import '@/landing/landing.css'
 
@@ -28,7 +29,7 @@ export default function LandingLayout({ children }: { children: React.ReactNode 
   useEffect(() => {
     const html = document.documentElement
     html.setAttribute('data-theme', 'dark')
-    html.style.backgroundColor = '#08090b'
+    html.style.backgroundColor = '#050505'
     html.style.color = '#f5f5f5'
     return () => {
       html.setAttribute('data-theme', 'light')
@@ -42,7 +43,7 @@ export default function LandingLayout({ children }: { children: React.ReactNode 
     return (
       <PopupProvider>
         <ScrollProgress />
-        {children}
+        <div className="mk">{children}</div>
         <ChatBot />
         <ScrollToTopButton />
       </PopupProvider>
@@ -52,7 +53,7 @@ export default function LandingLayout({ children }: { children: React.ReactNode 
   return (
     <PopupProvider>
       <ScrollProgress />
-      <div className="brand-home landing-root min-h-screen">
+      <div className="mk brand-home landing-root min-h-screen">
         <HomeNavbar />
         {children}
         <AppStoreButtons />

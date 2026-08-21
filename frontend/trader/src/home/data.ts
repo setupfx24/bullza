@@ -55,10 +55,28 @@ export const HERO = {
   pillBadge: 'Live',
   headline: 'Trade Smarter Grow Faster',
   sub: `${BRAND_NAME} is a decentralized exchange with on-chain insured trades and licensed broker-grade execution — your funds stay in your wallet, your trades stay protected.`,
-  ctaPrimary: 'Details',
+  ctaPrimary: 'Get Started',
   ctaSecondary: 'Learn How It Works',
-  ctaHref: '/bonus',
+  ctaHref: SIGNUP_HREF,
   ctaSecondaryHref: '/how-it-works',
+  /** Standing first-deposit offer pill under the hero CTAs. */
+  bonusLabel: '100% Bonus on Your First Deposit',
+  bonusCta: 'Details',
+  bonusHref: '/bonus',
+};
+
+/**
+ * Social-proof strip under the hero.
+ *
+ * `rating` is intentionally QUALITATIVE — the platform has no audited
+ * review-score to cite, so we describe the five-star testimonials that
+ * already exist in TESTIMONIALS rather than inventing a score out of a
+ * review count. The counters below it reuse STATS verbatim; never add a
+ * new figure here without a verifiable source.
+ */
+export const SOCIAL_PROOF = {
+  ratingLabel: 'Five-star reviews',
+  ratingSub: 'from traders across our client base',
 };
 
 /**

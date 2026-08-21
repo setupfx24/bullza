@@ -1,18 +1,17 @@
 'use client';
 
-import { motion } from 'motion/react';
 import Link from 'next/link';
 import {
   ArrowUpRight,
-  TrendingUp,
-  Gem,
   BarChart2,
-  Cpu,
   Building,
+  Cpu,
+  Gem,
   Layers,
+  TrendingUp,
   type LucideIcon,
 } from 'lucide-react';
-import { BlurText } from './BlurText';
+import { Section, SectionHeading } from '@/marketing/components';
 import { INSTRUMENTS } from '../data';
 import { BRAND_NAME } from '@/lib/brand';
 
@@ -27,88 +26,82 @@ const iconMap: Record<string, LucideIcon> = {
 
 type Service = (typeof INSTRUMENTS)[number];
 
-function Card({
-  service,
-  className,
-  index,
-}: {
-  service: Service;
-  className?: string;
-  index: number;
-}) {
+/**
+ * Same visual contract as the shared <FeatureGrid />, but each card is a
+ * link — FeatureGrid has no href slot and lives outside this scope, so
+ * the card markup is mirrored here rather than forked upstream.
+ */
+function ServiceCard({ service }: { service: Service }) {
   const Icon = iconMap[service.icon] ?? TrendingUp;
+  const comingSoon = (service as { comingSoon?: boolean }).comingSoon === true;
+
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 24, filter: 'blur(8px)' }}
-      whileInView={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
-      viewport={{ once: true, amount: 0.2 }}
-      transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1], delay: 0.05 * index }}
-      whileHover={{ y: -4 }}
-      className={`liquid-glass rounded-2xl relative overflow-hidden group ${className ?? ''}`}
+    <Link
+      href={service.href}
+      className="mk-card mk-card--hover group relative flex flex-col"
+      style={{ gap: 'var(--mk-space-3)' }}
     >
-      <Link href={service.href} className="absolute inset-0 z-[1]" aria-label={service.title} />
-      <div className="liquid-glass-strong rounded-full w-11 h-11 flex items-center justify-center mb-5">
-        <Icon className="size-5 text-foreground" />
-      </div>
-      <h3 className="font-display uppercase text-2xl md:text-3xl leading-[0.95] tracking-tight mb-3 max-w-[18ch]">
-        {service.title}
-      </h3>
-      <p className="font-body text-sm text-foreground/65 max-w-[38ch] leading-relaxed">
-        {service.body}
-      </p>
-      <div className="mt-5">
-        {(service as { comingSoon?: boolean }).comingSoon ? (
-          <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/25 text-primary text-[10px] uppercase tracking-[0.18em] font-semibold">
-            <span className="relative inline-flex items-center justify-center">
-              <span className="absolute size-1.5 rounded-full bg-primary opacity-75 animate-ping" />
-              <span className="relative size-1.5 rounded-full bg-primary" />
-            </span>
-            {service.badge}
-          </span>
-        ) : (
-          <span className="liquid-glass rounded-full px-3 py-1 text-xs font-body text-foreground/85 inline-block">
-            {service.badge}
+      <span
+        className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl"
+        style={{ background: 'var(--mk-accent-soft)', color: 'var(--mk-accent)' }}
+      >
+        <Icon size={20} />
+      </span>
+
+      <h3 className="mk-h3" style={{ paddingRight: '2rem' }}>{service.title}</h3>
+      <p className="mk-body">{service.body}</p>
+
+      <span
+        className="inline-flex w-fit items-center rounded-full uppercase font-bold"
+        style={{
+          gap: 'var(--mk-space-2)',
+          marginTop: 'var(--mk-space-2)',
+          padding: '0.3rem 0.7rem',
+          fontSize: 'var(--mk-text-label)',
+          letterSpacing: 'var(--mk-tracking-label)',
+          background: comingSoon ? 'var(--mk-accent-soft)' : 'var(--mk-surface-2)',
+          border: `1px solid ${comingSoon ? 'var(--mk-accent-line)' : 'var(--mk-line)'}`,
+          color: comingSoon ? 'var(--mk-accent)' : 'var(--mk-text-faint)',
+        }}
+      >
+        {comingSoon && (
+          <span className="relative inline-flex items-center justify-center" aria-hidden>
+            <span
+              className="absolute size-1.5 rounded-full animate-ping opacity-75"
+              style={{ background: 'var(--mk-accent)' }}
+            />
+            <span className="relative size-1.5 rounded-full" style={{ background: 'var(--mk-accent)' }} />
           </span>
         )}
-      </div>
+        {service.badge}
+      </span>
 
-      <ArrowUpRight className="absolute top-6 right-6 size-5 text-foreground/30 group-hover:text-foreground/80 transition-colors" />
-    </motion.div>
+      <ArrowUpRight
+        size={18}
+        aria-hidden
+        className="absolute right-6 top-6 transition-colors"
+        style={{ color: 'var(--mk-text-faint)' }}
+      />
+    </Link>
   );
 }
 
 export function ServicesBento() {
   return (
-    <section id="services" className="relative py-16 sm:py-24 md:py-32 lg:py-40">
+    <Section id="services">
+      <SectionHeading
+        kicker="What We Offer"
+        title="Everything you need, on one platform"
+        lead={`From expert portfolio oversight to daily research and education — ${BRAND_NAME} delivers the full investment toolkit without bolting on a second provider.`}
+      />
       <div
-        className="max-w-[var(--max)] mx-auto"
-        style={{ paddingLeft: 'var(--gutter)', paddingRight: 'var(--gutter)' }}
+        className="grid grid-cols-1 sm:grid-cols-2"
+        style={{ gap: 'var(--mk-space-5)', marginTop: 'var(--mk-space-7)' }}
       >
-        <div className="flex flex-col items-start gap-5 mb-10 sm:mb-14 md:mb-20">
-          <span className="liquid-glass rounded-full px-4 py-1.5 text-xs text-foreground/80">
-            What We Offer
-          </span>
-          <BlurText
-            text="Comprehensive Investment Services Built for Growth"
-            as="h2"
-            className="font-display uppercase text-3xl sm:text-4xl md:text-6xl lg:text-7xl leading-[0.9] tracking-tight max-w-[18ch]"
-          />
-          <p className="font-body text-foreground/60 max-w-xl text-base md:text-lg">
-            From expert portfolio oversight to daily research and education — {BRAND_NAME} delivers the full investment toolkit on one platform.
-          </p>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-5 md:auto-rows-[minmax(260px,auto)]">
-          <div className="md:row-span-2 md:col-span-1 min-h-[480px] md:min-h-0">
-            <Card service={INSTRUMENTS[0]} className="p-8 h-full" index={0} />
-          </div>
-          <Card service={INSTRUMENTS[1]} className="p-6" index={1} />
-          <Card service={INSTRUMENTS[2]} className="p-6" index={2} />
-          <div className="md:col-span-2">
-            <Card service={INSTRUMENTS[3]} className="p-7 h-full" index={3} />
-          </div>
-        </div>
+        {INSTRUMENTS.map((service) => (
+          <ServiceCard key={service.title} service={service} />
+        ))}
       </div>
-    </section>
+    </Section>
   );
 }

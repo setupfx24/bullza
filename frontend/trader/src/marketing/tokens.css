@@ -1,0 +1,159 @@
+/* ─────────────────────────────────────────────────────────────────────
+   MARKETING DESIGN SYSTEM — single source of truth.
+
+   Every public-facing page (home, company, markets, products, services,
+   legal) reads from this one block. Change a value here and the whole
+   marketing site follows; no component edit needed.
+
+   Scoped to `.mk` (applied by the (landing) layout) so none of it leaks
+   into the authenticated trader app, which keeps its own theme tokens
+   in app/globals.css.
+   ───────────────────────────────────────────────────────────────────── */
+
+.mk {
+  /* ── Colour ─────────────────────────────────────────────────────── */
+  --mk-bg:            #050505;   /* page canvas */
+  --mk-bg-raised:     #0b0b0c;   /* section bands that lift off the canvas */
+  --mk-surface:       #101012;   /* cards */
+  --mk-surface-2:     #17171a;   /* nested / hovered cards */
+
+  --mk-line:          rgba(255, 255, 255, 0.09);   /* default hairline */
+  --mk-line-strong:   rgba(255, 255, 255, 0.16);   /* emphasised edge */
+
+  --mk-text:          #ffffff;
+  --mk-text-muted:    #a1a1aa;   /* body copy on dark */
+  --mk-text-faint:    #6b6b74;   /* labels, meta, captions */
+
+  --mk-accent:        #E85D3D;   /* brand coral — CTAs, highlights */
+  --mk-accent-hover:  #C9482D;
+  --mk-accent-soft:   rgba(232, 93, 61, 0.12);   /* tinted fills */
+  --mk-accent-line:   rgba(232, 93, 61, 0.32);
+
+  --mk-up:            #22c55e;   /* semantic: gains — never brand */
+  --mk-down:          #ef4444;   /* semantic: losses */
+
+  /* ── Type scale (fluid: clamp(min, preferred, max)) ─────────────── */
+  --mk-font: 'Montserrat', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  --mk-font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
+
+  --mk-text-display: clamp(2.6rem, 1.6rem + 4.4vw, 5rem);      /* hero headline */
+  --mk-text-h1:      clamp(2.1rem, 1.5rem + 2.6vw, 3.5rem);    /* page title */
+  --mk-text-h2:      clamp(1.7rem, 1.3rem + 1.7vw, 2.6rem);    /* section title */
+  --mk-text-h3:      clamp(1.2rem, 1.05rem + 0.6vw, 1.5rem);   /* card title */
+  --mk-text-lead:    clamp(1rem, 0.95rem + 0.3vw, 1.2rem);     /* standfirst */
+  --mk-text-body:    1rem;
+  --mk-text-sm:      0.875rem;
+  --mk-text-xs:      0.75rem;
+  --mk-text-label:   0.6875rem;                                 /* eyebrow / kicker */
+
+  --mk-leading-tight: 1.06;
+  --mk-leading-snug:  1.28;
+  --mk-leading-body:  1.65;
+  --mk-tracking-label: 0.16em;
+
+  /* ── Spacing scale ──────────────────────────────────────────────── */
+  --mk-space-1: 0.25rem;
+  --mk-space-2: 0.5rem;
+  --mk-space-3: 0.75rem;
+  --mk-space-4: 1rem;
+  --mk-space-5: 1.5rem;
+  --mk-space-6: 2rem;
+  --mk-space-7: 3rem;
+  --mk-space-8: 4rem;
+  --mk-space-9: 6rem;
+
+  /* Vertical rhythm between page sections, and the page gutter. */
+  --mk-section-y:  clamp(3.5rem, 2rem + 6vw, 7rem);
+  --mk-gutter:     clamp(1rem, 0.5rem + 2.2vw, 2.5rem);
+  --mk-container:  1200px;
+
+  /* ── Shape + depth ──────────────────────────────────────────────── */
+  --mk-radius-sm:  8px;
+  --mk-radius:     14px;
+  --mk-radius-lg:  22px;
+  --mk-radius-pill: 999px;
+
+  --mk-shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --mk-shadow-lift: 0 18px 50px rgba(0, 0, 0, 0.55);
+  --mk-shadow-glow: 0 12px 40px rgba(232, 93, 61, 0.18);
+
+  --mk-transition: 200ms cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* Base text settings for everything inside the marketing surface. */
+  color: var(--mk-text);
+  background-color: var(--mk-bg);
+  font-family: var(--mk-font);
+}
+
+/* ── Primitives ───────────────────────────────────────────────────── */
+
+.mk-container {
+  width: 100%;
+  max-width: var(--mk-container);
+  margin-inline: auto;
+  padding-inline: var(--mk-gutter);
+}
+
+.mk-section { padding-block: var(--mk-section-y); }
+.mk-section--raised { background: var(--mk-bg-raised); }
+
+/* Eyebrow / kicker above a section title. */
+.mk-kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--mk-space-2);
+  font-size: var(--mk-text-label);
+  font-weight: 700;
+  letter-spacing: var(--mk-tracking-label);
+  text-transform: uppercase;
+  color: var(--mk-accent);
+}
+
+.mk-h1 { font-size: var(--mk-text-h1); line-height: var(--mk-leading-tight); font-weight: 800; letter-spacing: -0.02em; }
+.mk-h2 { font-size: var(--mk-text-h2); line-height: var(--mk-leading-snug); font-weight: 800; letter-spacing: -0.02em; }
+.mk-h3 { font-size: var(--mk-text-h3); line-height: var(--mk-leading-snug); font-weight: 700; }
+.mk-lead { font-size: var(--mk-text-lead); line-height: var(--mk-leading-body); color: var(--mk-text-muted); }
+.mk-body { font-size: var(--mk-text-body); line-height: var(--mk-leading-body); color: var(--mk-text-muted); }
+
+.mk-card {
+  background: var(--mk-surface);
+  border: 1px solid var(--mk-line);
+  border-radius: var(--mk-radius-lg);
+  padding: var(--mk-space-6);
+  box-shadow: var(--mk-shadow-card);
+  transition: border-color var(--mk-transition), background-color var(--mk-transition), transform var(--mk-transition);
+}
+.mk-card--hover:hover {
+  border-color: var(--mk-line-strong);
+  background: var(--mk-surface-2);
+  transform: translateY(-2px);
+}
+
+.mk-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--mk-space-2);
+  padding: 0.8rem 1.5rem;
+  border-radius: var(--mk-radius-pill);
+  font-size: var(--mk-text-sm);
+  font-weight: 700;
+  line-height: 1;
+  transition: background-color var(--mk-transition), border-color var(--mk-transition), transform var(--mk-transition);
+  white-space: nowrap;
+}
+.mk-btn:active { transform: scale(0.985); }
+.mk-btn--primary { background: var(--mk-accent); color: #fff; box-shadow: var(--mk-shadow-glow); }
+.mk-btn--primary:hover { background: var(--mk-accent-hover); }
+.mk-btn--ghost { border: 1px solid var(--mk-line-strong); color: var(--mk-text); }
+.mk-btn--ghost:hover { background: rgba(255, 255, 255, 0.05); }
+
+/* Respect the OS reduced-motion setting across every marketing animation. */
+@media (prefers-reduced-motion: reduce) {
+  .mk *, .mk *::before, .mk *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}

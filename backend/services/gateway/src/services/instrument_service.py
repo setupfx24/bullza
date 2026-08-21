@@ -78,11 +78,51 @@ async def get_symbol_market_status(symbol: str, db: AsyncSession) -> dict:
     )
 
 
-async def get_all_prices() -> list[dict]:
-    keys = []
-    async for key in redis_client.scan_iter(f"{PriceChannel.TICK_PREFIX}*"):
-        keys.append(key)
+# Cached `tick:*` key list for get_all_prices(). The key SET changes only
+# when an instrument is added/removed (rare); the VALUES change constantly.
+# Discovering the keys was the expensive half — see get_all_prices below.
+_TICK_KEYS_CACHE: list[str] = []
+_TICK_KEYS_AT: float = 0.0
+_TICK_KEYS_TTL_SEC = 30.0
 
+
+async def _tick_keys() -> list[str]:
+    """Symbol key list for the price snapshot, refreshed at most every 30s.
+
+    Discovery still uses SCAN (never KEYS), but now runs ~twice a minute
+    instead of on every request. A new instrument shows up within one TTL.
+    """
+    global _TICK_KEYS_CACHE, _TICK_KEYS_AT
+    import time as _time
+    now = _time.monotonic()
+    if _TICK_KEYS_CACHE and (now - _TICK_KEYS_AT) < _TICK_KEYS_TTL_SEC:
+        return _TICK_KEYS_CACHE
+    keys: list[str] = []
+    # count=500 keeps this to a couple of round trips instead of the
+    # default ~10-key chunks.
+    async for key in redis_client.scan_iter(f"{PriceChannel.TICK_PREFIX}*", count=500):
+        keys.append(key)
+    if keys:
+        _TICK_KEYS_CACHE = keys
+        _TICK_KEYS_AT = now
+        return keys
+    # Nothing found (feed down / flushed): don't cache the empty result, but
+    # keep serving the last known key set so a transient blip doesn't blank
+    # every client's watchlist.
+    return _TICK_KEYS_CACHE
+
+
+async def get_all_prices() -> list[dict]:
+    """Snapshot of every live tick.
+
+    Polled by every open terminal every 1.5s, so it must not walk the Redis
+    keyspace. It previously ran a full `scan_iter` per request; the keyspace
+    also holds bar:current:*, rl:*, throttle:* and margin_call_sent:* keys and
+    therefore grows with user count, making the cost per request grow with
+    traffic. The key list is now cached (see _tick_keys) and only the MGET —
+    which is what actually needs to be fresh — runs per request.
+    """
+    keys = await _tick_keys()
     if not keys:
         return []
 

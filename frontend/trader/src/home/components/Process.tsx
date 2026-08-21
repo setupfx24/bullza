@@ -3,11 +3,12 @@
 import Link from 'next/link';
 import { motion } from 'motion/react';
 import { ArrowUpRight } from 'lucide-react';
-import { BlurText } from './BlurText';
-import { Button } from '../ui/Button';
+import { Section, SectionHeading } from '@/marketing/components';
 import { SIGNUP_HREF } from '../data';
 import { BRAND_NAME } from '@/lib/brand';
 
+/* Three steps only — the account tiers / "choose your plan" step was
+   dropped with the pricing section the client asked us to remove. */
 const STEPS = [
   { n: 1, title: 'Register', body: 'Complete our secure online application in minutes.' },
   { n: 2, title: 'Fund',     body: 'Choose from multiple fee-free deposit options.' },
@@ -16,71 +17,57 @@ const STEPS = [
 
 export function Process() {
   return (
-    <section id="process" className="relative py-16 sm:py-24 md:py-32 lg:py-40 border-t border-border">
+    <Section id="process">
+      <SectionHeading
+        kicker="How It Works"
+        title="Start trading in three steps"
+        lead="From signup to your first live position — no paperwork, no hold-ups, no surprises."
+      />
+
       <div
-        className="max-w-[var(--max)] mx-auto"
-        style={{ paddingLeft: 'var(--gutter)', paddingRight: 'var(--gutter)' }}
+        className="grid grid-cols-1 md:grid-cols-3"
+        style={{ gap: 'var(--mk-space-5)', marginTop: 'var(--mk-space-7)' }}
       >
-        <div className="flex flex-col items-start gap-5 mb-10 sm:mb-14 md:mb-20">
-          <span className="liquid-glass rounded-full px-4 py-1.5 text-xs text-foreground/80">
-            How It Works
-          </span>
-          <BlurText
-            text="A New Era of Intelligent Trading"
-            as="h2"
-            className="font-display uppercase text-3xl sm:text-4xl md:text-6xl leading-[0.9] tracking-tight max-w-[18ch]"
-          />
-          <p className="font-body text-foreground/60 max-w-2xl text-sm sm:text-base">
-            {BRAND_NAME} is a leading AI-driven cryptocurrency and forex investment company. From sign-up to first profit in three simple steps — whether you are a first-time investor or a seasoned trader.
-          </p>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 sm:gap-12 md:gap-20 items-start">
-          <div className="md:sticky md:top-32">
-            <h3 className="font-display uppercase text-2xl sm:text-3xl md:text-5xl leading-[0.95] tracking-tight">
-              Start Trading in
-              <br />
-              <span className="text-primary">3 Simple Steps</span>
-            </h3>
-            <p className="mt-5 font-body text-foreground/60 max-w-md">
-              From signup to your first live position in three guided steps — no paperwork, no hold-ups, no surprises.
-            </p>
-            <div className="mt-8">
-              <Button variant="hero" asChild>
-                <Link href={SIGNUP_HREF}>
-                  Register
-                  <ArrowUpRight className="ml-1 size-4" />
-                </Link>
-              </Button>
-            </div>
-          </div>
-
-          <div className="flex flex-col gap-8 md:gap-10">
-            {STEPS.map((step, i) => (
-              <motion.div
-                key={step.n}
-                initial={{ opacity: 0, y: 18, filter: 'blur(4px)' }}
-                whileInView={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
-                viewport={{ once: true, amount: 0.4 }}
-                transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1], delay: 0.08 * i }}
-                className="flex items-start gap-5"
-              >
-                <span className="shrink-0 size-10 rounded-full bg-primary text-primary-foreground flex items-center justify-center font-display font-bold text-base">
-                  {step.n}
-                </span>
-                <div>
-                  <h4 className="font-display uppercase text-xl md:text-2xl tracking-tight">
-                    {step.title}
-                  </h4>
-                  <p className="mt-2 font-body text-sm md:text-[15px] text-foreground/65 leading-relaxed max-w-[40ch]">
-                    {step.body}
-                  </p>
-                </div>
-              </motion.div>
-            ))}
-          </div>
-        </div>
+        {STEPS.map((step, i) => (
+          <motion.article
+            key={step.n}
+            initial={{ opacity: 0, y: 16 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, amount: 0.35 }}
+            transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1], delay: 0.08 * i }}
+            className="mk-card mk-card--hover relative flex flex-col"
+            style={{ gap: 'var(--mk-space-3)' }}
+          >
+            <span
+              className="inline-flex h-11 w-11 items-center justify-center rounded-full font-extrabold"
+              style={{
+                background: 'var(--mk-accent-soft)',
+                border: '1px solid var(--mk-accent-line)',
+                color: 'var(--mk-accent)',
+                fontSize: 'var(--mk-text-sm)',
+              }}
+              aria-hidden
+            >
+              {String(step.n).padStart(2, '0')}
+            </span>
+            <h3 className="mk-h3">{step.title}</h3>
+            <p className="mk-body">{step.body}</p>
+          </motion.article>
+        ))}
       </div>
-    </section>
+
+      <div
+        className="flex flex-wrap items-center justify-center"
+        style={{ gap: 'var(--mk-space-3)', marginTop: 'var(--mk-space-7)' }}
+      >
+        <Link href={SIGNUP_HREF} className="mk-btn mk-btn--primary">
+          Open an account
+          <ArrowUpRight size={16} />
+        </Link>
+        <Link href="/how-it-works" className="mk-btn mk-btn--ghost">
+          Read the full walkthrough
+        </Link>
+      </div>
+    </Section>
   );
 }

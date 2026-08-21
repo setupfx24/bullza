@@ -43,7 +43,7 @@ export function LiveTickerBar() {
       displayMode: 'adaptive',
       colorTheme: 'dark',
       locale: 'en',
-      backgroundColor: 'rgba(10, 10, 10, 1)',
+      backgroundColor: 'rgba(11, 11, 12, 1)',
     });
     container.appendChild(script);
 
@@ -53,7 +53,13 @@ export function LiveTickerBar() {
   }, []);
 
   return (
-    <div className="border-b border-border bg-background/80 backdrop-blur-sm">
+    <div
+      style={{
+        background: 'var(--mk-bg-raised)',
+        borderTop: '1px solid var(--mk-line)',
+        borderBottom: '1px solid var(--mk-line)',
+      }}
+    >
       <div ref={containerRef} className="tradingview-widget-container w-full" />
     </div>
   );

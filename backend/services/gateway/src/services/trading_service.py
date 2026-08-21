@@ -816,7 +816,10 @@ async def user_close_quote(
     return c_bid, c_ask
 
 
-async def list_positions(account_id: UUID, user_id: UUID, status: str, db: AsyncSession) -> list[dict]:
+async def list_positions(
+    account_id: UUID, user_id: UUID, status: str, db: AsyncSession,
+    limit: int = 500,
+) -> list[dict]:
     # Load the account WITH its group so we know the lot scaling
     # multiplier for the display swap below. Cent accounts persist
     # lots scaled DOWN (Mig 0069 — trader's 0.01 stored as 0.0001);
@@ -843,7 +846,15 @@ async def list_positions(account_id: UUID, user_id: UUID, status: str, db: Async
     elif status == "closed":
         query = query.where(Position.status == "closed")
 
-    result = await db.execute(query.order_by(Position.created_at.desc()))
+    # Hard cap. `status=closed` was unbounded, and closed positions are never
+    # deleted, so a long-lived account could ask the gateway to materialise
+    # its entire history in one request. Every real caller asks for `open`
+    # (the terminal polls this every 1.5s), where the cap is far above any
+    # plausible position count; closed history has its own paginated
+    # endpoint (/portfolio/trades).
+    result = await db.execute(
+        query.order_by(Position.created_at.desc()).limit(max(1, min(int(limit or 500), 1000)))
+    )
     positions = result.scalars().all()
 
     # Per-position insurance markers — needed so the trader-side
@@ -874,6 +885,38 @@ async def list_positions(account_id: UUID, user_id: UUID, status: str, db: Async
             # unavailable.
             logger.warning("Failed to attach insurance markers: %s", _e)
 
+    # ── Batch the two per-position lookups that used to run inside the
+    # loop below (one Redis GET and one SELECT per row). Same data, same
+    # semantics — just fetched in one round trip each, like the insurance
+    # markers above already do.
+    ticks_by_symbol: dict[str, str | None] = {}
+    copy_traded_ids: set = set()
+    if positions:
+        symbols = sorted({
+            p.instrument.symbol for p in positions
+            if p.instrument and p.instrument.symbol
+        })
+        if symbols:
+            try:
+                vals = await redis_client.mget(
+                    [PriceChannel.tick_key(s) for s in symbols]
+                )
+                ticks_by_symbol = dict(zip(symbols, vals))
+            except Exception as _te:
+                # Fall through with an empty map: every row then renders
+                # its stored profit, exactly as it does when a tick is
+                # missing for that symbol.
+                logger.warning("Failed to batch-load ticks for positions: %s", _te)
+        try:
+            ct_rows = (await db.execute(
+                select(CopyTrade.investor_position_id).where(
+                    CopyTrade.investor_position_id.in_([p.id for p in positions])
+                )
+            )).scalars().all()
+            copy_traded_ids = {r for r in ct_rows if r is not None}
+        except Exception as _ce:
+            logger.warning("Failed to batch-load copy-trade links: %s", _ce)
+
     response = []
     for pos in positions:
         current_price = None
@@ -881,7 +924,9 @@ async def list_positions(account_id: UUID, user_id: UUID, status: str, db: Async
         sv = side_val(pos.side)
         contract_size = pos.instrument.contract_size if pos.instrument else Decimal("100000")
 
-        tick_data = await redis_client.get(PriceChannel.tick_key(pos.instrument.symbol))
+        tick_data = ticks_by_symbol.get(
+            pos.instrument.symbol if pos.instrument else None
+        )
         pos_status = pos.status.value if hasattr(pos.status, 'value') else str(pos.status)
 
         if tick_data and pos_status == "open":
@@ -913,11 +958,7 @@ async def list_positions(account_id: UUID, user_id: UUID, status: str, db: Async
                 symbol=pos.instrument.symbol if pos.instrument else None,
             ))
 
-        copy_trade_q = await db.execute(
-            select(CopyTrade).where(CopyTrade.investor_position_id == pos.id)
-        )
-        copy_trade = copy_trade_q.scalar_one_or_none()
-        trade_type = "copy_trade" if copy_trade else "self_trade"
+        trade_type = "copy_trade" if pos.id in copy_traded_ids else "self_trade"
 
         pos_status_val = pos.status.value if hasattr(pos.status, 'value') else str(pos.status)
 

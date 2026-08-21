@@ -44,7 +44,18 @@ class VerificationReminderEngine:
         self._running = False
 
     async def _run(self):
+        # Cluster leader lock. The gateway runs `--workers 2` in prod and
+        # every worker starts every engine, so without this both workers
+        # ran this loop concurrently — duplicate payouts/emails and double
+        # the DB load. Acquired and RELEASED per tick (rather than held
+        # for the TTL) so the cadence stays exactly TICK_INTERVAL; the TTL
+        # is only a crash guard. Fails closed: on a Redis outage no worker
+        # acquires and the tick is skipped, which is the safe direction.
+        from packages.common.src.redis_client import redis_client, acquire_leader_lock
         while self._running:
+            if not await acquire_leader_lock('engine:verification_reminder:lock', 900):
+                await asyncio.sleep(TICK_INTERVAL)
+                continue
             try:
                 async with AsyncSessionLocal() as db:
                     sent = await send_due_reminders(db)
@@ -53,6 +64,11 @@ class VerificationReminderEngine:
                     logger.info("KYC reminder: emailed %d users", sent)
             except Exception as e:
                 logger.error("Verification reminder engine error: %s", e, exc_info=True)
+            finally:
+                try:
+                    await redis_client.delete('engine:verification_reminder:lock')
+                except Exception:
+                    pass  # TTL still expires it
             await asyncio.sleep(TICK_INTERVAL)
 
 

@@ -91,7 +91,17 @@ class TradingAccount(Base):
     updated_at = Column(DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow)
 
     user = relationship("User", back_populates="accounts")
-    positions = relationship("Position", back_populates="account", lazy="selectin")
+    # `lazy="select"`, NOT "selectin": selectin fires automatically on every
+    # TradingAccount load and emits `SELECT * FROM positions WHERE account_id
+    # IN (...)` with no status filter — closed positions included, and those
+    # are never deleted. The risk engine loads every margined account once a
+    # second, so this was hydrating the entire lifetime position history of
+    # every active account, every second, for data nothing reads (no call
+    # site accesses `account.positions`). Anything that needs them should ask
+    # explicitly with `.options(selectinload(TradingAccount.positions))`.
+    positions = relationship("Position", back_populates="account", lazy="select")
+    # Stays eager: a small reference table that IS read on the hot order path
+    # (trading_service resolves lot_size_multiplier off it per order).
     account_group = relationship("AccountGroup", lazy="selectin")
 
 

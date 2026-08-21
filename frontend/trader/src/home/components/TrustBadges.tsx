@@ -1,11 +1,13 @@
 'use client';
 
 /**
- * "Trusted By" badge row — sits just above the footer on every public
- * landing page. Logo-only, single-line layout (11 badges; mobile falls
- * back to horizontal scroll via overflow-x-auto).
+ * "Trusted By" partner-logo band — a quiet, continuously scrolling
+ * marquee. Rendered on the homepage (via HomePage) and above the footer
+ * on every inner landing page (via the (landing) layout).
+ *
+ * The logos are decorative marks only; no partner claim is made in copy.
  */
-type Badge = { label?: string; sub?: string; logo: string };
+type Badge = { label?: string; logo: string };
 
 const BADGES: Badge[] = [
   { logo: '/images/b5.png' },
@@ -21,39 +23,61 @@ const BADGES: Badge[] = [
   { logo: '/images/b11.png' },
 ];
 
+/* Rendered twice back-to-back so translateX(-50%) loops seamlessly. */
+const TRACK = [...BADGES, ...BADGES];
+
+const FADE =
+  'linear-gradient(to right, transparent, #000 10%, #000 90%, transparent)';
+
 export function TrustBadges() {
   return (
     <section
       aria-label="Trusted by partners"
-      className="relative py-10 sm:py-14 border-t border-border"
+      className="relative overflow-hidden"
+      style={{
+        paddingBlock: 'var(--mk-space-8)',
+        background: 'var(--mk-bg-raised)',
+        borderBlock: '1px solid var(--mk-line)',
+      }}
     >
-      <div
-        className="mx-auto"
+      <p
+        className="mk-container text-center uppercase font-semibold"
         style={{
-          maxWidth: 'var(--max)',
-          paddingLeft: 'var(--gutter)',
-          paddingRight: 'var(--gutter)',
+          fontSize: 'var(--mk-text-label)',
+          letterSpacing: 'var(--mk-tracking-label)',
+          color: 'var(--mk-text-faint)',
+          marginBottom: 'var(--mk-space-6)',
         }}
       >
-        <p className="text-center text-[11px] uppercase tracking-[0.24em] text-foreground/55 mb-7 font-semibold">
-          Trusted By
-        </p>
-        <div className="flex flex-nowrap items-center justify-center gap-1 sm:gap-2 overflow-x-auto -mx-[var(--gutter)] px-[var(--gutter)]">
-          {BADGES.map(({ label, logo }) => (
-            <div
-              key={logo}
-              className="shrink-0 px-1 py-2 flex flex-col items-center text-center gap-2 w-[80px] sm:w-[100px] md:w-[110px]"
+        Trusted By
+      </p>
+
+      <div
+        className="group relative w-full overflow-hidden"
+        style={{ maskImage: FADE, WebkitMaskImage: FADE }}
+      >
+        <div
+          className="flex w-max items-center group-hover:[animation-play-state:paused]"
+          style={{
+            gap: 'var(--mk-space-7)',
+            animation: 'brand-marquee 42s linear infinite',
+          }}
+        >
+          {TRACK.map(({ label, logo }, i) => (
+            <span
+              key={`${logo}-${i}`}
+              className="shrink-0 opacity-55 transition-opacity duration-200 hover:opacity-100"
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={logo}
                 alt={label ?? ''}
-                className="size-12 sm:size-16 md:size-20 object-contain"
+                className="h-10 sm:h-12 w-auto max-w-[120px] object-contain"
                 aria-hidden={!label}
                 loading="lazy"
                 decoding="async"
               />
-            </div>
+            </span>
           ))}
         </div>
       </div>

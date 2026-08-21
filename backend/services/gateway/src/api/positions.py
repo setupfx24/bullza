@@ -17,12 +17,16 @@ router = APIRouter()
 async def list_positions(
     account_id: UUID,
     status: str = "open",
+    limit: int = 500,
     current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    """Positions for an account. `limit` is capped server-side (see
+    trading_service.list_positions) so `status=closed` can never ask for an
+    account's entire history in one response."""
     return await trading_service.list_positions(
         account_id=account_id, user_id=current_user["user_id"],
-        status=status, db=db,
+        status=status, db=db, limit=limit,
     )
 
 

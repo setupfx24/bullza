@@ -18,6 +18,20 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-broker}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-broker_dev}
       POSTGRES_DB: ${POSTGRES_DB:-broker}
+    # Connection headroom. SQLAlchemy pools are PER PROCESS and every process
+    # multiplies them: gateway (2 workers) + admin (2) + b-book + risk = 6
+    # processes × (DB_POOL_SIZE 20 + DB_MAX_OVERFLOW 10) = 180 possible
+    # connections, against the stock default of 100. Under load that surfaced
+    # as `FATAL: sorry, too many clients already` across every service at once.
+    # shared_buffers is raised alongside because each connection costs backend
+    # memory; tune both together, and prefer PgBouncer (transaction pooling) if
+    # this ever needs to go much higher.
+    command:
+      - postgres
+      - -c
+      - max_connections=300
+      - -c
+      - shared_buffers=256MB
     # No host port binding — all services connect via Docker network (postgres:5432)
     # For local dev access: docker compose exec postgres psql -U broker
     volumes:
