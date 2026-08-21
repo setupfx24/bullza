@@ -14,7 +14,6 @@ Module map:
     support.py    Tickets, notifications, banners
     system.py     SystemSetting, BonusOffer, UserBonus
     insurance.py  InsurancePolicy, InsuranceClaim
-    rewards.py    XP / AC / PS state, missions, store, audit
     share.py      SharedTrade
 """
 
@@ -56,27 +55,10 @@ from .system import (
 from .insurance import (
     InsurancePolicy, InsuranceClaim,
 )
-from .rewards import (
-    RewardsUserState, RewardsMission, RewardsUserMissionProgress,
-    RewardStoreItem, RewardsTransaction, LifestyleFulfillment,
-    RewardCampaign, RewardCampaignTier, RewardCampaignClaim,
-)
-from .play_zone import (
-    SpinWheelPrize, SpinResult,
-    LotteryRound, LotteryTicket,
-    BiddingRound, Bid,
-)
-from .staking import (
-    StakingPlan, StakingPosition, StakingRewardAccrual,
-)
-from .fixed_return import FixedReturnLock
-from .ai_station import AiStationSignal, AiStationTrade
-from .vip import VipPass
 from .share import SharedTrade
 from .rm import RMFundingRequest, RmManualRequest
 from .referral_bonus_campaign import ReferralBonusCampaign, ReferralBonusClaim
 from .abook import ABookOutbox
-
 
 __all__ = [
     "Base",
@@ -104,22 +86,6 @@ __all__ = [
     "SystemSetting", "BonusOffer", "UserBonus",
     # insurance
     "InsurancePolicy", "InsuranceClaim",
-    # rewards
-    "RewardsUserState", "RewardsMission", "RewardsUserMissionProgress",
-    "RewardStoreItem", "RewardsTransaction", "LifestyleFulfillment",
-    "RewardCampaign", "RewardCampaignTier", "RewardCampaignClaim",
-    # play zone
-    "SpinWheelPrize", "SpinResult",
-    "LotteryRound", "LotteryTicket",
-    "BiddingRound", "Bid",
-    # staking
-    "StakingPlan", "StakingPosition", "StakingRewardAccrual",
-    # AI-POWERED STAKING PROGRAM
-    "FixedReturnLock",
-    # AI Station (display-only signals/trades)
-    "AiStationSignal", "AiStationTrade",
-    # vip
-    "VipPass",
     # share
     "SharedTrade",
     # rm

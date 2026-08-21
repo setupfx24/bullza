@@ -13,7 +13,7 @@ from packages.common.src.models import (
     MasterAccount, InvestorAllocation, CopyTrade,
     TradingAccount, User, Position, PositionStatus,
     TradeHistory, AllocationCopyType, Transaction,
-    Referral, RewardsTransaction,
+    Referral,
 )
 from packages.common.src.redis_client import redis_client
 
@@ -1104,13 +1104,19 @@ async def distribute_copy_trade_platform_fee(
         anc.main_wallet_balance = Decimal(str(anc.main_wallet_balance or 0)) + payout
         paid_out += payout
 
-        db.add(RewardsTransaction(
+        # Audit row in the universal ledger. This used to be written to the
+        # rewards ledger (removed with the XP/AC module); the payout itself
+        # is a real main-wallet credit, so it must stay auditable.
+        db.add(Transaction(
             user_id=ancestor_id,
-            type=f"copy_fee_referral_l{level_idx + 1}",
-            xp_delta=0,
-            ac_delta=Decimal("0"),
-            source="copy_trade_platform_fee",
+            account_id=None,
+            type="referral_commission",
+            amount=payout,
+            balance_after=anc.main_wallet_balance,
             reference_id=reference_id,
+            description=(
+                f"Copy-trade platform fee referral (level {level_idx + 1})"
+            ),
         ))
         current = ancestor_id
     return paid_out

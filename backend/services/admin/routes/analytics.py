@@ -67,9 +67,8 @@ async def finance_overview(
 
 @router.get("/finance-overview/drill")
 async def finance_overview_drill(
-    section: str = Query(..., description="deposits|withdrawals|pending_deposits|pending_withdrawals|net_credit|fixed_return|trading|commission|swap|pamm_mam|insurance_fees|insurance_payouts|ib_commission|referral|promotional_expenses"),
+    section: str = Query(..., description="deposits|withdrawals|pending_deposits|pending_withdrawals|net_credit|trading|commission|swap|pamm_mam|insurance_fees|insurance_payouts|ib_commission|referral|promotional_expenses"),
     method: str | None = Query(None, description="filter deposit/withdrawal rows by method"),
-    tenure: str | None = Query(None, description="filter fixed_return locks by tenure label"),
     sort: str = Query("amount", description="amount | gainers | losers (trading only)"),
     start_date: str | None = Query(None),
     end_date:   str | None = Query(None),
@@ -78,7 +77,7 @@ async def finance_overview_drill(
 ):
     """Per-user drill-down behind a Finance Overview card (super_admin only)."""
     return await analytics_service.finance_overview_drill(
-        db=db, section=section, method=method, tenure=tenure, sort=sort,
+        db=db, section=section, method=method, sort=sort,
         start_date=_parse_date_bound(start_date, end_of_day=False),
         end_date=_parse_date_bound(end_date, end_of_day=True),
     )

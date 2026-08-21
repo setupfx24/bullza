@@ -11,7 +11,7 @@ import {
   Settings, Sliders, BarChart3, Gift, Image, HeadphonesIcon,
   UserCog, ChevronDown, ChevronRight, Network, Share2,
   DollarSign, Percent, ArrowLeftRight, PanelLeftClose, PanelLeft,
-  Receipt, Layers, ShieldCheck, ScrollText, BookOpen, Sparkles, Package, Megaphone,
+  Receipt, Layers, ShieldCheck, ScrollText, BookOpen, Megaphone,
   UserCheck, HandCoins, ClipboardList, KeyRound, Gauge,
 } from 'lucide-react';
 
@@ -40,7 +40,6 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Book Management', href: '/book', icon: BookOpen, perm: 'trades.view' },
   { label: 'Deposits', href: '/deposits', icon: Wallet, perm: 'deposits.view' },
   { label: 'Deposit Requests', href: '/deposit-requests', icon: Wallet, perm: 'deposits.view' },
-  { label: 'Approvals', href: '/approvals', icon: ShieldCheck, perm: 'funds.approve' },
   { label: 'Transactions', href: '/transactions', icon: Receipt, perm: 'deposits.view' },
   { label: 'Banks', href: '/banks', icon: Landmark, perm: 'banks.view' },
   { label: 'Payment Methods', href: '/payment-methods', icon: Landmark, perm: 'deposits.view' },
@@ -77,18 +76,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Analytics', href: '/analytics', icon: BarChart3, perm: 'analytics.view' },
   { label: 'Audit logs', href: '/audit-logs', icon: ScrollText, perm: 'audit_logs.view' },
   { label: 'Bonus', href: '/bonus', icon: Gift, perm: 'bonus.view' },
-  { label: 'Reward Offers', href: '/reward-campaigns', icon: Gift, perm: 'bonus.view' },
-  // Top-level entry so a Fixed-Return manager role (fixed_return.view) can
-  // reach the page without needing config.view (it also lives under Config
-  // for super-admins). Same page either way.
-  { label: 'AI-POWERED STAKING PROGRAM', href: '/config/fixed-return', icon: Wallet, perm: 'fixed_return.view' },
-  { label: 'AI Station (Trades)', href: '/ai-station', icon: Sparkles, perm: 'ai_station.manage' },
   { label: 'Trade Insurance', href: '/insurance', icon: ShieldCheck, perm: '*' },
-  // Play Zone + Lifestyle Fulfillment (gamification/rewards) are not used on
-  // this platform — hidden from the sidebar. The pages + APIs still exist, so
-  // re-add these entries to bring them back.
-  // { label: 'Play Zone', href: '/play-zone', icon: Sparkles, perm: '*' },
-  // { label: 'Lifestyle Queue', href: '/lifestyle', icon: Package, perm: '*' },
   { label: 'Banners', href: '/banners', icon: Image, perm: 'banners.view' },
   { label: 'Support', href: '/support', icon: HeadphonesIcon, perm: 'tickets.view' },
   // Tasks: visible to EVERY employee (My Tasks). Assign/Reports tabs inside

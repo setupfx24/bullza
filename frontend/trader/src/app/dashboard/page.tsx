@@ -17,7 +17,6 @@
  *   open positions list         → /portfolio/summary holdings
  *   top daily movers            → /instruments/{s}/bars + /prices/all
  *                                 (existing live-movers computation)
- *   daily streak                → existing StreakStrip (/rewards/state)
  *   KYC card                    → existing user.kyc_status + /kyc
  *   invite friends              → /business/referral/me
  *   deposit bonus + banners     → existing /wallet CTA + /banners
@@ -30,7 +29,6 @@ import toast from 'react-hot-toast';
 import DashboardShell from '@/components/layout/DashboardShell';
 import api from '@/lib/api/client';
 import { useAuthStore } from '@/stores/authStore';
-import StreakStrip from '@/components/earn/StreakStrip';
 import { AccountHero, type AccountRow } from '@/components/dashboard/AccountHero';
 import { MainWalletCard, type WalletSummary } from '@/components/dashboard/MainWalletCard';
 import { PnlTiles, type PnlBreakdown } from '@/components/dashboard/PnlTiles';
@@ -257,8 +255,6 @@ function BrokerHome() {
         </div>
         <div className="lg:col-span-5"><TopMoversCard movers={movers} /></div>
       </div>
-
-      <StreakStrip />
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-5">
         <div className="lg:col-span-4"><InviteFriendsCard /></div>

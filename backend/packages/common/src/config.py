@@ -277,12 +277,7 @@ class Settings(BaseSettings):
     # Deposit proof screenshots + user payout QR for manual withdrawals (gateway). Mount same path in admin for review.
     WALLET_UPLOAD_ROOT: str = "uploads/wallet"
 
-    # ─── Admin financial-action thresholds (USD) ──────────────────────────
-    # Withdrawals at or above this amount require a second admin to approve
-    # (4-eyes rule). Add-fund / deduct-fund go through the same gate.
-    # 0 ⇒ EVERY admin fund add/deduct/withdrawal-approval needs a second
-    # admin's sign-off (client 2026-06-12 — no direct admin funding at all).
-    ADMIN_DUAL_APPROVAL_THRESHOLD: float = 0.0
+    # ─── Admin financial-action limits (USD) ──────────────────────────────
     # Hard cap for any single admin balance mutation (defense-in-depth, even
     # for a super_admin). Set to 0 to disable.
     ADMIN_BALANCE_MUTATION_CAP: float = 100_000.0

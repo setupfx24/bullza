@@ -43,7 +43,6 @@ export const NAV_ITEMS: NavItem[] = [
     children: [
       { label: 'IB',           href: '/products/ib-referral' },
       { label: 'Referral',     href: '/products/referral' },
-      { label: 'AI-POWERED STAKING PROGRAM', href: '/products/fixed-return-insurance' },
       { label: 'Insurance',    href: '/products/insurance' },
     ],
   },
@@ -92,19 +91,16 @@ export const LIVE_TICKER = [
 ];
 
 export const INSTRUMENTS = [
-  { icon: 'Cpu',        title: 'AI-Driven Auto Trading',         badge: '24/7 Active',       body: 'Our intelligent algorithms monitor markets 24/7 and execute high-frequency trades to maximise your returns with minimal risk.', href: '/services/ai-auto-trading' },
   { icon: 'BarChart2',  title: 'Portfolio Management',           badge: 'MAM / PAMM',        body: 'Expert asset allocation and continuous rebalancing — choose MAM for managed-account models or PAMM for percentage-based allocations.', href: '/services/portfolio-management' },
   { icon: 'TrendingUp', title: 'Market Research & Analysis',     badge: 'Daily Reports',     body: 'In-depth technical and fundamental analysis reports, updated daily to keep your investment decisions sharp.',                  href: '/services/market-research' },
   { icon: 'Layers',     title: 'Educational Resources',          badge: 'Beginner Friendly', body: 'Learn trading strategies, crypto fundamentals, and market dynamics through curated workshops, guides, and webinars.',          href: '/services/education' },
   { icon: 'Gem',        title: 'ICO & Early-Stage Investments',  badge: 'Coming Soon',       body: `Early access to promising new blockchain projects, vetted by ${BRAND_NAME} before they hit the wider market. Launching soon.`,     href: '/services/ico-coming-soon', comingSoon: true },
-  { icon: 'Building',   title: 'Automated Profit Generation',    badge: 'Algo Powered',      body: `Beyond standard trading, ${BRAND_NAME} deploys advanced algorithmic bots designed to generate consistent returns even in volatile markets.`, href: '/services/automated-profit' },
 ] as const;
 
 export const WHY_US = [
   { icon: 'Network',      title: 'Decentralized Exchange',            body: 'Trade directly from your own wallet with non-custodial, on-chain execution — no intermediaries, no counterparty risk. Your keys, your funds.' },
   { icon: 'ShieldCheck',  title: 'Insurance for Traders',             body: 'Every trade is policy-backed with on-chain insurance. If the market moves against you beyond defined thresholds, your insured amount is protected.' },
   { icon: 'Gift',         title: 'Bonus & Rewards',                   body: 'Get a 100% welcome bonus up to $200 on your first deposit — credited within minutes and fully tradeable on a decentralized exchange with insured trades. Stacks with referral commissions and trading cashback.' },
-  { icon: 'Lock',         title: 'Fixed Rate Return',                 body: 'Lock in guaranteed AI-POWERED STAKING PROGRAMs with our structured investment plans — predictable income with transparent terms and no hidden fees.' },
   { icon: 'Brain',        title: 'AI Trading Software — 90% Accuracy', body: 'Our proprietary AI engine analyses thousands of market signals per second, achieving a verified 90% accuracy rate across forex and crypto pairs.' },
   { icon: 'ShieldPlus',   title: 'Insured Trading',                   body: 'All positions carry built-in trade insurance. Your capital is safeguarded with multi-layer protection — cold storage, encryption, and smart-contract coverage.' },
   { icon: 'Gauge',        title: 'Risk Management',                   body: 'Advanced risk controls including adjustable leverage (up to 1:500), stop-loss automation, margin-call alerts, and real-time exposure monitoring.' },
@@ -170,10 +166,6 @@ export const FAQ = [
     a: `${BRAND_NAME} offers a fast web platform accessible from any modern browser, plus dedicated iOS and Android mobile apps. All platforms sync to a single account, so your positions, alerts, and watchlists stay in sync across every device.`,
   },
   {
-    q: 'What is AI-POWERED STAKING PROGRAM?',
-    a: 'AI-POWERED STAKING PROGRAM is a capital-protected investment product where you lock your principal for a defined tenure (Month, Quarter, Half-Year, Year, or 2 Year) and earn a known, AI-POWERED STAKING PROGRAM paid at maturity. Returns scale with deposit size and tenure — from 1% per month on a $1K Monthly plan to 7% on a $50K+ 2-Year plan. Your principal is held in a segregated trust account and returned in full at maturity. See the Products → AI-POWERED STAKING PROGRAM page for the full rate matrix.',
-  },
-  {
     q: 'How does the Decentralized Exchange work?',
     a: `${BRAND_NAME} DEX lets you trade directly from your own wallet with non-custodial, on-chain execution. You keep your private keys, your funds never leave your wallet, and every order is settled through smart contracts — no counterparty risk, no withdrawal queues. Connect MetaMask, WalletConnect, or any EVM-compatible wallet, sign the trade, and the swap clears on-chain in seconds.`,
   },
@@ -206,11 +198,9 @@ export const FOOTER_QUICK_LINKS = [
 ];
 
 export const FOOTER_SERVICES = [
-  { label: 'AI Auto Trading',       href: '/services/ai-auto-trading' },
   { label: 'Portfolio Management',  href: '/services/portfolio-management' },
   { label: 'Market Research',       href: '/services/market-research' },
   { label: 'Educational Resources', href: '/services/education' },
-  { label: 'Automated Profit',      href: '/services/automated-profit' },
   { label: 'ICO Investments',       href: '/services/ico-coming-soon' },
 ];
 

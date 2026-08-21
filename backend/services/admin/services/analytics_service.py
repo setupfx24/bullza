@@ -371,12 +371,10 @@ async def finance_overview(db: AsyncSession, start_date=None, end_date=None) -> 
     AI-POWERED STAKING PROGRAM is reported separately (NOT part of Net P&L).
 
     start_date/end_date (optional UTC datetimes) restrict the FLOW figures
-    (P&L sources, deposits, withdrawals, pending, fixed-return collected) to
+    (P&L sources, deposits, withdrawals, pending) to
     that window. Net Credit stays a live snapshot (it's a current balance,
     not a flow) and ignores the date range.
     """
-    from packages.common.src.models import FixedReturnLock
-
     def _dr(q, col):
         """Apply the optional [start_date, end_date] window to a query."""
         if start_date is not None:
@@ -540,135 +538,13 @@ async def finance_overview(db: AsyncSession, start_date=None, end_date=None) -> 
         ), Transaction.account_id)
     )).scalar() or 0))
 
-    # ── AI-POWERED STAKING PROGRAM (separate from P&L) ──────────────────────────────
-    # When a date window is given, scope to locks OPENED in that window
-    # ("collected in this period"); otherwise all currently-active locks.
-    active_locks = (await db.execute(
-        _xu(_dr(
-            select(FixedReturnLock).where(FixedReturnLock.state.in_(["active", "early_pending"])),
-            FixedReturnLock.locked_at,
-        ), FixedReturnLock.user_id)
-    )).scalars().all()
-    fr_collected = 0.0
-    fr_interest_paid = 0.0
-    fr_payable = 0.0
-    fr_accrued = 0.0   # interest that has BUILT UP day-by-day up to today
-    _now = datetime.now(timezone.utc)
-    by_tenure: dict[str, dict] = {}
-    maturing: dict[str, dict] = {}
-    by_user: dict = {}  # uid -> {principal, interest_paid, interest_accrued, count}
-    for lk in active_locks:
-        p = float(lk.principal or 0)
-        fr_collected += p
-        paid = float(lk.total_interest_paid or 0)
-        fr_interest_paid += paid
-        # Projected total interest the broker will owe over the full lock
-        # (rate_pct is per tenure-cycle; months/cycle = tenure_days/30).
-        months = int(lk.lock_months_at_creation or 24)
-        cyc_months = max(1, int(round((lk.tenure_days or 30) / 30)))
-        cycles = max(1, months // cyc_months)
-        projected = p * float(lk.rate_pct or 0) / 100.0 * cycles
-        fr_payable += max(0.0, projected - paid)
-        # Accrued-to-date: how much interest has built up on a per-day basis
-        # from lock start until today (capped at maturity / projected total).
-        td = int(lk.tenure_days or 30) or 30
-        daily_interest = p * float(lk.rate_pct or 0) / 100.0 / td
-        # locked_at comes back tz-NAIVE from the DB (like every other datetime
-        # here); subtracting it from the aware _now raises TypeError, which the
-        # bare except swallowed → days_elapsed=0 → accrued was ALWAYS $0. Coerce
-        # to UTC-aware first, exactly like the rest of the codebase does.
-        try:
-            _la = lk.locked_at
-            if _la is not None and _la.tzinfo is None:
-                _la = _la.replace(tzinfo=timezone.utc)
-            days_elapsed = max(0, (_now - _la).days) if _la else 0
-        except Exception:
-            days_elapsed = 0
-        total_days = max(1, cycles * td)
-        this_accrued = min(projected, daily_interest * min(days_elapsed, total_days))
-        fr_accrued += this_accrued
-        bu = by_user.setdefault(lk.user_id, {
-            "principal": 0.0, "interest_paid": 0.0, "interest_accrued": 0.0, "count": 0,
-        })
-        bu["principal"] += p
-        bu["interest_paid"] += paid
-        bu["interest_accrued"] += this_accrued
-        bu["count"] += 1
-        t = lk.tenure_label or "—"
-        by_tenure.setdefault(t, {"tenure": t, "principal": 0.0, "count": 0})
-        by_tenure[t]["principal"] += p
-        by_tenure[t]["count"] += 1
-        if lk.matures_at:
-            mk = lk.matures_at.strftime("%Y-%m")
-            maturing.setdefault(mk, {"month": mk, "principal": 0.0, "count": 0})
-            maturing[mk]["principal"] += p
-            maturing[mk]["count"] += 1
-    fr_by_tenure = sorted(
-        [{**v, "principal": round(v["principal"], 2)} for v in by_tenure.values()],
-        key=lambda x: x["principal"], reverse=True,
-    )
-    fr_maturing = sorted(
-        [{**v, "principal": round(v["principal"], 2)} for v in maturing.values()],
-        key=lambda x: x["month"],
-    )
-
-    # Per-user interest breakdown — how much interest each user's locks have
-    # generated (accrued day-by-day to date) and how much was actually paid out.
-    umap_fr = await _user_label_map(db, list(by_user.keys()))
-    fr_by_user = sorted(
-        [
-            {
-                "user_id": str(uid) if uid else None,
-                "name": umap_fr.get(uid, {}).get("name", "—"),
-                "email": umap_fr.get(uid, {}).get("email"),
-                "principal": round(v["principal"], 2),
-                "interest_accrued": round(v["interest_accrued"], 2),
-                "interest_paid": round(v["interest_paid"], 2),
-                "count": v["count"],
-            }
-            for uid, v in by_user.items()
-        ],
-        key=lambda x: x["interest_accrued"], reverse=True,
-    )[:100]
-
-    # Per-user AI-Powered-Staking referral commission RECEIVED — credited into a
-    # referrer's referral_commission_balance and recorded as a referral_commission
-    # transaction whose description mentions "staking". Date-scoped like the rest.
-    comm_q = select(
-        Transaction.user_id,
-        func.coalesce(func.sum(Transaction.amount), 0),
-        func.count(Transaction.id),
-    ).where(
-        Transaction.type == "referral_commission",
-        func.lower(Transaction.description).like("%staking%"),
-    )
-    comm_q = _xu(_dr(comm_q, Transaction.created_at), Transaction.user_id).group_by(Transaction.user_id)
-    comm_rows = (await db.execute(comm_q)).all()
-    umap_comm = await _user_label_map(db, [r[0] for r in comm_rows if r[0]])
-    fr_referral_commission = sorted(
-        [
-            {
-                "user_id": str(uid) if uid else None,
-                "name": umap_comm.get(uid, {}).get("name", "—"),
-                "email": umap_comm.get(uid, {}).get("email"),
-                "amount": round(float(total or 0), 2),
-                "count": int(cnt or 0),
-            }
-            for uid, total, cnt in comm_rows
-        ],
-        key=lambda x: x["amount"], reverse=True,
-    )
-
     # ── Promotional Expenses (ONLY the EXTRA above standard) ──────────────
     # Read purely from the promotional_expenses ledger — the premium a user was
-    # paid ABOVE the standard rate via a per-user custom offer (e.g. FR referral
-    # extra %, auto-logged in _pay_fr_referral) plus manual admin entries. NOT
+    # paid ABOVE the standard rate via a per-user custom offer, plus manual
+    # admin entries. NOT
     # the full commissions/bonuses (those are normal business cost, not
     # promotional). These are deliberate expense records → summed as-is.
     _PE_LABELS = {
-        "fr_referral_extra": "AI-POWERED STAKING PROGRAM referral — extra %",
-        "extra_fr_interest": "Extra AI-POWERED STAKING PROGRAM interest",
-        "fr_referral_bonus": "AI-POWERED STAKING PROGRAM referral bonus",
         "custom_benefit": "Custom promotional benefit",
         "manual": "Manual entries",
     }
@@ -700,20 +576,6 @@ async def finance_overview(db: AsyncSession, start_date=None, end_date=None) -> 
             "account_credit": round(account_credit, 2),
             "insurance_credited_lifetime": round(insurance_credited, 2),
         },
-        "fixed_return": {
-            "collected": round(fr_collected, 2),
-            "interest_paid_to_date": round(fr_interest_paid, 2),
-            "projected_payable": round(fr_payable, 2),
-            # Interest accrued day-by-day up to today, and the slice of it not
-            # yet paid out (what the broker effectively owes as of now).
-            "accrued_to_date": round(fr_accrued, 2),
-            "accrued_unpaid": round(max(0.0, fr_accrued - fr_interest_paid), 2),
-            "by_tenure": fr_by_tenure,
-            "maturing": fr_maturing,
-            # Per-user interest generated + per-user staking referral commission.
-            "by_user": fr_by_user,
-            "referral_commission": fr_referral_commission,
-        },
         "pending_deposits": {"total": pdep_total, "by_method": pdep_methods},
         "pending_withdrawals": {"total": pwd_total, "by_method": pwd_methods},
         "total_withdrawable": {"total": round(total_withdrawable, 2)},
@@ -736,22 +598,19 @@ async def _user_label_map(db: AsyncSession, user_ids: list) -> dict:
 
 
 async def finance_overview_drill(
-    db: AsyncSession, section: str, method: str | None = None, tenure: str | None = None,
+    db: AsyncSession, section: str, method: str | None = None,
     sort: str = "amount", start_date=None, end_date=None,
 ) -> dict:
     """Per-user drill-down for a Finance Overview card.
 
     section ∈ {deposits, withdrawals, pending_deposits, pending_withdrawals,
-               net_credit, fixed_return,
+               net_credit,
                trading, commission, swap, pamm_mam, insurance_fees,
                insurance_payouts, ib_commission, referral}.
-    `method` filters deposit/withdrawal rows; `tenure` filters fixed_return
-    locks; `sort` ∈ {amount, gainers, losers} (gainers/losers only meaningful
+    `method` filters deposit/withdrawal rows.
     for the trading P&L section).
     Returns {section, method, users:[{user_id,name,email,amount,count}], total}.
     """
-    from packages.common.src.models import FixedReturnLock
-
     section = (section or "").strip()
     users: list[dict] = []
 
@@ -865,29 +724,6 @@ async def finance_overview_drill(
                 "email": info.get("email"),
                 "amount": round(amt, 2),
                 "count": 1,
-            })
-
-    elif section == "fixed_return":
-        q = select(FixedReturnLock).where(FixedReturnLock.state.in_(["active", "early_pending"]))
-        if tenure:
-            q = q.where(FixedReturnLock.tenure_label == tenure)
-        q = _xu(_dr(q, FixedReturnLock.locked_at), FixedReturnLock.user_id)
-        locks = (await db.execute(q)).scalars().all()
-        acc: dict = {}
-        for lk in locks:
-            uid = lk.user_id
-            entry = acc.setdefault(uid, {"amount": 0.0, "count": 0})
-            entry["amount"] += float(lk.principal or 0)
-            entry["count"] += 1
-        umap = await _user_label_map(db, list(acc.keys()))
-        for uid, e in acc.items():
-            info = umap.get(uid, {})
-            users.append({
-                "user_id": str(uid) if uid else None,
-                "name": info.get("name", "—"),
-                "email": info.get("email"),
-                "amount": round(e["amount"], 2),
-                "count": e["count"],
             })
 
     elif section == "trading":
@@ -1066,7 +902,7 @@ async def finance_overview_drill(
     return {
         "section": section,
         "method": method,
-        "tenure": tenure,
+
         "sort": sort,
         "users": users,
         "total": round(sum(u["amount"] for u in users), 2),

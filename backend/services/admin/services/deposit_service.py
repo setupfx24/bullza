@@ -154,7 +154,6 @@ async def list_all_withdrawals(page: int, per_page: int, status: str | None, db:
 async def approve_deposit(
     deposit_id: uuid.UUID, admin_id: uuid.UUID, ip_address: str | None, db: AsyncSession,
     verified_amount: Decimal | None = None,
-    approval_request_id: uuid.UUID | None = None,
 ) -> dict:
     # Lock the deposit row so a double-click / two admins can't both
     # approve and credit twice.
@@ -167,50 +166,8 @@ async def approve_deposit(
     if deposit.status != "pending":
         raise HTTPException(status_code=400, detail="Deposit is not pending")
 
-    # ── Two-admin gate (client 2026-06-16): EVERY deposit approval, any
-    # amount, needs a second SUPER-ADMIN sign-off. The first call (by the
-    # deposit-authority admin) creates a pending request and raises 202; a
-    # super admin approves it in /approvals, which re-invokes this with
-    # approval_request_id set to actually credit the user. ──
-    from .approval_service import request_or_execute, mark_executed
-    from packages.common.src.settings_store import get_bool_setting, get_float_setting
     _gate_amt = Decimal(str(verified_amount if verified_amount is not None else (deposit.amount or 0)))
-    # Dual-approval for deposits is OPT-IN (client 2026-06-20). Forcing EVERY
-    # deposit through a second super-admin sign-off deadlocked single-admin
-    # setups — the requesting admin can't approve their own request
-    # (chk_distinct_approver), and if there's no second approver the deposit is
-    # stuck "pending approval" forever, which surfaced to the client as
-    # "deposit approve nahi ho raha / internal server error". Default now: the
-    # deposit-authority admin approves directly. Brokers who want the strict
-    # two-admin flow flip on `deposit_dual_approval_required`.
-    # Dual approval fires when EITHER the strict "all deposits" flag is on, OR
-    # the amount is at/above the admin-set limit (deposit_dual_approval_min_usd;
-    # 0 = no limit). Lets a broker require a second super-admin sign-off only on
-    # large deposits (client 2026-07-08).
-    _dual_required = await get_bool_setting("deposit_dual_approval_required", False)
-    _dual_min = Decimal(str(await get_float_setting("deposit_dual_approval_min_usd", 0.0)))
-    _needs_dual = _dual_required or (_dual_min > 0 and _gate_amt >= _dual_min)
-    if approval_request_id is not None:
-        # Second leg: a different super admin completed the request in /approvals
-        # and it re-invokes here with the request id — validate then credit.
-        _ar = (await db.execute(
-            text("SELECT status, action, target_id FROM admin_approval_requests WHERE id = :rid FOR UPDATE"),
-            {"rid": str(approval_request_id)},
-        )).mappings().first()
-        if not _ar or _ar["status"] != "approved":
-            raise HTTPException(status_code=409, detail="Approval not in 'approved' state")
-        if _ar["action"] != "deposit_approve" or str(_ar["target_id"]) != str(deposit_id):
-            raise HTTPException(status_code=409, detail="Approval does not match this deposit")
-    elif _needs_dual:
-        # Strict two-admin flow ON → create a pending request and stop (202).
-        await request_or_execute(
-            db, action="deposit_approve", target_type="deposit",
-            target_id=deposit_id, amount=_gate_amt,
-            payload={"verified_amount": str(_gate_amt)},
-            requested_by=admin_id, always=True,
-        )
-        # request_or_execute raises ApprovalRequired (202) — unreachable below.
-    # else: single-admin direct approval → fall through and credit now.
+    _ = _gate_amt  # retained for the verified-amount overwrite below
 
     # Manual deposits carry the amount the USER typed in the form, which
     # may not match their uploaded proof (audit finding H1 — user claims
@@ -659,8 +616,6 @@ async def approve_deposit(
         action_url="/wallet",
         commit=False,
     )
-    if approval_request_id is not None:
-        await mark_executed(db, request_id=approval_request_id)
     await db.commit()
     # Email — fire-and-forget after commit so SMTP latency doesn't delay the
     # admin's response and a delivery failure can't roll back the approval.
@@ -751,7 +706,6 @@ async def reject_deposit(
 
 async def approve_withdrawal(
     withdrawal_id: uuid.UUID, admin_id: uuid.UUID, ip_address: str | None, db: AsyncSession,
-    approval_request_id: uuid.UUID | None = None,
 ) -> dict:
     # Lock the withdrawal row FOR UPDATE so two admins (or one
     # double-click) can't both pass the status==pending check and
@@ -764,37 +718,6 @@ async def approve_withdrawal(
         raise HTTPException(status_code=404, detail="Withdrawal not found")
     if withdrawal.status != "pending":
         raise HTTPException(status_code=400, detail="Withdrawal is not pending")
-
-    # ── Dual-approval gate (opt-in, client 2026-06-20): same as deposits, the
-    # forced two-admin sign-off deadlocked single-admin setups, so it's now
-    # off by default and toggled via withdrawal_dual_approval_required. ──
-    from .approval_service import request_or_execute, mark_executed
-    from packages.common.src.settings_store import get_bool_setting, get_float_setting
-    # Same as deposits: dual approval fires when the strict flag is on OR the
-    # amount is at/above the admin-set limit (withdrawal_dual_approval_min_usd;
-    # 0 = no limit). Large withdrawals get a second super-admin sign-off.
-    _wd_dual_required = await get_bool_setting("withdrawal_dual_approval_required", False)
-    _wd_dual_min = Decimal(str(await get_float_setting("withdrawal_dual_approval_min_usd", 0.0)))
-    _wd_amt = Decimal(str(withdrawal.amount or 0))
-    _wd_needs_dual = _wd_dual_required or (_wd_dual_min > 0 and _wd_amt >= _wd_dual_min)
-    if approval_request_id is not None:
-        _ar = (await db.execute(
-            text("SELECT status, action, target_id FROM admin_approval_requests WHERE id = :rid FOR UPDATE"),
-            {"rid": str(approval_request_id)},
-        )).mappings().first()
-        if not _ar or _ar["status"] != "approved":
-            raise HTTPException(status_code=409, detail="Approval not in 'approved' state")
-        if _ar["action"] != "withdrawal_approve" or str(_ar["target_id"]) != str(withdrawal_id):
-            raise HTTPException(status_code=409, detail="Approval does not match this withdrawal")
-    elif _wd_needs_dual:
-        await request_or_execute(
-            db, action="withdrawal_approve", target_type="withdrawal",
-            target_id=withdrawal_id, amount=Decimal(str(withdrawal.amount or 0)),
-            payload={"amount": str(withdrawal.amount or 0)},
-            requested_by=admin_id, always=True,
-        )
-        # raises ApprovalRequired (202) — unreachable below.
-    # else: single-admin direct approval → fall through and pay out now.
 
     if withdrawal.account_id:
         # Lock the trading account so the balance check + debit are
@@ -926,8 +849,6 @@ async def approve_withdrawal(
         action_url="/wallet",
         commit=False,
     )
-    if approval_request_id is not None:
-        await mark_executed(db, request_id=approval_request_id)
     await db.commit()
     # Approval email — fire-and-forget.
     try:

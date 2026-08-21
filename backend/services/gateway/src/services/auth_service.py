@@ -496,14 +496,6 @@ async def _consume_referral(db: AsyncSession, user_id: UUID, referral_code: str)
         if (new_user is not None and new_user.referred_by_user_id is None
                 and ib_profile.user_id != user_id):
             new_user.referred_by_user_id = ib_profile.user_id
-        # Best-effort: a rewards-side failure must not block the signup itself.
-        try:
-            from . import rewards_service
-            await rewards_service.award_signup_referral_bonus(
-                db, referrer_user_id=ib_profile.user_id, referred_user_id=user_id,
-            )
-        except Exception as _e:
-            logger.debug("signup referral bonus failed: %s", _e)
 
 
 async def _attach_to_company_ib(db: AsyncSession, user_id: UUID) -> None:
@@ -563,13 +555,6 @@ async def _attach_to_company_ib(db: AsyncSession, user_id: UUID) -> None:
     # tree (and earns trade commissions) but is silently shorted on the
     # one-time signup credit. Best-effort: a rewards failure must not
     # block signup.
-    try:
-        from . import rewards_service
-        await rewards_service.award_signup_referral_bonus(
-            db, referrer_user_id=company_ib.user_id, referred_user_id=user_id,
-        )
-    except Exception as _e:
-        logger.debug("Super IB signup bonus failed: %s", _e)
 
 
 # ─── Core: issue auth response ───────────────────────────────────────────

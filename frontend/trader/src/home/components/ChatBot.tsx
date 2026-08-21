@@ -27,7 +27,7 @@ const RULES: { keys: string[]; reply: string; cta?: { label: string; href: strin
   {
     keys: ['hi', 'hello', 'hey', 'namaste', 'hola', 'good morning', 'good afternoon', 'good evening'],
     reply:
-      `Hi! 👋 I'm your ${BRAND_NAME} assistant. I can help with account types, deposits, the welcome bonus, fixed-return plans, our DEX, insurance, IB program, and more. What would you like to know?`,
+      `Hi! 👋 I'm your ${BRAND_NAME} assistant. I can help with account types, deposits, the welcome bonus, our DEX, insurance, IB program, and more. What would you like to know?`,
   },
   {
     keys: ['bonus', 'welcome bonus', '100%', 'promo', 'first deposit bonus'],
@@ -51,12 +51,6 @@ const RULES: { keys: string[]; reply: string; cta?: { label: string; href: strin
     cta: [{ label: 'View all accounts', href: '/account-types' }],
   },
   {
-    keys: ['AI-POWERED STAKING PROGRAM', 'fixed-return', 'fixed yield', 'guaranteed return', 'capital protected'],
-    reply:
-      'AI-POWERED STAKING PROGRAM plans lock your principal for a defined tenure (Month / Quarter / Half-Year / Year / 2 Year) and pay a known return at maturity. Bigger deposits and longer tenures earn higher rates — up to 7% on $50K+ 2-Year plans.',
-    cta: [{ label: 'See rate matrix', href: '/products/fixed-return-insurance' }],
-  },
-  {
     keys: ['dex', 'decentralized', 'decentralised', 'non-custodial', 'wallet', 'metamask', 'on-chain', 'on chain'],
     reply:
       `${BRAND_NAME} DEX lets you trade directly from your own wallet — non-custodial, on-chain execution. Keep your private keys, sign trades, settle through smart contracts in seconds. MetaMask, WalletConnect, and EVM wallets all work.`,
@@ -66,19 +60,13 @@ const RULES: { keys: string[]; reply: string; cta?: { label: string; href: strin
     keys: ['insurance', 'insured', 'insure', 'trade protection', 'protect my trade'],
     reply:
       `Every position on ${BRAND_NAME} is automatically policy-backed by on-chain trade insurance — no opt-in. If the market moves against you beyond the policy threshold, the insured amount pays out automatically via smart contract.`,
-    cta: [{ label: 'Read more', href: '/products/fixed-return-insurance' }],
+    cta: [{ label: 'Read more', href: '/products/insurance' }],
   },
   {
     keys: ['ib', 'referral', 'partner', 'introducing broker', 'affiliate', 'commission'],
     reply:
       'The IB program pays lifetime per-lot commissions — up to $7 / lot at Platinum tier. Multi-tier earnings, weekly payouts, dedicated manager and marketing kit. Approval typically within 24 hours.',
     cta: [{ label: 'Apply for IB', href: '/products/ib-referral' }],
-  },
-  {
-    keys: ['ai', 'auto trading', 'automated', 'algo', 'bot', 'algorithm'],
-    reply:
-      'Our AI engine analyses thousands of market signals per second and executes trades 24/7 with a verified 90% accuracy across forex and crypto. Multi-strategy (trend, mean-reversion, breakout, vol arb), regime-aware, fully transparent.',
-    cta: [{ label: 'See AI trading', href: '/services/ai-auto-trading' }],
   },
   {
     keys: ['portfolio', 'mam', 'pamm', 'managed account', 'manager'],
@@ -159,7 +147,7 @@ const QUICK_REPLIES = [
   'Welcome bonus',
   'Minimum deposit',
   'Account types',
-  'AI-POWERED STAKING PROGRAM',
+  'Trade insurance',
   'Open account',
   'Live agent',
 ];
@@ -169,7 +157,7 @@ const INITIAL: Msg[] = [
     id: 'm0',
     sender: 'bot',
     text:
-      `Hi! 👋 I'm the ${BRAND_NAME} Assistant. Ask me about the welcome bonus, account types, fixed-return plans, our DEX, insurance, the IB program — or pick a topic below.`,
+      `Hi! 👋 I'm the ${BRAND_NAME} Assistant. Ask me about the welcome bonus, account types, our DEX, insurance, the IB program — or pick a topic below.`,
     ts: Date.now(),
   },
 ];
@@ -188,7 +176,7 @@ function matchRule(input: string): { reply: string; cta?: { label: string; href:
   // Default fallback
   return {
     reply:
-      "I didn't quite catch that — try asking about the welcome bonus, minimum deposit, account types, AI-POWERED STAKING PROGRAM, our DEX, trade insurance, the IB program, or AI trading. Or pick a chip below 👇",
+      "I didn't quite catch that — try asking about the welcome bonus, minimum deposit, account types, our DEX, trade insurance, or the IB program. Or pick a chip below 👇",
   };
 }
 

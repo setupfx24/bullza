@@ -46,10 +46,6 @@ class User(Base):
     # When TRUE the trader is routed to swap-free (Islamic) account groups
     # by default and is exempt from the overnight leverage fee engine.
     is_islamic = Column(Boolean, default=False, server_default="false")
-    # Set to TRUE when the user holds an active VipPass (mirrored on User
-    # for fast lookup at reward-application time). Gated by
-    # system_settings.vip_pass_enabled until token economics land.
-    is_vip = Column(Boolean, default=False, server_default="false")
     # Per-user bank/manual deposit visibility (client 2026-06-23): admin can
     # show the bank deposit option to specific clients only. NULL = follow the
     # global wallet.manual_enabled toggle; True/False = explicit per-user override.
@@ -124,18 +120,6 @@ class User(Base):
     referral_commission_balance = Column(
         Numeric(18, 8), nullable=False, default=0, server_default="0",
     )
-    # How THIS user (as a referrer) wants their AI-Powered-Staking referral
-    # commission paid (Migration 0084): 'principal' = a % of each referred
-    # user's principal once they lock; 'interest' = a % of each interest payout
-    # the referred user receives. The % values are admin settings.
-    fr_referral_mode = Column(
-        String(20), nullable=False, default="principal", server_default="principal",
-    )
-    # Per-referrer OVERRIDE of the FR referral commission % (migration 0090).
-    # NULL = fall back to the global fr_referral_principal_pct / _interest_pct
-    # setting for that leg; a value pins a custom rate for THIS referrer only.
-    fr_referral_principal_pct_override = Column(Numeric(8, 4), nullable=True)
-    fr_referral_interest_pct_override = Column(Numeric(8, 4), nullable=True)
     # Per-IB pool of accumulated trade commissions from the MLM chain.
     # Lives on the IB's user row. Increments inside the IB engine on
     # each qualifying trade; "Transfer to Main Wallet" on /business
@@ -144,18 +128,6 @@ class User(Base):
     ib_commission_balance = Column(
         Numeric(18, 8), nullable=False, default=0, server_default="0",
     )
-    # Per-user AI-POWERED STAKING PROGRAM rate override. NULL = use the global
-    # `fixed_return_rates` setting (the rate matrix configured on
-    # /admin/config/fixed-return). When set, expected shape:
-    #   { "rate_matrix_pct": [[..], ..] }  same dims as the global matrix.
-    # Read inside fixed_return_service.create_lock so a VIP trader can
-    # be granted a non-standard ladder without changing the global
-    # ladder visible to everyone else. Migration 0064.
-    fixed_return_rate_override = Column(JSONB, nullable=True)
-    # Eligibility-nudge engine: when the user crossed the funded-account
-    # threshold and we educated them about AI-POWERED STAKING PROGRAM + Trade Insurance.
-    # NULL = never nudged; we re-nudge ~quarterly while still eligible.
-    fr_insurance_nudge_sent_at = Column(DateTime(timezone=True), nullable=True)
     # Statement digest engine: last weekly / monthly digest send timestamps.
     # NULL = never sent; weekly engine runs Mondays, monthly on the 1st.
     weekly_statement_sent_at = Column(DateTime(timezone=True), nullable=True)

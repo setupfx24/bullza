@@ -49,7 +49,7 @@ async def list_trading_instruments(segment: str | None, db: AsyncSession) -> lis
         sv, st, pimp = await resolve_spread_config(db, inst)
         mid = await _mid_price(inst.symbol)
         # Catalog preview shows the rack rate; tier and XP discount apply at order time.
-        comm = await resolve_commission(db, inst, Decimal("1"), mid, apply_xp_discount=False)
+        comm = await resolve_commission(db, inst, Decimal("1"), mid)
 
         out.append(
             {

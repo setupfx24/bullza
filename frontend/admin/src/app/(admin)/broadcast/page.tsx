@@ -49,7 +49,7 @@ export default function BroadcastPage() {
   const [anMessage, setAnMessage] = useState('');
   const [anCtaLabel, setAnCtaLabel] = useState('');
   const [anCtaUrl, setAnCtaUrl] = useState('');
-  const [anAudience, setAnAudience] = useState<'all' | 'funded_only' | 'ib' | 'pamm_mam' | 'fixed_return'>('all');
+  const [anAudience, setAnAudience] = useState<'all' | 'funded_only' | 'ib' | 'pamm_mam'>('all');
   const [anPreview, setAnPreview] = useState<number | null>(null);
   const [anSending, setAnSending] = useState(false);
 
@@ -326,7 +326,7 @@ export default function BroadcastPage() {
         <div>
           <h2 className="text-lg font-semibold text-text-primary">Custom Announcement</h2>
           <p className="text-xxs text-text-tertiary mt-0.5">
-            Send any message (event, offer, update) with your own title to a chosen audience — All / IB / PAMM-MAM / Fixed-return / Funded.
+            Send any message (event, offer, update) with your own title to a chosen audience — All / IB / PAMM-MAM / Funded.
           </p>
         </div>
       </div>
@@ -378,7 +378,6 @@ export default function BroadcastPage() {
             <option value="funded_only">Funded only (balance &gt; 0)</option>
             <option value="ib">IB / Affiliates</option>
             <option value="pamm_mam">PAMM / MAM managers</option>
-            <option value="fixed_return">AI-POWERED STAKING PROGRAM holders</option>
           </select>
         </div>
 

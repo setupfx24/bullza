@@ -3,7 +3,7 @@
 /**
  * Risk Disclaimer — public legal page.
  * Linked from footer; previously 404'd. Boilerplate adapted to the platform's
- * product mix (forex, CFDs, crypto, fixed-return-insurance plans).
+ * product mix (forex, CFDs, crypto).
  */
 import Link from 'next/link';
 import { ArrowUpRight, ShieldAlert, TriangleAlert, Info, Mail } from 'lucide-react';
@@ -13,8 +13,7 @@ import { BRAND_NAME, BRAND_SUPPORT_EMAIL } from '@/lib/brand';
 const SECTIONS = [
   {
     h: '1. General Risk Warning',
-    p: `Trading forex, contracts-for-difference (CFDs), crypto-assets, and structured-yield
-    products carries a high level of risk and can result in losses that exceed your initial
+    p: `Trading forex, contracts-for-difference (CFDs), and crypto-assets carries a high level of risk and can result in losses that exceed your initial
     deposit. These products may not be suitable for every investor. You should only trade with
     capital you can afford to lose, and seek independent advice if you do not fully understand
     the risks involved.`,
@@ -55,47 +54,39 @@ const SECTIONS = [
     time of opt-in. Bonus equity is not in itself withdrawable.`,
   },
   {
-    h: '7. AI-POWERED STAKING PROGRAM Plans',
-    p: `AI-POWERED STAKING PROGRAM ("FRI") plans pay a contractual yield at maturity, underwritten by
-    independent regulated insurance counterparties. Capital protection at maturity is subject to
-    the underwriter's continuing solvency and the policy terms. FRI plans are NOT bank deposits
-    and are NOT covered by deposit-insurance schemes. Early withdrawal, where permitted, forfeits
-    accrued yield and may incur an exit fee.`,
-  },
-  {
-    h: '8. Trade Insurance',
+    h: '7. Trade Insurance',
     p: `Trade Insurance, where activated on the order ticket, refunds a stated percentage of any
     covered losing trade up to the policy cap disclosed at the time of opt-in. The fee is
     deducted on trade open and is non-refundable. Insurance payouts are subject to minimum trade
     duration and the policy conditions visible at activation.`,
   },
   {
-    h: '9. AI & Algo Trading',
+    h: '8. AI & Algo Trading',
     p: `Our AI-driven auto-trading and algorithmic strategies analyse historical and live market
     data but cannot anticipate every market condition. Past back-tested or live performance is
     not indicative of future results. You are responsible for monitoring positions, setting
     risk limits, and pausing strategies during high-impact news.`,
   },
   {
-    h: '10. Tax Treatment',
+    h: '9. Tax Treatment',
     p: `The tax treatment of trading profits, swap interest, and bonus equity varies by
     jurisdiction. You are responsible for declaring and paying any applicable tax. ${BRAND_NAME} does
     not provide tax advice — consult a qualified tax adviser for your situation.`,
   },
   {
-    h: '11. No Investment Advice',
+    h: '10. No Investment Advice',
     p: `Information published on our website, in market commentary, and inside the platform is
     general in nature and does not constitute personalised investment advice. We do not consider
     your individual objectives, financial situation, or needs.`,
   },
   {
-    h: '12. Jurisdictional Restrictions',
+    h: '11. Jurisdictional Restrictions',
     p: `${BRAND_NAME} Services are not available to residents of jurisdictions where the offering of
     CFD, forex, or crypto-derivative trading is prohibited under local law. You are responsible
     for ensuring your use of the Services complies with the laws of your jurisdiction.`,
   },
   {
-    h: '13. Acknowledgement',
+    h: '12. Acknowledgement',
     p: `By opening a ${BRAND_NAME} account you confirm you have read, understood, and accepted this Risk
     Disclaimer alongside our Terms of Service and Privacy Policy. You trade at your own risk.`,
   },
@@ -106,7 +97,7 @@ export default function RiskPage() {
     <main className="min-h-screen" style={{ background: '#08090b', color: '#f5f5f5' }}>
       <BannerPlaceholder
         title="Risk Disclaimer"
-        tagline="Plain-English warnings about the risks of trading forex, CFDs, crypto, and structured-yield products."
+        tagline="Plain-English warnings about the risks of trading forex, CFDs, and crypto."
       />
 
       <section className="mx-auto max-w-[840px] px-[var(--gutter)] pt-10 pb-6">

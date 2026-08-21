@@ -2,7 +2,7 @@ import { BRAND_NAME } from '@/lib/brand';
 import {
   Home, LayoutGrid, Wallet, History, TrendingUp, Copy, Users,
   GraduationCap, Newspaper, ShieldCheck, Settings, Receipt,
-  Calculator, Gift, Percent, Trophy,
+  Calculator,
 } from 'lucide-react';
 
 export type LeafItem = { label: string; href: string; icon: any };
@@ -19,16 +19,7 @@ export const NAV_ITEMS: NavEntry[] = [
   { label: 'Deposit/Withdraw', href: '/wallet', icon: Wallet },
   { label: 'Transactions', href: '/transactions', icon: History },
   { label: 'Portfolio', href: '/portfolio', icon: Receipt },
-  {
-    label: 'Earn',
-    icon: Gift,
-    key: 'earn',
-    children: [
-      { label: 'Referral', href: '/referral', icon: Users },
-      { label: 'AI-POWERED STAKING PROGRAM', href: '/fixed-return', icon: Percent },
-      { label: 'Rewards', href: '/earn/rewards', icon: Trophy },
-    ],
-  },
+  { label: 'Referral', href: '/referral', icon: Users },
   { label: 'Trade Insurance', href: '/insurance', icon: ShieldCheck },
   { label: 'PAMM', href: '/pamm', icon: TrendingUp },
   { label: 'MAMM', href: '/social', icon: Copy },

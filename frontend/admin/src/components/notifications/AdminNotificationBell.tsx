@@ -3,7 +3,7 @@
 /**
  * Admin notification bell — pulsing badge in the top bar that shows the
  * count of admin-actionable items (pending deposits, withdrawals, KYC
- * submissions, support tickets, dual-approval requests, recent sign-ups).
+ * submissions, support tickets, recent sign-ups).
  *
  * Implementation notes:
  *  • Dropdown is rendered via a React portal at document.body level.
@@ -25,7 +25,7 @@ import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
 import {
   Bell, AlertTriangle, ArrowDownToLine, ArrowUpFromLine, IdCard,
-  MessageCircle, ShieldCheck, UserPlus,
+  MessageCircle, UserPlus,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { adminApi } from '@/lib/api';
@@ -56,10 +56,7 @@ function iconFor(kind: string) {
     case 'withdrawals': return ArrowUpFromLine;
     case 'kyc':         return IdCard;
     case 'tickets':     return MessageCircle;
-    case 'approvals':   return ShieldCheck;
     case 'new_users':   return UserPlus;
-    case 'fixed_return_withdrawals': return ArrowUpFromLine;
-    case 'fixed_return_new':         return ArrowDownToLine;
     default:            return AlertTriangle;
   }
 }

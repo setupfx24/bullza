@@ -91,29 +91,6 @@ class FrReferralOverrideBody(BaseModel):
     interest_pct: float | None = None
 
 
-@router.get("/{user_id}/fr-referral-override")
-async def get_fr_referral_override(
-    user_id: uuid.UUID,
-    admin: User = Depends(require_permission("users.view")),
-    db: AsyncSession = Depends(get_db),
-):
-    """This referrer's custom FR referral-commission % (and the global defaults)."""
-    return await user_service.get_fr_referral_override(user_id=user_id, db=db)
-
-
-@router.post("/{user_id}/fr-referral-override")
-async def set_fr_referral_override(
-    user_id: uuid.UUID,
-    body: FrReferralOverrideBody,
-    admin: User = Depends(require_permission("users.add_fund")),
-    db: AsyncSession = Depends(get_db),
-):
-    """Set/clear a custom FR referral-commission % for this referrer. Send null
-    on a leg to clear it (that leg falls back to the global setting)."""
-    return await user_service.set_fr_referral_override(
-        user_id=user_id, principal_pct=body.principal_pct,
-        interest_pct=body.interest_pct, db=db,
-    )
 
 
 @router.get("/{user_id}/deposits")
@@ -131,20 +108,13 @@ async def add_fund(
     user_id: uuid.UUID,
     body: FundRequest,
     request: Request,
-    approval_request_id: uuid.UUID | None = None,
     admin: User = Depends(require_permission("users.add_fund")),
     db: AsyncSession = Depends(get_db),
 ):
-    """Add funds to user main wallet.
-
-    For amounts < ADMIN_DUAL_APPROVAL_THRESHOLD: executes immediately.
-    For amounts ≥ threshold: returns 202 with `request_id`. A second admin
-    must POST /admin/approvals/{request_id}/approve, then this endpoint is
-    called again with `?approval_request_id=...`."""
+    """Add funds to the user's main wallet."""
     return await user_service.add_fund(
         user_id=user_id, body=body, admin_id=admin.id,
         ip_address=request.client.host if request.client else None, db=db,
-        approval_request_id=approval_request_id,
     )
 
 
@@ -153,15 +123,13 @@ async def deduct_fund(
     user_id: uuid.UUID,
     body: FundRequest,
     request: Request,
-    approval_request_id: uuid.UUID | None = None,
     admin: User = Depends(require_permission("users.deduct_fund")),
     db: AsyncSession = Depends(get_db),
 ):
-    """Deduct funds. Same dual-approval gate as add-fund."""
+    """Deduct funds from the user's main wallet or a trading account."""
     return await user_service.deduct_fund(
         user_id=user_id, body=body, admin_id=admin.id,
         ip_address=request.client.host if request.client else None, db=db,
-        approval_request_id=approval_request_id,
     )
 
 

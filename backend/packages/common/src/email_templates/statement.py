@@ -41,7 +41,6 @@ def render_statement_digest(
     commissions_paid: Decimal | float,
     swap_paid: Decimal | float,
     bonus_credited: Decimal | float = 0,
-    fr_interest_credited: Decimal | float = 0,
     insurance_refunds: Decimal | float = 0,
     currency: str = "USD",
     trader_app_url: str = "",
@@ -83,8 +82,6 @@ def render_statement_digest(
     ]
     if float(bonus_credited) > 0:
         rows.append(("Bonus credited", _fmt_money(bonus_credited, currency)))
-    if float(fr_interest_credited) > 0:
-        rows.append(("AI-POWERED STAKING PROGRAM interest", _fmt_money(fr_interest_credited, currency)))
     if float(insurance_refunds) > 0:
         rows.append(("Insurance refunds", _fmt_money(insurance_refunds, currency)))
     rows.append(("Closing balance", _fmt_money(closing_balance, currency)))
@@ -120,8 +117,6 @@ def render_statement_digest(
     ]
     if float(bonus_credited) > 0:
         text_lines.append(f"Bonus credited:      {_fmt_money(bonus_credited, currency)}")
-    if float(fr_interest_credited) > 0:
-        text_lines.append(f"FR interest:         {_fmt_money(fr_interest_credited, currency)}")
     if float(insurance_refunds) > 0:
         text_lines.append(f"Insurance refunds:   {_fmt_money(insurance_refunds, currency)}")
     text_lines += [

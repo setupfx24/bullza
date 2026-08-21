@@ -21,20 +21,14 @@ from .api import (
     auth, orders, positions, accounts, instruments, deposits, webhooks,
     websocket_manager, social, business, portfolio, profile, support,
     notifications, banners, trading_catalog, followers, lp_receiver,
-    share, insurance, rewards, play_zone, staking, fixed_return,
-    bonus_tiers, referral_tiers, tradingview, ai_station, contact,
+    share, insurance, bonus_tiers, referral_tiers, contact,
 )
 from .engines.sltp_engine import sltp_engine
 from .engines.copy_engine import copy_engine
 from .engines.stats_engine import stats_engine
-from .engines.staking_engine import staking_engine
-from .engines.play_zone_engine import play_zone_engine
 from .engines.overnight_fee_engine import overnight_fee_engine
 from .engines.verification_reminder_engine import verification_reminder_engine
 from .engines.deposit_reminder_engine import deposit_reminder_engine
-from .engines.fixed_return_engine import fixed_return_engine
-from .engines.ai_station_engine import ai_station_engine
-from .engines.eligibility_nudge_engine import eligibility_nudge_engine
 from .engines.statement_engine import statement_engine
 from .engines.payout_engine import payout_engine
 from .engines.nowpayments_reconcile_engine import nowpayments_reconcile_engine
@@ -51,7 +45,6 @@ if not _cors_origins:
     _cors_origins = ["http://localhost:3000", "http://localhost:3001"]
 _cors_methods = [m.strip() for m in settings.CORS_ALLOW_METHODS.split(",") if m.strip()]
 _cors_headers = [h.strip() for h in settings.CORS_ALLOW_HEADERS.split(",") if h.strip()]
-
 
 async def _backfill_close_reasons():
     """Relabel historical trade_history rows where close_price matches the
@@ -85,21 +78,15 @@ async def _backfill_close_reasons():
     except Exception as e:
         logger.warning("close_reason backfill skipped: %s", e)
 
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await _backfill_close_reasons()
     await sltp_engine.start()
     await copy_engine.start()
     await stats_engine.start()
-    await staking_engine.start()
-    await play_zone_engine.start()
     await overnight_fee_engine.start()
     await verification_reminder_engine.start()
     await deposit_reminder_engine.start()
-    await fixed_return_engine.start()
-    await ai_station_engine.start()
-    await eligibility_nudge_engine.start()
     await statement_engine.start()
     await payout_engine.start()
     await nowpayments_reconcile_engine.start()
@@ -109,19 +96,13 @@ async def lifespan(app: FastAPI):
     await nowpayments_reconcile_engine.stop()
     await payout_engine.stop()
     await statement_engine.stop()
-    await eligibility_nudge_engine.stop()
-    await ai_station_engine.stop()
-    await fixed_return_engine.stop()
     await deposit_reminder_engine.stop()
     await verification_reminder_engine.stop()
     await overnight_fee_engine.stop()
-    await play_zone_engine.stop()
-    await staking_engine.stop()
     await stats_engine.stop()
     await copy_engine.stop()
     await sltp_engine.stop()
     await redis_client.close()
-
 
 app = FastAPI(
     title=f"{settings.BRAND_NAME} Gateway",
@@ -170,23 +151,15 @@ app.include_router(share.public_router, prefix="/api/v1/public", tags=["Public S
 # Public — no JWT. Website contact form → CONTACT_INBOX_EMAIL.
 app.include_router(contact.public_router, prefix="/api/v1/public", tags=["Contact Form"])
 app.include_router(insurance.router, prefix="/api/v1/insurance", tags=["Trade Insurance"])
-app.include_router(rewards.router, prefix="/api/v1/rewards", tags=["Rewards"])
-app.include_router(play_zone.router, prefix="/api/v1/play", tags=["Play Zone"])
-app.include_router(staking.router, prefix="/api/v1/staking", tags=["Staking"])
-app.include_router(fixed_return.router, prefix="/api/v1/fixed-return", tags=["AI-POWERED STAKING PROGRAM"])
-app.include_router(tradingview.router, prefix="/api/v1/webhooks/tradingview", tags=["AI Station Webhook"])
-app.include_router(ai_station.router, prefix="/api/v1/ai-station", tags=["AI Station"])
 # Public — no JWT. Drives the trader /bonus page's deposit-match tier cards.
 app.include_router(bonus_tiers.router, prefix="/api/v1/bonus", tags=["Bonus Tiers"])
 # Public — no JWT. Drives the trader /products/referral payout-ladder table.
 # Reads from system_settings.ib_commission_tiers (managed in admin /config/ib-tiers).
 app.include_router(referral_tiers.router, prefix="/api/v1/referral", tags=["Referral Tiers"])
 
-
 @app.get("/health")
 async def health():
     return {"status": "ok", "service": "gateway"}
-
 
 # ============================================
 # WEBSOCKET — Price Streaming & Trade Updates
@@ -202,7 +175,6 @@ def _verify_ws_token(token: str | None) -> dict | None:
     except Exception:
         return None
 
-
 def _ws_token(websocket: WebSocket, token_q: str | None) -> str | None:
     """Resolve the JWT to use for a WebSocket auth: prefer the httpOnly
     auth cookie (browsers send it on the WS upgrade request), fall back
@@ -213,7 +185,6 @@ def _ws_token(websocket: WebSocket, token_q: str | None) -> str | None:
         return token_q
     cookie = websocket.cookies.get(settings.ACCESS_TOKEN_COOKIE_NAME)
     return cookie or None
-
 
 @app.websocket("/ws/prices")
 async def price_stream(websocket: WebSocket, token: str | None = Query(default=None)):
@@ -248,7 +219,6 @@ async def price_stream(websocket: WebSocket, token: str | None = Query(default=N
         await pubsub.unsubscribe(PriceChannel.PRICE_CHANNEL)
         await pubsub.close()
 
-
 # ─── Live OHLC bar updates for the trader chart ──────────────────────────────
 # Replaces the trader frontend's old client-side bar synthesis (which built
 # the in-progress candle from raw ticks and drifted from the server's
@@ -282,7 +252,6 @@ _TF_TO_TV_RESOLUTION: dict[str, str] = {
     "1h": "60", "4h": "240", "1d": "1D",
 }
 
-
 def _normalise_resolution(value: str | None) -> str | None:
     """Accept either a TV resolution ('5') or a TF key ('5m'); return TF key."""
     if not value:
@@ -293,7 +262,6 @@ def _normalise_resolution(value: str | None) -> str | None:
     if v in _TF_TO_TV_RESOLUTION:
         return v
     return None
-
 
 @app.websocket("/ws/bars")
 async def bar_stream(websocket: WebSocket, token: str | None = Query(default=None)):
@@ -406,7 +374,6 @@ async def bar_stream(websocket: WebSocket, token: str | None = Query(default=Non
         except Exception:
             pass
 
-
 @app.websocket("/ws/trades/{account_id}")
 async def trade_stream(websocket: WebSocket, account_id: str, token: str | None = Query(default=None)):
     token = _ws_token(websocket, token)
@@ -466,7 +433,6 @@ async def trade_stream(websocket: WebSocket, account_id: str, token: str | None 
     finally:
         await pubsub.unsubscribe(channel)
         await pubsub.close()
-
 
 # NOTE: the former /ws/admin endpoint was removed (2026-08-20 review) —
 # it subscribed to admin:trades / admin:deposits / admin:alerts, channels

@@ -214,20 +214,6 @@ export default function UsersPage() {
   const [menuPos, setMenuPos] = useState<{ top: number; left: number } | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
-  // Dual-approval threshold — admin-editable in Settings. Used to show the
-  // real limit in the Add/Deduct Fund modal instead of a hard-coded $1,000
-  // (client 2026-06-24). Falls back to 1000 if Settings aren't readable.
-  const [dualThreshold, setDualThreshold] = useState(1000);
-  useEffect(() => {
-    adminApi.get<{ key: string; value: unknown }[]>('/settings')
-      .then((rows) => {
-        const row = Array.isArray(rows) ? rows.find((r) => r.key === 'dual_approval_threshold_usd') : undefined;
-        const n = row ? Number(row.value) : NaN;
-        if (Number.isFinite(n) && n >= 0) setDualThreshold(n);
-      })
-      .catch(() => { /* no settings access → keep default */ });
-  }, []);
-
   // Effective permissions of the logged-in admin/employee — drives which
   // actions appear in the 3-dot menu. A limited employee must NOT see (or be
   // tempted to click) Ban / Kill-switch / Terminate / Delete etc. they have no
@@ -433,25 +419,8 @@ export default function UsersPage() {
       } else if (modalType !== 'add-fund' && modalAccountId) {
         payload.account_id = modalAccountId;
       }
-      // Backend returns HTTP 202 with detail.code='approval_required' when the
-      // amount is >= ADMIN_DUAL_APPROVAL_THRESHOLD (default $1000). The fund is
-      // NOT applied yet — a second admin must approve via /admin/approvals.
-      // The API client treats 202 as success and returns the body, so without
-      // this branch we'd show "successful" while the user's wallet stays the
-      // same. Surface the pending state explicitly instead.
-      const resp = await adminApi.post<{ detail?: { code?: string; request_id?: string; threshold_usd?: number; message?: string } }>(
-        `/users/${modalUser.id}/${modalType}`,
-        payload,
-      );
-      if (resp?.detail?.code === 'approval_required') {
-        toast(
-          `Pending — amount ≥ $${resp.detail.threshold_usd?.toLocaleString() ?? dualThreshold.toLocaleString()}. ` +
-          `A second admin must approve this in /approvals.`,
-          { icon: '⏳', duration: 6000 },
-        );
-      } else {
-        toast.success(`${FUND_LABELS[modalType as FundAction]} successful`);
-      }
+      await adminApi.post(`/users/${modalUser.id}/${modalType}`, payload);
+      toast.success(`${FUND_LABELS[modalType as FundAction]} successful`);
       closeModal();
       fetchUsers();
     } catch (e) {
@@ -962,9 +931,6 @@ export default function UsersPage() {
                 <p className="text-sm font-semibold text-buy">Funds go to Main Wallet</p>
                 <p className="text-xs text-text-secondary mt-0.5 leading-relaxed">
                   The amount will be credited to the user&apos;s <strong>main wallet</strong>. The user must then transfer funds to their trading account from the Wallet page.
-                </p>
-                <p className="text-[11px] text-text-tertiary mt-1.5 leading-snug">
-                  Amounts of <strong>${dualThreshold.toLocaleString()} or more</strong> require a second admin to approve in <strong>/approvals</strong> before the wallet is credited. A repeat fund-add to the same user within 24h also needs approval, even below this limit.
                 </p>
               </div>
             </div>

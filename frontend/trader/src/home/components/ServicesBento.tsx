@@ -94,7 +94,7 @@ export function ServicesBento() {
             className="font-display uppercase text-3xl sm:text-4xl md:text-6xl lg:text-7xl leading-[0.9] tracking-tight max-w-[18ch]"
           />
           <p className="font-body text-foreground/60 max-w-xl text-base md:text-lg">
-            From AI-driven automation to expert oversight — {BRAND_NAME} delivers the full investment toolkit on one platform.
+            From expert portfolio oversight to daily research and education — {BRAND_NAME} delivers the full investment toolkit on one platform.
           </p>
         </div>
 
@@ -106,12 +106,6 @@ export function ServicesBento() {
           <Card service={INSTRUMENTS[2]} className="p-6" index={2} />
           <div className="md:col-span-2">
             <Card service={INSTRUMENTS[3]} className="p-7 h-full" index={3} />
-          </div>
-          <div className="md:col-span-3 md:row-auto">
-            <Card service={INSTRUMENTS[4]} className="p-7 h-full min-h-[200px]" index={4} />
-          </div>
-          <div className="md:col-span-3 md:row-auto">
-            <Card service={INSTRUMENTS[5]} className="p-7 h-full min-h-[200px]" index={5} />
           </div>
         </div>
       </div>

@@ -17,12 +17,10 @@ from routes import (
     config as routes_config, instruments_admin, business, social, analytics, bonus, banners,
     support, employees, settings, transactions, kyc, account_types, user_audit_logs,
     admin_audit_logs,
-    insurance as insurance_admin, play_zone as play_zone_admin,
-    lifestyle as lifestyle_admin, approvals, notifications, broadcast,
-    fixed_return as fixed_return_admin, rm as rm_admin, tasks as tasks_admin,
+    insurance as insurance_admin,
+    notifications, broadcast,
+    rm as rm_admin, tasks as tasks_admin,
     expenses as expenses_admin, risk as risk_admin,
-    reward_campaigns as reward_campaigns_admin,
-    ai_station as ai_station_admin,
     referral_campaigns as referral_campaigns_admin,
 )
 
@@ -38,7 +36,6 @@ if not _cors_origins:
     _cors_origins = ["http://localhost:3001"]
 _cors_methods = [m.strip() for m in app_settings.CORS_ALLOW_METHODS.split(",") if m.strip()]
 _cors_headers = [h.strip() for h in app_settings.CORS_ALLOW_HEADERS.split(",") if h.strip()]
-
 
 async def _detect_schema_drift():
     """Loud drift DETECTOR — no longer mutates schema at boot.
@@ -82,13 +79,11 @@ async def _detect_schema_drift():
     except Exception as e:  # noqa: BLE001 — a probe failure must not block boot
         logger.warning("schema drift probe skipped: %s", e)
 
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await _detect_schema_drift()
     yield
     await engine.dispose()
-
 
 app = FastAPI(
     title=f"{app_settings.BRAND_NAME} Admin API",
@@ -109,7 +104,6 @@ app.add_middleware(
 
 add_middleware_stack(app)
 
-
 @app.exception_handler(Exception)
 async def unhandled_exception(request: Request, exc: Exception):
     """Return JSON (not plain text) so proxies and the admin UI can parse errors."""
@@ -118,7 +112,6 @@ async def unhandled_exception(request: Request, exc: Exception):
         status_code=500,
         content={"detail": "Internal server error"},
     )
-
 
 prefix = "/api/v1/admin"
 
@@ -146,19 +139,12 @@ app.include_router(account_types.router, prefix=prefix)
 app.include_router(user_audit_logs.router, prefix=prefix)
 app.include_router(admin_audit_logs.router, prefix=prefix)
 app.include_router(insurance_admin.router, prefix=prefix)
-app.include_router(fixed_return_admin.router, prefix=prefix)
-app.include_router(play_zone_admin.router, prefix=prefix)
-app.include_router(lifestyle_admin.router, prefix=prefix)
-app.include_router(approvals.router, prefix=f"{prefix}/approvals", tags=["Approvals"])
 app.include_router(notifications.router, prefix=prefix)
 app.include_router(broadcast.router, prefix=prefix)
 app.include_router(rm_admin.router, prefix=prefix)
 app.include_router(expenses_admin.router, prefix=prefix)
 app.include_router(risk_admin.router, prefix=prefix)
-app.include_router(reward_campaigns_admin.router, prefix=prefix)
-app.include_router(ai_station_admin.router, prefix=prefix)
 app.include_router(referral_campaigns_admin.router, prefix=prefix)
-
 
 @app.get("/health")
 async def health_check():

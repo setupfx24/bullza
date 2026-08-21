@@ -380,24 +380,11 @@ export default function DepositsPage() {
           }
           verified = v;
         }
-        // Every deposit/withdrawal approval now needs a 2nd super-admin
-        // sign-off (any amount). The backend returns HTTP 202 with
-        // detail.code='approval_required' on the first (authority-admin)
-        // approval — the money is NOT moved yet; a super admin must approve
-        // it in /approvals. adminApi treats 202 as success and returns the
-        // body, so we branch on the code.
-        const resp: any = await adminApi.post(`${basePath}/approve`, {
+        await adminApi.post(`${basePath}/approve`, {
           note: actionNote.trim() || undefined,
           verified_amount: verified,
         });
-        if (resp?.detail?.code === 'approval_required') {
-          toast.success(
-            'Sent for super-admin approval. It will be credited once a super admin approves it in /approvals.',
-            { duration: 6000 },
-          );
-        } else {
-          toast.success('Approved successfully');
-        }
+        toast.success('Approved successfully');
       } else {
         await adminApi.post(`${basePath}/reject`, {
           reason: actionReason.trim(),

@@ -29,9 +29,7 @@ ADMIN_COOKIE_NAME = "admin_access"
 #   users.impersonate   — login-as a trader (account takeover)
 #   users.delete        — permanently delete a user + their ledger
 #   settings.manage     — edit platform/system settings (withdrawal flags…)
-#   fixed_return.manage — grant/approve fixed-return locks (payouts)
 #   insurance.manage    — edit insurance fee/payout economics
-#   funds.approve       — approve/reject a 2nd-admin financial sign-off
 #   referral_campaigns.* — create/pause/edit referral bonus campaigns (real payouts)
 EMPLOYEE_ROLE_PERMISSIONS = {
     "super_admin": {"*"},
@@ -56,10 +54,6 @@ EMPLOYEE_ROLE_PERMISSIONS = {
         # Finance admins clear RM funding requests (the two-admin approve →
         # credit flow) and assign users to RMs.
         "rm.manage", "rm.assign",
-        # Dual-approval (4-eyes) sign-off. Two finance admins approve each
-        # other's fund/withdrawal requests; the "can't approve your own"
-        # rule still blocks self-approval, so the control stays intact.
-        "funds.approve",
     },
     "risk_manager": {
         "trades.view", "positions.view", "users.view",

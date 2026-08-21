@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from packages.common.src.models import (
     ChargeConfig, SpreadConfig, Instrument, InstrumentConfig,
-    AccountGroup, RewardsUserState,
+    AccountGroup,
 )
 
 
@@ -49,31 +49,6 @@ async def spread_boost_multiplier() -> Decimal:
         pass
     return Decimal("1")
 
-
-# ─── XP-tier brokerage discount ─────────────────────────────────────
-# Per XP_Reward_mechanism slide 7: higher XP levels reduce brokerage. We
-# apply a 1% discount per level above L1, capped at 9% at L10. Modest by
-# design — the smart-fee engine and account tier do most of the work.
-XP_DISCOUNT_PER_LEVEL = Decimal("0.01")
-XP_DISCOUNT_MAX_LEVELS = 9  # so max discount = 9% at level 10
-
-
-async def _xp_discount_for_user(db: AsyncSession, user_id: UUID) -> Decimal:
-    """Returns a multiplier in [0.91, 1.00]. 1.00 means no discount."""
-    state = (await db.execute(
-        select(RewardsUserState.xp).where(RewardsUserState.user_id == user_id)
-    )).scalar_one_or_none()
-    if state is None:
-        return Decimal("1")
-    # Inline level lookup (mirrors LEVEL_THRESHOLDS in rewards_service.py
-    # but kept here so this module has no service-layer dependency).
-    thresholds = [0, 500, 1500, 3000, 5000, 8000, 12000, 18000, 26000, 36000]
-    level = 1
-    for i, t in enumerate(thresholds):
-        if (state or 0) >= t:
-            level = i + 1
-    levels_above_one = max(0, min(XP_DISCOUNT_MAX_LEVELS, level - 1))
-    return Decimal("1") - (XP_DISCOUNT_PER_LEVEL * Decimal(levels_above_one))
 
 async def _get_instrument_config_row(
     db: AsyncSession, instrument_id: UUID
@@ -276,7 +251,6 @@ async def resolve_commission(
     fill_price: Decimal,
     user_id: Optional[UUID] = None,
     account_group_id: Optional[UUID] = None,
-    apply_xp_discount: bool = True,
 ) -> Decimal:
     """Total commission for opening/closing a position.
 
@@ -289,10 +263,6 @@ async def resolve_commission(
       6. Account-group commission_pct (Phase 2 smart-fee tier)
       7. 0 — last resort, only if there are no admin rows AND no account_group
 
-    If apply_xp_discount=True, the resolved value is multiplied by an XP-tier
-    discount (1% per level above L1, capped at 9%). Discount is *opt-out*
-    so callers like the trading-catalog page that just preview a rate can
-    pass apply_xp_discount=False to show the rack rate.
     """
     notional = lots * (instrument.contract_size or Decimal("100000")) * fill_price
 
@@ -372,14 +342,6 @@ async def resolve_commission(
 
     if base_commission is None:
         return Decimal("0")
-
-    if apply_xp_discount and user_id is not None:
-        try:
-            multiplier = await _xp_discount_for_user(db, user_id)
-            base_commission = base_commission * multiplier
-        except Exception:
-            # XP discount is best-effort; never fail the trade because of it.
-            pass
 
     return base_commission
 

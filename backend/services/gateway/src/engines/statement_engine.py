@@ -134,7 +134,6 @@ async def _aggregate_window(
     deposits = by_type.get("deposit", Decimal("0"))
     withdrawals = abs(by_type.get("withdrawal", Decimal("0")))
     bonus_credited = by_type.get("bonus", Decimal("0")) + by_type.get("bonus_credit", Decimal("0"))
-    fr_interest = by_type.get("fr_interest", Decimal("0")) + by_type.get("fixed_return_interest", Decimal("0"))
     insurance_refunds = by_type.get("insurance_refund", Decimal("0"))
 
     return {
@@ -146,7 +145,6 @@ async def _aggregate_window(
         "deposits_total": deposits,
         "withdrawals_total": withdrawals,
         "bonus_credited": bonus_credited,
-        "fr_interest_credited": fr_interest,
         "insurance_refunds": insurance_refunds,
     }
 
@@ -157,7 +155,7 @@ def _empty_aggregates() -> dict:
         "realized_pnl": z, "commissions_paid": z, "swap_paid": z,
         "total_volume_lots": z, "trades_closed": 0,
         "deposits_total": z, "withdrawals_total": z,
-        "bonus_credited": z, "fr_interest_credited": z, "insurance_refunds": z,
+        "bonus_credited": z, "insurance_refunds": z,
     }
 
 
@@ -169,7 +167,6 @@ def _has_activity(agg: dict) -> bool:
         or agg["deposits_total"] != 0
         or agg["withdrawals_total"] != 0
         or agg["bonus_credited"] != 0
-        or agg["fr_interest_credited"] != 0
         or agg["insurance_refunds"] != 0
     )
 

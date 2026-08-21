@@ -28,8 +28,7 @@ router = APIRouter(prefix="/broadcast", tags=["Broadcast"])
 async def _resolve_recipients(db: AsyncSession, audience: str) -> list:
     """Active, email-verified, non-demo users filtered by audience segment.
 
-    Segments: all / verified (same base), funded_only, ib, pamm_mam,
-    fixed_return."""
+    Segments: all / verified (same base), funded_only, ib, pamm_mam."""
     from sqlalchemy import func
     # Promo + demo showcase users never receive admin broadcasts (client
     # 2026-07-16 — "promotional wale account ka kuch bhi admin me na show ho";
@@ -69,12 +68,6 @@ async def _resolve_recipients(db: AsyncSession, audience: str) -> list:
             select(MasterAccount.user_id).where(MasterAccount.master_type.in_(["pamm", "mamm"]))
         )).all()
         seg_ids = {r[0] for r in rows}
-    elif audience == "fixed_return":
-        from packages.common.src.models import FixedReturnLock
-        rows = (await db.execute(
-            select(FixedReturnLock.user_id).where(FixedReturnLock.state.in_(["active", "early_pending"]))
-        )).all()
-        seg_ids = {r[0] for r in rows}
 
     return [u for u in recipients if u.id in seg_ids]
 
@@ -88,7 +81,7 @@ class AnnouncementIn(BaseModel):
     intro: str | None = Field(None, max_length=300)
     cta_label: str | None = Field(None, max_length=40)
     cta_url: str | None = Field(None, max_length=400)
-    audience: str = Field("all", pattern="^(all|verified|funded_only|ib|pamm_mam|fixed_return)$")
+    audience: str = Field("all", pattern="^(all|verified|funded_only|ib|pamm_mam)$")
     throttle_per_100_ms: int = Field(500, ge=0, le=10_000)
     dry_run: bool = False
 

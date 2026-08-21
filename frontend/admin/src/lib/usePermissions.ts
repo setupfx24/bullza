@@ -5,7 +5,7 @@ import { adminApi } from '@/lib/api';
 
 /**
  * Shared admin permission hook (client 2026-06-20). Several action surfaces
- * (deposits approve/reject, fixed-return grant, …) were showing buttons the
+ * (deposits approve/reject, per-user fund actions, …) were showing buttons the
  * employee had no permission for, because only the sidebar/users page gated by
  * /auth/me. This centralises that check: `can(perm)` is true for super_admin
  * ('*') or when the permission is in the employee's resolved set.

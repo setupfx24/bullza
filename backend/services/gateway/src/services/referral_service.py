@@ -640,25 +640,10 @@ async def get_my_referral_dashboard(db: AsyncSession, user_id: UUID) -> dict:
         }
         for r in extra_rows
     ]
-    # The user's EFFECTIVE FR referral % (their custom override if set, else the
-    # global) so the page can show the boosted rate they actually earn.
-    _g_prin = float(await get_float_setting("fr_referral_principal_pct", 0.0))
-    _g_int = float(await get_float_setting("fr_referral_interest_pct", 0.0))
-    _eff_prin = (
-        float(user.fr_referral_principal_pct_override)
-        if user.fr_referral_principal_pct_override is not None else _g_prin
-    )
-    _eff_int = (
-        float(user.fr_referral_interest_pct_override)
-        if user.fr_referral_interest_pct_override is not None else _g_int
-    )
-
     return {
         "referral_code": user.referral_code,
         "extra_income": round(extra_income, 2),
         "extra_income_ledger": extra_income_ledger,
-        "fr_referral_principal_pct_effective": _eff_prin,
-        "fr_referral_interest_pct_effective": _eff_int,
         "referrals": int(referrals),
         "qualified_referrals": int(qualified),
         "pending_referrals": int(max(0, int(referrals) - int(qualified))),
@@ -671,36 +656,12 @@ async def get_my_referral_dashboard(db: AsyncSession, user_id: UUID) -> dict:
         # Kept for backward compat with any older client build that
         # still reads `commission_pct`. New clients ignore it.
         "commission_pct": 0.0,
-        # AI-Powered-Staking referral: the referrer's chosen payout mode and the
-        # admin-set percentages, so the /referral page can render the toggle and
-        # what each option pays (client 2026-06-30).
-        "fr_referral_mode": (user.fr_referral_mode or "principal"),
-        "fr_referral_principal_pct": float(await get_float_setting("fr_referral_principal_pct", 0.0)),
-        "fr_referral_interest_pct": float(await get_float_setting("fr_referral_interest_pct", 0.0)),
-        # Per-entry breakdown (direct bounty vs AI-Powered-Staking referral),
-        # each attributed to the referred user by name.
+        # Per-entry breakdown of referral commission, each attributed to
+        # the referred user by name.
         "commission_ledger": commission_ledger,
     }
 
 
-async def set_fr_referral_mode(db: AsyncSession, user_id: UUID, mode: str) -> str:
-    """Set the referrer's global AI-Staking referral payout mode (client
-    2026-06-30). 'principal' = a % of each referred user's principal once they
-    lock; 'interest' = a % of each interest payout they receive."""
-    m = (mode or "").strip().lower()
-    if m not in ("principal", "interest"):
-        raise HTTPException(status_code=400, detail="mode must be 'principal' or 'interest'")
-    user = (await db.execute(
-        select(User).where(User.id == user_id).with_for_update()
-    )).scalar_one_or_none()
-    if user is None:
-        raise HTTPException(status_code=404, detail="User not found")
-    user.fr_referral_mode = m
-    await db.commit()
-    return m
-
-
-# ─── IB per-referral bounty (separate from user-level commission) ────
 
 async def maybe_pay_ib_referral_bounty(
     db: AsyncSession, user_id: UUID, deposit: Deposit

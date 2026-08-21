@@ -5,14 +5,14 @@
  *
  * Headline cards for the whole company's money — each card is clickable
  * and opens a drill-down modal with its segregation (P&L by source,
- * deposits/withdrawals by method, credit split, fixed-return by tenure +
- * maturity schedule, pending by mode). Data: GET /analytics/finance-overview
+ * deposits/withdrawals by method, credit split, pending by mode).
+ * Data: GET /analytics/finance-overview
  * (super_admin only). Clicking a method/tenure row inside a drill opens a
  * second-level per-USER breakdown via /analytics/finance-overview/drill.
  */
 import { useCallback, useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
-import { Loader2, X, TrendingUp, ArrowDownCircle, ArrowUpCircle, Gift, Lock, Clock, ChevronRight, Megaphone, Plus, Wallet } from 'lucide-react';
+import { Loader2, X, TrendingUp, ArrowDownCircle, ArrowUpCircle, Gift, Clock, ChevronRight, Megaphone, Plus, Wallet } from 'lucide-react';
 import { adminApi } from '@/lib/api';
 import DateField from '@/components/ui/DateField';
 
@@ -23,12 +23,6 @@ interface Overview {
   deposits: { total: number; by_method: Row[] };
   withdrawals: { total: number; by_method: Row[] };
   net_credit: { total: number; bonus: number; account_credit: number; insurance_credited_lifetime: number };
-  fixed_return: {
-    collected: number; interest_paid_to_date: number; projected_payable: number;
-    accrued_to_date?: number; accrued_unpaid?: number; by_tenure: Row[]; maturing: Row[];
-    by_user?: { user_id: string | null; name: string; email: string | null; principal: number; interest_accrued: number; interest_paid: number; count: number }[];
-    referral_commission?: { user_id: string | null; name: string; email: string | null; amount: number; count: number }[];
-  };
   pending_deposits: { total: number; by_method: Row[] };
   pending_withdrawals: { total: number; by_method: Row[] };
   total_withdrawable?: { total: number };
@@ -146,7 +140,7 @@ export default function FinanceOverviewPage() {
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [addOpen, setAddOpen] = useState(false);
-  const [addForm, setAddForm] = useState({ amount: '', category: 'extra_fr_interest', user_id: '', note: '' });
+  const [addForm, setAddForm] = useState({ amount: '', category: 'custom_benefit', user_id: '', note: '' });
   const [submitting, setSubmitting] = useState(false);
 
   const load = useCallback(async () => {
@@ -342,119 +336,6 @@ export default function FinanceOverviewPage() {
       },
     },
     {
-      title: 'AI-POWERED STAKING PROGRAM collected', value: data.fixed_return.collected, icon: Lock,
-      sub: `Payable: ${fmt(data.fixed_return.projected_payable)}`, drill: {
-        title: 'AI-POWERED STAKING PROGRAM — by tenure & maturity',
-        render: () => (
-          <div className="space-y-4">
-            {/* ── Overview tiles ── */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-              {[
-                { label: 'Collected', val: data.fixed_return.collected, tone: 'text-text-primary' },
-                { label: 'Interest paid', val: data.fixed_return.interest_paid_to_date, tone: 'text-text-primary' },
-                { label: 'Projected payable', val: data.fixed_return.projected_payable, tone: 'text-amber-400' },
-                { label: 'Accrued to date', val: data.fixed_return.accrued_to_date ?? 0, tone: 'text-buy' },
-                { label: 'Accrued unpaid', val: data.fixed_return.accrued_unpaid ?? 0, tone: 'text-amber-400' },
-              ].map((c) => (
-                <div key={c.label} className="rounded-lg border border-border-primary bg-bg-secondary/50 px-3 py-2.5">
-                  <p className="text-[10px] text-text-tertiary uppercase tracking-wide">{c.label}</p>
-                  <p className={`font-mono text-sm font-semibold mt-0.5 ${c.tone}`}>{fmt(c.val)}</p>
-                </div>
-              ))}
-            </div>
-
-            {/* ── By tenure ── */}
-            <div className="rounded-lg border border-border-primary overflow-hidden">
-              <div className="px-3 py-2 bg-bg-tertiary/40 border-b border-border-primary">
-                <p className="text-xs font-semibold text-text-primary">By tenure</p>
-                <p className="text-[10px] text-text-tertiary">Locked principal per payout cycle — click a row for the per-user breakdown</p>
-              </div>
-              <div className="p-2.5">{methodTable(data.fixed_return.by_tenure, 'principal', 'fixed_return')}</div>
-            </div>
-
-            {/* ── Maturing ── */}
-            <div className="rounded-lg border border-border-primary overflow-hidden">
-              <div className="px-3 py-2 bg-bg-tertiary/40 border-b border-border-primary">
-                <p className="text-xs font-semibold text-text-primary">Maturing</p>
-                <p className="text-[10px] text-text-tertiary">Principal maturing by month</p>
-              </div>
-              <div className="p-2.5">{methodTable(data.fixed_return.maturing, 'principal')}</div>
-            </div>
-
-            {/* ── Interest by user ── */}
-            <div className="rounded-lg border border-border-primary overflow-hidden">
-              <div className="px-3 py-2 bg-bg-tertiary/40 border-b border-border-primary">
-                <p className="text-xs font-semibold text-text-primary">Interest by user</p>
-                <p className="text-[10px] text-text-tertiary">Whose locks generated how much interest</p>
-              </div>
-              <div className="p-2.5">
-                {(data.fixed_return.by_user?.length ?? 0) > 0 ? (
-                  <table className="w-full text-xs">
-                    <thead>
-                      <tr className="text-text-tertiary border-b border-border-primary">
-                        <th className="text-left py-1.5 font-medium">User</th>
-                        <th className="text-right py-1.5 font-medium">Interest accrued</th>
-                        <th className="text-right py-1.5 font-medium">Interest paid</th>
-                        <th className="text-right py-1.5 font-medium">Principal</th>
-                        <th className="text-right py-1.5 font-medium">Locks</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {data.fixed_return.by_user!.map((u, i) => (
-                        <tr key={i} className="border-b border-border-primary/40">
-                          <td className="py-1.5">
-                            {u.user_id ? <a href={`/users/${u.user_id}`} className="text-accent hover:underline">{u.name}</a> : u.name}
-                            {u.email && <span className="text-text-tertiary block text-[10px]">{u.email}</span>}
-                          </td>
-                          <td className="py-1.5 text-right font-mono text-buy">{fmt(u.interest_accrued)}</td>
-                          <td className="py-1.5 text-right font-mono text-text-primary">{fmt(u.interest_paid)}</td>
-                          <td className="py-1.5 text-right font-mono text-text-tertiary">{fmt(u.principal)}</td>
-                          <td className="py-1.5 text-right text-text-tertiary">{u.count}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                ) : <p className="text-xs text-text-tertiary py-1">No active locks.</p>}
-              </div>
-            </div>
-
-            {/* ── Staking referral commission ── */}
-            <div className="rounded-lg border border-border-primary overflow-hidden">
-              <div className="px-3 py-2 bg-bg-tertiary/40 border-b border-border-primary">
-                <p className="text-xs font-semibold text-text-primary">Staking referral commission</p>
-                <p className="text-[10px] text-text-tertiary">Which referrer received how much from AI-POWERED STAKING PROGRAM</p>
-              </div>
-              <div className="p-2.5">
-                {(data.fixed_return.referral_commission?.length ?? 0) > 0 ? (
-                  <table className="w-full text-xs">
-                    <thead>
-                      <tr className="text-text-tertiary border-b border-border-primary">
-                        <th className="text-left py-1.5 font-medium">User</th>
-                        <th className="text-right py-1.5 font-medium">Commission</th>
-                        <th className="text-right py-1.5 font-medium">Payouts</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {data.fixed_return.referral_commission!.map((u, i) => (
-                        <tr key={i} className="border-b border-border-primary/40">
-                          <td className="py-1.5">
-                            {u.user_id ? <a href={`/users/${u.user_id}`} className="text-accent hover:underline">{u.name}</a> : u.name}
-                            {u.email && <span className="text-text-tertiary block text-[10px]">{u.email}</span>}
-                          </td>
-                          <td className="py-1.5 text-right font-mono text-buy">{fmt(u.amount)}</td>
-                          <td className="py-1.5 text-right text-text-tertiary">{u.count}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                ) : <p className="text-xs text-text-tertiary py-1">No staking referral commission yet.</p>}
-              </div>
-            </div>
-          </div>
-        ),
-      },
-    },
-    {
       title: 'Pending Deposits', value: data.pending_deposits.total, icon: Clock,
       drill: { title: 'Pending deposits — by method (click for per-user)', render: () => methodTable(data.pending_deposits.by_method, 'amount', 'pending_deposits') },
     },
@@ -497,7 +378,7 @@ export default function FinanceOverviewPage() {
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           {/* Custom date range — restricts flow figures (P&L, deposits,
-              withdrawals, fixed-return collected) to the window. */}
+              withdrawals) to the window. */}
           <span className="text-xxs text-text-tertiary">From</span>
           <DateField value={dateFrom} max={dateTo || undefined} onChange={setDateFrom} />
           <span className="text-xxs text-text-tertiary">To</span>
@@ -575,7 +456,7 @@ export default function FinanceOverviewPage() {
             </div>
             <div className="p-5 space-y-3">
               <p className="text-xxs text-text-tertiary">
-                Log a give-away that has no other record (e.g. extra AI-POWERED STAKING PROGRAM interest or a custom benefit).
+                Log a give-away that has no other record (e.g. a custom promotional benefit).
                 It's added to the Promotional Expenses total. To also move money into a user's wallet, use Add Fund on the user page.
               </p>
               <div>
@@ -594,8 +475,6 @@ export default function FinanceOverviewPage() {
                   onChange={(e) => setAddForm({ ...addForm, category: e.target.value })}
                   className="w-full mt-1 rounded-md bg-bg-tertiary border border-border-primary px-3 py-2 text-sm text-text-primary"
                 >
-                  <option value="extra_fr_interest">Extra AI-POWERED STAKING PROGRAM interest</option>
-                  <option value="fr_referral_bonus">AI-POWERED STAKING PROGRAM referral bonus</option>
                   <option value="custom_benefit">Custom promotional benefit</option>
                   <option value="manual">Other</option>
                 </select>

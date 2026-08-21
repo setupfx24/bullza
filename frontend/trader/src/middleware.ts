@@ -29,8 +29,7 @@ const NEUTRAL_EXACT = new Set<string>(['/favicon.ico', '/robots.txt', '/sitemap.
 const PROTECTED_PREFIXES = [
   '/dashboard', '/accounts', '/wallet', '/transactions', '/portfolio',
   '/profile', '/kyc', '/referral', '/business', '/social', '/pamm',
-  '/insurance', '/earn', '/rewards', '/fixed-return', '/risk-calculator',
-  '/more', '/support', '/trading',
+  '/insurance', '/risk-calculator', '/more', '/support', '/trading',
 ];
 
 // Must match ACCESS_TOKEN_COOKIE_NAME / REFRESH_TOKEN_COOKIE_NAME in

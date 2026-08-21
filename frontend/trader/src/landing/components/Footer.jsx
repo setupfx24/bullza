@@ -12,11 +12,9 @@ const columns = {
     { name: 'Crypto',      path: '/trading/crypto' },
   ],
   Services: [
-    { name: 'AI Auto Trading',       path: '/services/ai-auto-trading' },
     { name: 'Portfolio Management',  path: '/services/portfolio-management' },
     { name: 'Market Research',       path: '/services/market-research' },
     { name: 'Education',             path: '/services/education' },
-    { name: 'Automated Profit',      path: '/services/automated-profit' },
     { name: 'ICO (Coming Soon)',     path: '/services/ico-coming-soon' },
   ],
   Accounts: [
@@ -33,7 +31,8 @@ const columns = {
   ],
   Products: [
     { name: 'IB Referral',              path: '/products/ib-referral' },
-    { name: 'AI-POWERED STAKING PROGRAM',   path: '/products/fixed-return-insurance' },
+    { name: 'Referral',                 path: '/products/referral' },
+    { name: 'Trade Insurance',          path: '/products/insurance' },
   ],
   Company: [
     { name: 'About Us',       path: '/company/about' },
@@ -78,9 +77,8 @@ export default function Footer() {
                 pricing, insured trades, and fully automated trading with no human intervention.
               </p>
               <p className="text-sm leading-relaxed max-w-sm mb-6" style={{ color: 'var(--fx-text-2)' }}>
-                {BRAND_NAME} also provides staking with fixed monthly income, anytime withdrawals,
-                and a rewarding IB (Introducing Broker) program with profit-sharing opportunities
-                for partners and affiliates.
+                {BRAND_NAME} also provides a rewarding IB (Introducing Broker) program with
+                profit-sharing opportunities for partners and affiliates.
               </p>
 
               <div className="flex items-center gap-2 text-sm mb-5" style={{ color: 'var(--fx-text-3)' }}>

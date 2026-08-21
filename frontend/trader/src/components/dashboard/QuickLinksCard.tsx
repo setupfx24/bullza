@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { ArrowUpRight, Wallet, Sparkles, Users, Calculator } from 'lucide-react';
+import { ArrowUpRight, Wallet, Users, Calculator } from 'lucide-react';
 import { PanelCard } from './PanelCard';
 
 /**
@@ -10,7 +10,6 @@ import { PanelCard } from './PanelCard';
  */
 const LINKS = [
   { href: '/wallet', label: 'Wallet & transfers', Icon: Wallet },
-  { href: '/earn/rewards', label: 'Rewards & missions', Icon: Sparkles },
   { href: '/referral', label: 'Referral program', Icon: Users },
   { href: '/risk-calculator', label: 'Risk calculator', Icon: Calculator },
 ];

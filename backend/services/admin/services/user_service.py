@@ -150,60 +150,6 @@ async def set_user_referral_disabled(
     return {"user_id": str(user_id), "referral_disabled": user.referral_disabled}
 
 
-async def get_fr_referral_override(user_id: uuid.UUID, db: AsyncSession) -> dict:
-    """Current per-referrer FR referral-commission % override + the global
-    defaults it falls back to, for the admin user-detail override card."""
-    from packages.common.src.settings_store import get_float_setting
-    user = (await db.execute(select(User).where(User.id == user_id))).scalar_one_or_none()
-    if user is None:
-        raise HTTPException(status_code=404, detail="User not found")
-    po = user.fr_referral_principal_pct_override
-    io = user.fr_referral_interest_pct_override
-    return {
-        "user_id": str(user_id),
-        "mode": (user.fr_referral_mode or "principal"),
-        "principal_pct_override": (float(po) if po is not None else None),
-        "interest_pct_override": (float(io) if io is not None else None),
-        "global_principal_pct": float(await get_float_setting("fr_referral_principal_pct", 0.0)),
-        "global_interest_pct": float(await get_float_setting("fr_referral_interest_pct", 0.0)),
-    }
-
-
-async def set_fr_referral_override(
-    user_id: uuid.UUID, principal_pct, interest_pct, db: AsyncSession,
-) -> dict:
-    """Set/clear a referrer's custom FR referral-commission %. Pass None on a
-    leg to CLEAR it (that leg then falls back to the global setting)."""
-    user = (await db.execute(select(User).where(User.id == user_id))).scalar_one_or_none()
-    if user is None:
-        raise HTTPException(status_code=404, detail="User not found")
-
-    def _norm(v):
-        if v is None or v == "":
-            return None
-        d = Decimal(str(v))
-        if d < 0:
-            raise HTTPException(status_code=400, detail="Percentage cannot be negative")
-        if d > 100:
-            raise HTTPException(status_code=400, detail="Percentage cannot exceed 100")
-        return d
-
-    user.fr_referral_principal_pct_override = _norm(principal_pct)
-    user.fr_referral_interest_pct_override = _norm(interest_pct)
-    await db.commit()
-    return {
-        "user_id": str(user_id),
-        "principal_pct_override": (
-            float(user.fr_referral_principal_pct_override)
-            if user.fr_referral_principal_pct_override is not None else None
-        ),
-        "interest_pct_override": (
-            float(user.fr_referral_interest_pct_override)
-            if user.fr_referral_interest_pct_override is not None else None
-        ),
-    }
-
-
 async def list_users(
     page: int, per_page: int, search: str | None,
     status_filter: str | None, kyc_filter: str | None,
@@ -558,66 +504,11 @@ async def _apply_first_funding_bonus(user_row, amount: Decimal, db) -> Decimal:
 async def add_fund(
     user_id: uuid.UUID, body: FundRequest,
     admin_id: uuid.UUID, ip_address: str | None, db: AsyncSession,
-    *, approval_request_id: uuid.UUID | None = None,
 ) -> dict:
-    """Add funds to user's MAIN WALLET. User must transfer to trading account manually.
-
-    Above ADMIN_DUAL_APPROVAL_THRESHOLD this raises ApprovalRequired (HTTP 202)
-    instead of executing — a second admin must call /admin/approvals/{id}/approve
-    and re-invoke this with ``approval_request_id`` set."""
+    """Add funds to user's MAIN WALLET. User must transfer to trading account manually."""
     from packages.common.src.notify import create_notification
-    from .approval_service import request_or_execute, mark_executed
 
     amt = Decimal(str(body.amount))
-
-    if approval_request_id is None:
-        # Anti-split guard (client 2026-06-23): if this user already received an
-        # admin fund-add in the last 24h, force dual approval on the NEXT one —
-        # even below the threshold — so an employee can't bypass the second
-        # sign-off by splitting one large credit into several small top-ups.
-        from datetime import datetime, timedelta, timezone
-        cutoff = datetime.now(timezone.utc) - timedelta(hours=24)
-        recent = await db.execute(
-            select(Transaction.id).where(
-                Transaction.user_id == user_id,
-                Transaction.type == "adjustment",
-                Transaction.amount > 0,
-                Transaction.created_by.isnot(None),
-                Transaction.created_at >= cutoff,
-            ).limit(1)
-        )
-        force_dual = recent.first() is not None
-
-        # First-pass: gate on amount thresholds (or force dual approval if the
-        # 24h guard above tripped). Either short-circuits with a 202 (approval
-        # required) or returns None to proceed.
-        await request_or_execute(
-            db,
-            action="add_fund",
-            target_type="user",
-            target_id=user_id,
-            amount=amt,
-            payload={"description": body.description, "source": "main_wallet"},
-            requested_by=admin_id,
-            always=force_dual,
-        )
-    else:
-        # Second-pass: confirm the approval row matches what we're about to
-        # do. fetch_pending() is unusable here — it only accepts rows still
-        # in 'pending', and this row is already 'approved'. Direct lookup.
-        from sqlalchemy import text as _t
-        row = await db.execute(
-            _t("SELECT status, action, target_id, payload FROM admin_approval_requests WHERE id = :rid FOR UPDATE"),
-            {"rid": str(approval_request_id)},
-        )
-        ar = row.mappings().first()
-        if not ar or ar["status"] != "approved":
-            raise HTTPException(status_code=409, detail="Approval not in 'approved' state")
-        if ar["action"] != "add_fund" or str(ar["target_id"]) != str(user_id):
-            raise HTTPException(status_code=409, detail="Approval does not match this action")
-        approved_amt = Decimal(str(ar["payload"].get("amount", "0")))
-        if approved_amt != amt:
-            raise HTTPException(status_code=409, detail="Amount differs from approved request")
 
     # Pessimistic row lock so two concurrent admins (e.g. shift change)
     # cannot both add the same bonus and corrupt the balance.
@@ -689,10 +580,7 @@ async def add_fund(
         action_url="/wallet",
         commit=False,
     )
-    if approval_request_id is not None:
-        await mark_executed(db, request_id=approval_request_id)
-    # Atomic: balance update + transaction row + audit log + (optional)
-    # approval-status-flip all flushed and committed in a single tx.
+    # Atomic: balance update + transaction row + audit log all
     await db.commit()
     return {
         "message": "Fund added to main wallet successfully",
@@ -703,44 +591,12 @@ async def add_fund(
 async def deduct_fund(
     user_id: uuid.UUID, body: FundRequest,
     admin_id: uuid.UUID, ip_address: str | None, db: AsyncSession,
-    *, approval_request_id: uuid.UUID | None = None,
 ) -> dict:
     """Deduct funds. `body.source` controls where the deduction comes from:
        - "main_wallet":    deduct only from the user's main wallet (error if short).
        - "trading_account": deduct only from body.account_id (error if short).
-       - None (legacy):    try main wallet first, fall back to body.account_id.
-
-    Above ADMIN_DUAL_APPROVAL_THRESHOLD this raises ApprovalRequired (HTTP 202)
-    on the first call; the second admin approves, then the original admin
-    re-invokes with ``approval_request_id`` set to actually move the money."""
-    from .approval_service import request_or_execute, mark_executed
-    from sqlalchemy import text as _t
-
+       - None (legacy):    try main wallet first, fall back to body.account_id."""
     amt = Decimal(str(body.amount))
-
-    if approval_request_id is None:
-        await request_or_execute(
-            db,
-            action="deduct_fund",
-            target_type="user",
-            target_id=user_id,
-            amount=amt,
-            payload={"description": body.description, "source": getattr(body, "source", None),
-                     "account_id": getattr(body, "account_id", None)},
-            requested_by=admin_id,
-        )
-    else:
-        row = await db.execute(
-            _t("SELECT status, action, target_id, payload FROM admin_approval_requests WHERE id = :rid FOR UPDATE"),
-            {"rid": str(approval_request_id)},
-        )
-        ar = row.mappings().first()
-        if not ar or ar["status"] != "approved":
-            raise HTTPException(status_code=409, detail="Approval not in 'approved' state")
-        if ar["action"] != "deduct_fund" or str(ar["target_id"]) != str(user_id):
-            raise HTTPException(status_code=409, detail="Approval does not match this action")
-        if Decimal(str(ar["payload"].get("amount", "0"))) != amt:
-            raise HTTPException(status_code=409, detail="Amount differs from approved request")
 
     source = (getattr(body, "source", None) or "").strip().lower() or None
 
@@ -790,8 +646,6 @@ async def deduct_fund(
             new_values={"main_wallet_balance": str(user_row.main_wallet_balance), "amount_deducted": str(body.amount)},
             ip_address=ip_address,
         )
-        if approval_request_id is not None:
-            await mark_executed(db, request_id=approval_request_id)
         await db.commit()
         return {
             "message": "Fund deducted from main wallet successfully",
@@ -842,8 +696,6 @@ async def deduct_fund(
         new_values={"balance": str(account.balance), "amount_deducted": str(body.amount)},
         ip_address=ip_address,
     )
-    if approval_request_id is not None:
-        await mark_executed(db, request_id=approval_request_id)
     await db.commit()
     return {"message": "Fund deducted from trading account successfully", "new_balance": float(account.balance)}
 
@@ -851,41 +703,9 @@ async def deduct_fund(
 async def give_credit(
     user_id: uuid.UUID, body: CreditRequest,
     admin_id: uuid.UUID, ip_address: str | None, db: AsyncSession,
-    *, approval_request_id: uuid.UUID | None = None,
 ) -> dict:
-    """Grant bonus credit on a trading account.
-
-    Credit counts toward equity — and therefore margin level — so it is
-    gated by the same dual-approval rules as add_fund (risk review
-    2026-08-20: credit previously bypassed the 4-eyes gate entirely,
-    letting a single admin inflate equity without a second signature)."""
-    from .approval_service import request_or_execute, mark_executed
-    from sqlalchemy import text as _t
-
+    """Grant bonus credit on a trading account."""
     amt = Decimal(str(body.amount))
-
-    if approval_request_id is None:
-        await request_or_execute(
-            db,
-            action="give_credit",
-            target_type="user",
-            target_id=user_id,
-            amount=amt,
-            payload={"description": body.description, "account_id": body.account_id},
-            requested_by=admin_id,
-        )
-    else:
-        row = await db.execute(
-            _t("SELECT status, action, target_id, payload FROM admin_approval_requests WHERE id = :rid FOR UPDATE"),
-            {"rid": str(approval_request_id)},
-        )
-        ar = row.mappings().first()
-        if not ar or ar["status"] != "approved":
-            raise HTTPException(status_code=409, detail="Approval not in 'approved' state")
-        if ar["action"] != "give_credit" or str(ar["target_id"]) != str(user_id):
-            raise HTTPException(status_code=409, detail="Approval does not match this action")
-        if Decimal(str(ar["payload"].get("amount", "0"))) != amt:
-            raise HTTPException(status_code=409, detail="Amount differs from approved request")
 
     # Row lock — two concurrent admins must serialise on the same account.
     account_result = await db.execute(
@@ -919,8 +739,6 @@ async def give_credit(
         new_values={"credit": str(account.credit), "amount": str(body.amount)},
         ip_address=ip_address,
     )
-    if approval_request_id is not None:
-        await mark_executed(db, request_id=approval_request_id)
     await db.commit()
     return {"message": "Credit added successfully", "new_credit": float(account.credit)}
 
@@ -928,37 +746,9 @@ async def give_credit(
 async def take_credit(
     user_id: uuid.UUID, body: CreditRequest,
     admin_id: uuid.UUID, ip_address: str | None, db: AsyncSession,
-    *, approval_request_id: uuid.UUID | None = None,
 ) -> dict:
-    """Remove bonus credit from a trading account. Dual-approval gated for
-    the same reason as give_credit — credit moves equity and margin."""
-    from .approval_service import request_or_execute, mark_executed
-    from sqlalchemy import text as _t
-
+    """Remove bonus credit from a trading account."""
     amt = Decimal(str(body.amount))
-
-    if approval_request_id is None:
-        await request_or_execute(
-            db,
-            action="take_credit",
-            target_type="user",
-            target_id=user_id,
-            amount=amt,
-            payload={"description": body.description, "account_id": body.account_id},
-            requested_by=admin_id,
-        )
-    else:
-        row = await db.execute(
-            _t("SELECT status, action, target_id, payload FROM admin_approval_requests WHERE id = :rid FOR UPDATE"),
-            {"rid": str(approval_request_id)},
-        )
-        ar = row.mappings().first()
-        if not ar or ar["status"] != "approved":
-            raise HTTPException(status_code=409, detail="Approval not in 'approved' state")
-        if ar["action"] != "take_credit" or str(ar["target_id"]) != str(user_id):
-            raise HTTPException(status_code=409, detail="Approval does not match this action")
-        if Decimal(str(ar["payload"].get("amount", "0"))) != amt:
-            raise HTTPException(status_code=409, detail="Amount differs from approved request")
 
     account_result = await db.execute(
         select(TradingAccount).where(
@@ -994,8 +784,6 @@ async def take_credit(
         new_values={"credit": str(account.credit), "amount_removed": str(body.amount)},
         ip_address=ip_address,
     )
-    if approval_request_id is not None:
-        await mark_executed(db, request_id=approval_request_id)
     await db.commit()
     return {"message": "Credit removed successfully", "new_credit": float(account.credit)}
 
@@ -1353,8 +1141,7 @@ async def delete_user(
     await db.execute(update(AuditLog).where(AuditLog.admin_id == user_id).values(admin_id=None))
 
     # ── 9b. RESTRICT FKs that block the delete (no ON DELETE CASCADE) ──
-    # Most user-owned tables (insurance_policies, rewards_*, staking_positions,
-    # fixed_return_locks, vip_passes, shared_trades, spin/lottery/bids) use
+    # Most user-owned tables (insurance_policies, shared_trades, …) use
     # ON DELETE CASCADE, so the DB clears them automatically. These do NOT and
     # would otherwise raise a ForeignKeyViolation on the final delete — which
     # surfaced to the admin as a silent "nothing happened". Raw SQL avoids
@@ -1376,7 +1163,6 @@ async def delete_user(
         "UPDATE rm_funding_requests SET approved_by = NULL WHERE approved_by = :uid",
         "UPDATE rm_funding_requests SET credited_by = NULL WHERE credited_by = :uid",
         "UPDATE rm_funding_requests SET rejected_by = NULL WHERE rejected_by = :uid",
-        "UPDATE lifestyle_fulfillments SET handled_by = NULL WHERE handled_by = :uid",
         # Newer tables that FK users.id — harmless no-ops if the user never
         # touched them, skipped entirely if the table isn't present.
         "DELETE FROM employee_tasks WHERE assigned_to = :uid OR assigned_by = :uid",
@@ -1387,7 +1173,7 @@ async def delete_user(
         # uncleaned row blocks the final user delete → the 500 on master users.
         "DELETE FROM spread_configs WHERE user_id = :uid",
         "DELETE FROM swap_configs WHERE user_id = :uid",
-        # Social / sharing + rewards rows that FK users.id without CASCADE.
+        # Social / sharing rows that FK users.id without CASCADE.
         "DELETE FROM shared_trades WHERE user_id = :uid",
         "DELETE FROM social_follows WHERE follower_id = :uid OR following_id = :uid",
         "DELETE FROM master_followers WHERE follower_user_id = :uid",

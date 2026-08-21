@@ -21,7 +21,6 @@ from packages.common.src.instrument_pricing import (
     resolve_commission, resolve_spread_config, symmetric_quote_from_mid,
 )
 from packages.common.src.insurance.claims import maybe_pay as insurance_maybe_pay
-from . import rewards_service
 from packages.common.src.database import AsyncSessionLocal
 from packages.common.src.redis_client import redis_client, PriceChannel
 from packages.common.src.notify import create_notification
@@ -1368,32 +1367,6 @@ async def close_position(position_id: UUID, req, user_id: UUID, db: AsyncSession
     # `history.profit` reflects only the partial lots; the policy's
     # remaining cap is enforced inside evaluate_claim.
     await insurance_maybe_pay(db=db, position=pos, history=history)
-
-    # Rewards — bump every mission whose action_kind matches this event,
-    # AND credit XP/AC/PS for trade volume (own + 10-level referral chain).
-    # Errors here must never block the close, so swallow.
-    try:
-        await rewards_service.mark_progress(db, user_id, "place_trades", 1)
-        # If the close was profitable, count it for win-streak missions.
-        if result_profit > 0:
-            try:
-                await rewards_service.mark_progress(db, user_id, "win_streak", 1)
-            except Exception:
-                pass
-        try:
-            notional = Decimal(str(close_lots)) * Decimal(str(contract_size)) * Decimal(str(pos.open_price))
-            if notional > 0:
-                volume_usd = int(notional)
-                await rewards_service.mark_progress(db, user_id, "trade_volume_usd", volume_usd)
-                # XP_Reward_mechanism slide 3: award XP/AC/PS by traded
-                # volume + distribute through the 10-level referral chain.
-                await rewards_service.award_trading_volume_rewards(
-                    db, user_id, notional, reference_id=pos.id,
-                )
-        except Exception as _vol_exc:
-            logger.debug("rewards trade-volume distribution failed: %s", _vol_exc)
-    except Exception as _exc:
-        logger.debug("rewards mark_progress failed: %s", _exc)
 
     # Referral bonus campaigns gated on a trade-count (required_trades > 0).
     # Only closed trades count, so this only makes sense to check here, at
