@@ -733,7 +733,7 @@ export default function TradingTerminalPage() {
         className="hidden lg:flex shrink-0 flex-col h-full min-h-0 overflow-hidden bg-bg-base border-r border-border-primary"
         style={{ width: wlW }}
       >
-        <InstrumentsTable onViewNews={onPanelsSelectNews} />
+        <InstrumentsTable />
       </div>
       <div className="hidden lg:block">
         <PanelResizeHandle

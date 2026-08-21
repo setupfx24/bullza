@@ -1,16 +1,13 @@
 'use client';
 
 import { useState, useEffect, useRef, useMemo } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
 import { clsx } from 'clsx';
-import { ChevronDown, Search, Star, Newspaper, BarChart3 } from 'lucide-react';
+import { ChevronDown, Search, Star } from 'lucide-react';
 import { useTradingStore, type InstrumentInfo } from '@/stores/tradingStore';
-import { tradingTerminalUrl } from '@/lib/tradingNav';
 import SymbolIcon from './SymbolIcon';
 
 type Trend = 'up' | 'down' | 'neutral';
 type Segment = 'All' | 'Forex' | 'Crypto' | 'Indices' | 'Commodities' | 'Metals' | 'Stocks';
-type View = 'instruments' | 'news';
 
 const SEGMENTS: Segment[] = ['All', 'Forex', 'Crypto', 'Indices', 'Commodities', 'Metals', 'Stocks'];
 
@@ -80,18 +77,10 @@ function spreadInPips(
   return Math.max(0, Math.round(((ask - bid) / pip) * 10) / 10);
 }
 
-export type InstrumentsTableProps = {
-  onExitMarkets?: () => void;
-  onViewNews?: () => void;
-};
-
-export default function InstrumentsTable({ onExitMarkets, onViewNews }: InstrumentsTableProps) {
-  const router = useRouter();
-  const urlParams = useSearchParams();
+export default function InstrumentsTable() {
   const { watchlist, prices, selectedSymbol, setSelectedSymbol, instruments, activeAccount } =
     useTradingStore();
 
-  const [view, setView] = useState<View>('instruments');
   const [search, setSearch] = useState('');
   const [segment, setSegment] = useState<Segment>('All');
   const [segOpen, setSegOpen] = useState(false);
@@ -198,12 +187,6 @@ export default function InstrumentsTable({ onExitMarkets, onViewNews }: Instrume
 
   const handleRowClick = (symbol: string) => {
     setSelectedSymbol(symbol);
-    if (onExitMarkets) {
-      onExitMarkets();
-      return;
-    }
-    const acc = urlParams.get('account');
-    if (acc) router.push(tradingTerminalUrl(acc, { view: 'chart' }));
   };
 
   const toggleStar = (symbol: string, e: React.MouseEvent) => {
@@ -218,39 +201,8 @@ export default function InstrumentsTable({ onExitMarkets, onViewNews }: Instrume
 
   return (
     <div className="h-full min-h-0 flex flex-col bg-bg-base text-text-primary">
-      {/* Top toolbar — view toggle + search + segment dropdown + star */}
+      {/* Top toolbar — search + segment dropdown + star */}
       <div className="shrink-0 flex items-center gap-2 px-3 py-2.5 border-b border-border-primary bg-bg-secondary">
-        {/* View toggle: Instruments / News */}
-        <div className="flex items-center gap-1 shrink-0 rounded-lg border border-border-primary bg-bg-secondary p-0.5">
-          <button
-            type="button"
-            onClick={() => setView('instruments')}
-            className={clsx(
-              'flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-bold uppercase tracking-wide transition-colors',
-              view === 'instruments'
-                ? 'bg-accent/15 text-accent'
-                : 'text-text-tertiary hover:text-text-primary',
-            )}
-            aria-label="Instruments"
-          >
-            <BarChart3 className="w-3.5 h-3.5" />
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setView('news');
-              if (onViewNews) onViewNews();
-            }}
-            className={clsx(
-              'flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-bold uppercase tracking-wide transition-colors',
-              view === 'news' ? 'bg-accent/15 text-accent' : 'text-text-tertiary hover:text-text-primary',
-            )}
-            aria-label="News"
-          >
-            <Newspaper className="w-3.5 h-3.5" />
-          </button>
-        </div>
-
         {/* Search */}
         <div className="relative flex-1 min-w-0">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-text-tertiary" />
