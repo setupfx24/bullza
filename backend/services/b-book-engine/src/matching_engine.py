@@ -57,10 +57,11 @@ class MatchingEngine:
     async def stop(self):
         self._running = False
 
-    async def _get_price(self, symbol: str) -> Optional[tuple[Decimal, Decimal]]:
-        """Latest executable bid/ask, or None when the tick is missing OR
-        older than STALE_PRICE_SECONDS — a stale price must never execute."""
-        tick_data = await redis_client.get(PriceChannel.tick_key(symbol))
+    @staticmethod
+    def _parse_tick(tick_data: Optional[str]) -> Optional[tuple[Decimal, Decimal]]:
+        """Executable bid/ask from a raw tick payload, or None when it is
+        missing OR older than STALE_PRICE_SECONDS — a stale price must
+        never execute."""
         if not tick_data:
             return None
         tick = json.loads(tick_data)
@@ -77,6 +78,37 @@ class MatchingEngine:
                 pass
         return Decimal(str(tick["bid"])), Decimal(str(tick["ask"]))
 
+    async def _load_prices(self, symbols: set[str]) -> dict[str, tuple[Decimal, Decimal]]:
+        """One MGET for the whole sweep instead of a GET per row.
+
+        These loops run every 100ms; a serial Redis round trip per row meant
+        ten positions on XAUUSD issued ten identical GETs, and the loop's
+        entire time budget went to Redis once the table grew. Same staleness
+        rule as before — symbols whose tick is missing or stale are simply
+        absent from the returned map, so callers still skip them.
+        (Mirrors gateway sltp_engine._load_prices_for.)
+        """
+        if not symbols:
+            return {}
+        sym_list = sorted(symbols)
+        try:
+            values = await redis_client.mget(
+                [PriceChannel.tick_key(s) for s in sym_list]
+            )
+        except Exception as exc:  # noqa: BLE001 — a Redis blip skips this tick
+            logger.error("Price batch load failed: %s", exc)
+            return {}
+        out: dict[str, tuple[Decimal, Decimal]] = {}
+        for sym, raw in zip(sym_list, values):
+            parsed = self._parse_tick(raw)
+            if parsed is not None:
+                out[sym] = parsed
+        return out
+
+    async def _get_price(self, symbol: str) -> Optional[tuple[Decimal, Decimal]]:
+        """Single-symbol variant, kept for one-off lookups."""
+        return self._parse_tick(await redis_client.get(PriceChannel.tick_key(symbol)))
+
     async def _monitor_pending_orders(self):
         """Monitor and trigger pending orders when price conditions are met."""
         logger.info("Pending order monitor started")
@@ -90,13 +122,20 @@ class MatchingEngine:
                     )
                     pending_orders = result.scalars().all()
 
+                    prices = await self._load_prices({
+                        o.instrument.symbol for o in pending_orders
+                        if o.instrument and o.instrument.symbol
+                    })
+
                     for order in pending_orders:
                         if order.expires_at and datetime.now(timezone.utc) > order.expires_at:
                             order.status = OrderStatus.EXPIRED
                             await db.commit()
                             continue
 
-                        price_data = await self._get_price(order.instrument.symbol)
+                        price_data = prices.get(
+                            order.instrument.symbol if order.instrument else None
+                        )
                         if not price_data:
                             continue
 
@@ -261,8 +300,15 @@ class MatchingEngine:
                     )
                     positions = result.scalars().all()
 
+                    prices = await self._load_prices({
+                        p.instrument.symbol for p in positions
+                        if p.instrument and p.instrument.symbol
+                    })
+
                     for pos in positions:
-                        price_data = await self._get_price(pos.instrument.symbol)
+                        price_data = prices.get(
+                            pos.instrument.symbol if pos.instrument else None
+                        )
                         if not price_data:
                             continue
 

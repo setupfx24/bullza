@@ -90,6 +90,33 @@ class RiskEngine:
                         for p in all_pos_result.scalars().all():
                             positions_by_account[p.account_id].append(p)
 
+                    # One MGET for the whole sweep instead of a GET per
+                    # position per second, and the two stop-out/margin-call
+                    # thresholds read ONCE per tick instead of twice per
+                    # account (they are global settings that change ~never).
+                    _all_symbols = sorted({
+                        p.instrument.symbol
+                        for plist in positions_by_account.values()
+                        for p in plist
+                        if p.instrument and p.instrument.symbol
+                    })
+                    ticks_by_symbol: dict = {}
+                    if _all_symbols:
+                        try:
+                            _vals = await redis_client.mget(
+                                [PriceChannel.tick_key(s) for s in _all_symbols]
+                            )
+                            ticks_by_symbol = dict(zip(_all_symbols, _vals))
+                        except Exception as _me:
+                            # Empty map => every position reads as "no tick"
+                            # => stale_price => the account is skipped, which
+                            # is the existing safe path for a dead feed.
+                            logger.error("Tick batch load failed: %s", _me)
+
+                    from packages.common.src.settings_store import get_float_setting
+                    stop_out = await get_float_setting("stop_out_level", settings.STOP_OUT_LEVEL)
+                    margin_call = await get_float_setting("margin_call_level", settings.MARGIN_CALL_LEVEL)
+
                     for account in accounts:
                         positions = positions_by_account.get(account.id, [])
                         if not positions:
@@ -107,7 +134,9 @@ class RiskEngine:
                         now_epoch = _time.time()
                         stale_price = False
                         for pos in positions:
-                            tick_data = await redis_client.get(PriceChannel.tick_key(pos.instrument.symbol))
+                            tick_data = ticks_by_symbol.get(
+                                pos.instrument.symbol if pos.instrument else None
+                            )
                             if not tick_data:
                                 stale_price = True
                                 continue
@@ -166,10 +195,6 @@ class RiskEngine:
                                 account.account_number,
                             )
                             continue
-
-                        from packages.common.src.settings_store import get_float_setting
-                        stop_out = await get_float_setting("stop_out_level", settings.STOP_OUT_LEVEL)
-                        margin_call = await get_float_setting("margin_call_level", settings.MARGIN_CALL_LEVEL)
 
                         if margin_level <= Decimal(str(stop_out)):
                             await self._execute_stop_out(account, positions, db)
@@ -395,9 +420,26 @@ class RiskEngine:
 
                     exposure: dict[str, dict] = defaultdict(lambda: {"long_lots": Decimal("0"), "short_lots": Decimal("0"), "long_value": Decimal("0"), "short_value": Decimal("0")})
 
+                    # One MGET for the sweep rather than a GET per position.
+                    _exp_symbols = sorted({
+                        p.instrument.symbol for p in positions
+                        if p.instrument and p.instrument.symbol
+                    })
+                    _exp_ticks: dict = {}
+                    if _exp_symbols:
+                        try:
+                            _ev = await redis_client.mget(
+                                [PriceChannel.tick_key(s) for s in _exp_symbols]
+                            )
+                            _exp_ticks = dict(zip(_exp_symbols, _ev))
+                        except Exception as _ee:
+                            # Empty map => every position is skipped below,
+                            # same as when its tick is missing today.
+                            logger.error("Exposure tick batch load failed: %s", _ee)
+
                     for pos in positions:
                         symbol = pos.instrument.symbol
-                        tick_data = await redis_client.get(PriceChannel.tick_key(symbol))
+                        tick_data = _exp_ticks.get(symbol)
                         if not tick_data:
                             continue
                         tick = json.loads(tick_data)
