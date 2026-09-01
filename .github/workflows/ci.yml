@@ -72,18 +72,14 @@ jobs:
       - uses: actions/checkout@v4
       - name: No stray brand references
         run: |
-          hits=$(grep -rin swisdex \
+          # Retired brand names, assembled from parts so this workflow
+          # never matches its own guard.
+          pat="$(printf '%s' 'swis' 'dex')\|$(printf '%s' 'trust' 'edge')"
+          hits=$(grep -rin "$pat" \
             --exclude-dir=.git \
             --exclude-dir=node_modules \
             --exclude-dir=charting_library \
-            --exclude-dir=versions \
-            --exclude=ci.yml \
             . \
-            | grep -v 'COMPOSE_PROJECT_NAME=swisdex' \
-            | grep -v 'SWISDEX_DIR' \
-            | grep -v 'swisdex_pg_data\|swisdex_ts_data' \
-            | grep -v 'SwisDexAdmin2025' \
-            | grep -v '^\./docker-compose' \
             || true)
           if [ -n "$hits" ]; then
             echo "$hits"

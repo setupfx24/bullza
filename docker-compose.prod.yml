@@ -2,12 +2,9 @@
 # Broker platform — Production overrides
 # Usage: docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 #
-# ⚠️  MIGRATION WARNING — the compose project name was renamed from
-# `swisdex` to `broker`. Volumes/containers/networks are namespaced by
-# project name: under the new name Docker creates EMPTY pg_data/ts_data
-# volumes and orphans the old swisdex_* ones. Existing deployments must
-# either export COMPOSE_PROJECT_NAME=swisdex or migrate the volumes
-# before switching. See the header of docker-compose.yml.
+# ⚠️  Volumes/containers/networks are namespaced by the compose project
+# name — renaming it on an existing deployment orphans the old volumes.
+# See the header of docker-compose.yml before changing `name:`.
 # ============================================================
 name: broker
 

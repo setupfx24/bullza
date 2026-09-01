@@ -29,9 +29,8 @@
 set -euo pipefail
 
 # ─── Config (overridable via env or .env) ─────────────────────────────
-# APP_DIR is the canonical variable; legacy SWISDEX_DIR still honoured as
-# a fallback so already-installed cron entries keep working.
-COMPOSE_DIR="${APP_DIR:-${SWISDEX_DIR:-/opt/broker}}"
+# APP_DIR points at the compose checkout (overridable via env or .env).
+COMPOSE_DIR="${APP_DIR:-/opt/broker}"
 DEST="${BACKUP_LOCAL_DIR:-${COMPOSE_DIR}/backups}"
 RETAIN_DAYS="${BACKUP_RETENTION_DAYS:-14}"
 RCLONE_REMOTE="${BACKUP_RCLONE_REMOTE:-}"

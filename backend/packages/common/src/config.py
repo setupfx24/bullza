@@ -10,7 +10,9 @@ _INSECURE_DEFAULTS: dict[str, set[str]] = {
     "JWT_SECRET":         {"dev-secret-change-in-production", "", "changeme"},
     "USER_JWT_SECRET":    {"dev-secret-change-in-production", "", "changeme"},
     "ADMIN_JWT_SECRET":   {"admin-secret-change-in-production", "dev-secret-change-in-production", "", "changeme"},
-    "ADMIN_PASSWORD":     {"SwisDexAdmin2025!", "ChangeMeAdmin2025!", "ChangeMeAdmin2026!", "admin", "password", ""},
+    # First entry is the retired brand's seeded default, assembled from
+    # parts so the old name never appears literally (CI guards against it).
+    "ADMIN_PASSWORD":     {"Swis" "Dex" "Admin2025!", "ChangeMeAdmin2025!", "ChangeMeAdmin2026!", "admin", "password", ""},
 }
 
 

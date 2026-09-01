@@ -20,8 +20,8 @@ set -euo pipefail
 DUMP="${1:?dump path required}"
 UPLOADS="${2:-}"
 TS_DUMP="${3:-}"
-# APP_DIR is canonical; legacy SWISDEX_DIR honoured as fallback.
-COMPOSE_DIR="${APP_DIR:-${SWISDEX_DIR:-/opt/broker}}"
+# APP_DIR points at the compose checkout.
+COMPOSE_DIR="${APP_DIR:-/opt/broker}"
 GPG_RECIPIENT="${BACKUP_GPG_RECIPIENT:-}"
 GPG_PASS_FILE="${BACKUP_GPG_PASSPHRASE_FILE:-}"
 

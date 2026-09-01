@@ -9,8 +9,8 @@
 # /var/log writes need root on a default Docker install).
 set -euo pipefail
 
-# APP_DIR is canonical; legacy SWISDEX_DIR honoured as fallback.
-COMPOSE_DIR="${APP_DIR:-${SWISDEX_DIR:-/opt/broker}}"
+# APP_DIR points at the compose checkout.
+COMPOSE_DIR="${APP_DIR:-/opt/broker}"
 SCRIPT="$COMPOSE_DIR/scripts/backup.sh"
 LOG="/var/log/broker-backup.log"
 

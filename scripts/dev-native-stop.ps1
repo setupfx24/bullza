@@ -14,13 +14,14 @@ foreach ($port in $ports) {
 }
 
 # Engines (market-data, b-book, risk) have no ports — kill leftover venv pythons
+$root = Split-Path -Parent $PSScriptRoot
+$venv = Join-Path $root "backend\.venv"
 Get-CimInstance Win32_Process -Filter "Name = 'python.exe'" |
-    Where-Object { $_.CommandLine -match [regex]::Escape("swisdesk\backend\.venv") } |
+    Where-Object { $_.CommandLine -match [regex]::Escape($venv) } |
     ForEach-Object {
         Write-Host "Stopping backend python (pid $($_.ProcessId))"
         Stop-Process -Id $_.ProcessId -Force -Confirm:$false -ErrorAction SilentlyContinue
     }
 
-$root = Split-Path -Parent $PSScriptRoot
 docker compose -f "$root\docker-compose.yml" -f "$root\docker-compose.local-infra.yml" stop postgres timescaledb redis
 Write-Host "Done."

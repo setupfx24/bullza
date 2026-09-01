@@ -11,7 +11,7 @@
 #         gateway http://localhost:8000/docs | admin-api http://localhost:8001/docs
 
 $ErrorActionPreference = "Stop"
-$root    = Split-Path -Parent $PSScriptRoot          # swisdesk/
+$root    = Split-Path -Parent $PSScriptRoot          # repo root
 $backend = Join-Path $root "backend"
 $py      = Join-Path $backend ".venv\Scripts\python.exe"
 

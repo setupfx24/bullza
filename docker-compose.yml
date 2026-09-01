@@ -1,13 +1,9 @@
 # Broker stack (project name → container/volume prefix).
 #
-# ⚠️  MIGRATION WARNING — the compose project name was renamed from
-# `swisdex` to `broker`. Docker namespaces volumes/containers/networks by
-# project name, so on an EXISTING deployment `docker compose up` under the
-# new name will create EMPTY pg_data/ts_data volumes and orphan the old
-# ones (swisdex_pg_data, swisdex_ts_data, ...). Existing deployments must
-# either:
-#   1) export COMPOSE_PROJECT_NAME=swisdex   (keeps using the old volumes), or
-#   2) migrate the volumes to the new names before switching.
+# ⚠️  Docker namespaces volumes/containers/networks by project name, so
+# renaming `name:` on an EXISTING deployment creates EMPTY pg_data/ts_data
+# volumes and orphans the old ones. If you rename, either export
+# COMPOSE_PROJECT_NAME=<old name> or migrate the volumes first.
 # Fresh installs need nothing.
 name: broker
 
