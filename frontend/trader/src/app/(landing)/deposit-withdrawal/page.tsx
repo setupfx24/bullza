@@ -6,8 +6,8 @@
  * style sub-clauses. Linked from the footer "Legal documents" row.
  */
 import Link from 'next/link';
-import { Wallet, ArrowUpRight, ShieldCheck, Mail } from 'lucide-react';
-import { BannerPlaceholder } from '@/home/components/BannerPlaceholder';
+import { Wallet, ShieldCheck, Mail } from 'lucide-react';
+import { Section, PageHero, CtaBanner } from '@/marketing/components';
 import { BRAND_NAME, BRAND_SUPPORT_EMAIL } from '@/lib/brand';
 
 /** Section shape — supports flat prose paragraphs, bullet lists, and
@@ -18,9 +18,9 @@ type Block =
   | { kind: 'bullets'; items: string[] }
   | { kind: 'sub'; n: string; title: string; blocks: Block[] };
 
-type Section = { h: string; blocks: Block[] };
+type PolicySection = { h: string; blocks: Block[] };
 
-const SECTIONS: Section[] = [
+const SECTIONS: PolicySection[] = [
   {
     h: '1. Introduction',
     blocks: [
@@ -188,8 +188,8 @@ function renderBlocks(blocks: Block[], keyPrefix = ''): React.ReactNode {
     );
     return (
       <div key={k} className="mt-3">
-        <h3 className="font-semibold text-foreground/90 mb-2">
-          <span className="mr-2">{b.n}</span> {b.title}
+        <h3 className="font-bold mb-2" style={{ color: 'var(--mk-text)' }}>
+          <span className="mr-2" style={{ color: 'var(--mk-accent)' }}>{b.n}</span> {b.title}
         </h3>
         <div className="space-y-3">{renderBlocks(b.blocks, k)}</div>
       </div>
@@ -199,74 +199,62 @@ function renderBlocks(blocks: Block[], keyPrefix = ''): React.ReactNode {
 
 export default function DepositWithdrawalPage() {
   return (
-    <main className="min-h-screen" style={{ background: '#08090b', color: '#f5f5f5' }}>
-      <BannerPlaceholder
+    <main>
+      <PageHero
+        kicker="Legal"
         title="Deposit & Withdrawal Policy"
-        tagline={`The rules for funding and withdrawing from your ${BRAND_NAME} account.`}
+        lead={`The rules for funding and withdrawing from your ${BRAND_NAME} account.`}
       />
 
-      <section className="mx-auto max-w-[840px] px-[var(--gutter)] pt-10 pb-6">
-        <div className="liquid-glass rounded-2xl px-5 py-4 flex items-center gap-3 text-sm text-foreground/70">
-          <Wallet className="size-4 text-primary shrink-0" />
-          <span>
-            <span className="font-semibold text-foreground/90">{BRAND_NAME} — Deposit & Withdrawal Policy</span>{' '}
-            · Last updated: June 2026
-          </span>
-        </div>
-      </section>
-
-      <article className="mx-auto max-w-[840px] px-[var(--gutter)] py-6 sm:py-8 space-y-7">
-        {SECTIONS.map((sec, idx) => (
-          <section key={sec.h} className="liquid-glass rounded-2xl p-6 sm:p-7">
-            <h2 className="font-display text-lg sm:text-xl uppercase tracking-tight text-foreground mb-4">
-              {sec.h}
-            </h2>
-            <div className="text-sm sm:text-[15px] leading-relaxed text-foreground/75 space-y-3">
-              {renderBlocks(sec.blocks, String(idx))}
-            </div>
-          </section>
-        ))}
-
-        <div className="liquid-glass-strong rounded-2xl p-6 sm:p-7 flex flex-col sm:flex-row gap-4 sm:items-center sm:justify-between">
-          <div className="flex items-start gap-3">
-            <ShieldCheck className="size-5 text-primary shrink-0 mt-0.5" />
-            <p className="text-sm text-foreground/75 leading-relaxed">
-              Read this alongside our{' '}
-              <Link href="/terms" className="text-primary underline-offset-4 hover:underline">
-                Terms of Service
-              </Link>{' '}
-              and{' '}
-              <Link href="/privacy" className="text-primary underline-offset-4 hover:underline">
-                Privacy Policy
-              </Link>
-              .
-            </p>
+      <Section raised>
+        <div className="mx-auto max-w-[840px] flex flex-col gap-7">
+          <div className="mk-card flex items-center gap-3" style={{ padding: 'var(--mk-space-4) var(--mk-space-5)' }}>
+            <Wallet size={16} className="shrink-0" style={{ color: 'var(--mk-accent)' }} />
+            <span className="mk-body" style={{ fontSize: 'var(--mk-text-sm)' }}>
+              <span className="font-bold" style={{ color: 'var(--mk-text)' }}>
+                {BRAND_NAME} — Deposit &amp; Withdrawal Policy
+              </span>{' '}
+              · Last updated: June 2026
+            </span>
           </div>
-          <a
-            href={`mailto:${BRAND_SUPPORT_EMAIL}`}
-            className="inline-flex items-center gap-2 rounded-full bg-primary text-white px-5 py-2.5 text-sm font-semibold uppercase tracking-wider hover:opacity-90 shrink-0"
-          >
-            <Mail className="size-4" /> Contact Support
-          </a>
-        </div>
-      </article>
 
-      <section className="mx-auto max-w-[1200px] px-[var(--gutter)] pb-20">
-        <div className="liquid-glass-strong rounded-3xl p-8 sm:p-12 text-center">
-          <h2 className="font-display uppercase text-2xl sm:text-3xl tracking-tight">
-            Fund Your Account
-          </h2>
-          <p className="mt-4 text-foreground/70 max-w-xl mx-auto text-sm sm:text-base">
-            Open a {BRAND_NAME} account and deposit via supported cryptocurrencies in minutes.
-          </p>
-          <Link
-            href="/auth/register"
-            className="mt-7 inline-flex items-center gap-2 rounded-full bg-primary text-white px-6 py-3 text-sm font-semibold uppercase tracking-wider hover:opacity-90"
-          >
-            Open Account <ArrowUpRight className="size-4" />
-          </Link>
+          {SECTIONS.map((sec, idx) => (
+            <section key={sec.h} className="mk-card">
+              <h2 className="mk-h3" style={{ marginBottom: 'var(--mk-space-4)' }}>{sec.h}</h2>
+              <div className="mk-body space-y-3" style={{ fontSize: 'var(--mk-text-sm)' }}>
+                {renderBlocks(sec.blocks, String(idx))}
+              </div>
+            </section>
+          ))}
+
+          <div className="mk-card flex flex-col sm:flex-row gap-4 sm:items-center sm:justify-between">
+            <div className="flex items-start gap-3">
+              <ShieldCheck size={18} className="shrink-0 mt-0.5" style={{ color: 'var(--mk-accent)' }} />
+              <p className="mk-body" style={{ fontSize: 'var(--mk-text-sm)' }}>
+                Read this alongside our{' '}
+                <Link href="/terms" className="underline-offset-4 hover:underline" style={{ color: 'var(--mk-accent)' }}>
+                  Terms of Service
+                </Link>{' '}
+                and{' '}
+                <Link href="/privacy" className="underline-offset-4 hover:underline" style={{ color: 'var(--mk-accent)' }}>
+                  Privacy Policy
+                </Link>
+                .
+              </p>
+            </div>
+            <a href={`mailto:${BRAND_SUPPORT_EMAIL}`} className="mk-btn mk-btn--primary shrink-0">
+              <Mail size={16} /> Contact Support
+            </a>
+          </div>
         </div>
-      </section>
+      </Section>
+
+      <CtaBanner
+        title="Fund Your Account"
+        lead={`Open a ${BRAND_NAME} account and deposit via supported cryptocurrencies in minutes.`}
+        primary={{ label: 'Open Account', href: '/auth/register' }}
+        secondary={{ label: 'Contact Support', href: '/company/contact' }}
+      />
     </main>
   );
 }

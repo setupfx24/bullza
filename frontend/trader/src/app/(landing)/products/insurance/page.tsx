@@ -1,17 +1,19 @@
 'use client';
 
 /**
- * Trade Insurance — public marketing surface.
+ * Trade Insurance — public marketing surface, restyled onto the shared
+ * marketing design system.
  *
  * The IB Account Tiers grid that briefly lived here has been moved to
  * the IB referral page (/products/ib-referral) where it belongs. This
- * page pitches Insurance: hero banner, value props, the two coverage
+ * page pitches Insurance: hero, value props, the two coverage
  * tiers (50% Standard / 70% Premium promo — both share the same bullet
  * list, only the cover % and promo flag differ), and a CTA. Exact
  * premiums/caps are still confirmed on the order ticket at activation.
  */
 import Link from 'next/link';
-import { ArrowUpRight, ShieldCheck, Zap, Lock, ScrollText, Check } from 'lucide-react';
+import { ShieldCheck, Zap, Lock, ScrollText, Check } from 'lucide-react';
+import { Section, SectionHeading, PageHero, FeatureGrid, CtaBanner } from '@/marketing/components';
 import { BRAND_NAME } from '@/lib/brand';
 
 // Two coverage tiers shown on the order ticket. Per the client, both cards
@@ -39,157 +41,167 @@ const COVER_TIERS = [
   },
 ];
 
-const FEATURES = [
-  {
-    Icon: ShieldCheck,
-    title: 'On-Chain Policy Backing',
-    body: 'Every covered position is backed by an on-chain insurance contract. Eligible losses are claimable — once approved, the payout is credited to your account as tradable funds.',
-  },
-  {
-    Icon: Zap,
-    title: 'One-Click Activation',
-    body: 'Toggle Insurance on the order ticket as you place the trade. Premium is deducted at fill, cover is live the same second.',
-  },
-  {
-    Icon: Lock,
-    title: 'Claimable Tradable Credit',
-    body: 'If your covered trade closes at a loss within the policy terms, file a claim from your account. Once approved the payout is issued as a credit — tradable only (usable on new positions), not directly withdrawable as cash.',
-  },
-  {
-    Icon: ScrollText,
-    title: 'Transparent Terms',
-    body: 'Cover percentage, premium, cap, and minimum trade duration are all shown on the order ticket before you opt in.',
-  },
-];
+/** Gold flag reserved for the limited promo tier — carried over from the
+ *  previous design so the promo card keeps reading as the promo card. */
+const PROMO_TONE = '#e8b923';
 
 export default function InsurancePage() {
   return (
-    <main className="min-h-screen bg-background">
+    <main>
+      <PageHero
+        kicker="Trade Insurance"
+        title={<>Protect every <span style={{ color: 'var(--mk-accent)' }}>position</span>.</>}
+        lead="Activate Insurance on the order ticket and, if your covered trade closes at a loss within the policy terms, file a claim — once approved, the payout is credited to your account as tradable funds. On-chain, transparent, and live the moment you fund the premium."
+        primary={{ label: 'Open Account', href: '/auth/register' }}
+        secondary={{ label: 'See Coverage Tiers', href: '#coverage' }}
+      />
+
       {/* Hero banner */}
-      <section className="mx-auto max-w-[1200px] px-[var(--gutter)] pt-24 sm:pt-28">
+      <Section>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src="/images/insurance_banner1.png"
           alt={`${BRAND_NAME} Trade Insurance — protect every position`}
-          className="w-full rounded-3xl max-h-[420px] object-cover"
-          style={{ border: '1px solid rgba(255,255,255,0.06)' }}
+          className="w-full max-h-[420px] object-cover"
+          style={{ borderRadius: 'var(--mk-radius-lg)', border: '1px solid var(--mk-line)' }}
         />
-      </section>
+      </Section>
 
-      {/* Intro */}
-      <section className="mx-auto max-w-[1200px] px-[var(--gutter)] py-12 sm:py-16">
-        <div className="text-center max-w-2xl mx-auto mb-12">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full liquid-glass text-xs uppercase tracking-[0.18em] text-foreground/70 font-body">
-            <ShieldCheck className="size-3.5" />
-            Trade Insurance
-          </div>
-          <h2 className="mt-5 font-display uppercase text-3xl sm:text-4xl md:text-5xl tracking-tight">
-            Protect every <span className="text-primary">position</span>.
-          </h2>
-          <p className="mt-4 text-foreground/70 text-sm sm:text-base leading-relaxed">
-            Activate Insurance on the order ticket and, if your covered trade closes at a loss
-            within the policy terms, file a claim — once approved, the payout is credited to your
-            account as tradable funds. On-chain, transparent, and live the moment you fund the
-            premium.
-          </p>
-        </div>
+      {/* Features */}
+      <Section raised>
+        <SectionHeading kicker="How It Works" title="Cover that lives on the order ticket" />
+        <FeatureGrid
+          className="mt-12"
+          columns={4}
+          items={[
+            {
+              icon: ShieldCheck,
+              title: 'On-Chain Policy Backing',
+              body: 'Every covered position is backed by an on-chain insurance contract. Eligible losses are claimable — once approved, the payout is credited to your account as tradable funds.',
+            },
+            {
+              icon: Zap,
+              title: 'One-Click Activation',
+              body: 'Toggle Insurance on the order ticket as you place the trade. Premium is deducted at fill, cover is live the same second.',
+            },
+            {
+              icon: Lock,
+              title: 'Claimable Tradable Credit',
+              body: 'If your covered trade closes at a loss within the policy terms, file a claim from your account. Once approved the payout is issued as a credit — tradable only (usable on new positions), not directly withdrawable as cash.',
+            },
+            {
+              icon: ScrollText,
+              title: 'Transparent Terms',
+              body: 'Cover percentage, premium, cap, and minimum trade duration are all shown on the order ticket before you opt in.',
+            },
+          ]}
+        />
 
-        {/* Features */}
-        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
-          {FEATURES.map(({ Icon, title, body }) => (
-            <article key={title} className="liquid-glass rounded-2xl p-6 flex flex-col gap-4">
-              <div className="size-11 rounded-xl bg-primary/25 flex items-center justify-center">
-                <Icon className="size-5 text-primary" />
-              </div>
-              <h3 className="font-display text-lg uppercase tracking-tight">{title}</h3>
-              <p className="text-sm text-foreground/65 leading-relaxed">{body}</p>
-            </article>
-          ))}
-        </div>
-
-        <p className="mt-8 text-center text-xs text-foreground/45 max-w-2xl mx-auto leading-relaxed">
+        <p
+          className="mt-8 text-center mx-auto max-w-2xl"
+          style={{ fontSize: 'var(--mk-text-xs)', lineHeight: 'var(--mk-leading-body)', color: 'var(--mk-text-faint)' }}
+        >
           Insurance premiums apply per trade and are non-refundable. Coverage percentages, caps, and
           minimum trade durations are shown on the order ticket at activation time and may change
           without notice.
         </p>
-      </section>
+      </Section>
 
       {/* Coverage tiers */}
-      <section className="mx-auto max-w-[1200px] px-[var(--gutter)] pb-12 sm:pb-16">
-        <div className="text-center max-w-2xl mx-auto mb-10">
-          <h2 className="font-display uppercase text-2xl sm:text-3xl tracking-tight">Coverage Tiers</h2>
-          <p className="mt-3 text-foreground/65 text-sm sm:text-base leading-relaxed">
-            Activate insurance on the order ticket and get a refund if your trade closes at a loss.
-            Two coverage tiers — pick the one that fits your risk.
-          </p>
-        </div>
+      <Section id="coverage">
+        <SectionHeading
+          kicker="Coverage"
+          title="Coverage Tiers"
+          lead="Activate insurance on the order ticket and get a refund if your trade closes at a loss. Two coverage tiers — pick the one that fits your risk."
+        />
 
-        <div className="grid sm:grid-cols-2 gap-5 max-w-4xl mx-auto">
-          {COVER_TIERS.map((t) => (
-            <article
-              key={t.label}
-              className={`relative liquid-glass rounded-2xl p-7 flex flex-col border ${
-                t.promo ? 'border-[#e8b923]/40' : 'border-primary/30'
-              }`}
-            >
-              {t.promo && (
-                <span className="absolute top-5 right-5 inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-[#e8b923]/15 text-[#e8b923]">
-                  Limited Promo
-                </span>
-              )}
-              <div className="flex items-baseline gap-2">
-                <span className={`font-display text-5xl ${t.promo ? 'text-[#e8b923]' : 'text-primary'}`}>
-                  {t.pct}
-                </span>
-                <span className="text-xs uppercase tracking-wider text-foreground/55">loss cover</span>
-              </div>
-              <h3 className="mt-3 font-display text-lg uppercase tracking-tight">{t.label}</h3>
-              <p className="text-[11px] uppercase tracking-wider text-foreground/45">{t.sub}</p>
-              <ul className="mt-5 space-y-2.5 flex-1">
-                {t.bullets.map((b) => (
-                  <li key={b} className="flex items-start gap-2 text-sm text-foreground/75">
-                    <Check className={`size-4 mt-0.5 shrink-0 ${t.promo ? 'text-[#e8b923]' : 'text-primary'}`} />
-                    <span>{b}</span>
-                  </li>
-                ))}
-              </ul>
-              <Link
-                href="/auth/register"
-                className={`mt-6 inline-flex items-center justify-center gap-2 rounded-full px-5 py-3 text-sm font-semibold uppercase tracking-wider transition ${
-                  t.promo
-                    ? 'bg-[#e8b923] text-black hover:opacity-90'
-                    : 'bg-primary text-white hover:opacity-90'
-                }`}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 max-w-4xl mx-auto mt-12">
+          {COVER_TIERS.map((t) => {
+            const tone = t.promo ? PROMO_TONE : 'var(--mk-accent)';
+            return (
+              <article
+                key={t.label}
+                className="mk-card mk-card--hover relative flex flex-col gap-3"
+                style={{ borderColor: t.promo ? `${PROMO_TONE}66` : 'var(--mk-accent-line)' }}
               >
-                Activate Now <ArrowUpRight className="size-4" />
-              </Link>
-            </article>
-          ))}
+                {t.promo && (
+                  <span
+                    className="absolute top-5 right-5 inline-flex items-center rounded-full px-2.5 py-1 font-bold uppercase"
+                    style={{
+                      background: `${PROMO_TONE}26`,
+                      color: PROMO_TONE,
+                      fontSize: '10px',
+                      letterSpacing: '0.12em',
+                    }}
+                  >
+                    Limited Promo
+                  </span>
+                )}
+                <div className="flex items-baseline gap-2">
+                  <span
+                    className="font-extrabold"
+                    style={{ fontSize: 'var(--mk-text-h1)', color: tone, lineHeight: 1 }}
+                  >
+                    {t.pct}
+                  </span>
+                  <span
+                    style={{
+                      fontSize: 'var(--mk-text-label)',
+                      letterSpacing: 'var(--mk-tracking-label)',
+                      textTransform: 'uppercase',
+                      color: 'var(--mk-text-faint)',
+                    }}
+                  >
+                    loss cover
+                  </span>
+                </div>
+                <div>
+                  <h3 className="mk-h3">{t.label}</h3>
+                  <p
+                    style={{
+                      fontSize: 'var(--mk-text-label)',
+                      letterSpacing: 'var(--mk-tracking-label)',
+                      textTransform: 'uppercase',
+                      color: 'var(--mk-text-faint)',
+                    }}
+                  >
+                    {t.sub}
+                  </p>
+                </div>
+                <ul className="flex flex-col gap-2.5 flex-1 mt-2">
+                  {t.bullets.map((b) => (
+                    <li key={b} className="flex items-start gap-2 mk-body" style={{ fontSize: 'var(--mk-text-sm)' }}>
+                      <Check size={16} className="mt-1 shrink-0" style={{ color: tone }} />
+                      <span>{b}</span>
+                    </li>
+                  ))}
+                </ul>
+                <Link
+                  href="/auth/register"
+                  className={t.promo ? 'mk-btn mt-4' : 'mk-btn mk-btn--primary mt-4'}
+                  style={t.promo ? { background: PROMO_TONE, color: '#0a0a0a' } : undefined}
+                >
+                  Activate Now
+                </Link>
+              </article>
+            );
+          })}
         </div>
 
-        <p className="mt-6 text-center text-xs text-foreground/45 max-w-2xl mx-auto leading-relaxed">
+        <p
+          className="mt-6 text-center mx-auto max-w-2xl"
+          style={{ fontSize: 'var(--mk-text-xs)', lineHeight: 'var(--mk-leading-body)', color: 'var(--mk-text-faint)' }}
+        >
           Insurance fees apply per trade and are non-refundable. Coverage payouts are subject to
           minimum trade duration and the policy terms shown on the order ticket at activation time.
         </p>
-      </section>
+      </Section>
 
-      {/* CTA */}
-      <section className="mx-auto max-w-[1200px] px-[var(--gutter)] pb-20">
-        <div className="liquid-glass-strong rounded-3xl p-8 sm:p-12 text-center">
-          <h2 className="font-display uppercase text-2xl sm:text-3xl tracking-tight">
-            Trade With Built-In Protection
-          </h2>
-          <p className="mt-4 text-foreground/70 max-w-xl mx-auto text-sm sm:text-base">
-            Open a {BRAND_NAME} account and tap Insurance on any order to lock in cover for that trade.
-          </p>
-          <Link
-            href="/auth/register"
-            className="mt-7 inline-flex items-center gap-2 rounded-full bg-primary text-white px-6 py-3 text-sm font-semibold uppercase tracking-wider hover:opacity-90"
-          >
-            Open Account <ArrowUpRight className="size-4" />
-          </Link>
-        </div>
-      </section>
+      <CtaBanner
+        title="Trade With Built-In Protection"
+        lead={`Open a ${BRAND_NAME} account and tap Insurance on any order to lock in cover for that trade.`}
+        primary={{ label: 'Open Account', href: '/auth/register' }}
+      />
     </main>
   );
 }

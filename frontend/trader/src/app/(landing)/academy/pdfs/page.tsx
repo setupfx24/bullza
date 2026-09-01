@@ -1,9 +1,13 @@
 'use client';
 
+/**
+ * Academy → Downloadable PDFs. Restyled onto the shared marketing design
+ * system. The PDF data, the category tab filtering and the email-gate form
+ * logic are carried over unchanged — only the shell and cards were restyled.
+ */
 import { useMemo, useState } from 'react';
-import Link from 'next/link';
 import { FileText, Download, ArrowUpRight, Mail } from 'lucide-react';
-import { BannerPlaceholder } from '@/home/components/BannerPlaceholder';
+import { Section, SectionHeading, PageHero, CtaBanner } from '@/marketing/components';
 import { BRAND_NAME } from '@/lib/brand';
 
 type Cat = 'Guides' | 'E-books' | 'Reports';
@@ -37,78 +41,97 @@ export default function AcademyPdfsPage() {
   const list = useMemo(() => (tab === 'All' ? PDFS : PDFS.filter((p) => p.category === tab)), [tab]);
 
   return (
-    <main className="min-h-screen bg-background">
-      <BannerPlaceholder
-        title={`${BRAND_NAME} Academy — PDFs`}
-        tagline="Downloadable guides, e-books, and quarterly research — read offline, refer back any time."
+    <main>
+      <PageHero
+        kicker={`${BRAND_NAME} Academy`}
+        title="Downloadable PDFs"
+        lead="Downloadable guides, e-books, and quarterly research — read offline, refer back any time."
+        primary={{ label: 'Browse the Library', href: '#pdfs' }}
       />
 
-      {/* Category tabs */}
-      <section id="categories" className="mx-auto max-w-[1200px] px-[var(--gutter)] py-6 sm:py-10">
-        <div className="flex flex-wrap justify-center gap-2 p-1.5 rounded-full liquid-glass w-fit mx-auto">
+      <Section raised id="categories">
+        <SectionHeading kicker="Library" title="Guides, E-books & Reports" />
+
+        {/* Category tabs */}
+        <div
+          className="flex flex-wrap justify-center gap-2 p-1.5 w-fit mx-auto mt-10"
+          style={{ borderRadius: 'var(--mk-radius-pill)', border: '1px solid var(--mk-line)', background: 'var(--mk-surface)' }}
+        >
           {TABS.map((t) => (
             <button
               key={t}
               type="button"
               onClick={() => setTab(t)}
               aria-pressed={tab === t}
-              className={`px-4 py-2 rounded-full text-sm font-body transition-colors ${
-                tab === t ? 'bg-primary text-white' : 'text-foreground/70 hover:text-foreground'
-              }`}
+              className="px-4 py-2 font-bold"
+              style={{
+                borderRadius: 'var(--mk-radius-pill)',
+                fontSize: 'var(--mk-text-sm)',
+                background: tab === t ? 'var(--mk-accent)' : 'transparent',
+                color: tab === t ? '#fff' : 'var(--mk-text-muted)',
+                transition: 'background-color var(--mk-transition), color var(--mk-transition)',
+              }}
             >
               {t}
             </button>
           ))}
         </div>
-      </section>
 
-      {/* PDF grid */}
-      <section id="pdfs" className="mx-auto max-w-[1200px] px-[var(--gutter)] pb-16 sm:pb-20">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+        {/* PDF grid */}
+        <div id="pdfs" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 mt-10">
           {list.map((p) => (
-            <article key={p.id} className="liquid-glass rounded-2xl overflow-hidden flex flex-col">
+            <article key={p.id} className="mk-card mk-card--hover overflow-hidden flex flex-col" style={{ padding: 0 }}>
               {/* TODO: PDF cover thumbnail yahan aayega */}
               <div
-                className="image-placeholder relative aspect-[3/4] bg-foreground/[0.06] flex items-center justify-center"
+                className="relative aspect-[3/4] flex items-center justify-center"
+                style={{ background: 'var(--mk-surface-2)' }}
                 aria-label={`${p.title} cover`}
               >
-                <FileText className="size-12 text-foreground/40" aria-hidden />
-                <span className="absolute top-2 left-2 text-[10px] px-2 py-0.5 rounded-md bg-primary/30 text-primary uppercase tracking-wider">
+                <FileText size={44} style={{ color: 'var(--mk-text-faint)' }} aria-hidden />
+                <span
+                  className="absolute top-3 left-3 px-2 py-0.5 font-bold uppercase"
+                  style={{
+                    fontSize: '10px',
+                    letterSpacing: '0.12em',
+                    borderRadius: 'var(--mk-radius-sm)',
+                    background: 'var(--mk-accent-soft)',
+                    color: 'var(--mk-accent)',
+                  }}
+                >
                   {p.category}
                 </span>
               </div>
-              <div className="p-5 flex flex-col gap-3 flex-1">
-                <h3 className="font-display text-lg uppercase tracking-tight text-foreground leading-tight">
-                  {p.title}
-                </h3>
-                <p className="text-sm text-foreground/65 leading-relaxed flex-1">{p.description}</p>
-                <div className="flex items-center justify-between text-xs text-foreground/55">
+              <div className="flex flex-col gap-3 flex-1" style={{ padding: 'var(--mk-space-5)' }}>
+                <h3 className="mk-h3">{p.title}</h3>
+                <p className="mk-body flex-1" style={{ fontSize: 'var(--mk-text-sm)' }}>{p.description}</p>
+                <div
+                  className="flex items-center justify-between"
+                  style={{ fontSize: 'var(--mk-text-xs)', color: 'var(--mk-text-faint)' }}
+                >
                   <span>{p.pages} pages</span>
                   <span>{p.size}</span>
                 </div>
                 <button
                   type="button"
-                  className="mt-2 inline-flex items-center justify-center gap-2 rounded-full bg-primary/25 hover:bg-primary/40 text-primary px-4 py-2.5 text-xs font-semibold uppercase tracking-wider transition-colors"
+                  className="mk-btn mk-btn--ghost w-full mt-2"
                   aria-label={`Download ${p.title}`}
                 >
-                  <Download className="size-4" /> Download
+                  <Download size={16} /> Download
                 </button>
               </div>
             </article>
           ))}
         </div>
-      </section>
+      </Section>
 
       {/* Email-gate form */}
-      <section id="gate" className="mx-auto max-w-[1200px] px-[var(--gutter)] pb-20">
-        <div className="liquid-glass-strong rounded-3xl p-6 sm:p-10 grid md:grid-cols-2 gap-8 items-center">
-          <div>
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/25 text-primary text-[11px] uppercase tracking-[0.16em] mb-4">
-              <Mail className="size-3.5" /> Premium Library
-            </div>
-            <h2 className="font-display uppercase text-2xl sm:text-3xl tracking-tight">Get every new release in your inbox</h2>
-            <p className="mt-3 text-foreground/65 text-sm sm:text-base max-w-md">
-              Drop your email — we send each new guide, e-book, and quarterly report as soon as it's published. No spam, unsubscribe anytime.
+      <Section id="gate">
+        <div className="mk-card grid md:grid-cols-2 gap-8 items-center">
+          <div className="flex flex-col gap-3">
+            <span className="mk-kicker"><Mail size={13} /> Premium Library</span>
+            <h2 className="mk-h2">Get every new release in your inbox</h2>
+            <p className="mk-lead">
+              {'Drop your email — we send each new guide, e-book, and quarterly report as soon as it\'s published. No spam, unsubscribe anytime.'}
             </p>
           </div>
           <form
@@ -116,7 +139,7 @@ export default function AcademyPdfsPage() {
             className="flex flex-col sm:flex-row gap-3"
             aria-label="Subscribe for new PDFs"
           >
-            <label className="flex-1">
+            <label className="flex-1 min-w-0">
               <span className="sr-only">Email address</span>
               <input
                 type="email"
@@ -124,18 +147,29 @@ export default function AcademyPdfsPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="you@example.com"
-                className="w-full liquid-glass rounded-full px-4 py-3 text-sm bg-transparent text-foreground placeholder:text-foreground/40 outline-none focus:ring-2 focus:ring-primary/60"
+                className="w-full px-4 py-3 bg-transparent outline-none"
+                style={{
+                  border: '1px solid var(--mk-line)',
+                  borderRadius: 'var(--mk-radius-pill)',
+                  background: 'var(--mk-surface-2)',
+                  fontSize: 'var(--mk-text-sm)',
+                  color: 'var(--mk-text)',
+                }}
               />
             </label>
-            <button
-              type="submit"
-              className="inline-flex items-center justify-center gap-2 rounded-full bg-primary text-white px-6 py-3 text-sm font-semibold uppercase tracking-wider hover:opacity-90"
-            >
-              Subscribe <ArrowUpRight className="size-4" />
+            <button type="submit" className="mk-btn mk-btn--primary shrink-0">
+              Subscribe <ArrowUpRight size={16} />
             </button>
           </form>
         </div>
-      </section>
+      </Section>
+
+      <CtaBanner
+        title="Read it, then trade it"
+        lead={`Open a ${BRAND_NAME} account and apply the playbooks on a live or demo account.`}
+        primary={{ label: 'Open Account', href: '/auth/register' }}
+        secondary={{ label: 'Read the Academy Blog', href: '/academy/blogs' }}
+      />
     </main>
   );
 }

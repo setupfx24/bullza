@@ -11,9 +11,9 @@
  */
 import { useState, useMemo, useRef, useEffect } from 'react';
 import { clsx } from 'clsx';
-import Link from 'next/link';
-import { Info, Calculator, Search, ChevronDown, X, ArrowUpRight } from 'lucide-react';
+import { Info, Search, ChevronDown, X } from 'lucide-react';
 import { usdPipValuePerLot, usdMarginPerLot, suggestedLotSize } from '@/lib/trading/riskMath';
+import { Section, PageHero, CtaBanner } from '@/marketing/components';
 import { BRAND_NAME } from '@/lib/brand';
 
 type CalcTab = 'margin' | 'pnl' | 'lotsize' | 'swap';
@@ -196,15 +196,32 @@ function SelectField({
 
 function ResultPanel({ label, value, details }: { label: string; value: string; details?: { l: string; v: string }[] }) {
   return (
-    <div className="rounded-2xl border border-accent/20 bg-gradient-to-br from-accent/10 via-accent/5 to-transparent flex flex-col items-center justify-center p-6 sm:p-8 min-h-[220px] w-full">
-      <span className="text-sm font-semibold text-text-secondary mb-2">{label}</span>
-      <span className="text-3xl sm:text-4xl font-black font-mono text-accent">{value}</span>
+    <div
+      className="flex flex-col items-center justify-center p-6 sm:p-8 min-h-[220px] w-full"
+      style={{
+        borderRadius: 'var(--mk-radius-lg)',
+        border: '1px solid var(--mk-accent-line)',
+        background: 'var(--mk-accent-soft)',
+      }}
+    >
+      <span
+        className="mb-2 font-semibold"
+        style={{ fontSize: 'var(--mk-text-sm)', color: 'var(--mk-text-muted)' }}
+      >
+        {label}
+      </span>
+      <span
+        className="font-black"
+        style={{ fontSize: 'var(--mk-text-h2)', fontFamily: 'var(--mk-font-mono)', color: 'var(--mk-accent)', lineHeight: 1.1 }}
+      >
+        {value}
+      </span>
       {details && details.length > 0 && (
         <div className="mt-4 w-full space-y-1.5 max-w-[260px]">
           {details.map((d) => (
-            <div key={d.l} className="flex items-center justify-between text-[11px]">
-              <span className="text-text-tertiary">{d.l}</span>
-              <span className="font-mono font-semibold text-text-secondary">{d.v}</span>
+            <div key={d.l} className="flex items-center justify-between" style={{ fontSize: 'var(--mk-text-xs)' }}>
+              <span style={{ color: 'var(--mk-text-faint)' }}>{d.l}</span>
+              <span className="font-semibold" style={{ fontFamily: 'var(--mk-font-mono)', color: 'var(--mk-text-muted)' }}>{d.v}</span>
             </div>
           ))}
         </div>
@@ -285,45 +302,52 @@ export default function CalculatorPage() {
   }, [lots, daysHeld, entryPrice, pipSize, contractSize, symbol, baseCcy, quoteCcy]);
 
   return (
-    <section className="mx-auto max-w-[1100px] px-[var(--gutter)] py-12 sm:py-16">
-      <div className="text-center mb-10">
-        <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full liquid-glass text-[11px] uppercase tracking-[0.16em] text-foreground/70">
-          <Calculator className="size-3.5" /> Risk Management
-        </span>
-        <h2 className="mt-5 font-display uppercase text-2xl sm:text-3xl md:text-4xl tracking-tight">
-          Trading Calculators
-        </h2>
-        <p className="mt-3 text-foreground/65 max-w-xl mx-auto text-sm sm:text-base">
-          Margin, profit/loss, lot size and swap — the same calculators you get
-          inside your {BRAND_NAME} account. Enter your numbers to plan a trade.
-        </p>
-      </div>
+    <main>
+      <PageHero
+        kicker="Risk Management"
+        title="Trading Calculators"
+        lead={`Margin, profit/loss, lot size and swap — the same calculators you get inside your ${BRAND_NAME} account. Enter your numbers to plan a trade.`}
+      />
 
-      <div className="space-y-3">
+      <Section raised>
+        <div className="mx-auto max-w-[1100px] space-y-3">
         {TABS.map((t) => {
           const open = tab === t.id;
           return (
             <div
               key={t.id}
-              className={clsx('rounded-2xl border bg-bg-secondary overflow-hidden transition-colors', open ? 'border-accent/40' : 'border-border-primary')}
+              className="overflow-hidden"
+              style={{
+                borderRadius: 'var(--mk-radius-lg)',
+                border: `1px solid ${open ? 'var(--mk-accent-line)' : 'var(--mk-line)'}`,
+                background: 'var(--mk-surface)',
+                transition: 'border-color var(--mk-transition)',
+              }}
             >
               <button
                 type="button"
                 onClick={() => setTab(open ? null : t.id)}
-                className="w-full flex items-center justify-between px-5 py-4 hover:bg-bg-hover/40 transition-colors"
+                className="w-full flex items-center justify-between px-5 py-4"
               >
                 <div className="text-left min-w-0">
-                  <p className="text-sm sm:text-base font-bold text-text-primary truncate">{t.label}</p>
-                  <p className="text-[11px] sm:text-xs text-text-tertiary mt-0.5 truncate">{t.sub}</p>
+                  <p className="font-bold truncate" style={{ fontSize: 'var(--mk-text-body)', color: 'var(--mk-text)' }}>{t.label}</p>
+                  <p className="mt-0.5 truncate" style={{ fontSize: 'var(--mk-text-xs)', color: 'var(--mk-text-faint)' }}>{t.sub}</p>
                 </div>
-                <ChevronDown size={18} className={clsx('shrink-0 ml-3 transition-transform', open ? 'rotate-180 text-accent' : 'text-text-tertiary')} />
+                <ChevronDown
+                  size={18}
+                  className={clsx('shrink-0 ml-3 transition-transform', open && 'rotate-180')}
+                  style={{ color: open ? 'var(--mk-accent)' : 'var(--mk-text-faint)' }}
+                />
               </button>
 
               {open && (
-                <div className="border-t border-border-primary">
+                <div style={{ borderTop: '1px solid var(--mk-line)' }}>
                   <div className="grid grid-cols-1 lg:grid-cols-5">
                     {/* LEFT — Form */}
-                    <div className="lg:col-span-3 p-5 sm:p-6 space-y-4 border-b lg:border-b-0 lg:border-r border-border-primary">
+                    <div
+                      className="lg:col-span-3 p-5 sm:p-6 space-y-4"
+                      style={{ borderBottom: '1px solid var(--mk-line)' }}
+                    >
                       {(tab === 'margin' || tab === 'pnl') && (
                         <SelectField
                           label="Direction" tip="Buy or Sell" value={side} onChange={setSide}
@@ -417,20 +441,23 @@ export default function CalculatorPage() {
             </div>
           );
         })}
-      </div>
+        </div>
 
-      <div className="mt-8 text-center">
-        <Link
-          href="/auth/register"
-          className="inline-flex items-center gap-2 rounded-full bg-primary text-white px-6 py-3 text-sm font-semibold uppercase tracking-wider hover:opacity-90"
+        <p
+          className="mt-8 mx-auto max-w-2xl text-center"
+          style={{ fontSize: 'var(--mk-text-xs)', color: 'var(--mk-text-faint)', lineHeight: 'var(--mk-leading-body)' }}
         >
-          Start Trading <ArrowUpRight className="size-4" />
-        </Link>
-        <p className="mt-4 text-[11px] text-foreground/45 max-w-2xl mx-auto leading-relaxed">
           Results are approximate. Actual values vary with market conditions, the live spread,
           your account currency, and the instrument&apos;s contract specs.
         </p>
-      </div>
-    </section>
+      </Section>
+
+      <CtaBanner
+        title="Plan the trade, then place it"
+        lead={`Open a ${BRAND_NAME} account and use the same calculators inside the platform.`}
+        primary={{ label: 'Start Trading', href: '/auth/register' }}
+        secondary={{ label: 'Compare Account Types', href: '/account-types' }}
+      />
+    </main>
   );
 }

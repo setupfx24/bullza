@@ -37,6 +37,9 @@ const columns = {
   Company: [
     { name: 'About Us',       path: '/company/about' },
     { name: 'Contact',        path: '/company/contact' },
+    { name: 'Careers',        path: '/careers' },
+    { name: 'FAQ',            path: '/faq' },
+    { name: 'Download',       path: '/download' },
   ],
 }
 

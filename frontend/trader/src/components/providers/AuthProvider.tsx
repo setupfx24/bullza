@@ -36,7 +36,13 @@ function isPublicPath(pathname: string | null): boolean {
   if (['/trading/forex', '/trading/commodities', '/trading/indices', '/trading/crypto'].includes(p)) return true;
   if (['/platforms/web', '/platforms/copy-trading', '/platforms/prop-trading', '/platforms/ib-management', '/platforms/super-admin'].includes(p)) return true;
   if (['/accounts/standard', '/accounts/pro', '/accounts/demo'].includes(p)) return true;
-  return ['/privacy', '/terms', '/risk', '/about', '/contact', '/platforms', '/white-label'].includes(p);
+  // Marketing + legal/utility pages. /delete-account in particular MUST stay
+  // reachable without a session (Google Play "Account deletion" URL).
+  return [
+    '/privacy', '/terms', '/risk', '/about', '/contact', '/platforms', '/white-label',
+    '/faq', '/download', '/careers',
+    '/risk-warning', '/restricted-countries', '/delete-account', '/deposit-withdrawal',
+  ].includes(p);
 }
 
 function MaintenanceScreen() {

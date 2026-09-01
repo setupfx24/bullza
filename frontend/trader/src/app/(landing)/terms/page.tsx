@@ -1,4 +1,9 @@
-'use client';
+import Link from 'next/link';
+import { Section, PageHero, CtaBanner } from '@/marketing/components';
+import {
+  LegalDoc, LegalSection, LegalClause, LegalP, LegalCallout, legalAnchor,
+} from '../_legal/LegalDoc';
+import { BRAND_NAME, BRAND_SUPPORT_EMAIL } from '@/lib/brand';
 
 /**
  * Terms & Conditions — public legal page.
@@ -6,13 +11,9 @@
  * Section copy is preserved verbatim from the client-supplied PDF
  * "terms and condition.pdf" (delivered 2026-06-09). The 14-section
  * structure + numbered clauses match the PDF; only the visual chrome
- * follows the dark-themed (landing) layout. Six signed PDFs are
- * surfaced as a download grid above the inline sections.
+ * follows the shared marketing design system. No clause has been
+ * reworded, reordered, merged or dropped.
  */
-import Link from 'next/link';
-import { FileText, ArrowUpRight, ScrollText, ShieldAlert, Mail } from 'lucide-react';
-import { BannerPlaceholder } from '@/home/components/BannerPlaceholder';
-import { BRAND_NAME, BRAND_SUPPORT_EMAIL } from '@/lib/brand';
 
 /* Official PDF links live in the footer "Legal documents" row now —
    the on-page PDF grid was removed per client request. */
@@ -125,130 +126,82 @@ const SECTIONS: { h: string; clauses: { n: string; body: string }[] }[] = [
   },
 ];
 
+const CONTACT_HEADING = '14. Contact Information';
+const RISK_HEADING = 'Risk Disclaimer';
+
+const TOC = [
+  ...SECTIONS.map((s) => ({ id: legalAnchor(s.h), label: s.h })),
+  { id: legalAnchor(CONTACT_HEADING), label: CONTACT_HEADING },
+  { id: legalAnchor(RISK_HEADING), label: RISK_HEADING },
+];
+
 export default function TermsPage() {
   return (
-    <main className="min-h-screen" style={{ background: '#08090b', color: '#f5f5f5' }}>
-      <BannerPlaceholder
+    <main>
+      <PageHero
+        kicker="Legal"
         title="Terms and Conditions"
-        tagline={`The rules that govern your use of ${BRAND_NAME}. Read carefully before you trade.`}
+        lead={`The rules that govern your use of ${BRAND_NAME}. Read carefully before you trade.`}
       />
 
-      <section className="mx-auto max-w-[840px] px-[var(--gutter)] pt-10 pb-6">
-        <div className="liquid-glass rounded-2xl px-5 py-4 flex items-center gap-3 text-sm text-foreground/70">
-          <FileText className="size-4 text-primary shrink-0" />
-          <span>
-            <span className="font-semibold text-foreground/90">{BRAND_NAME} — Terms and Conditions</span>{' '}
-            · Last updated: June 2026
-          </span>
-        </div>
-      </section>
-
-      {/* PDF download grid removed per client request — the official
-          signed documents are now linked from the bottom of every page
-          footer as plain text links that open the PDF in a new tab. */}
-
-      {/* 14 verbatim PDF sections */}
-      <article className="mx-auto max-w-[840px] px-[var(--gutter)] py-8 sm:py-10 space-y-7">
-        {SECTIONS.map(({ h, clauses }) => (
-          <section key={h} className="liquid-glass rounded-2xl p-6 sm:p-7">
-            <h2 className="font-display text-lg sm:text-xl uppercase tracking-tight text-foreground mb-4">
-              {h}
-            </h2>
-            <div className="space-y-3 text-sm sm:text-[15px] leading-relaxed text-foreground/75">
+      <Section raised>
+        <LegalDoc toc={TOC} updated="June 2026">
+          {SECTIONS.map(({ h, clauses }) => (
+            <LegalSection key={h} id={legalAnchor(h)} heading={h}>
               {clauses.map(({ n, body }) => (
-                <p key={n}>
-                  <b className="text-foreground/95 mr-1">{n}</b> {body}
-                </p>
+                <LegalClause key={n} n={n}>{body}</LegalClause>
               ))}
-            </div>
-          </section>
-        ))}
+            </LegalSection>
+          ))}
 
-        {/* Section 14 — Contact (special handling: includes contact card) */}
-        <section className="liquid-glass rounded-2xl p-6 sm:p-7">
-          <h2 className="font-display text-lg sm:text-xl uppercase tracking-tight text-foreground mb-4">
-            14. Contact Information
-          </h2>
-          <p className="text-sm sm:text-[15px] leading-relaxed text-foreground/75 mb-4">
-            For any questions, support requests, or concerns regarding these Terms &amp; Conditions, please contact:
-          </p>
-          <div
-            className="rounded-xl p-5 text-sm space-y-1"
-            style={{
-              background: 'hsl(11 79% 57% / 0.10)',
-              border: '1px solid hsl(11 79% 57% / 0.35)',
-            }}
-          >
-            <p className="font-semibold text-foreground">{BRAND_NAME} Support Team</p>
-            <p className="text-foreground/75">
+          {/* Section 14 — Contact (special handling: includes contact card) */}
+          <LegalSection id={legalAnchor(CONTACT_HEADING)} heading={CONTACT_HEADING}>
+            <LegalP>
+              For any questions, support requests, or concerns regarding these Terms &amp; Conditions, please contact:
+            </LegalP>
+            <LegalCallout>
+              <span style={{ color: 'var(--mk-text)', fontWeight: 700 }}>{BRAND_NAME} Support Team</span>
+              <br />
               Email:{' '}
-              <a href={`mailto:${BRAND_SUPPORT_EMAIL}`} className="text-primary hover:underline">
+              <a
+                href={`mailto:${BRAND_SUPPORT_EMAIL}`}
+                className="hover:underline"
+                style={{ color: 'var(--mk-accent)' }}
+              >
                 {BRAND_SUPPORT_EMAIL}
               </a>
-            </p>
-          </div>
-          <p className="mt-4 text-sm sm:text-[15px] leading-relaxed text-foreground/75">
-            By registering for an account and using {BRAND_NAME} services, you confirm that you have read, understood, and agreed to these Terms &amp; Conditions.
-          </p>
-        </section>
+            </LegalCallout>
+            <LegalP>
+              By registering for an account and using {BRAND_NAME} services, you confirm that you have read, understood, and agreed to these Terms &amp; Conditions.
+            </LegalP>
+          </LegalSection>
 
-        {/* Risk Disclaimer — kept as the platform's standard trader-facing warning */}
-        <div
-          className="rounded-2xl p-6 sm:p-7"
-          style={{
-            background: 'hsl(0 100% 41% / 0.08)',
-            border: '1px solid hsl(0 100% 41% / 0.35)',
-          }}
-        >
-          <h2 className="font-display text-lg sm:text-xl uppercase tracking-tight text-foreground mb-3 inline-flex items-center gap-2">
-            <ShieldAlert className="size-5 text-secondary" /> Risk Disclaimer
-          </h2>
-          <p className="text-sm sm:text-[15px] leading-relaxed text-foreground/75">
-            Trading foreign exchange (forex) and other leveraged financial products carries a high level of risk and may not be suitable for all investors. Leverage can work both for and against you — while it amplifies potential profits, it equally amplifies potential losses. You could sustain a loss of some or all of your initial investment and should not invest money that you cannot afford to lose. You should be aware of all the risks associated with leveraged trading and seek independent financial advice if you have any doubts. Past performance is not indicative of future results.
-          </p>
-        </div>
-
-        {/* Cross-links */}
-        <div className="liquid-glass-strong rounded-2xl p-6 sm:p-7 flex flex-col sm:flex-row gap-4 sm:items-center sm:justify-between">
-          <div className="flex items-start gap-3">
-            <ShieldAlert className="size-5 text-primary shrink-0 mt-0.5" />
-            <p className="text-sm text-foreground/75 leading-relaxed">
+          {/* Risk Disclaimer — kept as the platform's standard trader-facing warning */}
+          <LegalSection id={legalAnchor(RISK_HEADING)} heading={RISK_HEADING}>
+            <LegalCallout tone="warn">
+              Trading foreign exchange (forex) and other leveraged financial products carries a high level of risk and may not be suitable for all investors. Leverage can work both for and against you — while it amplifies potential profits, it equally amplifies potential losses. You could sustain a loss of some or all of your initial investment and should not invest money that you cannot afford to lose. You should be aware of all the risks associated with leveraged trading and seek independent financial advice if you have any doubts. Past performance is not indicative of future results.
+            </LegalCallout>
+            <LegalP>
               These Terms work alongside our{' '}
-              <Link href="/privacy" className="text-primary underline-offset-4 hover:underline">
+              <Link href="/privacy" className="hover:underline" style={{ color: 'var(--mk-accent)' }}>
                 Privacy Policy
               </Link>{' '}
               and{' '}
-              <Link href="/risk" className="text-primary underline-offset-4 hover:underline">
+              <Link href="/risk" className="hover:underline" style={{ color: 'var(--mk-accent)' }}>
                 Risk Disclaimer
               </Link>
               .
-            </p>
-          </div>
-          <a
-            href={`mailto:${BRAND_SUPPORT_EMAIL}`}
-            className="inline-flex items-center gap-2 rounded-full bg-primary text-white px-5 py-2.5 text-sm font-semibold uppercase tracking-wider hover:opacity-90 shrink-0"
-          >
-            <Mail className="size-4" /> Contact Support
-          </a>
-        </div>
-      </article>
+            </LegalP>
+          </LegalSection>
+        </LegalDoc>
+      </Section>
 
-      <section className="mx-auto max-w-[1200px] px-[var(--gutter)] pb-20">
-        <div className="liquid-glass-strong rounded-3xl p-8 sm:p-12 text-center">
-          <h2 className="font-display uppercase text-2xl sm:text-3xl tracking-tight inline-flex items-center gap-2">
-            <ScrollText className="size-6 text-primary" /> Ready to Begin?
-          </h2>
-          <p className="mt-4 text-foreground/70 max-w-xl mx-auto text-sm sm:text-base">
-            By opening a {BRAND_NAME} account, you confirm you have read and accepted these Terms.
-          </p>
-          <Link
-            href="/auth/register"
-            className="mt-7 inline-flex items-center gap-2 rounded-full bg-primary text-white px-6 py-3 text-sm font-semibold uppercase tracking-wider hover:opacity-90"
-          >
-            Open Account <ArrowUpRight className="size-4" />
-          </Link>
-        </div>
-      </section>
+      <CtaBanner
+        title="Ready to Begin?"
+        lead={`By opening a ${BRAND_NAME} account, you confirm you have read and accepted these Terms.`}
+        primary={{ label: 'Open Account', href: '/auth/register' }}
+        secondary={{ label: 'Contact Support', href: `mailto:${BRAND_SUPPORT_EMAIL}` }}
+      />
     </main>
   );
 }

@@ -48,7 +48,7 @@ function TradingSession({ children }: { children: React.ReactNode }) {
   const accountQueryId = searchParams.get('account');
 
   const {
-    updatePrice,
+    updatePrices,
     setActiveAccount,
     setAccounts,
     setPositions,
@@ -137,7 +137,7 @@ function TradingSession({ children }: { children: React.ReactNode }) {
     wsManager.connect();
     const unsub = wsManager.onMessage((data) => {
       const ticks = extractTicksFromPayload(data);
-      for (const t of ticks) updatePrice(t);
+      updatePrices(ticks);
     });
 
     let pollCancelled = false;
@@ -153,7 +153,7 @@ function TradingSession({ children }: { children: React.ReactNode }) {
         if (ticks.length <= 1) {
           console.warn(`[prices] /instruments/prices/all returned ${ticks.length} tick(s) — feed may be publishing only one symbol`);
         }
-        for (const t of ticks) updatePrice(t);
+        updatePrices(ticks);
       } catch (err) {
         console.warn('[prices] poll of /instruments/prices/all failed:', err);
       }
@@ -193,7 +193,7 @@ function TradingSession({ children }: { children: React.ReactNode }) {
       clearInterval(positionPoll);
       clearInterval(pricePoll);
     };
-  }, [setAccounts, setInstruments, updatePrice, refreshPositions, refreshAccount]);
+  }, [setAccounts, setInstruments, updatePrices, refreshPositions, refreshAccount]);
 
   /* Picker vs terminal: active account + positions. */
   useEffect(() => {

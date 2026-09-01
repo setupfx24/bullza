@@ -1,81 +1,113 @@
 import LandingHeader from '@/components/landing/LandingHeader'
 import LandingFooter from '@/components/landing/LandingFooter'
 import { Phone, Mail, MessageCircle, MapPin, Clock } from 'lucide-react'
+import { Section, SectionHeading, PageHero } from '@/marketing/components'
 import { BRAND_NAME, BRAND_SUPPORT_EMAIL } from '@/lib/brand'
+import '@/marketing/tokens.css'
+
+/**
+ * Standalone /contact. Restyled onto the shared marketing design system —
+ * the body is wrapped in `.mk` so it picks up the marketing tokens (this
+ * route sits outside the (landing) group, which normally applies them).
+ *
+ * The enquiry form keeps every field, label, placeholder, option and the
+ * submit control exactly as before; only the visual treatment changed.
+ *
+ * LandingHeader / LandingFooter keep their own existing styling; they are
+ * shared chrome outside this restyle's scope.
+ */
 
 export const metadata = { title: `Contact Us — ${BRAND_NAME}` }
 
+/** Shared field styling — one source of truth for every control below. */
+const FIELD_STYLE: React.CSSProperties = {
+  background: 'var(--mk-surface-2)',
+  border: '1px solid var(--mk-line)',
+  borderRadius: 'var(--mk-radius-sm)',
+  color: 'var(--mk-text)',
+  fontSize: 'var(--mk-text-sm)',
+  width: '100%',
+  padding: '0.75rem 1rem',
+  outline: 'none',
+}
+
+const LABEL_STYLE: React.CSSProperties = {
+  display: 'block',
+  marginBottom: 'var(--mk-space-2)',
+  fontSize: 'var(--mk-text-sm)',
+  color: 'var(--mk-text-muted)',
+}
+
+const CONTACT_METHODS = [
+  { icon: Phone, title: 'WhatsApp', value: '+44 7737 119978', desc: 'Available 24/7' },
+  { icon: Mail, title: 'Email', value: BRAND_SUPPORT_EMAIL, desc: 'Response within 1 hour' },
+  { icon: MessageCircle, title: 'Live Chat', value: 'Chat with us', desc: 'Instant support' },
+]
+
+const OFFICES = [
+  {
+    city: 'Scotland Office',
+    address: `${BRAND_NAME} Office 23US, 18 Young St, UNIT LGE 1/1, Edinburgh EH2 4JB, Scotland`,
+    hours: 'Mon-Fri: 9:00 AM - 6:00 PM GMT',
+  },
+  {
+    city: 'St. Lucia Office',
+    address: 'Rodney Bay, Gros Islet, St. Lucia',
+    hours: 'Mon-Fri: 9:00 AM - 5:00 PM AST',
+  },
+]
+
 export default function ContactPage() {
   return (
-    <div className="min-h-screen bg-white text-gray-900">
+    <div className="min-h-screen">
       <LandingHeader />
 
-      {/* Hero Section */}
-      <section className="bg-gradient-to-b from-white to-gray-50 pt-16 pb-20">
-        <div className="max-w-7xl mx-auto px-6 lg:px-8 text-center">
-          <h1 className="text-4xl lg:text-5xl font-extrabold text-gray-900 leading-tight mb-6">
-            Get in Touch<br />
-            <span className="text-blue-600">We're Here to Help</span>
-          </h1>
-          <p className="text-lg text-gray-500 max-w-2xl mx-auto leading-relaxed">
-            Have questions? Our support team is available 24/7 to assist you.
-          </p>
-        </div>
-      </section>
+      <div className="mk">
+        <PageHero
+          kicker="Contact"
+          title={<>Get in Touch<br /><span style={{ color: 'var(--mk-accent)' }}>We&apos;re Here to Help</span></>}
+          lead="Have questions? Our support team is available 24/7 to assist you."
+        />
 
-      {/* Contact Methods */}
-      <section className="py-20 bg-white">
-        <div className="max-w-7xl mx-auto px-6 lg:px-8">
-          <div className="grid md:grid-cols-3 gap-8 mb-16">
-            {[
-              { icon: Phone, title: 'WhatsApp', value: '+44 7737 119978', desc: 'Available 24/7' },
-              { icon: Mail, title: 'Email', value: BRAND_SUPPORT_EMAIL, desc: 'Response within 1 hour' },
-              { icon: MessageCircle, title: 'Live Chat', value: 'Chat with us', desc: 'Instant support' },
-            ].map(({ icon: Icon, title, value, desc }) => (
-              <div key={title} className="bg-gray-50 rounded-xl p-8 border border-gray-200 text-center hover:shadow-md transition-shadow">
-                <div className="w-14 h-14 bg-blue-50 rounded-xl flex items-center justify-center mx-auto mb-4">
-                  <Icon className="w-7 h-7 text-blue-600" />
-                </div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">{title}</h3>
-                <p className="text-blue-600 font-semibold mb-2">{value}</p>
-                <p className="text-gray-500 text-sm">{desc}</p>
-              </div>
+        {/* Contact Methods */}
+        <Section raised>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+            {CONTACT_METHODS.map(({ icon: Icon, title, value, desc }) => (
+              <article key={title} className="mk-card mk-card--hover text-center flex flex-col items-center gap-3">
+                <span
+                  className="inline-flex h-14 w-14 items-center justify-center rounded-xl shrink-0"
+                  style={{ background: 'var(--mk-accent-soft)', color: 'var(--mk-accent)' }}
+                >
+                  <Icon className="h-6 w-6" />
+                </span>
+                <h3 className="mk-h3">{title}</h3>
+                <p className="font-bold break-words" style={{ color: 'var(--mk-accent)' }}>{value}</p>
+                <p className="mk-body" style={{ fontSize: 'var(--mk-text-sm)' }}>{desc}</p>
+              </article>
             ))}
           </div>
 
           {/* Contact Form */}
-          <div className="max-w-2xl mx-auto bg-gray-50 rounded-2xl p-8 border border-gray-200">
-            <h2 className="text-2xl font-bold text-gray-900 mb-6">Send us a Message</h2>
-            <form className="space-y-6">
-              <div className="grid md:grid-cols-2 gap-6">
+          <div className="mk-card max-w-2xl mx-auto mt-12">
+            <h2 className="mk-h2 mb-6">Send us a Message</h2>
+            <form className="flex flex-col gap-5">
+              <div className="grid md:grid-cols-2 gap-5">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">First Name</label>
-                  <input
-                    type="text"
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="John"
-                  />
+                  <label style={LABEL_STYLE}>First Name</label>
+                  <input type="text" style={FIELD_STYLE} placeholder="John" />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Last Name</label>
-                  <input
-                    type="text"
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="Doe"
-                  />
+                  <label style={LABEL_STYLE}>Last Name</label>
+                  <input type="text" style={FIELD_STYLE} placeholder="Doe" />
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
-                <input
-                  type="email"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="john@example.com"
-                />
+                <label style={LABEL_STYLE}>Email</label>
+                <input type="email" style={FIELD_STYLE} placeholder="john@example.com" />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Subject</label>
-                <select className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                <label style={LABEL_STYLE}>Subject</label>
+                <select style={FIELD_STYLE}>
                   <option>General Inquiry</option>
                   <option>Technical Support</option>
                   <option>Account Issues</option>
@@ -84,60 +116,38 @@ export default function ContactPage() {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Message</label>
-                <textarea
-                  rows={5}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="How can we help you?"
-                />
+                <label style={LABEL_STYLE}>Message</label>
+                <textarea rows={5} style={{ ...FIELD_STYLE, resize: 'none' }} placeholder="How can we help you?" />
               </div>
-              <button
-                type="submit"
-                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-lg transition-colors"
-              >
+              <button type="submit" className="mk-btn mk-btn--primary w-full">
                 Send Message
               </button>
             </form>
           </div>
-        </div>
-      </section>
+        </Section>
 
-      {/* Office Locations */}
-      <section className="py-20 bg-gray-50">
-        <div className="max-w-7xl mx-auto px-6 lg:px-8">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl font-extrabold text-gray-900 mb-4">Our Offices</h2>
-          </div>
-          <div className="grid md:grid-cols-2 gap-8">
-            {[
-              {
-                city: 'Scotland Office',
-                address: `${BRAND_NAME} Office 23US, 18 Young St, UNIT LGE 1/1, Edinburgh EH2 4JB, Scotland`,
-                hours: 'Mon-Fri: 9:00 AM - 6:00 PM GMT',
-              },
-              {
-                city: 'St. Lucia Office',
-                address: 'Rodney Bay, Gros Islet, St. Lucia',
-                hours: 'Mon-Fri: 9:00 AM - 5:00 PM AST',
-              },
-            ].map(({ city, address, hours }) => (
-              <div key={city} className="bg-white rounded-xl p-8 border border-gray-200">
-                <h3 className="text-xl font-bold text-gray-900 mb-4">{city}</h3>
-                <div className="space-y-3">
+        {/* Office Locations */}
+        <Section>
+          <SectionHeading kicker="Offices" title="Our Offices" />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mt-12">
+            {OFFICES.map(({ city, address, hours }) => (
+              <article key={city} className="mk-card mk-card--hover flex flex-col gap-4">
+                <h3 className="mk-h3">{city}</h3>
+                <div className="flex flex-col gap-3">
                   <div className="flex items-start gap-3">
-                    <MapPin className="w-5 h-5 text-gray-400 mt-0.5" />
-                    <p className="text-gray-600">{address}</p>
+                    <MapPin className="h-5 w-5 mt-0.5 shrink-0" style={{ color: 'var(--mk-accent)' }} />
+                    <p className="mk-body">{address}</p>
                   </div>
                   <div className="flex items-center gap-3">
-                    <Clock className="w-5 h-5 text-gray-400" />
-                    <p className="text-gray-600">{hours}</p>
+                    <Clock className="h-5 w-5 shrink-0" style={{ color: 'var(--mk-accent)' }} />
+                    <p className="mk-body">{hours}</p>
                   </div>
                 </div>
-              </div>
+              </article>
             ))}
           </div>
-        </div>
-      </section>
+        </Section>
+      </div>
 
       <LandingFooter />
     </div>

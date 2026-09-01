@@ -1,67 +1,82 @@
 'use client';
 
-import { useState } from 'react';
+/**
+ * Welcome Bonus page. Restyled onto the shared marketing design system;
+ * every line of copy is carried over from the previous version.
+ */
 import Link from 'next/link';
 import {
-  ArrowUpRight, Gift, Wallet, CheckCircle2, Sparkles,
-  Zap, ShieldCheck, Clock, ChevronDown,
+  Gift, Wallet, CheckCircle2, Sparkles, Zap, ShieldCheck, Clock,
 } from 'lucide-react';
-import { BannerPlaceholder } from '@/home/components/BannerPlaceholder';
+import { Section, SectionHeading, PageHero, FeatureGrid, FaqAccordion, CtaBanner } from '@/marketing/components';
+import type { FaqItem } from '@/marketing/components';
 import { BRAND_NAME } from '@/lib/brand';
 
 const SIGNUP_HREF = '/auth/register';
 
+const STEPS = [
+  { n: '01', icon: Wallet,       title: 'Open Account',       body: 'Sign up in under 3 minutes. KYC verification is automated and usually completes within 24 hours.' },
+  { n: '02', icon: Gift,         title: 'Make First Deposit',  body: 'Deposit at least $50 via crypto, wire, or card. Tier is set automatically based on amount.' },
+  { n: '03', icon: Zap,          title: 'Bonus Credited',      body: 'Matching bonus lands in your bonus-equity balance within minutes — no manual claim needed.' },
+  { n: '04', icon: CheckCircle2, title: 'Trade & Withdraw',    body: 'Use the bonus equity to open positions. Withdraw your profits at any time — no holding period.' },
+];
+
+const FAQS: FaqItem[] = [
+  {
+    q: 'What is the minimum deposit to claim the welcome bonus?',
+    a: 'Only $50. Make a first deposit of $50 or more and the matching welcome bonus is credited to your account automatically — no promo code needed. Larger deposits unlock higher bonus tiers up to the full match.',
+  },
+  {
+    q: 'Can I withdraw the bonus immediately?',
+    a: 'Your profits from trading the bonus are withdrawable at any time. The bonus equity itself is subject to the standard programme terms shown in your dashboard.',
+  },
+  {
+    q: 'What happens if I deposit more than once?',
+    a: 'The welcome bonus applies only to your first qualifying deposit. Subsequent deposits are eligible for loyalty rewards and reload promotions, which run separately.',
+  },
+  {
+    q: 'Which deposit methods qualify?',
+    a: `All standard methods qualify: crypto (BTC, ETH, USDT, USDC), bank wire, Visa/Mastercard, Skrill, Neteller, and supported local options. Internal transfers between ${BRAND_NAME} accounts do not qualify.`,
+  },
+  {
+    q: 'What if I lose the bonus on a trade?',
+    a: 'Bonus equity absorbs losses first — your deposited capital is protected ahead of bonus. If the bonus is fully consumed by losses, your principal is untouched.',
+  },
+  {
+    q: 'Can the bonus be combined with other promotions?',
+    a: 'Yes. The welcome bonus stacks with the ongoing referral program, loyalty rewards, and trade cashback. It cannot be combined with one-time competitor-switch offers.',
+  },
+];
+
 export default function BonusPage() {
   return (
-    <main className="min-h-screen bg-background">
-      <BannerPlaceholder
-        title="100% Welcome Bonus"
-        tagline="On your first deposit — auto-credited within minutes, fully tradeable, no promo code needed."
+    <main>
+      <PageHero
+        kicker="Limited-Time Welcome Offer"
+        title={<><span style={{ color: 'var(--mk-accent)' }}>100% Bonus</span> on Your First Deposit</>}
+        lead="On your first deposit — auto-credited within minutes, fully tradeable, no promo code needed."
+        primary={{ label: 'Claim Bonus', href: SIGNUP_HREF }}
+        secondary={{ label: 'See FAQ', href: '#faq' }}
       />
 
-      {/* Bold heading band — "100% Bonus on Your First Deposit — Details" */}
-      <section className="mx-auto max-w-[1200px] px-[var(--gutter)] pt-8 sm:pt-10">
-        <div
-          className="rounded-3xl p-6 sm:p-8 text-center"
-          style={{
-            background:
-              'linear-gradient(135deg, hsl(11 79% 57% / 0.18) 0%, hsl(0 0% 6% / 0.6) 60%, hsl(0 100% 41% / 0.12) 100%)',
-            border: '1px solid hsl(11 79% 57% / 0.45)',
-          }}
-        >
-          <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/30 text-primary text-[11px] uppercase tracking-[0.22em] font-bold">
-            <Sparkles className="size-3" /> Details
-          </span>
-          <h2 className="mt-4 font-display uppercase font-extrabold tracking-tight leading-[0.95] text-foreground text-3xl sm:text-4xl md:text-5xl">
-            <span className="text-primary">100% Bonus</span> on Your First Deposit
-          </h2>
-          <p className="mt-3 mx-auto max-w-2xl text-foreground/75 text-sm sm:text-base">
-            Full breakdown of the welcome match — tier-by-tier amounts, unlock requirements, and how to claim. Everything you need to know in one place.
-          </p>
-        </div>
-      </section>
-
       {/* Intro callout */}
-      <section className="mx-auto max-w-[1200px] px-[var(--gutter)] py-10 sm:py-14">
-        <div className="liquid-glass-strong rounded-3xl p-6 sm:p-10 grid lg:grid-cols-[1.2fr_1fr] gap-8 items-center">
-          <div>
-            <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/25 text-primary text-[11px] uppercase tracking-[0.18em] font-semibold">
-              <Sparkles className="size-3" /> Limited-Time Welcome Offer
+      <Section raised>
+        <div className="grid lg:grid-cols-[1.2fr_1fr] gap-8 items-center">
+          <div className="flex flex-col gap-4">
+            <span className="mk-kicker">
+              <Sparkles size={13} /> Limited-Time Welcome Offer
             </span>
-            <h2 className="mt-5 font-display uppercase text-2xl sm:text-3xl md:text-4xl tracking-tight">
-              Deposit more. <span className="text-primary">Trade with more.</span>
+            <h2 className="mk-h2">
+              Deposit more. <span style={{ color: 'var(--mk-accent)' }}>Trade with more.</span>
             </h2>
-            <p className="mt-4 text-foreground/70 text-sm sm:text-base leading-relaxed max-w-xl">
+            <p className="mk-lead">
               {BRAND_NAME} matches your first deposit with bonus equity that lands in your account within minutes.
-              The bigger the tier you hit, the larger the matched amount — up to a full <span className="text-primary font-semibold">$200</span> credited on a $200 deposit.
+              The bigger the tier you hit, the larger the matched amount — up to a full{' '}
+              <span className="font-bold" style={{ color: 'var(--mk-accent)' }}>$200</span> credited on a $200 deposit.
             </p>
-            <div className="mt-7 flex flex-wrap gap-3">
-              <Link href={SIGNUP_HREF} className="inline-flex items-center gap-2 rounded-full bg-primary text-white px-6 py-3 text-sm font-semibold uppercase tracking-wider hover:opacity-90">
-                Claim Bonus <ArrowUpRight className="size-4" />
-              </Link>
-              <Link href="#faq" className="inline-flex items-center gap-2 rounded-full liquid-glass px-6 py-3 text-sm font-semibold uppercase tracking-wider hover:bg-foreground/10">
-                See FAQ
-              </Link>
+            <div className="flex flex-wrap gap-3 pt-2">
+              <Link href={SIGNUP_HREF} className="mk-btn mk-btn--primary">Claim Bonus</Link>
+              <Link href="#faq" className="mk-btn mk-btn--ghost">See FAQ</Link>
             </div>
           </div>
           {/* Bonus illustration — branded artwork dropped by the client. */}
@@ -69,127 +84,77 @@ export default function BonusPage() {
           <img
             src="/images/bonus_details3.png"
             alt="Welcome bonus illustration"
-            className="rounded-2xl w-full min-h-[260px] max-h-[340px] object-cover"
-            style={{ border: '1px solid hsl(11 79% 57% / 0.35)' }}
+            className="w-full max-w-full min-h-[260px] max-h-[340px] object-cover"
+            style={{ borderRadius: 'var(--mk-radius-lg)', border: '1px solid var(--mk-accent-line)' }}
           />
         </div>
-      </section>
+      </Section>
 
       {/* "Pick Your Tier" section removed per client request — the
           welcome bonus rules are explained inline in the intro callout
           and FAQ; visitors land on /auth/register from the page CTA. */}
 
       {/* How it works */}
-      <section className="mx-auto max-w-[1200px] px-[var(--gutter)] py-12 sm:py-16">
-        <div className="text-center mb-10">
-          <h2 className="font-display uppercase text-2xl sm:text-3xl md:text-4xl tracking-tight">How to Claim</h2>
-          <p className="mt-3 text-foreground/65 max-w-xl mx-auto text-sm sm:text-base">
-            Four simple steps — no promo codes, no support tickets, no waiting.
-          </p>
-        </div>
-        <ol className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
-          {[
-            { n: '01', icon: Wallet,      title: 'Open Account',    body: 'Sign up in under 3 minutes. KYC verification is automated and usually completes within 24 hours.' },
-            { n: '02', icon: Gift,        title: 'Make First Deposit', body: 'Deposit at least $50 via crypto, wire, or card. Tier is set automatically based on amount.' },
-            { n: '03', icon: Zap,         title: 'Bonus Credited',   body: 'Matching bonus lands in your bonus-equity balance within minutes — no manual claim needed.' },
-            { n: '04', icon: CheckCircle2, title: 'Trade & Withdraw', body: 'Use the bonus equity to open positions. Withdraw your profits at any time — no holding period.' },
-          ].map(({ n, icon: Icon, title, body }) => (
-            <li key={n} className="liquid-glass rounded-2xl p-6">
-              <div className="flex items-center justify-between">
-                <span className="font-display text-4xl text-primary/70">{n}</span>
-                <div className="size-11 rounded-xl bg-primary/25 flex items-center justify-center"><Icon className="size-5 text-primary" /></div>
+      <Section>
+        <SectionHeading
+          kicker="Claiming"
+          title="How to Claim"
+          lead="Four simple steps — no promo codes, no support tickets, no waiting."
+        />
+        <ol className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mt-12">
+          {STEPS.map(({ n, icon: Icon, title, body }) => (
+            <li key={n} className="mk-card mk-card--hover flex flex-col gap-3">
+              <div className="flex items-center justify-between gap-3">
+                <span
+                  className="font-extrabold"
+                  style={{ fontSize: 'var(--mk-text-h2)', color: 'var(--mk-accent-line)', lineHeight: 1 }}
+                >
+                  {n}
+                </span>
+                <span
+                  className="inline-flex h-11 w-11 items-center justify-center rounded-xl shrink-0"
+                  style={{ background: 'var(--mk-accent-soft)', color: 'var(--mk-accent)' }}
+                >
+                  <Icon size={20} />
+                </span>
               </div>
-              <h3 className="mt-4 font-display text-lg uppercase tracking-tight">{title}</h3>
-              <p className="mt-2 text-sm text-foreground/65 leading-relaxed">{body}</p>
+              <h3 className="mk-h3">{title}</h3>
+              <p className="mk-body" style={{ fontSize: 'var(--mk-text-sm)' }}>{body}</p>
             </li>
           ))}
         </ol>
-      </section>
+      </Section>
 
       {/* Why our bonus is different */}
-      <section className="mx-auto max-w-[1200px] px-[var(--gutter)] py-12 sm:py-16">
-        <div className="text-center mb-10">
-          <h2 className="font-display uppercase text-2xl sm:text-3xl md:text-4xl tracking-tight">Why This Bonus Is Different</h2>
-        </div>
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
-          {[
-            { icon: Zap,         title: 'Instant Credit',          body: 'No 5-day approval. Bonus lands in your account within minutes of your deposit clearing.' },
-            { icon: CheckCircle2, title: 'Fully Tradeable',         body: 'Use the bonus equity on any instrument — forex, crypto, indices, metals. No restrictions.' },
-            { icon: ShieldCheck, title: 'Transparent Terms',       body: 'Plain-English programme terms. Bonus status and equity are visible in your dashboard from day one.' },
-            { icon: Clock,       title: 'No Time Pressure',         body: 'No 30-day deadline games. Take the time you need to trade the unlock volume responsibly.' },
-            { icon: Sparkles,    title: 'No Promo Codes',          body: 'Tier is set automatically by deposit size. No emails to chase, no codes to remember.' },
-          ].map(({ icon: Icon, title, body }) => (
-            <article key={title} className="liquid-glass rounded-2xl p-6">
-              <div className="size-11 rounded-xl bg-primary/25 flex items-center justify-center mb-4"><Icon className="size-5 text-primary" /></div>
-              <h3 className="font-display text-lg uppercase tracking-tight">{title}</h3>
-              <p className="mt-2 text-sm text-foreground/65 leading-relaxed">{body}</p>
-            </article>
-          ))}
-        </div>
-      </section>
+      <Section raised>
+        <SectionHeading kicker="The Difference" title="Why This Bonus Is Different" />
+        <FeatureGrid
+          className="mt-12"
+          columns={3}
+          items={[
+            { icon: Zap,          title: 'Instant Credit',    body: 'No 5-day approval. Bonus lands in your account within minutes of your deposit clearing.' },
+            { icon: CheckCircle2, title: 'Fully Tradeable',   body: 'Use the bonus equity on any instrument — forex, crypto, indices, metals. No restrictions.' },
+            { icon: ShieldCheck,  title: 'Transparent Terms', body: 'Plain-English programme terms. Bonus status and equity are visible in your dashboard from day one.' },
+            { icon: Clock,        title: 'No Time Pressure',  body: 'No 30-day deadline games. Take the time you need to trade the unlock volume responsibly.' },
+            { icon: Sparkles,     title: 'No Promo Codes',    body: 'Tier is set automatically by deposit size. No emails to chase, no codes to remember.' },
+          ]}
+        />
+      </Section>
 
       {/* FAQ */}
-      <section id="faq" className="mx-auto max-w-[800px] px-[var(--gutter)] py-12 sm:py-16">
-        <h2 className="text-center font-display uppercase text-2xl sm:text-3xl tracking-tight mb-8">FAQ</h2>
-        <div className="space-y-3">
-          <FaqItem q="What is the minimum deposit to claim the welcome bonus?">
-            Only $50. Make a first deposit of $50 or more and the matching welcome bonus is credited
-            to your account automatically — no promo code needed. Larger deposits unlock higher
-            bonus tiers up to the full match.
-          </FaqItem>
-          <FaqItem q="Can I withdraw the bonus immediately?">
-            Your profits from trading the bonus are withdrawable at any time. The bonus equity itself
-            is subject to the standard programme terms shown in your dashboard.
-          </FaqItem>
-          <FaqItem q="What happens if I deposit more than once?">
-            The welcome bonus applies only to your first qualifying deposit. Subsequent deposits are eligible
-            for loyalty rewards and reload promotions, which run separately.
-          </FaqItem>
-          <FaqItem q="Which deposit methods qualify?">
-            All standard methods qualify: crypto (BTC, ETH, USDT, USDC), bank wire, Visa/Mastercard, Skrill,
-            Neteller, and supported local options. Internal transfers between {BRAND_NAME} accounts do not qualify.
-          </FaqItem>
-          <FaqItem q="What if I lose the bonus on a trade?">
-            Bonus equity absorbs losses first — your deposited capital is protected ahead of bonus. If the
-            bonus is fully consumed by losses, your principal is untouched.
-          </FaqItem>
-          <FaqItem q="Can the bonus be combined with other promotions?">
-            Yes. The welcome bonus stacks with the ongoing referral program, loyalty rewards, and trade
-            cashback. It cannot be combined with one-time competitor-switch offers.
-          </FaqItem>
+      <Section id="faq">
+        <SectionHeading kicker="Questions" title="FAQ" />
+        <div className="mx-auto max-w-[800px] mt-12">
+          <FaqAccordion items={FAQS} />
         </div>
-      </section>
+      </Section>
 
-      {/* CTA */}
-      <section className="mx-auto max-w-[1200px] px-[var(--gutter)] pb-20">
-        <div className="liquid-glass-strong rounded-3xl p-8 sm:p-12 text-center">
-          <h2 className="font-display uppercase text-2xl sm:text-3xl tracking-tight">Claim Your Bonus Today</h2>
-          <p className="mt-4 text-foreground/70 max-w-xl mx-auto text-sm sm:text-base">
-            Open your {BRAND_NAME} account, make your first deposit, and the matching bonus is in your balance within minutes.
-          </p>
-          <div className="mt-7 flex flex-wrap justify-center gap-3">
-            <Link href={SIGNUP_HREF} className="inline-flex items-center gap-2 rounded-full bg-primary text-white px-6 py-3 text-sm font-semibold uppercase tracking-wider hover:opacity-90">
-              Open Account <ArrowUpRight className="size-4" />
-            </Link>
-            <Link href="#tiers" className="inline-flex items-center gap-2 rounded-full liquid-glass px-6 py-3 text-sm font-semibold uppercase tracking-wider hover:bg-foreground/10">
-              Review Tiers
-            </Link>
-          </div>
-        </div>
-      </section>
+      <CtaBanner
+        title="Claim Your Bonus Today"
+        lead={`Open your ${BRAND_NAME} account, make your first deposit, and the matching bonus is in your balance within minutes.`}
+        primary={{ label: 'Open Account', href: SIGNUP_HREF }}
+        secondary={{ label: 'Read the FAQ', href: '#faq' }}
+      />
     </main>
-  );
-}
-
-function FaqItem({ q, children }: { q: string; children: React.ReactNode }) {
-  const [open, setOpen] = useState(false);
-  return (
-    <div className="liquid-glass rounded-2xl">
-      <button type="button" onClick={() => setOpen((v) => !v)} aria-expanded={open} className="w-full flex items-center justify-between gap-4 px-5 py-4 text-left">
-        <span className="font-display text-base sm:text-lg uppercase tracking-tight">{q}</span>
-        <ChevronDown className={`size-5 text-foreground/55 shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} />
-      </button>
-      {open && <div className="px-5 pb-5 text-sm text-foreground/70 leading-relaxed">{children}</div>}
-    </div>
   );
 }

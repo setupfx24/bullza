@@ -1,14 +1,16 @@
-'use client';
+import Link from 'next/link';
+import { Section, PageHero, CtaBanner } from '@/marketing/components';
+import {
+  LegalDoc, LegalSection, LegalP, LegalCallout, legalAnchor,
+} from '../_legal/LegalDoc';
+import { BRAND_NAME, BRAND_SUPPORT_EMAIL } from '@/lib/brand';
 
 /**
  * Risk Disclaimer — public legal page.
- * Linked from footer; previously 404'd. Boilerplate adapted to the platform's
- * product mix (forex, CFDs, crypto).
+ * Linked from footer. Boilerplate adapted to the platform's product mix
+ * (forex, CFDs, crypto). Restyled onto the shared marketing design
+ * system; every clause is carried over verbatim.
  */
-import Link from 'next/link';
-import { ArrowUpRight, ShieldAlert, TriangleAlert, Info, Mail } from 'lucide-react';
-import { BannerPlaceholder } from '@/home/components/BannerPlaceholder';
-import { BRAND_NAME, BRAND_SUPPORT_EMAIL } from '@/lib/brand';
 
 const SECTIONS = [
   {
@@ -92,81 +94,59 @@ const SECTIONS = [
   },
 ];
 
+const TOC = SECTIONS.map((s) => ({ id: legalAnchor(s.h), label: s.h }));
+
 export default function RiskPage() {
   return (
-    <main className="min-h-screen" style={{ background: '#08090b', color: '#f5f5f5' }}>
-      <BannerPlaceholder
+    <main>
+      <PageHero
+        kicker="Legal"
         title="Risk Disclaimer"
-        tagline="Plain-English warnings about the risks of trading forex, CFDs, and crypto."
+        lead="Plain-English warnings about the risks of trading forex, CFDs, and crypto."
       />
 
-      <section className="mx-auto max-w-[840px] px-[var(--gutter)] pt-10 pb-6">
-        <div
-          className="rounded-2xl px-5 py-4 flex items-start gap-3 text-sm"
-          style={{
-            background: 'hsl(0 100% 41% / 0.10)',
-            border: '1px solid hsl(0 100% 41% / 0.35)',
-          }}
-        >
-          <TriangleAlert className="size-5 text-secondary shrink-0 mt-0.5" />
-          <div className="text-foreground/85 leading-relaxed">
-            <span className="font-semibold text-foreground">Important:</span> Trading carries
-            significant risk. Past performance is not indicative of future results. You may lose
-            some or all of your invested capital — only trade with money you can afford to lose.
-          </div>
-        </div>
-      </section>
+      <Section raised>
+        <LegalDoc toc={TOC}>
+          <LegalCallout tone="warn">
+            <span style={{ color: 'var(--mk-text)', fontWeight: 700 }}>Important:</span> Trading
+            carries significant risk. Past performance is not indicative of future results. You may
+            lose some or all of your invested capital — only trade with money you can afford to lose.
+          </LegalCallout>
 
-      <article className="mx-auto max-w-[840px] px-[var(--gutter)] py-8 sm:py-10 space-y-7">
-        {SECTIONS.map(({ h, p }) => (
-          <section key={h} className="liquid-glass rounded-2xl p-6 sm:p-7">
-            <h2 className="font-display text-lg sm:text-xl uppercase tracking-tight text-foreground mb-3">
-              {h}
-            </h2>
-            <p className="text-sm sm:text-[15px] leading-relaxed text-foreground/75">{p}</p>
-          </section>
-        ))}
+          {SECTIONS.map(({ h, p }) => (
+            <LegalSection key={h} id={legalAnchor(h)} heading={h}>
+              <LegalP>{p}</LegalP>
+            </LegalSection>
+          ))}
 
-        <div className="liquid-glass-strong rounded-2xl p-6 sm:p-7 flex flex-col sm:flex-row gap-4 sm:items-center sm:justify-between">
-          <div className="flex items-start gap-3">
-            <Info className="size-5 text-primary shrink-0 mt-0.5" />
-            <p className="text-sm text-foreground/75 leading-relaxed">
-              Cross-read with our{' '}
-              <Link href="/terms" className="text-primary underline-offset-4 hover:underline">
-                Terms of Service
-              </Link>{' '}
-              and{' '}
-              <Link href="/privacy" className="text-primary underline-offset-4 hover:underline">
-                Privacy Policy
-              </Link>
-              .
-            </p>
-          </div>
-          <a
-            href={`mailto:${BRAND_SUPPORT_EMAIL}`}
-            className="inline-flex items-center gap-2 rounded-full bg-primary text-white px-5 py-2.5 text-sm font-semibold uppercase tracking-wider hover:opacity-90 shrink-0"
-          >
-            <Mail className="size-4" /> Risk Queries
-          </a>
-        </div>
-      </article>
+          <LegalP>
+            Cross-read with our{' '}
+            <Link href="/terms" className="hover:underline" style={{ color: 'var(--mk-accent)' }}>
+              Terms of Service
+            </Link>{' '}
+            and{' '}
+            <Link href="/privacy" className="hover:underline" style={{ color: 'var(--mk-accent)' }}>
+              Privacy Policy
+            </Link>
+            . Risk queries can be sent to{' '}
+            <a
+              href={`mailto:${BRAND_SUPPORT_EMAIL}`}
+              className="hover:underline"
+              style={{ color: 'var(--mk-accent)' }}
+            >
+              {BRAND_SUPPORT_EMAIL}
+            </a>
+            .
+          </LegalP>
+        </LegalDoc>
+      </Section>
 
-      <section className="mx-auto max-w-[1200px] px-[var(--gutter)] pb-20">
-        <div className="liquid-glass-strong rounded-3xl p-8 sm:p-12 text-center">
-          <h2 className="font-display uppercase text-2xl sm:text-3xl tracking-tight inline-flex items-center gap-2">
-            <ShieldAlert className="size-6 text-primary" /> Trade Responsibly
-          </h2>
-          <p className="mt-4 text-foreground/70 max-w-xl mx-auto text-sm sm:text-base">
-            Open an account only after reading and accepting all our risk disclosures.
-          </p>
-          <Link
-            href="/auth/register"
-            className="mt-7 inline-flex items-center gap-2 rounded-full bg-primary text-white px-6 py-3 text-sm font-semibold uppercase tracking-wider hover:opacity-90"
-          >
-            Open Account <ArrowUpRight className="size-4" />
-          </Link>
-        </div>
-      </section>
+      <CtaBanner
+        title="Trade Responsibly"
+        lead="Open an account only after reading and accepting all our risk disclosures."
+        primary={{ label: 'Open Account', href: '/auth/register' }}
+        secondary={{ label: 'Read the Risk Warning', href: '/risk-warning' }}
+      />
     </main>
   );
 }

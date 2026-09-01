@@ -1,9 +1,14 @@
 'use client';
 
+/**
+ * Academy → Blog. Restyled onto the shared marketing design system.
+ * The post data, search/filter and pagination logic are carried over
+ * unchanged — only the page shell and card styling were replaced.
+ */
 import { useMemo, useState } from 'react';
-import Link from 'next/link';
 import { Search, Calendar, User, ArrowRight, ArrowUpRight, ArrowLeft } from 'lucide-react';
-import { BannerPlaceholder } from '@/home/components/BannerPlaceholder';
+import { clsx } from 'clsx';
+import { Section, PageHero, CtaBanner } from '@/marketing/components';
 import { BRAND_NAME } from '@/lib/brand';
 
 interface Post {
@@ -48,53 +53,77 @@ export default function AcademyBlogsPage() {
   const pageItems = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
   return (
-    <main className="min-h-screen bg-background">
-      <BannerPlaceholder
-        title={`${BRAND_NAME} Academy — Blog`}
-        tagline="Market insights, strategy breakdowns, and platform tips from our trading desk."
+    <main>
+      <PageHero
+        kicker={`${BRAND_NAME} Academy`}
+        title="Academy Blog"
+        lead="Market insights, strategy breakdowns, and platform tips from our trading desk."
       />
 
-      <div className="mx-auto max-w-[1200px] px-[var(--gutter)] py-12 sm:py-16">
+      <Section raised>
         {/* Featured post */}
-        <article className="liquid-glass-strong rounded-3xl overflow-hidden grid md:grid-cols-2 mb-12">
+        <article className="mk-card overflow-hidden grid md:grid-cols-2 gap-6" style={{ padding: 0 }}>
           {/* TODO: Featured post hero image yahan aayegi */}
-          <div className="image-placeholder relative aspect-[4/3] md:aspect-auto bg-foreground/[0.06] min-h-[260px]" aria-label={`${featured.title} cover`} />
-          <div className="p-6 sm:p-10 flex flex-col gap-4 justify-center">
-            <div className="inline-flex items-center gap-2 self-start text-[11px] uppercase tracking-[0.16em] text-primary">
-              Featured · {featured.category}
+          <div
+            className="relative aspect-[4/3] md:aspect-auto min-h-[260px]"
+            style={{ background: 'var(--mk-surface-2)' }}
+            aria-label={`${featured.title} cover`}
+          />
+          <div className="flex flex-col gap-4 justify-center" style={{ padding: 'var(--mk-space-6)' }}>
+            <span className="mk-kicker">Featured · {featured.category}</span>
+            <h2 className="mk-h2">{featured.title}</h2>
+            <p className="mk-lead">{featured.excerpt}</p>
+            <div className="flex items-center gap-4 flex-wrap" style={{ fontSize: 'var(--mk-text-xs)', color: 'var(--mk-text-faint)' }}>
+              <span className="inline-flex items-center gap-1.5"><User size={13} /> {featured.author}</span>
+              <span className="inline-flex items-center gap-1.5"><Calendar size={13} /> {featured.date}</span>
             </div>
-            <h2 className="font-display text-2xl sm:text-3xl md:text-4xl uppercase tracking-tight leading-tight">
-              {featured.title}
-            </h2>
-            <p className="text-foreground/65 text-sm sm:text-base leading-relaxed">{featured.excerpt}</p>
-            <div className="flex items-center gap-4 text-xs text-foreground/55">
-              <span className="inline-flex items-center gap-1.5"><User className="size-3.5" /> {featured.author}</span>
-              <span className="inline-flex items-center gap-1.5"><Calendar className="size-3.5" /> {featured.date}</span>
-            </div>
-            <button type="button" className="mt-2 self-start inline-flex items-center gap-2 text-sm font-semibold text-primary hover:opacity-80">
-              Read Full Story <ArrowUpRight className="size-4" />
+            <button
+              type="button"
+              className="mt-2 self-start inline-flex items-center gap-2 font-bold"
+              style={{ fontSize: 'var(--mk-text-sm)', color: 'var(--mk-accent)' }}
+            >
+              Read Full Story <ArrowUpRight size={16} />
             </button>
           </div>
         </article>
 
-        <div className="grid lg:grid-cols-[1fr_320px] gap-10">
+        <div className="grid lg:grid-cols-[1fr_320px] gap-10 mt-12">
           {/* Blog grid */}
-          <div>
+          <div className="min-w-0">
             <div className="grid sm:grid-cols-2 gap-5">
               {pageItems.map((p) => (
-                <article key={p.id} className="liquid-glass rounded-2xl overflow-hidden flex flex-col">
+                <article key={p.id} className="mk-card mk-card--hover overflow-hidden flex flex-col" style={{ padding: 0 }}>
                   {/* TODO: Post thumbnail yahan aayega */}
-                  <div className="image-placeholder relative aspect-video bg-foreground/[0.06]" aria-label={`${p.title} thumbnail`} />
-                  <div className="p-5 flex flex-col gap-3 flex-1">
-                    <span className="text-[10px] uppercase tracking-[0.16em] text-primary self-start">{p.category}</span>
-                    <h3 className="font-display text-lg uppercase tracking-tight text-foreground leading-tight">{p.title}</h3>
-                    <div className="flex items-center gap-3 text-[11px] text-foreground/55">
-                      <span className="inline-flex items-center gap-1"><User className="size-3" /> {p.author}</span>
-                      <span className="inline-flex items-center gap-1"><Calendar className="size-3" /> {p.date}</span>
+                  <div
+                    className="relative aspect-video"
+                    style={{ background: 'var(--mk-surface-2)' }}
+                    aria-label={`${p.title} thumbnail`}
+                  />
+                  <div className="flex flex-col gap-3 flex-1" style={{ padding: 'var(--mk-space-5)' }}>
+                    <span
+                      className="self-start"
+                      style={{
+                        fontSize: 'var(--mk-text-label)',
+                        letterSpacing: 'var(--mk-tracking-label)',
+                        textTransform: 'uppercase',
+                        fontWeight: 700,
+                        color: 'var(--mk-accent)',
+                      }}
+                    >
+                      {p.category}
+                    </span>
+                    <h3 className="mk-h3">{p.title}</h3>
+                    <div className="flex items-center gap-3 flex-wrap" style={{ fontSize: 'var(--mk-text-xs)', color: 'var(--mk-text-faint)' }}>
+                      <span className="inline-flex items-center gap-1"><User size={12} /> {p.author}</span>
+                      <span className="inline-flex items-center gap-1"><Calendar size={12} /> {p.date}</span>
                     </div>
-                    <p className="text-sm text-foreground/65 leading-relaxed flex-1">{p.excerpt}</p>
-                    <button type="button" className="mt-2 inline-flex items-center gap-2 text-xs font-semibold text-primary hover:opacity-80 self-start">
-                      Read More <ArrowRight className="size-3.5" />
+                    <p className="mk-body flex-1" style={{ fontSize: 'var(--mk-text-sm)' }}>{p.excerpt}</p>
+                    <button
+                      type="button"
+                      className="mt-2 inline-flex items-center gap-2 font-bold self-start"
+                      style={{ fontSize: 'var(--mk-text-sm)', color: 'var(--mk-accent)' }}
+                    >
+                      Read More <ArrowRight size={14} />
                     </button>
                   </div>
                 </article>
@@ -103,15 +132,16 @@ export default function AcademyBlogsPage() {
 
             {/* Pagination */}
             {totalPages > 1 && (
-              <nav className="mt-10 flex items-center justify-center gap-2" aria-label="Pagination">
+              <nav className="mt-10 flex items-center justify-center gap-2 flex-wrap" aria-label="Pagination">
                 <button
                   type="button"
                   onClick={() => setPage((p) => Math.max(1, p - 1))}
                   disabled={safePage === 1}
-                  className="size-10 rounded-full liquid-glass flex items-center justify-center text-foreground disabled:opacity-30"
+                  className="h-10 w-10 rounded-full flex items-center justify-center disabled:opacity-30"
+                  style={{ border: '1px solid var(--mk-line-strong)', color: 'var(--mk-text)' }}
                   aria-label="Previous page"
                 >
-                  <ArrowLeft className="size-4" />
+                  <ArrowLeft size={16} />
                 </button>
                 {Array.from({ length: totalPages }, (_, i) => i + 1).map((n) => (
                   <button
@@ -119,9 +149,12 @@ export default function AcademyBlogsPage() {
                     type="button"
                     onClick={() => setPage(n)}
                     aria-current={n === safePage ? 'page' : undefined}
-                    className={`size-10 rounded-full text-sm font-semibold ${
-                      n === safePage ? 'bg-primary text-white' : 'liquid-glass text-foreground/80 hover:text-foreground'
-                    }`}
+                    className={clsx('h-10 w-10 rounded-full font-bold')}
+                    style={
+                      n === safePage
+                        ? { background: 'var(--mk-accent)', color: '#fff', fontSize: 'var(--mk-text-sm)' }
+                        : { border: '1px solid var(--mk-line-strong)', color: 'var(--mk-text-muted)', fontSize: 'var(--mk-text-sm)' }
+                    }
                   >
                     {n}
                   </button>
@@ -130,51 +163,71 @@ export default function AcademyBlogsPage() {
                   type="button"
                   onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                   disabled={safePage === totalPages}
-                  className="size-10 rounded-full liquid-glass flex items-center justify-center text-foreground disabled:opacity-30"
+                  className="h-10 w-10 rounded-full flex items-center justify-center disabled:opacity-30"
+                  style={{ border: '1px solid var(--mk-line-strong)', color: 'var(--mk-text)' }}
                   aria-label="Next page"
                 >
-                  <ArrowRight className="size-4" />
+                  <ArrowRight size={16} />
                 </button>
               </nav>
             )}
           </div>
 
           {/* Sidebar */}
-          <aside className="flex flex-col gap-6" aria-label="Sidebar">
-            <div className="liquid-glass rounded-2xl p-5">
-              <h3 className="font-display uppercase text-sm tracking-[0.16em] text-foreground/55 mb-4">Search</h3>
-              <div className="liquid-glass rounded-xl flex items-center gap-2 px-3.5 py-2.5">
-                <Search className="size-4 text-foreground/55" />
+          <aside className="flex flex-col gap-5 min-w-0" aria-label="Sidebar">
+            <div className="mk-card">
+              <h3 className="mk-kicker" style={{ color: 'var(--mk-text-faint)' }}>Search</h3>
+              <div
+                className="flex items-center gap-2 px-3.5 py-2.5 mt-4"
+                style={{ border: '1px solid var(--mk-line)', borderRadius: 'var(--mk-radius)', background: 'var(--mk-surface-2)' }}
+              >
+                <Search size={15} style={{ color: 'var(--mk-text-faint)' }} />
                 <input
                   type="search"
                   value={search}
                   onChange={(e) => { setSearch(e.target.value); setPage(1); }}
                   placeholder="Search posts…"
-                  className="bg-transparent text-sm text-foreground placeholder:text-foreground/40 outline-none flex-1 min-w-0"
+                  className="bg-transparent outline-none flex-1 min-w-0"
+                  style={{ fontSize: 'var(--mk-text-sm)', color: 'var(--mk-text)' }}
                   aria-label="Search blog posts"
                 />
               </div>
             </div>
 
-            <div className="liquid-glass rounded-2xl p-5">
-              <h3 className="font-display uppercase text-sm tracking-[0.16em] text-foreground/55 mb-4">Recent Posts</h3>
-              <ul className="flex flex-col gap-3">
+            <div className="mk-card">
+              <h3 className="mk-kicker" style={{ color: 'var(--mk-text-faint)' }}>Recent Posts</h3>
+              <ul className="flex flex-col gap-3 mt-4">
                 {POSTS.slice(0, 4).map((p) => (
                   <li key={p.id}>
-                    <button type="button" className="text-left text-sm text-foreground/80 hover:text-primary transition-colors">
+                    <button
+                      type="button"
+                      className="text-left"
+                      style={{ fontSize: 'var(--mk-text-sm)', color: 'var(--mk-text-muted)' }}
+                    >
                       {p.title}
                     </button>
-                    <div className="text-[11px] text-foreground/45 mt-0.5">{p.date}</div>
+                    <div className="mt-0.5" style={{ fontSize: 'var(--mk-text-xs)', color: 'var(--mk-text-faint)' }}>{p.date}</div>
                   </li>
                 ))}
               </ul>
             </div>
 
-            <div className="liquid-glass rounded-2xl p-5">
-              <h3 className="font-display uppercase text-sm tracking-[0.16em] text-foreground/55 mb-4">Categories</h3>
-              <div className="flex flex-wrap gap-2">
+            <div className="mk-card">
+              <h3 className="mk-kicker" style={{ color: 'var(--mk-text-faint)' }}>Categories</h3>
+              <div className="flex flex-wrap gap-2 mt-4">
                 {CATEGORIES.map((c) => (
-                  <button key={c} type="button" className="px-3 py-1 rounded-full liquid-glass text-xs text-foreground/85 hover:text-primary transition-colors">
+                  <button
+                    key={c}
+                    type="button"
+                    className="px-3 py-1"
+                    style={{
+                      borderRadius: 'var(--mk-radius-pill)',
+                      border: '1px solid var(--mk-line)',
+                      background: 'var(--mk-surface-2)',
+                      fontSize: 'var(--mk-text-xs)',
+                      color: 'var(--mk-text-muted)',
+                    }}
+                  >
                     {c}
                   </button>
                 ))}
@@ -183,27 +236,41 @@ export default function AcademyBlogsPage() {
 
             <form
               onSubmit={(e) => { e.preventDefault(); alert('Subscribed. (Demo only.)'); }}
-              className="liquid-glass-strong rounded-2xl p-5"
+              className="mk-card"
               aria-label="Newsletter signup"
             >
-              <h3 className="font-display uppercase text-sm tracking-[0.16em] text-foreground/55 mb-2">Weekly Newsletter</h3>
-              <p className="text-xs text-foreground/65 mb-4">One email every Friday. Trade ideas, market recap, no fluff.</p>
+              <h3 className="mk-kicker" style={{ color: 'var(--mk-text-faint)' }}>Weekly Newsletter</h3>
+              <p className="mk-body mt-2 mb-4" style={{ fontSize: 'var(--mk-text-xs)' }}>
+                One email every Friday. Trade ideas, market recap, no fluff.
+              </p>
               <label className="block">
                 <span className="sr-only">Email address</span>
                 <input
                   type="email"
                   required
                   placeholder="you@example.com"
-                  className="w-full liquid-glass rounded-xl px-3.5 py-2.5 text-sm bg-transparent text-foreground placeholder:text-foreground/40 outline-none focus:ring-2 focus:ring-primary/60"
+                  className="w-full px-3.5 py-2.5 bg-transparent outline-none"
+                  style={{
+                    border: '1px solid var(--mk-line)',
+                    borderRadius: 'var(--mk-radius)',
+                    background: 'var(--mk-surface-2)',
+                    fontSize: 'var(--mk-text-sm)',
+                    color: 'var(--mk-text)',
+                  }}
                 />
               </label>
-              <button type="submit" className="mt-3 w-full rounded-full bg-primary text-white px-4 py-2.5 text-xs font-semibold uppercase tracking-wider hover:opacity-90">
-                Subscribe
-              </button>
+              <button type="submit" className="mk-btn mk-btn--primary w-full mt-3">Subscribe</button>
             </form>
           </aside>
         </div>
-      </div>
+      </Section>
+
+      <CtaBanner
+        title="Learn it, then trade it"
+        lead={`Open a ${BRAND_NAME} account and put the desk's research to work.`}
+        primary={{ label: 'Open Account', href: '/auth/register' }}
+        secondary={{ label: 'Download the Guides', href: '/academy/pdfs' }}
+      />
     </main>
   );
 }

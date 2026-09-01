@@ -41,7 +41,7 @@ export default function AccountTradePanel({ account, onClose }: AccountTradePane
     prices,
     instruments,
     watchlist,
-    updatePrice,
+    updatePrices,
     setInstruments,
     setActiveAccount,
   } = useTradingStore();
@@ -92,7 +92,7 @@ export default function AccountTradePanel({ account, onClose }: AccountTradePane
     wsManager.connect();
     const unsubMsg = wsManager.onMessage((data) => {
       const ticks = extractTicksFromPayload(data);
-      for (const t of ticks) updatePrice(t);
+      updatePrices(ticks);
     });
     const unsubStatus = wsManager.onStatusChange(setWsStatus);
     setWsStatus(wsManager.status);
@@ -125,7 +125,7 @@ export default function AccountTradePanel({ account, onClose }: AccountTradePane
       try {
         const raw = await api.get<unknown>('/instruments/prices/all', undefined, { timeoutMs: 15000 });
         if (!pollActive) return;
-        for (const t of extractTicksFromPayload(raw)) updatePrice(t);
+        updatePrices(extractTicksFromPayload(raw));
       } catch {}
     };
     void pollPrices();

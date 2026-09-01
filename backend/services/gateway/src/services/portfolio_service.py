@@ -2,6 +2,7 @@
 import csv
 import io
 import json
+import logging
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from uuid import UUID
@@ -17,6 +18,8 @@ from packages.common.src.models import (
     TradeHistory, Instrument, CopyTrade, Transaction, AccountGroup,
 )
 from packages.common.src.redis_client import redis_client, PriceChannel
+
+logger = logging.getLogger("gateway.portfolio")
 
 
 async def _get_user_accounts(user_id: UUID, db: AsyncSession) -> list[TradingAccount]:
@@ -92,18 +95,36 @@ async def portfolio_summary(user_id: UUID, account_id: UUID | None, db: AsyncSes
     acct_by_id = {a.id: a for a in accounts}
     from .trading_service import user_close_quote
 
+    # One Redis round trip for the whole portfolio instead of a GET per
+    # position, and one spread resolution per (instrument, account, tick)
+    # instead of one per position — a 40-position portfolio on 4 symbols used
+    # to issue 40 GETs and 40 full spread-resolution chains.
+    ticks_by_symbol: dict[str, str | None] = {}
+    _symbols = sorted({
+        p.instrument.symbol for p in open_positions
+        if p.instrument and p.instrument.symbol
+    })
+    if _symbols:
+        try:
+            _vals = await redis_client.mget([PriceChannel.tick_key(s) for s in _symbols])
+            ticks_by_symbol = dict(zip(_symbols, _vals))
+        except Exception as _pe:  # noqa: BLE001 — fall back to stored profit below
+            logger.warning("Portfolio price batch load failed: %s", _pe)
+    close_quote_cache: dict = {}
+
     for pos in open_positions:
         symbol = pos.instrument.symbol if pos.instrument else "?"
         # Value at the user's CLOSE quote (mid re-spread with the user's own
         # spread), NOT the raw broadcast bid/ask — keeps floating P&L in step
         # with what close actually realises (client 2026-06-29).
-        tick_raw = await redis_client.get(PriceChannel.tick_key(symbol))
+        tick_raw = ticks_by_symbol.get(symbol)
         if tick_raw and pos.instrument:
             tick = json.loads(tick_raw)
             _acct = acct_by_id.get(pos.account_id)
             c_bid, c_ask = await user_close_quote(
                 db, pos.instrument, user_id, pos.account_id,
                 getattr(_acct, "account_group_id", None), tick,
+                cache=close_quote_cache,
             )
             cp = c_bid if (pos.side == OrderSide.BUY or pos.side.value == "buy") else c_ask
             pnl = _compute_pnl(pos, cp)

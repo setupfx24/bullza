@@ -1,4 +1,9 @@
-'use client';
+import Link from 'next/link';
+import { Section, PageHero, CtaBanner } from '@/marketing/components';
+import {
+  LegalDoc, LegalSection, LegalP, LegalList, LegalCallout, legalAnchor,
+} from '../_legal/LegalDoc';
+import { BRAND_NAME, BRAND_SUPPORT_EMAIL } from '@/lib/brand';
 
 /**
  * Restricted Countries — public legal page.
@@ -6,12 +11,9 @@
  * The list of restricted jurisdictions is the same one already shown in
  * the canonical landing footer (Footer.jsx 'Restricted Regions' callout),
  * surfaced as a dedicated page so the footer 'Restricted Countries' link
- * lands on its own document instead of a PDF download.
+ * lands on its own document instead of a PDF download. Restyled onto the
+ * shared marketing design system; the copy is carried over verbatim.
  */
-import Link from 'next/link';
-import { Ban, ArrowUpRight, Globe, Mail, ShieldAlert } from 'lucide-react';
-import { BannerPlaceholder } from '@/home/components/BannerPlaceholder';
-import { BRAND_NAME, BRAND_SUPPORT_EMAIL } from '@/lib/brand';
 
 const RESTRICTED = [
   'United States of America (USA)',
@@ -22,7 +24,7 @@ const RESTRICTED = [
   'Sudan',
 ];
 
-const SECTIONS = [
+const SECTIONS: { h: string; body: string; list?: string[]; trailing?: string }[] = [
   {
     h: '1. Overview',
     body: `${BRAND_NAME} ("${BRAND_NAME}", "Company", "we", "our", or "us") operates a regulated multi-asset trading platform. Due to local laws, sanctions regimes, regulatory requirements, and risk-management policies, our services are not available to citizens or residents of certain jurisdictions.`,
@@ -61,99 +63,55 @@ const SECTIONS = [
   },
 ];
 
+const TOC = SECTIONS.map((s) => ({ id: legalAnchor(s.h), label: s.h }));
+
 export default function RestrictedCountriesPage() {
   return (
-    <main className="min-h-screen" style={{ background: '#08090b', color: '#f5f5f5' }}>
-      <BannerPlaceholder
+    <main>
+      <PageHero
+        kicker="Legal"
         title="Restricted Countries"
-        tagline={`Jurisdictions where ${BRAND_NAME} services are not offered.`}
+        lead={`Jurisdictions where ${BRAND_NAME} services are not offered.`}
       />
 
-      <section className="mx-auto max-w-[840px] px-[var(--gutter)] pt-10 pb-6">
-        <div className="liquid-glass rounded-2xl px-5 py-4 flex items-center gap-3 text-sm text-foreground/70">
-          <Globe className="size-4 text-primary shrink-0" />
-          <span>
-            <span className="font-semibold text-foreground/90">{BRAND_NAME} — Restricted Countries</span>{' '}
-            · Last updated: June 2026
-          </span>
-        </div>
-      </section>
-
-      {/* Headline callout — quick-glance list of restricted countries */}
-      <section className="mx-auto max-w-[840px] px-[var(--gutter)] pt-2 pb-2">
-        <div
-          className="rounded-2xl p-5 sm:p-6 flex items-start gap-4"
-          style={{
-            background: 'hsl(0 100% 41% / 0.10)',
-            border: '1px solid hsl(0 100% 41% / 0.35)',
-          }}
-        >
-          <Ban className="size-5 text-secondary shrink-0 mt-0.5" />
-          <div className="text-sm sm:text-[15px] text-foreground/85 leading-relaxed">
-            <span className="font-semibold text-foreground">Services not available in:</span>{' '}
+      <Section raised>
+        <LegalDoc toc={TOC} updated="June 2026">
+          {/* Headline callout — quick-glance list of restricted countries */}
+          <LegalCallout tone="warn">
+            <span style={{ color: 'var(--mk-text)', fontWeight: 700 }}>
+              Services not available in:
+            </span>{' '}
             {RESTRICTED.join(' · ')}.
-          </div>
-        </div>
-      </section>
+          </LegalCallout>
 
-      <article className="mx-auto max-w-[840px] px-[var(--gutter)] py-6 sm:py-8 space-y-7">
-        {SECTIONS.map(({ h, body, list, trailing }) => (
-          <section key={h} className="liquid-glass rounded-2xl p-6 sm:p-7">
-            <h2 className="font-display text-lg sm:text-xl uppercase tracking-tight text-foreground mb-4">
-              {h}
-            </h2>
-            <div className="text-sm sm:text-[15px] leading-relaxed text-foreground/75 space-y-3">
-              <p>{body}</p>
-              {list && (
-                <ul className="list-disc list-inside space-y-1.5 mt-1 ml-1">
-                  {list.map((item) => <li key={item}>{item}</li>)}
-                </ul>
-              )}
-              {trailing && <p>{trailing}</p>}
-            </div>
-          </section>
-        ))}
+          {SECTIONS.map(({ h, body, list, trailing }) => (
+            <LegalSection key={h} id={legalAnchor(h)} heading={h}>
+              <LegalP>{body}</LegalP>
+              {list && <LegalList items={list} />}
+              {trailing && <LegalP>{trailing}</LegalP>}
+            </LegalSection>
+          ))}
 
-        <div className="liquid-glass-strong rounded-2xl p-6 sm:p-7 flex flex-col sm:flex-row gap-4 sm:items-center sm:justify-between">
-          <div className="flex items-start gap-3">
-            <ShieldAlert className="size-5 text-primary shrink-0 mt-0.5" />
-            <p className="text-sm text-foreground/75 leading-relaxed">
-              Read this alongside our{' '}
-              <Link href="/terms" className="text-primary underline-offset-4 hover:underline">
-                Terms of Service
-              </Link>{' '}
-              and{' '}
-              <Link href="/risk" className="text-primary underline-offset-4 hover:underline">
-                Risk Disclaimer
-              </Link>
-              .
-            </p>
-          </div>
-          <a
-            href={`mailto:${BRAND_SUPPORT_EMAIL}`}
-            className="inline-flex items-center gap-2 rounded-full bg-primary text-white px-5 py-2.5 text-sm font-semibold uppercase tracking-wider hover:opacity-90 shrink-0"
-          >
-            <Mail className="size-4" /> Contact Compliance
-          </a>
-        </div>
-      </article>
+          <LegalP>
+            Read this alongside our{' '}
+            <Link href="/terms" className="hover:underline" style={{ color: 'var(--mk-accent)' }}>
+              Terms of Service
+            </Link>{' '}
+            and{' '}
+            <Link href="/risk" className="hover:underline" style={{ color: 'var(--mk-accent)' }}>
+              Risk Disclaimer
+            </Link>
+            .
+          </LegalP>
+        </LegalDoc>
+      </Section>
 
-      <section className="mx-auto max-w-[1200px] px-[var(--gutter)] pb-20">
-        <div className="liquid-glass-strong rounded-3xl p-8 sm:p-12 text-center">
-          <h2 className="font-display uppercase text-2xl sm:text-3xl tracking-tight">
-            Eligible to Trade?
-          </h2>
-          <p className="mt-4 text-foreground/70 max-w-xl mx-auto text-sm sm:text-base">
-            If your jurisdiction isn&apos;t on the restricted list, open a {BRAND_NAME} account in minutes.
-          </p>
-          <Link
-            href="/auth/register"
-            className="mt-7 inline-flex items-center gap-2 rounded-full bg-primary text-white px-6 py-3 text-sm font-semibold uppercase tracking-wider hover:opacity-90"
-          >
-            Open Account <ArrowUpRight className="size-4" />
-          </Link>
-        </div>
-      </section>
+      <CtaBanner
+        title="Eligible to Trade?"
+        lead={`If your jurisdiction isn't on the restricted list, open a ${BRAND_NAME} account in minutes.`}
+        primary={{ label: 'Open Account', href: '/auth/register' }}
+        secondary={{ label: 'Contact Compliance', href: `mailto:${BRAND_SUPPORT_EMAIL}` }}
+      />
     </main>
   );
 }

@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { ArrowUpRight, Repeat, BarChart3, Coins, Bitcoin, LineChart } from 'lucide-react';
 import { LiveChartSection } from '@/home/components/LiveChartSection';
+import { Section, SectionHeading, CtaBanner } from '@/marketing/components';
 import { BRAND_NAME } from '@/lib/brand';
 
 const MARKETS = [
@@ -15,63 +16,54 @@ const MARKETS = [
 
 export default function MarketsPage() {
   return (
-    <main className="relative min-h-screen bg-background overflow-hidden">
-      <div
-        aria-hidden
-        className="absolute inset-0 -z-10"
-        style={{ background: 'radial-gradient(ellipse 60% 50% at 50% 0%, hsl(11 79% 57% / 0.18), transparent 70%)' }}
-      />
-
-      {/* Live chart + instrument directory — moved to top of page */}
-      <div className="pt-24 sm:pt-28 md:pt-32">
+    <main>
+      {/* Live chart + instrument directory — kept at the top of the page */}
+      <div style={{ paddingTop: 'var(--mk-space-9)' }}>
         <LiveChartSection />
       </div>
 
-      <section className="mx-auto max-w-[1200px] px-[var(--gutter)] pt-4 pb-12 sm:pb-20 md:pb-24 text-center">
-        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full liquid-glass text-xs uppercase tracking-[0.18em] text-foreground/70 font-body">
-          <span className="size-1.5 rounded-full bg-primary" />
-          What You Can Trade
-        </div>
-        <h2 className="mt-6 font-display uppercase tracking-tight leading-[0.95] text-foreground text-3xl sm:text-5xl md:text-6xl lg:text-7xl break-words">
-          One Login.
-          <br />
-          <span className="text-primary">Every Market.</span>
-        </h2>
-        <p className="mt-7 mx-auto max-w-2xl text-foreground/70 text-base sm:text-lg leading-relaxed">
-          {BRAND_NAME} gives you direct access to the world's most traded financial instruments —
-          from a single {BRAND_NAME} login. Open Standard, ECN, Pro, IB, or Demo accounts as you need them.
-        </p>
-      </section>
+      <Section raised>
+        <SectionHeading
+          kicker="What You Can Trade"
+          title={<>One Login. <span style={{ color: 'var(--mk-accent)' }}>Every Market.</span></>}
+          lead={`${BRAND_NAME} gives you direct access to the world's most traded financial instruments — from a single ${BRAND_NAME} login. Open Standard, ECN, Pro, IB, or Demo accounts as you need them.`}
+        />
 
-      <section className="mx-auto max-w-[1200px] px-[var(--gutter)] pb-24">
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 mt-12">
           {MARKETS.map(({ title, href, Icon, blurb }) => (
-            <Link
-              key={title}
-              href={href}
-              className="liquid-glass rounded-2xl p-7 group transition-transform hover:scale-[1.02]"
-            >
+            <Link key={title} href={href} className="mk-card mk-card--hover group flex flex-col gap-3">
               <div className="flex items-center justify-between gap-3">
-                <div className="size-12 rounded-xl bg-primary/25 flex items-center justify-center">
-                  <Icon className="size-6 text-primary" />
-                </div>
-                <ArrowUpRight className="size-5 text-foreground/40 group-hover:text-primary transition-colors" />
+                <span
+                  className="inline-flex h-11 w-11 items-center justify-center rounded-xl shrink-0"
+                  style={{ background: 'var(--mk-accent-soft)', color: 'var(--mk-accent)' }}
+                >
+                  <Icon size={20} />
+                </span>
+                <ArrowUpRight
+                  size={18}
+                  className="shrink-0 transition-colors"
+                  style={{ color: 'var(--mk-text-faint)' }}
+                />
               </div>
-              <h3 className="mt-5 font-display text-2xl uppercase tracking-tight text-foreground">{title}</h3>
-              <p className="mt-3 text-sm text-foreground/65 leading-relaxed">{blurb}</p>
+              <h3 className="mk-h3">{title}</h3>
+              <p className="mk-body" style={{ fontSize: 'var(--mk-text-sm)' }}>{blurb}</p>
             </Link>
           ))}
         </div>
 
-        <div className="mt-14 text-center">
-          <Link
-            href="/auth/register"
-            className="inline-flex items-center gap-2 rounded-full bg-primary text-white px-6 py-3 text-sm font-semibold uppercase tracking-wider hover:opacity-90 transition-opacity"
-          >
-            Open Account <ArrowUpRight className="size-4" />
+        <div className="text-center mt-10">
+          <Link href="/auth/register" className="mk-btn mk-btn--primary">
+            Open Account <ArrowUpRight size={16} />
           </Link>
         </div>
-      </section>
+      </Section>
+
+      <CtaBanner
+        title="One Account. Every Market."
+        lead={`Open a ${BRAND_NAME} account and trade forex, indices, commodities, crypto, and global equities from a single login.`}
+        primary={{ label: 'Open Account', href: '/auth/register' }}
+        secondary={{ label: 'Compare Account Types', href: '/account-types' }}
+      />
     </main>
   );
 }

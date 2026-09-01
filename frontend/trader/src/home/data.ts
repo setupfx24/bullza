@@ -212,6 +212,9 @@ export const FOOTER_QUICK_LINKS = [
   { label: 'Markets',      href: '/markets' },
   { label: 'Accounts',     href: '/account-types' },
   { label: 'How it Works', href: '/how-it-works' },
+  { label: 'FAQ',          href: '/faq' },
+  { label: 'Download',     href: '/download' },
+  { label: 'Careers',      href: '/careers' },
   { label: 'Contact',      href: '/company/contact' },
 ];
 

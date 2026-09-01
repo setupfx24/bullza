@@ -158,9 +158,12 @@ export default function MobileBottomNav() {
     ['/platforms/web', '/platforms/copy-trading', '/platforms/prop-trading', '/platforms/ib-management', '/platforms/super-admin'].includes(pathname || '') ||
     ['/accounts/standard', '/accounts/pro', '/accounts/demo'].includes(pathname || '');
   const isPublicPage =
-    isLandingPage || pathname === '/privacy' || pathname === '/terms' ||
-    pathname === '/risk' || pathname === '/about' || pathname === '/contact' ||
-    pathname === '/platforms' || pathname === '/white-label';
+    isLandingPage ||
+    [
+      '/privacy', '/terms', '/risk', '/about', '/contact', '/platforms', '/white-label',
+      '/faq', '/download', '/careers',
+      '/risk-warning', '/restricted-countries', '/delete-account', '/deposit-withdrawal',
+    ].includes(pathname || '');
   // Hide on the focused full-screen deposit checkout (client 2026-06-24).
   if (pathname?.startsWith('/auth') || pathname?.startsWith('/wallet/deposit') || isPublicPage) return null;
 

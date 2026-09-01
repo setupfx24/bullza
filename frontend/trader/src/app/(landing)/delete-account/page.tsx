@@ -1,4 +1,9 @@
-'use client';
+import Link from 'next/link';
+import { Section, PageHero, CtaBanner } from '@/marketing/components';
+import {
+  LegalDoc, LegalSection, LegalP, LegalList, LegalCallout, legalAnchor,
+} from '../_legal/LegalDoc';
+import { BRAND_NAME, BRAND_SUPPORT_EMAIL } from '@/lib/brand';
 
 /**
  * Account & Data Deletion — public page.
@@ -7,14 +12,38 @@
  * Must be reachable WITHOUT login, so it lives under (landing). Explains how
  * a user requests deletion, what is erased, and what we are legally required
  * to retain (financial/AML records). Linked from the Play Console listing.
+ *
+ * Restyled onto the shared marketing design system; every line of copy is
+ * carried over verbatim from the previous version of this page.
  */
-import Link from 'next/link';
-import { Trash2, Mail, ShieldCheck, Clock, ArrowUpRight } from 'lucide-react';
-import { BannerPlaceholder } from '@/home/components/BannerPlaceholder';
-import { BRAND_NAME, BRAND_SUPPORT_EMAIL } from '@/lib/brand';
 
 const SUPPORT_EMAIL = `${BRAND_SUPPORT_EMAIL}`;
 const SUBJECT = 'Account Deletion Request';
+
+const HEADINGS = {
+  request: 'How to request deletion',
+  deleted: 'What is deleted',
+  retained: 'What we must retain (and for how long)',
+  timeline: 'Timeline & conditions',
+  questions: 'Questions about your data?',
+};
+
+const TOC = Object.values(HEADINGS).map((h) => ({ id: legalAnchor(h), label: h }));
+
+const DELETED = [
+  'Profile & contact details (name, email, phone, address)',
+  'KYC documents & verification images',
+  'Login credentials & active sessions',
+  'Trading accounts & preferences',
+  'Watchlists, settings, and app data',
+  'Marketing / communication preferences',
+];
+
+const RETAINED = [
+  'Transaction, deposit & withdrawal records (financial/AML compliance) — typically up to 5–7 years.',
+  'Identity-verification records required by KYC/AML law for the mandated retention period.',
+  'Records needed to resolve disputes, prevent fraud, or comply with a legal/regulatory order.',
+];
 
 export default function DeleteAccountPage() {
   const mailto = `mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent(SUBJECT)}&body=${encodeURIComponent(
@@ -22,127 +51,155 @@ export default function DeleteAccountPage() {
   )}`;
 
   return (
-    <main className="min-h-screen bg-background">
-      <BannerPlaceholder
+    <main>
+      <PageHero
+        kicker="Your Data"
         title="Delete Your Account"
-        tagline={`Request permanent deletion of your ${BRAND_NAME} account and personal data. This page explains how, what is removed, and what we are required to keep.`}
+        lead={`Request permanent deletion of your ${BRAND_NAME} account and personal data. This page explains how, what is removed, and what we are required to keep.`}
       />
 
-      <section className="mx-auto max-w-[820px] px-[var(--gutter)] py-12 sm:py-16 space-y-10">
-        {/* How to request */}
-        <div>
-          <h2 className="flex items-center gap-2 font-display uppercase text-xl sm:text-2xl tracking-tight">
-            <Trash2 className="size-5 text-primary" /> How to request deletion
-          </h2>
-          <p className="mt-3 text-foreground/70 text-sm sm:text-base leading-relaxed">
-            You can request deletion of your {BRAND_NAME} account and associated personal data in either of these ways:
-          </p>
-          <ol className="mt-4 space-y-3 text-sm sm:text-base text-foreground/80">
-            <li className="flex gap-3">
-              <span className="shrink-0 w-6 h-6 rounded-full bg-primary/20 text-primary text-xs font-bold flex items-center justify-center">1</span>
-              <span>
-                <span className="font-semibold text-foreground">In the app / website:</span> Go to{' '}
-                <span className="font-medium">Settings → Account → Delete account</span> and follow the prompts, or contact 24/7 support from the help menu.
-              </span>
-            </li>
-            <li className="flex gap-3">
-              <span className="shrink-0 w-6 h-6 rounded-full bg-primary/20 text-primary text-xs font-bold flex items-center justify-center">2</span>
-              <span>
-                <span className="font-semibold text-foreground">By email:</span> Send a deletion request from your registered email address to{' '}
-                <a href={mailto} className="text-primary hover:underline font-medium">{SUPPORT_EMAIL}</a>{' '}
-                with the subject &quot;{SUBJECT}&quot;.
-              </span>
-            </li>
-          </ol>
-
-          <a
-            href={mailto}
-            className="mt-6 inline-flex items-center gap-2 rounded-full bg-primary text-white px-6 py-3 text-sm font-semibold uppercase tracking-wider hover:opacity-90"
-          >
-            <Mail className="size-4" /> Request account deletion
-          </a>
-        </div>
-
-        {/* What gets deleted */}
-        <div>
-          <h2 className="flex items-center gap-2 font-display uppercase text-xl sm:text-2xl tracking-tight">
-            <ShieldCheck className="size-5 text-primary" /> What is deleted
-          </h2>
-          <p className="mt-3 text-foreground/70 text-sm sm:text-base leading-relaxed">
-            Once your request is verified and any open positions / pending balances are settled, we permanently remove:
-          </p>
-          <ul className="mt-4 grid sm:grid-cols-2 gap-2 text-sm text-foreground/80">
-            {[
-              'Profile & contact details (name, email, phone, address)',
-              'KYC documents & verification images',
-              'Login credentials & active sessions',
-              'Trading accounts & preferences',
-              'Watchlists, settings, and app data',
-              'Marketing / communication preferences',
-            ].map((x) => (
-              <li key={x} className="flex items-start gap-2">
-                <span className="mt-1.5 size-1.5 rounded-full bg-primary shrink-0" />
-                <span>{x}</span>
+      <Section raised>
+        <LegalDoc toc={TOC}>
+          <LegalSection id={legalAnchor(HEADINGS.request)} heading={HEADINGS.request}>
+            <LegalP>
+              You can request deletion of your {BRAND_NAME} account and associated personal data in
+              either of these ways:
+            </LegalP>
+            <ol className="flex flex-col gap-3">
+              <li className="mk-body flex items-start gap-3">
+                <span
+                  className="shrink-0 inline-flex items-center justify-center rounded-full"
+                  style={{
+                    width: '1.5rem',
+                    height: '1.5rem',
+                    marginTop: '0.15em',
+                    background: 'var(--mk-accent-soft)',
+                    color: 'var(--mk-accent)',
+                    fontSize: 'var(--mk-text-xs)',
+                    fontWeight: 700,
+                  }}
+                >
+                  1
+                </span>
+                <span>
+                  <span style={{ color: 'var(--mk-text)', fontWeight: 700 }}>
+                    In the app / website:
+                  </span>{' '}
+                  Go to <span style={{ color: 'var(--mk-text)' }}>Settings → Account → Delete account</span>{' '}
+                  and follow the prompts, or contact 24/7 support from the help menu.
+                </span>
               </li>
-            ))}
-          </ul>
-        </div>
-
-        {/* What we retain */}
-        <div>
-          <h2 className="flex items-center gap-2 font-display uppercase text-xl sm:text-2xl tracking-tight">
-            <Clock className="size-5 text-[#e8b923]" /> What we must retain (and for how long)
-          </h2>
-          <p className="mt-3 text-foreground/70 text-sm sm:text-base leading-relaxed">
-            As a financial services provider, we are legally required (anti-money-laundering, tax, and audit
-            regulations) to retain certain records even after account deletion. These are kept only as long as the
-            law requires, stored securely, and are not used for any other purpose:
-          </p>
-          <ul className="mt-4 space-y-2 text-sm text-foreground/80">
-            {[
-              'Transaction, deposit & withdrawal records (financial/AML compliance) — typically up to 5–7 years.',
-              'Identity-verification records required by KYC/AML law for the mandated retention period.',
-              'Records needed to resolve disputes, prevent fraud, or comply with a legal/regulatory order.',
-            ].map((x) => (
-              <li key={x} className="flex items-start gap-2">
-                <span className="mt-1.5 size-1.5 rounded-full bg-[#e8b923] shrink-0" />
-                <span>{x}</span>
+              <li className="mk-body flex items-start gap-3">
+                <span
+                  className="shrink-0 inline-flex items-center justify-center rounded-full"
+                  style={{
+                    width: '1.5rem',
+                    height: '1.5rem',
+                    marginTop: '0.15em',
+                    background: 'var(--mk-accent-soft)',
+                    color: 'var(--mk-accent)',
+                    fontSize: 'var(--mk-text-xs)',
+                    fontWeight: 700,
+                  }}
+                >
+                  2
+                </span>
+                <span>
+                  <span style={{ color: 'var(--mk-text)', fontWeight: 700 }}>By email:</span> Send a
+                  deletion request from your registered email address to{' '}
+                  <a href={mailto} className="hover:underline" style={{ color: 'var(--mk-accent)' }}>
+                    {SUPPORT_EMAIL}
+                  </a>{' '}
+                  with the subject &quot;{SUBJECT}&quot;.
+                </span>
               </li>
-            ))}
-          </ul>
-          <p className="mt-3 text-xs text-foreground/45 leading-relaxed">
-            After the mandated retention period expires, this residual data is permanently deleted as well.
-          </p>
-        </div>
+            </ol>
+            <div>
+              <a href={mailto} className="mk-btn mk-btn--primary">
+                Request account deletion
+              </a>
+            </div>
+          </LegalSection>
 
-        {/* Timeline + conditions */}
-        <div>
-          <h2 className="font-display uppercase text-xl sm:text-2xl tracking-tight">Timeline &amp; conditions</h2>
-          <ul className="mt-4 space-y-2 text-sm text-foreground/80">
-            <li className="flex items-start gap-2"><span className="mt-1.5 size-1.5 rounded-full bg-primary shrink-0" /><span>Requests are verified against your registered identity to protect your account from fraudulent deletion.</span></li>
-            <li className="flex items-start gap-2"><span className="mt-1.5 size-1.5 rounded-full bg-primary shrink-0" /><span>Before deletion, please <span className="font-medium text-foreground">withdraw any remaining balance</span> and close all open positions. We will contact you if action is needed.</span></li>
-            <li className="flex items-start gap-2"><span className="mt-1.5 size-1.5 rounded-full bg-primary shrink-0" /><span>Deletion is normally completed within <span className="font-medium text-foreground">30 days</span> of a verified request.</span></li>
-            <li className="flex items-start gap-2"><span className="mt-1.5 size-1.5 rounded-full bg-primary shrink-0" /><span>Account deletion is permanent and cannot be undone.</span></li>
-          </ul>
-        </div>
+          <LegalSection id={legalAnchor(HEADINGS.deleted)} heading={HEADINGS.deleted}>
+            <LegalP>
+              Once your request is verified and any open positions / pending balances are settled, we
+              permanently remove:
+            </LegalP>
+            <LegalList items={DELETED} />
+          </LegalSection>
 
-        {/* Contact */}
-        <div className="liquid-glass-strong rounded-2xl p-6 sm:p-8 text-center">
-          <h2 className="font-display uppercase text-lg sm:text-xl tracking-tight">Questions about your data?</h2>
-          <p className="mt-2 text-foreground/70 text-sm">
-            Contact our team at{' '}
-            <a href={`mailto:${SUPPORT_EMAIL}`} className="text-primary hover:underline">{SUPPORT_EMAIL}</a>
-            {' '}or see our{' '}
-            <Link href="/privacy" className="text-primary hover:underline">Privacy Policy</Link>.
-          </p>
-          <a
-            href={mailto}
-            className="mt-5 inline-flex items-center gap-2 rounded-full liquid-glass px-5 py-2.5 text-sm font-semibold uppercase tracking-wider hover:bg-foreground/10"
-          >
-            Email us <ArrowUpRight className="size-4" />
-          </a>
-        </div>
-      </section>
+          <LegalSection id={legalAnchor(HEADINGS.retained)} heading={HEADINGS.retained}>
+            <LegalP>
+              As a financial services provider, we are legally required (anti-money-laundering, tax,
+              and audit regulations) to retain certain records even after account deletion. These are
+              kept only as long as the law requires, stored securely, and are not used for any other
+              purpose:
+            </LegalP>
+            <LegalList items={RETAINED} />
+            <p className="mk-body" style={{ fontSize: 'var(--mk-text-sm)', color: 'var(--mk-text-faint)' }}>
+              After the mandated retention period expires, this residual data is permanently deleted
+              as well.
+            </p>
+          </LegalSection>
+
+          <LegalSection id={legalAnchor(HEADINGS.timeline)} heading={HEADINGS.timeline}>
+            <ul className="flex flex-col gap-2">
+              <li className="mk-body flex items-start gap-3">
+                <span className="shrink-0 rounded-full" style={{ width: '5px', height: '5px', marginTop: '0.62em', background: 'var(--mk-accent)' }} />
+                <span>
+                  Requests are verified against your registered identity to protect your account from
+                  fraudulent deletion.
+                </span>
+              </li>
+              <li className="mk-body flex items-start gap-3">
+                <span className="shrink-0 rounded-full" style={{ width: '5px', height: '5px', marginTop: '0.62em', background: 'var(--mk-accent)' }} />
+                <span>
+                  Before deletion, please{' '}
+                  <span style={{ color: 'var(--mk-text)' }}>withdraw any remaining balance</span> and
+                  close all open positions. We will contact you if action is needed.
+                </span>
+              </li>
+              <li className="mk-body flex items-start gap-3">
+                <span className="shrink-0 rounded-full" style={{ width: '5px', height: '5px', marginTop: '0.62em', background: 'var(--mk-accent)' }} />
+                <span>
+                  Deletion is normally completed within{' '}
+                  <span style={{ color: 'var(--mk-text)' }}>30 days</span> of a verified request.
+                </span>
+              </li>
+              <li className="mk-body flex items-start gap-3">
+                <span className="shrink-0 rounded-full" style={{ width: '5px', height: '5px', marginTop: '0.62em', background: 'var(--mk-accent)' }} />
+                <span>Account deletion is permanent and cannot be undone.</span>
+              </li>
+            </ul>
+          </LegalSection>
+
+          <LegalSection id={legalAnchor(HEADINGS.questions)} heading={HEADINGS.questions}>
+            <LegalCallout>
+              Contact our team at{' '}
+              <a
+                href={`mailto:${SUPPORT_EMAIL}`}
+                className="hover:underline"
+                style={{ color: 'var(--mk-accent)' }}
+              >
+                {SUPPORT_EMAIL}
+              </a>{' '}
+              or see our{' '}
+              <Link href="/privacy" className="hover:underline" style={{ color: 'var(--mk-accent)' }}>
+                Privacy Policy
+              </Link>
+              .
+            </LegalCallout>
+          </LegalSection>
+        </LegalDoc>
+      </Section>
+
+      <CtaBanner
+        title="Questions about your data?"
+        lead={`Our support team can walk you through what ${BRAND_NAME} stores, why, and how to have it removed.`}
+        primary={{ label: 'Email us', href: mailto }}
+        secondary={{ label: 'Privacy Policy', href: '/privacy' }}
+      />
     </main>
   );
 }

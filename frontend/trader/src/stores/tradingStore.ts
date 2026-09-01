@@ -40,6 +40,42 @@ function usdPerQuote(
   return null;
 }
 
+type InstrumentLike = {
+  symbol: string;
+  contract_size?: number | null;
+  base_currency?: string | null;
+  quote_currency?: string | null;
+};
+
+/** symbol(UPPER) → instrument, cached per `instruments` array identity.
+ *
+ *  `livePnlFor` used to do up to two `Array.find()` scans per call, and it's
+ *  called once per open position per tick — with ~500 instruments and a burst
+ *  of ticks that's a linear scan storm on the render path. The store replaces
+ *  the array wholesale (`setInstruments`), so a WeakMap keyed on the array
+ *  identity is self-invalidating: a new array builds a new index, and the old
+ *  one is collected with it. Lookup semantics are identical to the old
+ *  two-pass find (exact-cased symbol wins over a case-insensitive match). */
+const _instrumentIndexCache = new WeakMap<object, Map<string, InstrumentLike>>();
+
+function instrumentIndex(instruments: InstrumentLike[] | null | undefined): Map<string, InstrumentLike> {
+  if (!Array.isArray(instruments)) return new Map();
+  const cached = _instrumentIndexCache.get(instruments);
+  if (cached) return cached;
+  const loose = new Map<string, InstrumentLike>();
+  const exact = new Map<string, InstrumentLike>();
+  for (const inst of instruments) {
+    const raw = String(inst?.symbol ?? '');
+    const key = raw.toUpperCase();
+    if (!key) continue;
+    if (!loose.has(key)) loose.set(key, inst);
+    if (raw === key && !exact.has(key)) exact.set(key, inst);
+  }
+  for (const [key, inst] of exact) loose.set(key, inst);
+  _instrumentIndexCache.set(instruments, loose);
+  return loose;
+}
+
 export function livePnlFor(
   pos: { side: string; open_price: number; lots: number; effective_lots?: number },
   tick: { bid: number; ask: number } | undefined | null,
@@ -62,9 +98,7 @@ export function livePnlFor(
     ? (tick.bid > 0 ? tick.bid : (tick.bid + tick.ask) / 2)
     : (tick.ask > 0 ? tick.ask : (tick.bid + tick.ask) / 2);
   if (!(cp > 0)) return null;
-  const inst =
-    instruments.find((i) => i.symbol === sym) ||
-    instruments.find((i) => String(i.symbol).toUpperCase() === sym);
+  const inst = instrumentIndex(instruments).get(sym);
   const cs = inst?.contract_size || defaultContractSize(sym);
   const pnlLots = pos.effective_lots ?? pos.lots;
   let pnl = pos.side === 'buy'
@@ -262,6 +296,7 @@ interface TradingState {
   setPendingOrders: (o: PendingOrder[]) => void;
   setSelectedSymbol: (s: string) => void;
   updatePrice: (t: TickData) => void;
+  updatePrices: (t: TickData[]) => void;
   addToWatchlist: (s: string) => void;
   removeFromWatchlist: (s: string) => void;
   setInstruments: (i: InstrumentInfo[]) => void;
@@ -464,55 +499,86 @@ export const useTradingStore = create<TradingState>()((set, get) => ({
     }
   },
 
-  updatePrice: (tick) => set((state) => {
-    const sym = String(tick.symbol || '').trim().toUpperCase();
-    if (!sym) return state;
-    // Re-derive bid/ask from the broadcast MID using THIS user's resolved
-    // spread, so the chart / P&L / panels reflect the spread their own account
-    // type is configured for — the shared broadcast can only carry the wildcard
-    // value (client 2026-07-22). The mid is unchanged, so anything computing
-    // from the mid (e.g. OrderPanel) is unaffected. No spread loaded yet →
-    // leave the broadcast quote untouched.
-    const normalized: TickData = applyUserSpread({ ...tick, symbol: sym }, state.mySpreads[sym]);
+  // Apply a whole tick burst in ONE store write. Every feed hands us an array
+  // (the WS frame carries many symbols, `/instruments/prices/all` carries the
+  // entire book), and the old per-tick loop meant N store writes → N price-map
+  // spreads → N full `positions.map()` passes → N subscriber notifications per
+  // burst. Same semantics per symbol as before, just accumulated first and
+  // committed once. `updatePrice` below is the single-tick shim.
+  updatePrices: (ticks) => set((state) => {
+    if (!ticks || ticks.length === 0) return state;
 
-    // Freshness guard (see lastAppliedTickTs above): drop the round-trip-stale
-    // REST-poll value (or a duplicate re-publish) that flashed the P&L backward,
-    // but only while a fresher tick is recent — after STALE_TICK_GRACE_MS of
-    // silence, let it through so a dead socket falls back to the poll (no freeze).
+    let nextPrices: Record<string, TickData> | null = null;
+    let nextPrev: Record<string, number> | null = null;
+    const touched = new Set<string>();
     const nowWall = Date.now();
-    const ts = Date.parse(normalized.timestamp);
-    const prevTs = lastAppliedTickTs.get(sym);
-    const prevWall = lastAppliedTickWall.get(sym) ?? 0;
-    if (Number.isFinite(ts) && prevTs !== undefined && ts <= prevTs
-        && nowWall - prevWall < STALE_TICK_GRACE_MS) {
-      return state; // stale/duplicate while a fresher value is live — ignore
-    }
-    lastAppliedTickWall.set(sym, nowWall);
-    if (Number.isFinite(ts) && (prevTs === undefined || ts > prevTs)) {
-      lastAppliedTickTs.set(sym, ts);
+
+    for (const tick of ticks) {
+      const sym = String(tick?.symbol || '').trim().toUpperCase();
+      if (!sym) continue;
+      // Re-derive bid/ask from the broadcast MID using THIS user's resolved
+      // spread, so the chart / P&L / panels reflect the spread their own account
+      // type is configured for — the shared broadcast can only carry the wildcard
+      // value (client 2026-07-22). The mid is unchanged, so anything computing
+      // from the mid (e.g. OrderPanel) is unaffected. No spread loaded yet →
+      // leave the broadcast quote untouched.
+      const normalized: TickData = applyUserSpread({ ...tick, symbol: sym }, state.mySpreads[sym]);
+
+      // Freshness guard (see lastAppliedTickTs above): drop the round-trip-stale
+      // REST-poll value (or a duplicate re-publish) that flashed the P&L backward,
+      // but only while a fresher tick is recent — after STALE_TICK_GRACE_MS of
+      // silence, let it through so a dead socket falls back to the poll (no freeze).
+      const ts = Date.parse(normalized.timestamp);
+      const prevTs = lastAppliedTickTs.get(sym);
+      const prevWall = lastAppliedTickWall.get(sym) ?? 0;
+      if (Number.isFinite(ts) && prevTs !== undefined && ts <= prevTs
+          && nowWall - prevWall < STALE_TICK_GRACE_MS) {
+        continue; // stale/duplicate while a fresher value is live — ignore
+      }
+      lastAppliedTickWall.set(sym, nowWall);
+      if (Number.isFinite(ts) && (prevTs === undefined || ts > prevTs)) {
+        lastAppliedTickTs.set(sym, ts);
+      }
+
+      const prev = (nextPrices ?? state.prices)[sym];
+      if (!nextPrices) nextPrices = { ...state.prices };
+      nextPrices[sym] = normalized;
+      if (prev) {
+        if (!nextPrev) nextPrev = { ...state.prevPrices };
+        nextPrev[sym] = prev.bid;
+      }
+      touched.add(sym);
     }
 
-    const prev = state.prices[sym];
-    // The full price map including this tick — passed to livePnlFor so a JPY
+    if (!nextPrices) return state; // every tick was stale/duplicate
+
+    // Re-value only the positions whose symbol moved in this burst. `nextPrices`
+    // is the full map including the new ticks — passed to livePnlFor so a JPY
     // cross (GBPJPY etc.) can look up USDJPY to convert quote→USD.
-    const nextPrices = { ...state.prices, [sym]: normalized };
+    const applied = nextPrices;
+    let positionsChanged = false;
+    const positions = state.positions.map((pos) => {
+      const pSym = String(pos.symbol || '').trim().toUpperCase();
+      if (!touched.has(pSym)) return pos;
+      // Value floating P&L via the shared helper (same "user close quote" basis
+      // the backend uses) — keeps the frontend in lockstep with the backend so
+      // the number doesn't snap on refresh.
+      const r = livePnlFor(pos, applied[pSym], state.instruments, pSym, applied);
+      if (!r) return pos;
+      positionsChanged = true;
+      return { ...pos, current_price: r.cp, profit: r.pnl };
+    });
+
     return {
-      prevPrices: prev
-        ? { ...state.prevPrices, [sym]: prev.bid }
-        : state.prevPrices,
-      prices: nextPrices,
-      positions: state.positions.map((pos) => {
-        const pSym = String(pos.symbol || '').trim().toUpperCase();
-        if (pSym !== sym) return pos;
-        // Value floating P&L at the tick MID via the shared helper (same
-        // "user close quote" basis the backend uses) — keeps the frontend in
-        // lockstep with the backend so the number doesn't snap on refresh.
-        const r = livePnlFor(pos, normalized, state.instruments, sym, nextPrices);
-        if (!r) return pos;
-        return { ...pos, current_price: r.cp, profit: r.pnl };
-      }),
+      prevPrices: nextPrev ?? state.prevPrices,
+      prices: applied,
+      // Keep the array identity when nothing was re-valued, so position
+      // subscribers don't re-render on ticks for symbols they don't hold.
+      positions: positionsChanged ? positions : state.positions,
     };
   }),
+
+  updatePrice: (tick) => get().updatePrices([tick]),
 
   addToWatchlist: (s) => set((st) => ({
     watchlist: st.watchlist.includes(s) ? st.watchlist : [...st.watchlist, s],

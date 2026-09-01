@@ -1,17 +1,18 @@
-'use client';
+import Link from 'next/link';
+import { Section, PageHero, CtaBanner } from '@/marketing/components';
+import {
+  LegalDoc, LegalSection, LegalSubheading, LegalP, LegalList, LegalCallout, legalAnchor,
+} from '../_legal/LegalDoc';
+import { BRAND_NAME, BRAND_SUPPORT_EMAIL } from '@/lib/brand';
 
 /**
  * Privacy Policy — public legal page.
  *
  * Section copy is preserved verbatim from the client-supplied PDF
  * "privcy policy.pdf" (delivered 2026-06-09). The 15-section structure
- * is preserved; only the visual chrome follows the dark-themed (landing)
- * layout.
+ * is preserved; only the visual chrome follows the shared marketing
+ * design system. Nothing has been reworded, reordered or dropped.
  */
-import Link from 'next/link';
-import { Lock, ArrowUpRight, ShieldCheck, Mail } from 'lucide-react';
-import { BannerPlaceholder } from '@/home/components/BannerPlaceholder';
-import { BRAND_NAME, BRAND_SUPPORT_EMAIL } from '@/lib/brand';
 
 /**
  * Each section has a heading + body. `body` can mix prose paragraphs,
@@ -19,7 +20,7 @@ import { BRAND_NAME, BRAND_SUPPORT_EMAIL } from '@/lib/brand';
  * is the minimum structure needed to reproduce the PDF wording 1:1.
  */
 type Subsection = { title: string; lead?: string; bullets?: string[]; trailing?: string };
-type Section = {
+type PolicySection = {
   h: string;
   lead?: string[];          // top-level prose paragraphs
   bullets?: string[];        // top-level bullets
@@ -27,7 +28,7 @@ type Section = {
   trailing?: string[];       // closing paragraphs after bullets / subs
 };
 
-const INTRO: Section = {
+const INTRO: PolicySection = {
   h: `Privacy Policy of ${BRAND_NAME}`,
   lead: [
     `At ${BRAND_NAME} ("${BRAND_NAME}", "Company", "we", "our", or "us"), protecting your privacy and personal information is one of our highest priorities. We are committed to collecting, processing, storing, and protecting your personal data responsibly and in accordance with applicable data protection laws and industry best practices.`,
@@ -35,7 +36,7 @@ const INTRO: Section = {
   ],
 };
 
-const SECTIONS: Section[] = [
+const SECTIONS: PolicySection[] = [
   {
     h: '1. Privacy Protection',
     lead: [
@@ -169,134 +170,95 @@ const SECTIONS: Section[] = [
   },
 ];
 
+const CONTACT_HEADING = '15. Contact Information';
+
+const TOC = [
+  { id: legalAnchor(INTRO.h), label: INTRO.h },
+  ...SECTIONS.map((s) => ({ id: legalAnchor(s.h), label: s.h })),
+  { id: legalAnchor(CONTACT_HEADING), label: CONTACT_HEADING },
+];
+
+/** Renders one policy section body — prose, bullets, sub-sections, trailing prose. */
+function SectionBody({ sec }: { sec: PolicySection }) {
+  return (
+    <>
+      {sec.lead?.map((p, i) => <LegalP key={`lead-${i}`}>{p}</LegalP>)}
+      {sec.bullets && <LegalList items={sec.bullets} />}
+      {sec.subs?.map((sub) => (
+        <div key={sub.title} className="flex flex-col gap-3">
+          <LegalSubheading>{sub.title}</LegalSubheading>
+          {sub.lead && <LegalP>{sub.lead}</LegalP>}
+          {sub.bullets && <LegalList items={sub.bullets} />}
+          {sub.trailing && <LegalP>{sub.trailing}</LegalP>}
+        </div>
+      ))}
+      {sec.trailing?.map((p, i) => <LegalP key={`tail-${i}`}>{p}</LegalP>)}
+    </>
+  );
+}
+
 export default function PrivacyPage() {
   return (
-    <main className="min-h-screen" style={{ background: '#08090b', color: '#f5f5f5' }}>
-      <BannerPlaceholder
+    <main>
+      <PageHero
+        kicker="Legal"
         title="Privacy Policy"
-        tagline="What personal data we collect, why we collect it, and how we keep it safe."
+        lead="What personal data we collect, why we collect it, and how we keep it safe."
       />
 
-      <section className="mx-auto max-w-[840px] px-[var(--gutter)] pt-10 pb-6">
-        <div className="liquid-glass rounded-2xl px-5 py-4 flex items-center gap-3 text-sm text-foreground/70">
-          <Lock className="size-4 text-primary shrink-0" />
-          <span>
-            <span className="font-semibold text-foreground/90">{BRAND_NAME} — Privacy Policy</span>{' '}
-            · Last updated: June 2026
-          </span>
-        </div>
-      </section>
+      <Section raised>
+        <LegalDoc toc={TOC} updated="June 2026">
+          <LegalSection id={legalAnchor(INTRO.h)} heading={INTRO.h}>
+            <SectionBody sec={INTRO} />
+          </LegalSection>
 
-      <article className="mx-auto max-w-[840px] px-[var(--gutter)] py-6 sm:py-8 space-y-7">
-        {/* Intro card */}
-        <section className="liquid-glass rounded-2xl p-6 sm:p-7">
-          <h2 className="font-display text-lg sm:text-xl uppercase tracking-tight text-foreground mb-4">
-            {INTRO.h}
-          </h2>
-          <div className="space-y-3 text-sm sm:text-[15px] leading-relaxed text-foreground/75">
-            {INTRO.lead?.map((p, i) => <p key={i}>{p}</p>)}
-          </div>
-        </section>
+          {SECTIONS.map((sec) => (
+            <LegalSection key={sec.h} id={legalAnchor(sec.h)} heading={sec.h}>
+              <SectionBody sec={sec} />
+            </LegalSection>
+          ))}
 
-        {SECTIONS.map((sec) => (
-          <section key={sec.h} className="liquid-glass rounded-2xl p-6 sm:p-7">
-            <h2 className="font-display text-lg sm:text-xl uppercase tracking-tight text-foreground mb-4">
-              {sec.h}
-            </h2>
-            <div className="text-sm sm:text-[15px] leading-relaxed text-foreground/75 space-y-3">
-              {sec.lead?.map((p, i) => <p key={`lead-${i}`}>{p}</p>)}
-              {sec.bullets && (
-                <ul className="list-disc list-inside space-y-1.5 mt-1">
-                  {sec.bullets.map((b) => <li key={b}>{b}</li>)}
-                </ul>
-              )}
-              {sec.subs?.map((sub) => (
-                <div key={sub.title} className="mt-3">
-                  <h3 className="font-semibold text-foreground/90 mb-1.5">{sub.title}</h3>
-                  {sub.lead && <p>{sub.lead}</p>}
-                  {sub.bullets && (
-                    <ul className="list-disc list-inside space-y-1.5 mt-1.5">
-                      {sub.bullets.map((b) => <li key={b}>{b}</li>)}
-                    </ul>
-                  )}
-                  {sub.trailing && <p className="mt-2">{sub.trailing}</p>}
-                </div>
-              ))}
-              {sec.trailing?.map((p, i) => <p key={`tail-${i}`}>{p}</p>)}
-            </div>
-          </section>
-        ))}
-
-        {/* Section 15 — Contact (special handling) */}
-        <section className="liquid-glass rounded-2xl p-6 sm:p-7">
-          <h2 className="font-display text-lg sm:text-xl uppercase tracking-tight text-foreground mb-4">
-            15. Contact Information
-          </h2>
-          <p className="text-sm sm:text-[15px] leading-relaxed text-foreground/75 mb-4">
-            For questions, concerns, requests, or complaints regarding this Privacy Policy, please contact:
-          </p>
-          <div
-            className="rounded-xl p-5 text-sm space-y-1"
-            style={{
-              background: 'hsl(11 79% 57% / 0.10)',
-              border: '1px solid hsl(11 79% 57% / 0.35)',
-            }}
-          >
-            <p className="font-semibold text-foreground">{BRAND_NAME} Support Team</p>
-            <p className="text-foreground/75">
+          {/* Section 15 — Contact (special handling) */}
+          <LegalSection id={legalAnchor(CONTACT_HEADING)} heading={CONTACT_HEADING}>
+            <LegalP>
+              For questions, concerns, requests, or complaints regarding this Privacy Policy, please contact:
+            </LegalP>
+            <LegalCallout>
+              <span style={{ color: 'var(--mk-text)', fontWeight: 700 }}>{BRAND_NAME} Support Team</span>
+              <br />
               Email:{' '}
-              <a href={`mailto:${BRAND_SUPPORT_EMAIL}`} className="text-primary hover:underline">
+              <a
+                href={`mailto:${BRAND_SUPPORT_EMAIL}`}
+                className="hover:underline"
+                style={{ color: 'var(--mk-accent)' }}
+              >
                 {BRAND_SUPPORT_EMAIL}
               </a>
-            </p>
-          </div>
-          <p className="mt-4 text-sm sm:text-[15px] leading-relaxed text-foreground/75">
-            {BRAND_NAME} is committed to protecting client privacy and maintaining the highest standards of data security and confidentiality.
-          </p>
-        </section>
-
-        {/* Cross-links */}
-        <div className="liquid-glass-strong rounded-2xl p-6 sm:p-7 flex flex-col sm:flex-row gap-4 sm:items-center sm:justify-between">
-          <div className="flex items-start gap-3">
-            <ShieldCheck className="size-5 text-primary shrink-0 mt-0.5" />
-            <p className="text-sm text-foreground/75 leading-relaxed">
+            </LegalCallout>
+            <LegalP>
+              {BRAND_NAME} is committed to protecting client privacy and maintaining the highest standards of data security and confidentiality.
+            </LegalP>
+            <LegalP>
               Read this alongside our{' '}
-              <Link href="/terms" className="text-primary underline-offset-4 hover:underline">
+              <Link href="/terms" className="hover:underline" style={{ color: 'var(--mk-accent)' }}>
                 Terms of Service
               </Link>{' '}
               and{' '}
-              <Link href="/risk" className="text-primary underline-offset-4 hover:underline">
+              <Link href="/risk" className="hover:underline" style={{ color: 'var(--mk-accent)' }}>
                 Risk Disclaimer
               </Link>
               .
-            </p>
-          </div>
-          <a
-            href={`mailto:${BRAND_SUPPORT_EMAIL}`}
-            className="inline-flex items-center gap-2 rounded-full bg-primary text-white px-5 py-2.5 text-sm font-semibold uppercase tracking-wider hover:opacity-90 shrink-0"
-          >
-            <Mail className="size-4" /> Contact Support
-          </a>
-        </div>
-      </article>
+            </LegalP>
+          </LegalSection>
+        </LegalDoc>
+      </Section>
 
-      <section className="mx-auto max-w-[1200px] px-[var(--gutter)] pb-20">
-        <div className="liquid-glass-strong rounded-3xl p-8 sm:p-12 text-center">
-          <h2 className="font-display uppercase text-2xl sm:text-3xl tracking-tight">
-            Your Data, Your Control
-          </h2>
-          <p className="mt-4 text-foreground/70 max-w-xl mx-auto text-sm sm:text-base">
-            Open a {BRAND_NAME} account confident that we treat your personal data with the same care we
-            apply to your trading capital.
-          </p>
-          <Link
-            href="/auth/register"
-            className="mt-7 inline-flex items-center gap-2 rounded-full bg-primary text-white px-6 py-3 text-sm font-semibold uppercase tracking-wider hover:opacity-90"
-          >
-            Open Account <ArrowUpRight className="size-4" />
-          </Link>
-        </div>
-      </section>
+      <CtaBanner
+        title="Your Data, Your Control"
+        lead={`Open a ${BRAND_NAME} account confident that we treat your personal data with the same care we apply to your trading capital.`}
+        primary={{ label: 'Open Account', href: '/auth/register' }}
+        secondary={{ label: 'Delete My Account', href: '/delete-account' }}
+      />
     </main>
   );
 }

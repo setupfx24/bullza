@@ -3,6 +3,7 @@ import asyncio
 import json
 import logging
 from decimal import Decimal
+from typing import Optional
 from uuid import UUID
 from datetime import datetime
 
@@ -777,6 +778,7 @@ async def user_close_quote(
     account_id: UUID,
     account_group_id,
     tick: dict,
+    cache: Optional[dict] = None,
 ) -> tuple[Decimal, Decimal]:
     """The bid/ask the user would CLOSE at: the live tick MID re-spread with the
     SAME per-user / master spread used at open and close (mirrors the close path
@@ -784,9 +786,27 @@ async def user_close_quote(
     configured spread, so valuing floating P&L off the raw tick showed a bigger
     loss than the user actually realises on close — the position looked like it
     "went straight to loss" and didn't track the displayed price (client
-    2026-06-29). Returns (close_bid, close_ask)."""
+    2026-06-29). Returns (close_bid, close_ask).
+
+    `cache` is an optional caller-owned dict for memoising WITHIN one request.
+    Resolving the spread costs a MasterAccount select plus the whole
+    resolve_spread_config chain (up to ~8 selects) and a Redis read, and the
+    positions/portfolio loops call this once per position — so 40 open
+    positions on 4 symbols paid for 40 full resolutions instead of 4. The key
+    covers every input that can change the result, so a hit is the value this
+    call would have computed; pass no cache to keep the old per-call
+    behaviour."""
     raw_bid = Decimal(str(tick["bid"]))
     raw_ask = Decimal(str(tick["ask"]))
+    ckey = None
+    if cache is not None:
+        ckey = (
+            getattr(instrument, "id", None), user_id, account_id,
+            account_group_id, str(raw_bid), str(raw_ask),
+        )
+        hit = cache.get(ckey)
+        if hit is not None:
+            return hit
     mid = (raw_bid + raw_ask) / Decimal("2")
     pip = Decimal(str(getattr(instrument, "pip_size", None) or "0.0001"))
     digits = int(getattr(instrument, "digits", None) or 5)
@@ -813,6 +833,8 @@ async def user_close_quote(
             "user_close_quote spread resolution failed for %s (user=%s): %s",
             getattr(instrument, "symbol", "?"), user_id, _e,
         )
+    if ckey is not None and cache is not None:
+        cache[ckey] = (c_bid, c_ask)
     return c_bid, c_ask
 
 
@@ -918,6 +940,10 @@ async def list_positions(
             logger.warning("Failed to batch-load copy-trade links: %s", _ce)
 
     response = []
+    # One spread resolution per (instrument, tick) instead of one per position —
+    # every row here shares the same account/user, so N positions on the same
+    # symbol resolved the identical spread N times.
+    close_quote_cache: dict = {}
     for pos in positions:
         current_price = None
         profit = float(pos.profit or 0)
@@ -938,6 +964,7 @@ async def list_positions(
             _cb, _ca = await user_close_quote(
                 db, pos.instrument, user_id, pos.account_id,
                 account_row.account_group_id, tick,
+                cache=close_quote_cache,
             )
             current_price = float(_cb) if sv == "buy" else float(_ca)
             # Use the async P&L converter so cross pairs (NZDJPY etc.) get

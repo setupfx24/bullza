@@ -1,123 +1,146 @@
 import LandingHeader from '@/components/landing/LandingHeader'
 import LandingFooter from '@/components/landing/LandingFooter'
 import { Users, Target, Shield, Globe } from 'lucide-react'
+import { Section, SectionHeading, PageHero, FeatureGrid, CtaBanner } from '@/marketing/components'
 import { BRAND_NAME } from '@/lib/brand'
+import '@/marketing/tokens.css'
+
+/**
+ * Standalone /about. Restyled onto the shared marketing design system —
+ * the page body is wrapped in `.mk` so it picks up the marketing tokens
+ * (this route sits outside the (landing) group, which normally applies
+ * them). Every line of copy is carried over unchanged.
+ *
+ * LandingHeader / LandingFooter keep their own existing styling; they are
+ * shared chrome outside this restyle's scope.
+ */
 
 export const metadata = { title: `About Us — ${BRAND_NAME}` }
 
+const STATS = [
+  { value: '150+', label: 'Countries Served' },
+  { value: '50,000+', label: 'Active Traders' },
+  { value: '$500M+', label: 'Daily Volume' },
+  { value: '99.9%', label: 'Uptime' },
+]
+
+const TEAM = [
+  { name: 'Alex Chen', role: 'CEO & Co-Founder', desc: 'Former Goldman Sachs trader with 15+ years in institutional trading.' },
+  { name: 'Sarah Johnson', role: 'CTO & Co-Founder', desc: 'Tech lead at Bloomberg, expert in low-latency trading systems.' },
+  { name: 'Michael Roberts', role: 'Head of Compliance', desc: 'Former SEC regulator, ensures full regulatory compliance globally.' },
+]
+
 export default function AboutPage() {
   return (
-    <div className="min-h-screen bg-white text-gray-900">
+    <div className="min-h-screen">
       <LandingHeader />
 
-      {/* Hero Section */}
-      <section className="bg-gradient-to-b from-white to-gray-50 pt-16 pb-20">
-        <div className="max-w-7xl mx-auto px-6 lg:px-8 text-center">
-          <h1 className="text-4xl lg:text-5xl font-extrabold text-gray-900 leading-tight mb-6">
-            About {BRAND_NAME}<br />
-            <span className="text-blue-600">Revolutionizing Global Trading</span>
-          </h1>
-          <p className="text-lg text-gray-500 max-w-2xl mx-auto leading-relaxed">
-            {BRAND_NAME} is a decentralized exchange paired with a regulated broker — combining on-chain insured trades, non-custodial wallets, institutional-grade tools, and transparent pricing for complete financial freedom.
-          </p>
-        </div>
-      </section>
+      <div className="mk">
+        <PageHero
+          kicker={`About ${BRAND_NAME}`}
+          title={<>About {BRAND_NAME}<br /><span style={{ color: 'var(--mk-accent)' }}>Revolutionizing Global Trading</span></>}
+          lead={`${BRAND_NAME} is a decentralized exchange paired with a regulated broker — combining on-chain insured trades, non-custodial wallets, institutional-grade tools, and transparent pricing for complete financial freedom.`}
+          primary={{ label: 'Open Account', href: '/auth/register' }}
+          secondary={{ label: 'Contact Us', href: '/contact' }}
+        />
 
-      {/* Our Story */}
-      <section className="py-20 bg-white">
-        <div className="max-w-4xl mx-auto px-6 lg:px-8">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl font-extrabold text-gray-900 mb-4">Our Story</h2>
-          </div>
-          <div className="prose prose-lg max-w-none space-y-6">
-            <p className="text-gray-500 leading-relaxed">
+        {/* Our Story */}
+        <Section raised>
+          <SectionHeading kicker="Our Story" title="Our Story" />
+          <div className="flex flex-col gap-5 mx-auto max-w-4xl mt-12">
+            <p className="mk-lead">
               {BRAND_NAME} was founded with a simple belief: trading should be accessible, transparent, and fair for everyone. We saw traders struggling with high fees, slow withdrawals, and limited access to global markets. We decided to change that.
             </p>
-            <p className="text-gray-500 leading-relaxed">
-              Today, {BRAND_NAME} serves thousands of traders across 150+ countries, providing them with the tools and freedom they deserve. We're not just a broker—we're a movement toward financial independence.
+            <p className="mk-lead">
+              Today, {BRAND_NAME} serves thousands of traders across 150+ countries, providing them with the tools and freedom they deserve. We&apos;re not just a broker—we&apos;re a movement toward financial independence.
             </p>
-            <p className="text-gray-500 leading-relaxed">
+            <p className="mk-lead">
               Our commitment is simple: provide the best trading experience with zero compromises on security, speed, or transparency.
             </p>
           </div>
-        </div>
-      </section>
+        </Section>
 
-      {/* Our Vision */}
-      <section className="py-20 bg-gray-50">
-        <div className="max-w-7xl mx-auto px-6 lg:px-8">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl font-extrabold text-gray-900 mb-4">Our Vision</h2>
-            <p className="text-gray-500 max-w-2xl mx-auto">
-              To become the world's most trusted trading platform by putting traders first.
-            </p>
-          </div>
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
-            {[
-              { icon: Users, title: 'Trader-First', desc: 'Every decision we make starts with what\'s best for our traders.' },
-              { icon: Target, title: 'Innovation', desc: 'Continuously pushing boundaries with cutting-edge technology.' },
-              { icon: Shield, title: 'Trust', desc: 'Building long-term relationships through transparency and reliability.' },
-              { icon: Globe, title: 'Global Access', desc: 'Making institutional-grade trading available to everyone, everywhere.' },
-            ].map(({ icon: Icon, title, desc }) => (
-              <div key={title} className="text-center">
-                <div className="w-16 h-16 bg-blue-50 rounded-xl flex items-center justify-center mx-auto mb-4">
-                  <Icon className="w-8 h-8 text-blue-600" />
+        {/* Our Vision */}
+        <Section>
+          <SectionHeading
+            kicker="Our Vision"
+            title="Our Vision"
+            lead="To become the world's most trusted trading platform by putting traders first."
+          />
+          <FeatureGrid
+            className="mt-12"
+            columns={4}
+            items={[
+              { icon: Users,  title: 'Trader-First',  body: "Every decision we make starts with what's best for our traders." },
+              { icon: Target, title: 'Innovation',    body: 'Continuously pushing boundaries with cutting-edge technology.' },
+              { icon: Shield, title: 'Trust',         body: 'Building long-term relationships through transparency and reliability.' },
+              { icon: Globe,  title: 'Global Access', body: 'Making institutional-grade trading available to everyone, everywhere.' },
+            ]}
+          />
+        </Section>
+
+        {/* Stats */}
+        <Section raised>
+          <SectionHeading kicker="By the Numbers" title="By the Numbers" />
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-5 mt-12">
+            {STATS.map(({ value, label }) => (
+              <div key={label} className="mk-card text-center">
+                <div
+                  className="font-extrabold"
+                  style={{ fontSize: 'var(--mk-text-h2)', color: 'var(--mk-accent)', lineHeight: 1.1 }}
+                >
+                  {value}
                 </div>
-                <h3 className="font-bold text-gray-900 mb-2">{title}</h3>
-                <p className="text-gray-500 text-sm">{desc}</p>
+                <div
+                  className="mt-2"
+                  style={{
+                    fontSize: 'var(--mk-text-label)',
+                    letterSpacing: 'var(--mk-tracking-label)',
+                    textTransform: 'uppercase',
+                    color: 'var(--mk-text-faint)',
+                  }}
+                >
+                  {label}
+                </div>
               </div>
             ))}
           </div>
-        </div>
-      </section>
+        </Section>
 
-      {/* Stats */}
-      <section className="py-20 bg-white">
-        <div className="max-w-7xl mx-auto px-6 lg:px-8">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl font-extrabold text-gray-900 mb-4">By the Numbers</h2>
-          </div>
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
-            {[
-              { value: '150+', label: 'Countries Served' },
-              { value: '50,000+', label: 'Active Traders' },
-              { value: '$500M+', label: 'Daily Volume' },
-              { value: '99.9%', label: 'Uptime' },
-            ].map(({ value, label }) => (
-              <div key={label} className="text-center">
-                <div className="text-4xl font-extrabold text-blue-600 mb-2">{value}</div>
-                <div className="text-gray-500">{label}</div>
-              </div>
+        {/* Team */}
+        <Section>
+          <SectionHeading
+            kicker="Leadership"
+            title="Leadership Team"
+            lead="Led by industry veterans from top financial institutions and technology companies."
+          />
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mt-12">
+            {TEAM.map(({ name, role, desc }) => (
+              <article key={name} className="mk-card mk-card--hover text-center flex flex-col items-center gap-3">
+                <div
+                  className="h-16 w-16 rounded-full"
+                  style={{ background: 'var(--mk-surface-2)', border: '1px solid var(--mk-line)' }}
+                />
+                <h3 className="mk-h3">{name}</h3>
+                <p
+                  className="font-bold"
+                  style={{ color: 'var(--mk-accent)', fontSize: 'var(--mk-text-sm)' }}
+                >
+                  {role}
+                </p>
+                <p className="mk-body">{desc}</p>
+              </article>
             ))}
           </div>
-        </div>
-      </section>
+        </Section>
 
-      {/* Team */}
-      <section className="py-20 bg-gray-50">
-        <div className="max-w-7xl mx-auto px-6 lg:px-8">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl font-extrabold text-gray-900 mb-4">Leadership Team</h2>
-            <p className="text-gray-500 max-w-2xl mx-auto">
-              Led by industry veterans from top financial institutions and technology companies.
-            </p>
-          </div>
-          <div className="grid md:grid-cols-3 gap-8">
-            {[
-              { name: 'Alex Chen', role: 'CEO & Co-Founder', desc: 'Former Goldman Sachs trader with 15+ years in institutional trading.' },
-              { name: 'Sarah Johnson', role: 'CTO & Co-Founder', desc: 'Tech lead at Bloomberg, expert in low-latency trading systems.' },
-              { name: 'Michael Roberts', role: 'Head of Compliance', desc: 'Former SEC regulator, ensures full regulatory compliance globally.' },
-            ].map(({ name, role, desc }) => (
-              <div key={name} className="bg-white rounded-xl p-8 border border-gray-200">
-                <div className="w-16 h-16 bg-gray-200 rounded-full mx-auto mb-4" />
-                <h3 className="font-bold text-gray-900 text-center mb-2">{name}</h3>
-                <p className="text-blue-600 text-center text-sm font-semibold mb-3">{role}</p>
-                <p className="text-gray-500 text-sm text-center">{desc}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
+        <CtaBanner
+          title={`Trade With ${BRAND_NAME}`}
+          lead="Open an account and get the tools and freedom you deserve — transparent pricing, fast withdrawals, global market access."
+          primary={{ label: 'Open Account', href: '/auth/register' }}
+          secondary={{ label: 'Contact Us', href: '/contact' }}
+        />
+      </div>
 
       <LandingFooter />
     </div>
