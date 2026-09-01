@@ -76,7 +76,7 @@ def render_contact_inquiry(
         cta_url=f"mailto:{email}",
         footer_note=(
             f"Replying to this email goes to the "
-            f"{(get_settings().BRAND_NAME or '').strip() or 'YourBrand'} inbox, "
+            f"{(get_settings().BRAND_NAME or '').strip() or 'Bullza'} inbox, "
             "not the sender — use the button above to reply directly."
         ),
         hero_eyebrow="Website Contact Form",
@@ -107,7 +107,7 @@ def render_contact_ack(
     label = subject_label(subject)
     first = (name or "there").strip().split(" ")[0] or "there"
     s = get_settings()
-    brand = (s.BRAND_NAME or "").strip() or "YourBrand"
+    brand = (s.BRAND_NAME or "").strip() or "Bullza"
     domain = (s.BRAND_DOMAIN or "").strip() or "example.com"
 
     body = f"""

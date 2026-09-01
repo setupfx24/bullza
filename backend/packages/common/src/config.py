@@ -21,8 +21,8 @@ class Settings(BaseSettings):
     # Display name and public domain used across emails, notifications and
     # any server-rendered copy. Set BRAND_NAME / BRAND_DOMAIN in .env when
     # deploying for a tenant; everything brand-visible flows from here.
-    BRAND_NAME: str = "YourBrand"
-    BRAND_DOMAIN: str = "example.com"
+    BRAND_NAME: str = "Bullza"
+    BRAND_DOMAIN: str = "bullza.com"
 
     DATABASE_URL: str = "postgresql+asyncpg://broker:broker_dev@localhost:5432/broker"
     TIMESCALE_URL: str = "postgresql+asyncpg://broker:broker_dev@localhost:5433/marketdata"
@@ -112,7 +112,7 @@ class Settings(BaseSettings):
     SMTP_USER: str = ""
     SMTP_PASSWORD: str = ""
     SMTP_FROM: str = ""
-    # Display name shown in the user's inbox (e.g. "YourBrand <noreply@…>").
+    # Display name shown in the user's inbox (e.g. "Bullza <noreply@…>").
     # We wrap whatever address SMTP_FROM holds with this display name, so
     # the inbox preview reads as the brand even if the mail provider's
     # underlying account is named differently. Empty ⇒ falls back to BRAND_NAME.

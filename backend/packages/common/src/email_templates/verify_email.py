@@ -26,7 +26,7 @@ def render_verify_email(
     expires_hours: int = 24,
 ) -> tuple[str, str, str]:
     name = (first_name or "there").strip() or "there"
-    brand = (get_settings().BRAND_NAME or "").strip() or "YourBrand"
+    brand = (get_settings().BRAND_NAME or "").strip() or "Bullza"
 
     intro = (
         f"Hi {name}, click the button below to confirm this is your email "

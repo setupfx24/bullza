@@ -11,7 +11,7 @@ def render_password_reset(
     expires_in_minutes: int = 15,
 ) -> tuple[str, str, str]:
     app_name = (app_name or "").strip() or (
-        (get_settings().BRAND_NAME or "").strip() or "YourBrand"
+        (get_settings().BRAND_NAME or "").strip() or "Bullza"
     )
     subject = f"Reset your {app_name} password"
     body = f"""

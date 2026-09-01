@@ -139,7 +139,7 @@ const Home = () => {
           </div>
           
           <div className="text-center">
-            <Link to="/company/why-trustedge" className="inline-flex items-center gap-2 text-primary-accent hover:text-white transition-colors font-semibold text-lg">
+            <Link to="/company/why-bullza" className="inline-flex items-center gap-2 text-primary-accent hover:text-white transition-colors font-semibold text-lg">
               Explore All Features
               <ArrowRight className="w-5 h-5" />
             </Link>

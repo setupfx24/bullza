@@ -39,7 +39,7 @@ def render_welcome(
 ) -> tuple[str, str, str]:
     name = (first_name or "trader").strip() or "trader"
     s = get_settings()
-    brand = (s.BRAND_NAME or "").strip() or "YourBrand"
+    brand = (s.BRAND_NAME or "").strip() or "Bullza"
     support_email = f"support@{(s.BRAND_DOMAIN or '').strip() or 'example.com'}"
 
     intro = (

@@ -160,7 +160,7 @@ _CATEGORY_DISPLAY_SUFFIXES: dict[str, str] = {
 
 
 def _category_display_name(cat: str) -> str:
-    brand = (get_settings().BRAND_NAME or "").strip() or "YourBrand"
+    brand = (get_settings().BRAND_NAME or "").strip() or "Bullza"
     suffix = _CATEGORY_DISPLAY_SUFFIXES.get(cat, _CATEGORY_DISPLAY_SUFFIXES["default"])
     return f"{brand} {suffix}".strip()
 
@@ -213,7 +213,7 @@ def _from_address(category: str = "default") -> str:
         # don't silently break existing branding. MAIL_FROM_NAME defaults to
         # "" and falls back to the configured brand name.
         name = ((getattr(s, "MAIL_FROM_NAME", None) or "").strip()
-                or (s.BRAND_NAME or "").strip() or "YourBrand")
+                or (s.BRAND_NAME or "").strip() or "Bullza")
 
     # Strip any pre-existing 'Name <addr>' wrapping — keep just the address.
     if "<" in raw and raw.endswith(">"):

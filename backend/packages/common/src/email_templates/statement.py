@@ -46,7 +46,7 @@ def render_statement_digest(
     trader_app_url: str = "",
 ) -> tuple[str, str, str]:
     s = get_settings()
-    brand = (s.BRAND_NAME or "").strip() or "YourBrand"
+    brand = (s.BRAND_NAME or "").strip() or "Bullza"
     trader_app_url = (trader_app_url or "").strip() or s.TRADER_APP_URL
     name = (first_name or "trader").strip() or "trader"
     cadence = "weekly" if period_kind == "weekly" else "monthly"

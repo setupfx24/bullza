@@ -27,7 +27,7 @@ def render_maintenance_notice(
     title_override: str | None = None,    # admin-set heading inside the email
 ) -> tuple[str, str, str]:
     s = get_settings()
-    brand = (s.BRAND_NAME or "").strip() or "YourBrand"
+    brand = (s.BRAND_NAME or "").strip() or "Bullza"
     domain = (s.BRAND_DOMAIN or "").strip() or "example.com"
     support_email = f"support@{domain}"
     trader_app_url = (trader_app_url or "").strip() or s.TRADER_APP_URL

@@ -44,7 +44,7 @@ def _header_brand_html() -> str:
     blocks images — we don't leave a lone broken icon.
     """
     s = get_settings()
-    brand = (s.BRAND_NAME or "").strip() or "YourBrand"
+    brand = (s.BRAND_NAME or "").strip() or "Bullza"
     logo = (getattr(s, "EMAIL_LOGO_URL", "") or "").strip()
     if logo:
         return (
@@ -110,7 +110,7 @@ def _app_badges_html() -> str:
           <tr>
             <td align="center" style="padding:0 0 10px;color:#0a0a0a;
                                       font-size:15px;font-weight:700;letter-spacing:0.2px;">
-              Trade anywhere — get the {escape((s.BRAND_NAME or "").strip() or "YourBrand")} app
+              Trade anywhere — get the {escape((s.BRAND_NAME or "").strip() or "Bullza")} app
             </td>
           </tr>
           <tr>
@@ -155,7 +155,7 @@ def render_layout(
                             "Welcome to the Future of Decentralized Trading")
     """
     s = get_settings()
-    brand = escape((s.BRAND_NAME or "").strip() or "YourBrand")
+    brand = escape((s.BRAND_NAME or "").strip() or "Bullza")
     support_email = escape(f"support@{(s.BRAND_DOMAIN or '').strip() or 'example.com'}")
     cta_block = ""
     if cta_label and cta_url:

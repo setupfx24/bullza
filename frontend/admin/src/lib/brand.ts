@@ -7,7 +7,7 @@
  */
 
 /** Product / company display name. */
-export const BRAND_NAME = process.env.NEXT_PUBLIC_BRAND_NAME || 'YourBrand';
+export const BRAND_NAME = process.env.NEXT_PUBLIC_BRAND_NAME || 'Bullza';
 
 /**
  * Logo image path. Empty string means "no image logo" — layout components

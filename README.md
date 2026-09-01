@@ -1,6 +1,6 @@
-# White-Label Broker Platform
+# Bullza — Broker Platform
 
-A full-stack, white-label forex/CFD brokerage platform:
+Bullza is a full-stack forex/CFD brokerage platform (white-label ready):
 
 - **Backend** — FastAPI microservices: `gateway` (trader REST + WebSocket), `admin` (back-office API), `market-data` (tick ingestion), `b-book-engine` (execution), `risk-engine` (margin/stop-out), plus a shared `packages/common` library.
 - **Frontends** — Next.js apps: `frontend/trader` (marketing site + trading dashboard/terminal) and `frontend/admin` (back-office panel).

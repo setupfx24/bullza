@@ -31,7 +31,7 @@ def render_fr_insurance_eligibility(
     """Pick subject/body based on flavor. The body links to the relevant
     product pages so the user can opt-in without admin involvement."""
     s = get_settings()
-    brand = (s.BRAND_NAME or "").strip() or "YourBrand"
+    brand = (s.BRAND_NAME or "").strip() or "Bullza"
     trader_app_url = (trader_app_url or "").strip() or s.TRADER_APP_URL
     name = (first_name or "trader").strip() or "trader"
 

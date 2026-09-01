@@ -23,7 +23,7 @@ def render_dashboard_access(
     dashboard_url: str,
 ) -> tuple[str, str, str]:
     name = (first_name or "trader").strip() or "trader"
-    brand = (get_settings().BRAND_NAME or "").strip() or "YourBrand"
+    brand = (get_settings().BRAND_NAME or "").strip() or "Bullza"
 
     intro = (
         f"Your profile is complete and your {brand} dashboard is ready. "
