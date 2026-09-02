@@ -321,10 +321,16 @@ async def distribute_ib_commission(
     Either gate failing → no commission this trade. The IB still earns
     from the same trader on every subsequent qualifying trade.
     """
+    # referrals.referred_id has no unique constraint — if a duplicate row
+    # ever slips in, scalar_one_or_none() would raise and silently kill the
+    # commission for that trader forever. First referral (oldest) wins.
     referral_q = await db.execute(
-        select(Referral).where(Referral.referred_id == trader_user_id)
+        select(Referral)
+        .where(Referral.referred_id == trader_user_id)
+        .order_by(Referral.created_at)
+        .limit(1)
     )
-    referral = referral_q.scalar_one_or_none()
+    referral = referral_q.scalars().first()
     if not referral or not referral.ib_profile_id:
         return
 

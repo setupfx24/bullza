@@ -2,8 +2,16 @@
 
 Architecture:
 - Manager trades one master TradingAccount; positions live as Position rows.
-- This engine polls ~every 2s, diffs master open positions vs in-memory snapshot,
-  opens/closes child positions on each linked investor account.
+- This engine polls ~every 2s and syncs STATELESSLY from the DB each cycle:
+  opens mirrors for young master positions with no CopyTrade yet, mirrors
+  partial closes by comparing follower lots against `master_lots × ratio`,
+  tracks master SL/TP onto open mirrors, and closes mirrors via the orphan
+  sweeps. No in-memory snapshot — a restart or leader rotation loses nothing.
+- A mirror may only OPEN while the master position is younger than
+  OPEN_MIRROR_MAX_AGE_SEC. Late entry at the master's original price would
+  hand the follower the master's unrealised P&L (a free option after a
+  restart, or for an investor who tops up margin once a trade turns green),
+  so missed trades stay missed.
 - Lot scaling is driven by InvestorAllocation.copy_type (signal | pamm | mam), not mixed.
 - Master positions are never modified by this engine.
 
@@ -14,10 +22,9 @@ import json
 import logging
 import unittest
 from decimal import Decimal
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
-from uuid import UUID
-from collections import defaultdict
+from uuid import UUID, uuid4
 from typing import Optional, Tuple
 
 from sqlalchemy import select, func
@@ -39,7 +46,29 @@ COPY_COMMENT_PREFIX = "Copy of master position "
 # Cluster-wide lock key so only one gateway worker processes copy trades at a
 # time — with --workers=N each worker would otherwise duplicate every mirror.
 COPY_ENGINE_LOCK_KEY = "copy_engine:cycle_lock"
-COPY_ENGINE_LOCK_TTL = 10
+# Must comfortably exceed the slowest realistic cycle: if the lock expired
+# mid-cycle a second worker would start processing concurrently and the
+# per-pair dedupe check can race (both read "no mirror yet" before either
+# commits).
+COPY_ENGINE_LOCK_TTL = 30
+# Release-only-if-owner: deleting the bare key would drop ANOTHER worker's
+# lock whenever ours had already expired mid-cycle.
+_LOCK_RELEASE_LUA = (
+    "if redis.call('get', KEYS[1]) == ARGV[1] then "
+    "return redis.call('del', KEYS[1]) else return 0 end"
+)
+# See module docstring — mirrors may only open while the master position is
+# this young. Covers normal engine lag; blocks stale-price late entry.
+OPEN_MIRROR_MAX_AGE_SEC = 180
+
+
+def _age_seconds(dt) -> Optional[float]:
+    """Age of a DB timestamp in seconds; treats naive datetimes as UTC."""
+    if dt is None:
+        return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return (datetime.now(timezone.utc) - dt).total_seconds()
 
 
 def resolve_copy_type(allocation: InvestorAllocation, master: MasterAccount) -> str:
@@ -60,7 +89,6 @@ def resolve_copy_type(allocation: InvestorAllocation, master: MasterAccount) -> 
 class CopyTradeEngine:
     def __init__(self):
         self._running = False
-        self._master_positions: dict[str, set[str]] = defaultdict(set)
 
     @staticmethod
     def compute_lot_size(
@@ -143,12 +171,14 @@ class CopyTradeEngine:
     async def _run(self):
         while self._running:
             lock_acquired = False
+            lock_token = uuid4().hex
             try:
                 # Cluster-wide leader lock — prevents duplicate mirroring when
-                # gateway runs with --workers=N.
+                # gateway runs with --workers=N. Token-stamped so release can
+                # verify ownership.
                 lock_acquired = bool(
                     await redis_client.set(
-                        COPY_ENGINE_LOCK_KEY, "1",
+                        COPY_ENGINE_LOCK_KEY, lock_token,
                         ex=COPY_ENGINE_LOCK_TTL, nx=True,
                     )
                 )
@@ -177,7 +207,9 @@ class CopyTradeEngine:
             finally:
                 if lock_acquired:
                     try:
-                        await redis_client.delete(COPY_ENGINE_LOCK_KEY)
+                        await redis_client.eval(
+                            _LOCK_RELEASE_LUA, 1, COPY_ENGINE_LOCK_KEY, lock_token,
+                        )
                     except Exception:
                         pass
 
@@ -218,7 +250,11 @@ class CopyTradeEngine:
         return float(q.scalar() or 0)
 
     async def process_master(self, master: MasterAccount, db: AsyncSession) -> None:
-        """One full sync cycle for a single master: read, diff, open/close children."""
+        """One full sync cycle for a single master, statelessly from the DB:
+        open mirrors for young unmirrored positions, then sync partial
+        closes + SL/TP onto open mirrors. Full closes are handled by the
+        orphan catch-up below (and the global sweep), which see every close
+        regardless of restarts or leader rotation."""
         master_id_str = str(master.id)
 
         master_positions_q = await db.execute(
@@ -234,8 +270,6 @@ class CopyTradeEngine:
             if p.comment and "Copy of master" in p.comment:
                 continue
             master_open[str(p.id)] = p
-        current_master_pos_ids = set(master_open.keys())
-        prev_master_pos_ids = self._master_positions.get(master_id_str, set())
 
         investors = await db.execute(
             select(InvestorAllocation).where(
@@ -246,7 +280,6 @@ class CopyTradeEngine:
         active_investors = investors.scalars().all()
         if not active_investors:
             logger.debug("process_master skip master=%s: no active allocations", master_id_str)
-            self._master_positions[master_id_str] = current_master_pos_ids
             return
 
         master_account = await db.get(TradingAccount, master.account_id)
@@ -263,16 +296,56 @@ class CopyTradeEngine:
                 master_id_str,
             )
 
-        new_positions = current_master_pos_ids - prev_master_pos_ids
-        closed_positions = prev_master_pos_ids - current_master_pos_ids
+        # One batch query: every CopyTrade (ANY status) for the currently-open
+        # master positions, plus the follower position. Drives both the
+        # "already mirrored / already settled" gate for opens and the
+        # partial-close + SL/TP sync pass.
+        copy_rows: list = []
+        if master_open:
+            copies_q = await db.execute(
+                select(CopyTrade, Position)
+                .join(
+                    Position,
+                    CopyTrade.investor_position_id == Position.id,
+                    isouter=True,
+                )
+                .where(
+                    CopyTrade.master_position_id.in_(
+                        [UUID(i) for i in master_open]
+                    )
+                )
+            )
+            copy_rows = list(copies_q.all())
+        mirrored_pairs = {
+            (str(ct.master_position_id), str(ct.investor_allocation_id))
+            for ct, _ in copy_rows
+        }
 
-        for pos_id in new_positions:
-            master_pos = master_open[pos_id]
+        # ── Open pass ─────────────────────────────────────────────────────
+        for pos_id, master_pos in master_open.items():
+            pos_age = _age_seconds(getattr(master_pos, "created_at", None))
             for investor in active_investors:
                 # PAMM investors have no sub-account — funds are pooled on the
                 # master's account directly. Profit is distributed to their main
                 # wallet when the master closes the trade (see trading_service).
                 if resolve_copy_type(investor, master) == "pamm":
+                    continue
+                # A pair that ever had a CopyTrade (open OR settled) is never
+                # re-mirrored — e.g. a mirror fully closed by the partial-close
+                # sync must not reopen while the master still holds a sliver.
+                if (pos_id, str(investor.id)) in mirrored_pairs:
+                    continue
+                # Freshness gate — mirrors open at the master's ORIGINAL price,
+                # so only positions younger than the window may be mirrored.
+                # Anything older (engine downtime, follower whose margin was
+                # short at open) stays missed; a late fill at a stale price
+                # would hand over the master's unrealised P&L.
+                if pos_age is None or pos_age > OPEN_MIRROR_MAX_AGE_SEC:
+                    continue
+                # Never mirror a position opened BEFORE this investor started
+                # following the master.
+                alloc_age = _age_seconds(getattr(investor, "created_at", None))
+                if alloc_age is not None and alloc_age < pos_age:
                     continue
                 investor_account = await db.get(TradingAccount, investor.investor_account_id)
                 if not investor_account or not investor_account.is_active:
@@ -291,22 +364,61 @@ class CopyTradeEngine:
                     db,
                 )
 
-        for closed_id in closed_positions:
-            copies = await db.execute(
-                select(CopyTrade).where(
-                    CopyTrade.master_position_id == UUID(closed_id),
-                    CopyTrade.status == "open",
-                )
+        # ── Partial-close + SL/TP sync pass ───────────────────────────────
+        # Stateless partial-close mirroring: the follower's fair size for a
+        # still-open master position is `master_lots × ratio` (ratio was
+        # fixed at open). If the master partially closed, the follower now
+        # holds an excess — close exactly that excess. Self-healing: partial
+        # closes that happened while the engine was down are caught on the
+        # next cycle. Mirrors are managed positions, so master SL/TP changes
+        # propagate onto them too.
+        for ct, inv_pos in copy_rows:
+            if ct.status != "open" or inv_pos is None:
+                continue
+            master_pos = master_open.get(str(ct.master_position_id))
+            if master_pos is None:
+                continue  # master closed — orphan catch-up below handles it
+            inv_status = (
+                inv_pos.status.value
+                if hasattr(inv_pos.status, "value")
+                else str(inv_pos.status)
             )
-            for copy in copies.scalars().all():
-                await self._close_copy(copy, master, db)
+            if inv_status != "open":
+                continue
 
-        # ── Orphan catch-up ────────────────────────────────────────────────
-        # In-memory diff (prev vs current) misses closes that happened while
-        # the engine was not running (gateway restart, crash, leader rotation
-        # when --workers=N + redis lock). Self-heal by closing any CopyTrade
-        # whose master position is no longer open but whose follower mirror
-        # is still marked open.
+            if inv_pos.stop_loss != master_pos.stop_loss:
+                inv_pos.stop_loss = master_pos.stop_loss
+            if inv_pos.take_profit != master_pos.take_profit:
+                inv_pos.take_profit = master_pos.take_profit
+
+            instrument = master_pos.instrument
+            lot_step = Decimal(str((instrument.lot_step if instrument else None) or "0.01"))
+            ratio = Decimal(str(ct.ratio or 1))
+            expected = Decimal(str(master_pos.lots or 0)) * ratio
+            excess = Decimal(str(inv_pos.lots or 0)) - expected
+            if excess <= lot_step / 2:
+                continue
+            close_lots = (excess / lot_step).to_integral_value(rounding="ROUND_FLOOR") * lot_step
+            if close_lots <= 0:
+                continue
+            remaining = Decimal(str(inv_pos.lots or 0)) - close_lots
+            try:
+                if remaining < lot_step:
+                    # Follower's fair share shrank below one lot step —
+                    # book them out entirely.
+                    await self._close_copy(ct, master, db)
+                else:
+                    await self._close_copy(ct, master, db, close_lots=close_lots)
+            except Exception as e:
+                logger.error(
+                    "Partial-close mirror failed copy=%s: %s", ct.id, e, exc_info=True,
+                )
+
+        # ── Close pass (orphan-style, stateless) ──────────────────────────
+        # THE close path: any CopyTrade whose master position is no longer
+        # open but whose follower mirror is still marked open gets closed.
+        # Works identically live, after a restart, and across leader
+        # rotation under --workers=N.
         orphan_copies_q = await db.execute(
             select(CopyTrade)
             .join(Position, CopyTrade.master_position_id == Position.id)
@@ -329,8 +441,6 @@ class CopyTradeEngine:
             )
             await self._close_copy(copy, master, db)
 
-        self._master_positions[master_id_str] = current_master_pos_ids
-
     async def _open_copy(
         self,
         master: MasterAccount,
@@ -346,14 +456,15 @@ class CopyTradeEngine:
             logger.warning("Skip copy open: no instrument on master position %s", master_pos.id)
             return
 
+        # ANY status — a settled mirror for this pair must never reopen
+        # while the master position is still alive.
         existing_q = await db.execute(
             select(CopyTrade).where(
                 CopyTrade.master_position_id == master_pos.id,
                 CopyTrade.investor_allocation_id == investor.id,
-                CopyTrade.status == "open",
             )
         )
-        if existing_q.scalar_one_or_none():
+        if existing_q.scalars().first():
             return
 
         side_val = master_pos.side.value if hasattr(master_pos.side, "value") else str(master_pos.side)
@@ -380,21 +491,23 @@ class CopyTradeEngine:
 
         copy_lots = float(base_lots)
         lot_step = float(instrument.lot_step or Decimal("0.01"))
-        copy_lots = max(lot_step, round(copy_lots / lot_step) * lot_step)
+        copy_lots = round(copy_lots / lot_step) * lot_step
 
         min_lot = float(instrument.min_lot or Decimal("0.01"))
         max_lot = float(instrument.max_lot or Decimal("100"))
-        copy_lots = max(min_lot, min(copy_lots, max_lot))
-
-        if copy_lots < MIN_COPY_LOT:
+        # Never bump a small follower UP to the instrument minimum — a fair
+        # share of 0.01 on a 0.1-min instrument would trade 10× their
+        # proportional risk. Too small = skip, same as below-MIN_COPY_LOT.
+        if copy_lots < max(min_lot, MIN_COPY_LOT):
             logger.info(
-                "Skip copy open: allocation=%s master_pos=%s post_step_lots=%s below min %s",
+                "Skip copy open: allocation=%s master_pos=%s post_step_lots=%s below instrument min %s",
                 investor.id,
                 master_pos.id,
                 copy_lots,
-                MIN_COPY_LOT,
+                max(min_lot, MIN_COPY_LOT),
             )
             return
+        copy_lots = min(copy_lots, max_lot)
 
         if investor.max_lot_override and copy_lots > float(investor.max_lot_override):
             copy_lots = float(investor.max_lot_override)
@@ -486,6 +599,21 @@ class CopyTradeEngine:
                 investor.id, order.id, e,
             )
 
+        # Auto-insure the mirrored position when the investor opted in AND the
+        # master allows it (admin gate on master.insurance_enabled). This is
+        # the wiring the InvestorAllocation.insurance_opt_in column promises.
+        # Best-effort: an insurance failure must never block the mirror.
+        if getattr(investor, "insurance_opt_in", False) and getattr(
+            master, "insurance_enabled", True
+        ):
+            try:
+                await self._auto_insure_copy(position, investor_account, instrument, db)
+            except Exception as e:
+                logger.warning(
+                    "Auto-insure failed for copy position %s (allocation=%s): %s",
+                    position.id, investor.id, e,
+                )
+
         logger.info(
             "Copy opened: %s %s %s lots investor=%s master_pos=%s copy_type=%s (master %s lots)",
             instrument.symbol,
@@ -497,7 +625,143 @@ class CopyTradeEngine:
             master_lots,
         )
 
-    async def _close_copy(self, copy: CopyTrade, master: MasterAccount, db: AsyncSession):
+    async def _auto_insure_copy(
+        self,
+        position: Position,
+        investor_account: TradingAccount,
+        instrument,
+        db: AsyncSession,
+    ) -> None:
+        """Activate a trade-insurance policy on a freshly mirrored position.
+
+        Mirrors the manual /insurance/activate endpoint's gates (config
+        enabled, ATR floor, daily policy cap) and pricing, using the FIRST
+        configured tier — the client-spec default. The premium is charged to
+        the investor's trading account exactly like a manual activation;
+        if the charge fails the policy is rolled back and the mirror stays
+        uninsured (best-effort, caller logs).
+        """
+        from packages.common.src.insurance.config import load_config
+        from packages.common.src.insurance.volatility import get_atr
+        from packages.common.src.insurance.pricing import quote_all_tiers
+        from packages.common.src.models import InsurancePolicy
+
+        cfg = await load_config()
+        if not cfg.enabled or not cfg.simple_tiers:
+            return
+        atr = await get_atr(instrument.symbol)
+        if atr < cfg.atr_floor:
+            logger.info(
+                "Auto-insure skipped (vol too low) position=%s symbol=%s",
+                position.id, instrument.symbol,
+            )
+            return
+
+        # Daily policy cap — same protection as the manual endpoint, scoped
+        # to the same account kind (demo vs real).
+        max_per_day = int(getattr(cfg, "max_policies_per_day", 0) or 0)
+        if max_per_day > 0:
+            since = datetime.now(timezone.utc) - timedelta(days=1)
+            cnt = (await db.execute(
+                select(func.count())
+                .select_from(InsurancePolicy)
+                .join(TradingAccount, TradingAccount.id == InsurancePolicy.account_id)
+                .where(
+                    InsurancePolicy.user_id == investor_account.user_id,
+                    InsurancePolicy.activated_at >= since,
+                    TradingAccount.is_demo == investor_account.is_demo,
+                )
+            )).scalar() or 0
+            if int(cnt) >= max_per_day:
+                logger.info(
+                    "Auto-insure skipped (daily cap %s) user=%s",
+                    max_per_day, investor_account.user_id,
+                )
+                return
+
+        # Win-rate feeds the high-winrate surcharge; degrade to 0 (no
+        # surcharge) rather than fail the activation if the helper moves.
+        try:
+            from ..api.insurance import _user_win_rate
+            win_rate = await _user_win_rate(db, investor_account.user_id)
+        except Exception:
+            win_rate = 0.0
+
+        contract_size = Decimal(str(instrument.contract_size or 100000))
+        trade_size_usd = float(
+            Decimal(str(position.lots)) * contract_size * Decimal(str(position.open_price))
+        )
+        sl_distance = None
+        if position.stop_loss is not None:
+            sl_distance = abs(
+                float(Decimal(str(position.open_price)) - Decimal(str(position.stop_loss)))
+            )
+
+        quotes = await quote_all_tiers(
+            cfg=cfg,
+            leverage=float(investor_account.leverage or 100),
+            atr=atr,
+            lots=float(position.lots),
+            trade_size_usd=trade_size_usd,
+            has_stop_loss=position.stop_loss is not None,
+            sl_distance=sl_distance,
+            win_rate=win_rate,
+            db=db,
+            user_id=investor_account.user_id,
+            account_group_id=investor_account.account_group_id,
+        )
+        if not quotes:
+            return
+        chosen = quotes[0]
+        fee_dec = Decimal(str(chosen["fee"]))
+
+        policy = InsurancePolicy(
+            id=uuid4(),
+            user_id=investor_account.user_id,
+            account_id=investor_account.id,
+            position_id=position.id,
+            instrument_id=instrument.id,
+            tier=chosen["tier"],
+            fee=fee_dec,
+            coverage_pct=Decimal(str(chosen["coverage_pct"])),
+            max_cap=Decimal(str(chosen["max_cap"])),
+            risk_score=Decimal(str(chosen.get("risk_score", 0) or 0)),
+            status="active",
+        )
+        db.add(policy)
+        await db.flush()
+
+        try:
+            from ..services import wallet_service
+            await wallet_service.charge_insurance_fee(
+                db=db,
+                user_id=investor_account.user_id,
+                account_id=investor_account.id,
+                amount=fee_dec,
+                policy_id=policy.id,
+                description=(
+                    f"Auto trade insurance — {str(chosen['tier']).title()} tier on "
+                    f"{instrument.symbol} copy trade ({float(position.lots):.2f} lots)"
+                ),
+            )
+        except Exception:
+            # Premium charge failed (insufficient balance etc.) — the mirror
+            # must not carry an unpaid policy.
+            await db.delete(policy)
+            raise
+
+        logger.info(
+            "Auto-insured copy position %s (%s, fee=%s)",
+            position.id, chosen["tier"], fee_dec,
+        )
+
+    async def _close_copy(
+        self,
+        copy: CopyTrade,
+        master: MasterAccount,
+        db: AsyncSession,
+        close_lots: Optional[Decimal] = None,
+    ):
         investor_pos = await db.get(Position, copy.investor_position_id)
         if not investor_pos:
             copy.status = "closed"
@@ -514,6 +778,19 @@ class CopyTradeEngine:
             copy.status = "closed"
             logger.warning("Close copy: no instrument on investor position %s", investor_pos.id)
             return
+
+        # Partial-close support: close_lots=None closes the whole mirror;
+        # a value closes just that slice (position stays open, copy stays
+        # open) — used by the sync pass to track master partial closes.
+        total_lots = Decimal(str(investor_pos.lots or 0))
+        lots_to_close = (
+            min(Decimal(str(close_lots)), total_lots)
+            if close_lots is not None
+            else total_lots
+        )
+        if lots_to_close <= 0:
+            return
+        is_partial = lots_to_close < total_lots
 
         side_val = investor_pos.side.value if hasattr(investor_pos.side, "value") else str(investor_pos.side)
         close_price = None
@@ -553,9 +830,9 @@ class CopyTradeEngine:
         contract_size = instrument.contract_size or Decimal("100000")
 
         if side_val == "buy":
-            gross_profit = (close_price - investor_pos.open_price) * investor_pos.lots * contract_size
+            gross_profit = (close_price - investor_pos.open_price) * lots_to_close * contract_size
         else:
-            gross_profit = (investor_pos.open_price - close_price) * investor_pos.lots * contract_size
+            gross_profit = (investor_pos.open_price - close_price) * lots_to_close * contract_size
         # Async converter — the sync version silently returned raw JPY
         # for cross pairs (NZDJPY, EURGBP, AUDCAD), which propagated to
         # investor balances as JPY-treated-as-USD and nuked accounts
@@ -596,10 +873,22 @@ class CopyTradeEngine:
 
         net_profit = gross_profit - performance_fee
 
-        investor_pos.status = PositionStatus.CLOSED.value
-        investor_pos.close_price = close_price
-        investor_pos.profit = net_profit
-        investor_pos.closed_at = datetime.now(timezone.utc)
+        # Proportional slice of accrued swap/commission travels with the
+        # closed lots (and comes OFF the position) so a later final close
+        # doesn't book the same charges twice in trade history.
+        slice_ratio = lots_to_close / total_lots if total_lots > 0 else Decimal("1")
+        slice_swap = (investor_pos.swap or Decimal("0")) * slice_ratio
+        slice_commission = (investor_pos.commission or Decimal("0")) * slice_ratio
+
+        if is_partial:
+            investor_pos.lots = total_lots - lots_to_close
+            investor_pos.swap = (investor_pos.swap or Decimal("0")) - slice_swap
+            investor_pos.commission = (investor_pos.commission or Decimal("0")) - slice_commission
+        else:
+            investor_pos.status = PositionStatus.CLOSED.value
+            investor_pos.close_price = close_price
+            investor_pos.profit = net_profit
+            investor_pos.closed_at = datetime.now(timezone.utc)
 
         investor_account = await db.get(TradingAccount, investor_pos.account_id)
         if investor_account:
@@ -609,7 +898,7 @@ class CopyTradeEngine:
             # value is JPY, not USD. Same fix the trader-side close path
             # got in commit c66e1e2. Without this, mirrored cross-pair
             # closes leak margin every cycle.
-            margin_release_raw = (investor_pos.lots * contract_size * investor_pos.open_price) / Decimal(
+            margin_release_raw = (lots_to_close * contract_size * investor_pos.open_price) / Decimal(
                 str(investor_account.leverage)
             )
             margin_release = await convert_to_account_currency(
@@ -645,13 +934,13 @@ class CopyTradeEngine:
             account_id=investor_pos.account_id,
             instrument_id=investor_pos.instrument_id,
             side=investor_pos.side,
-            lots=investor_pos.lots,
+            lots=lots_to_close,
             open_price=investor_pos.open_price,
             close_price=close_price,
-            swap=investor_pos.swap or Decimal("0"),
-            commission=investor_pos.commission or Decimal("0"),
+            swap=slice_swap,
+            commission=slice_commission,
             profit=net_profit,
-            close_reason="copy_close",
+            close_reason="copy_partial_close" if is_partial else "copy_close",
             opened_at=investor_pos.created_at,
             closed_at=datetime.now(timezone.utc),
         )
@@ -715,13 +1004,15 @@ class CopyTradeEngine:
                 # Update master's total fee earned
                 master.total_fee_earned = (master.total_fee_earned or Decimal("0")) + master_share
 
-        copy.status = "closed"
+        if not is_partial:
+            copy.status = "closed"
 
         logger.info(
-            "Copy closed: %s %s %s lots | gross=%s perf_fee=%s net=%s master_pos=%s",
+            "Copy %s: %s %s %s lots | gross=%s perf_fee=%s net=%s master_pos=%s",
+            "partial-closed" if is_partial else "closed",
             instrument.symbol,
             side_val,
-            investor_pos.lots,
+            lots_to_close,
             gross_profit,
             performance_fee,
             net_profit,
