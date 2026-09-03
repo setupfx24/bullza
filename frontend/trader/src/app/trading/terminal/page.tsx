@@ -5,8 +5,8 @@ import { createPortal } from 'react-dom';
 import dynamic from 'next/dynamic';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { clsx } from 'clsx';
-import { Maximize2, Minimize2, Search, ShieldCheck, X } from 'lucide-react';
-import { useUIStore, RAIL_INSTRUMENTS_LAYOUT } from '@/stores/uiStore';
+import { LayoutTemplate, ListOrdered, Maximize2, Minimize2, Search, ShieldCheck, X } from 'lucide-react';
+import { useUIStore } from '@/stores/uiStore';
 import { TERMINAL_RESIZE, maxBottomPanelHeightPx } from '@/lib/terminalLayout';
 import PanelResizeHandle from '@/components/trading/PanelResizeHandle';
 import { useTradingStore, InstrumentInfo } from '@/stores/tradingStore';
@@ -37,8 +37,6 @@ const MarketNewsPanel = dynamic(() => import('@/components/charts/MarketNewsPane
 });
 
 const ORDER_MIN = 250;
-/** Rail space the order ticket keeps when the instruments list is stacked above it. */
-const ORDER_TICKET_MIN_HEIGHT = 260;
 const ORDER_MAX = 560;
 const BOTTOM_MIN = 160;
 
@@ -56,20 +54,16 @@ export default function TradingTerminalPage() {
     setOrderPanelWidth,
     setBottomPanelHeight,
     toggleTerminalMarkets,
-    terminalInstrumentsHeight,
-    setTerminalInstrumentsHeight,
   } = useUIStore();
 
   useDocumentTitle();
 
   const [opW, setOpW] = useState(orderPanelWidth);
-  /** Height of the instruments list stacked above the order ticket. */
-  const [instrH, setInstrH] = useState(terminalInstrumentsHeight);
   const [bpH, setBpH] = useState(bottomPanelHeight);
   const [isMobile, setIsMobile] = useState(false);
 
   /** Snapshot at pointer-down: stable clamps while store updates mid-drag. */
-  const layoutDragStartRef = useRef({ op: 0, bp: 0, instr: 0, vw: 0, colH: 0 });
+  const layoutDragStartRef = useRef({ op: 0, bp: 0, vw: 0, colH: 0 });
   const centerColumnRef = useRef<HTMLDivElement>(null);
   const bottomRestoreRef = useRef(320);
   const [activeSpace, setActiveSpace] = useState<TerminalSpaceId>('balanced');
@@ -86,7 +80,6 @@ export default function TradingTerminalPage() {
     layoutDragStartRef.current = {
       op: s.orderPanelWidth,
       bp: s.bottomPanelHeight,
-      instr: s.terminalInstrumentsHeight,
       vw: typeof window !== 'undefined' ? window.innerWidth : 0,
       colH: Math.max(120, col),
     };
@@ -107,23 +100,6 @@ export default function TradingTerminalPage() {
     [setOrderPanelWidth],
   );
 
-  /** Inside the right rail, between the instruments list and the order
-      ticket below it: drag down grows the list. Clamped so the order
-      ticket always keeps a usable slice of the rail. */
-  const onInstrumentsHeightDrag = useCallback(
-    (dy: number) => {
-      const { instr, colH } = layoutDragStartRef.current;
-      const maxInstr = Math.min(
-        RAIL_INSTRUMENTS_LAYOUT.max,
-        Math.max(RAIL_INSTRUMENTS_LAYOUT.min, colH - ORDER_TICKET_MIN_HEIGHT),
-      );
-      const next = Math.max(RAIL_INSTRUMENTS_LAYOUT.min, Math.min(maxInstr, instr + dy));
-      setInstrH(next);
-      setTerminalInstrumentsHeight(next);
-    },
-    [setTerminalInstrumentsHeight],
-  );
-
   const onBottomDrag = useCallback(
     (dy: number) => {
       const { bp, colH } = layoutDragStartRef.current;
@@ -139,15 +115,11 @@ export default function TradingTerminalPage() {
     setOpW(orderPanelWidth);
   }, [orderPanelWidth]);
 
-  useEffect(() => {
-    setInstrH(terminalInstrumentsHeight);
-  }, [terminalInstrumentsHeight]);
-
-  // NOTE: no auto-widen effect for the Markets view. The instruments list
-  // now opens INSIDE the right rail, stacked above the order ticket
-  // (client 2026-09-03), so the rail keeps its width and the chart is
-  // never re-squeezed. terminalMarketsOpen drives that stack plus the
-  // left-rail button state and the symbol-search focus.
+  // NOTE: no auto-widen effect for the Markets view. Markets and the order
+  // ticket SWAP inside the right rail (client 2026-09-03), so the rail keeps
+  // its width in both views and the chart is never re-squeezed.
+  // terminalMarketsOpen drives that swap plus the left-rail button state
+  // and the symbol-search focus.
 
   useEffect(() => {
     setBpH(bottomPanelHeight);
@@ -845,40 +817,51 @@ export default function TradingTerminalPage() {
               </div>
             ) : (
               <>
-                {/* Instruments stack — hidden while the order ticket is the
-                    only thing on the rail; the left-rail Markets button
-                    opens it ABOVE the ticket so picking a symbol never
-                    hides the ticket (client 2026-09-03). It stacks inside
-                    the rail rather than taking a column of its own, so it
-                    costs the chart no width and stays available at every
-                    desktop size (below 768px the mobile layout takes over). */}
-                {terminalMarketsOpen ? (
-                  <>
-                    <div
-                      className="flex shrink-0 flex-col min-h-0 overflow-hidden border-b border-border-primary"
-                      /* maxHeight (not just the drag clamp) keeps the ticket
-                         usable on short viewports: the persisted height can
-                         outlive the window it was chosen in. */
-                      style={{
-                        height: instrH,
-                        maxHeight: `calc(100% - ${ORDER_TICKET_MIN_HEIGHT}px)`,
-                      }}
-                    >
-                      <Watchlist
-                        variant="terminalRail"
-                        onExitMarkets={() => setTerminalMarketsOpen(false)}
-                      />
-                    </div>
-                    <PanelResizeHandle
-                      axis="horizontal"
-                      hitSize={TERMINAL_RESIZE.handleHitPx}
-                      onDragStart={snapshotLayout}
-                      onDrag={onInstrumentsHeightDrag}
-                    />
-                  </>
-                ) : null}
+                {/* Markets / Trade switch — sits ABOVE the order ticket and
+                    swaps the rail between the two (client 2026-09-03,
+                    matching the reference platform): opening Markets hides
+                    the ticket completely and gives the instrument list the
+                    whole rail, so neither view is cramped and the chart
+                    keeps its width either way. */}
+                <div className="shrink-0 flex items-center gap-1.5 px-2 py-2 border-b border-border-primary bg-bg-secondary">
+                  <button
+                    type="button"
+                    onClick={() => setTerminalMarketsOpen(true)}
+                    aria-pressed={terminalMarketsOpen}
+                    className={clsx(
+                      'flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg border text-[11px] font-bold uppercase tracking-wide transition-colors',
+                      terminalMarketsOpen
+                        ? 'bg-accent/10 border-accent/50 text-accent'
+                        : 'bg-card border-border-primary text-text-secondary hover:text-text-primary hover:border-border-secondary',
+                    )}
+                  >
+                    <ListOrdered className="w-3.5 h-3.5" aria-hidden />
+                    Markets
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setTerminalMarketsOpen(false)}
+                    aria-pressed={!terminalMarketsOpen}
+                    className={clsx(
+                      'flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg border text-[11px] font-bold uppercase tracking-wide transition-colors',
+                      !terminalMarketsOpen
+                        ? 'bg-accent/10 border-accent/50 text-accent'
+                        : 'bg-card border-border-primary text-text-secondary hover:text-text-primary hover:border-border-secondary',
+                    )}
+                  >
+                    <LayoutTemplate className="w-3.5 h-3.5" aria-hidden />
+                    Trade
+                  </button>
+                </div>
                 <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
-                  <OrderPanel />
+                  {terminalMarketsOpen ? (
+                    <Watchlist
+                      variant="terminalRail"
+                      onExitMarkets={() => setTerminalMarketsOpen(false)}
+                    />
+                  ) : (
+                    <OrderPanel />
+                  )}
                 </div>
               </>
             )}
