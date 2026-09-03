@@ -39,8 +39,6 @@ const MarketNewsPanel = dynamic(() => import('@/components/charts/MarketNewsPane
 
 const ORDER_MIN = 250;
 const ORDER_MAX = 560;
-const MARKETS_MIN = 560;
-const MARKETS_MAX = 1200;
 const BOTTOM_MIN = 160;
 
 export default function TradingTerminalPage() {
@@ -93,24 +91,23 @@ export default function TradingTerminalPage() {
     };
   }, []);
 
-  /** Between chart and order+markets rail: drag right widens the rail. */
+  /** Between instruments panel and the order rail: drag right widens the rail. */
   const onChartRailDrag = useCallback(
     (dx: number) => {
       const { op, vw } = layoutDragStartRef.current;
-      const hardMax = terminalMarketsOpen ? MARKETS_MAX : ORDER_MAX;
-      const hardMin = terminalMarketsOpen ? MARKETS_MIN : ORDER_MIN;
       const maxOp = Math.min(
-        hardMax,
+        ORDER_MAX,
         vw - TERMINAL_RESIZE.handlesSlack - TERMINAL_RESIZE.chartMinWidth,
       );
-      const next = Math.max(hardMin, Math.min(maxOp, op - dx));
+      const next = Math.max(ORDER_MIN, Math.min(maxOp, op - dx));
       setOpW(next);
       setOrderPanelWidth(next);
     },
-    [setOrderPanelWidth, terminalMarketsOpen],
+    [setOrderPanelWidth],
   );
 
-  /** Between the instruments panel and the chart: drag right widens it. */
+  /** Between the chart and the instruments panel (panel sits to the RIGHT
+      of the handle): drag left widens it. */
   const onInstrumentsDrag = useCallback(
     (dx: number) => {
       const { wl, op, vw } = layoutDragStartRef.current;
@@ -118,7 +115,7 @@ export default function TradingTerminalPage() {
         WATCHLIST_LAYOUT.max,
         vw - op - TERMINAL_RESIZE.handlesSlack - TERMINAL_RESIZE.chartMinWidth,
       );
-      const next = Math.max(WATCHLIST_LAYOUT.min, Math.min(maxWl, wl + dx));
+      const next = Math.max(WATCHLIST_LAYOUT.min, Math.min(maxWl, wl - dx));
       setWlW(next);
       setWatchlistWidth(next);
     },
@@ -144,25 +141,11 @@ export default function TradingTerminalPage() {
     setWlW(watchlistWidth);
   }, [watchlistWidth]);
 
-  /** Auto-size the right rail when switching to/from Markets view. */
-  const orderWidthBeforeMarketsRef = useRef<number | null>(null);
-  useEffect(() => {
-    if (terminalMarketsOpen) {
-      if (orderWidthBeforeMarketsRef.current == null) {
-        orderWidthBeforeMarketsRef.current = opW;
-      }
-      const vw = typeof window !== 'undefined' ? window.innerWidth : 1600;
-      const target = Math.min(MARKETS_MAX, Math.max(MARKETS_MIN, Math.round(vw * 0.55)));
-      setOpW(target);
-      setOrderPanelWidth(target);
-    } else if (orderWidthBeforeMarketsRef.current != null) {
-      const restored = orderWidthBeforeMarketsRef.current;
-      orderWidthBeforeMarketsRef.current = null;
-      setOpW(restored);
-      setOrderPanelWidth(restored);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [terminalMarketsOpen]);
+  // NOTE: the old "auto-widen the rail to 55vw for the Markets view" effect
+  // is gone — the instruments panel is a permanent right-side neighbour of
+  // the order ticket now (client 2026-09-03), so widening the rail again
+  // would just re-squeeze the chart. terminalMarketsOpen still drives the
+  // left-rail button state and the symbol-search focus.
 
   useEffect(() => {
     setBpH(bottomPanelHeight);
@@ -725,25 +708,6 @@ export default function TradingTerminalPage() {
         terminalCalcOpen={terminalCalcOpen}
         onPanelsSelectCalc={onPanelsSelectCalc}
       />
-      {/* Left instruments panel — the markets list lives here permanently
-          instead of swapping into the right rail, so the trader can pick a
-          symbol without losing the order ticket. Hidden below lg where the
-          mobile layout (separate branch above) takes over. */}
-      <div
-        className="hidden lg:flex shrink-0 flex-col h-full min-h-0 overflow-hidden bg-bg-base border-r border-border-primary"
-        style={{ width: wlW }}
-      >
-        <InstrumentsTable />
-      </div>
-      <div className="hidden lg:block">
-        <PanelResizeHandle
-          axis="vertical"
-          hitSize={TERMINAL_RESIZE.handleHitPx}
-          onDragStart={snapshotLayout}
-          onDrag={onInstrumentsDrag}
-        />
-      </div>
-
       <div
         ref={centerColumnRef}
         className="flex-1 flex flex-col overflow-hidden min-w-0 min-h-0 relative z-0"
@@ -831,6 +795,27 @@ export default function TradingTerminalPage() {
             <div className="flex-1 min-w-0 min-h-0 overflow-hidden relative">
               <LiveChart />
             </div>
+          </div>
+
+          {/* Instruments panel — lives on the RIGHT next to the order ticket
+              (client 2026-09-03: chart was squeezed between the left markets
+              list and the right rail; both trade panels now share the right
+              side so the chart anchors the full remaining width). Hidden
+              below lg where the mobile layout (separate branch above)
+              takes over. */}
+          <div className="hidden lg:block">
+            <PanelResizeHandle
+              axis="vertical"
+              hitSize={TERMINAL_RESIZE.handleHitPx}
+              onDragStart={snapshotLayout}
+              onDrag={onInstrumentsDrag}
+            />
+          </div>
+          <div
+            className="hidden lg:flex shrink-0 flex-col h-full min-h-0 overflow-hidden bg-bg-base border-l border-border-primary"
+            style={{ width: wlW }}
+          >
+            <InstrumentsTable />
           </div>
 
           <PanelResizeHandle
