@@ -16,9 +16,15 @@ const buttonVariants = cva(
         secondary:  'bg-secondary text-secondary-foreground hover:bg-secondary/80',
         ghost:      'hover:bg-accent hover:text-accent-foreground',
         link:       'text-primary underline-offset-4 hover:underline',
-        hero:       'bg-[#E85D3D] text-white rounded-full px-7 py-3.5 text-base font-medium tracking-[-0.01em] hover:bg-[#C9482D] hover:text-white transition-colors',
-        heroGlass:  'liquid-glass-strong text-foreground rounded-full px-7 py-3.5 text-base font-normal tracking-[-0.01em] hover:bg-white/5 transition-colors',
-        heroSolid:  'bg-foreground text-background rounded-full px-7 py-3.5 text-base font-medium tracking-[-0.01em] hover:bg-foreground/90 transition-colors',
+        /* Redesign 2026-09-01: these three drive every marketing CTA.
+           They now read from the .brand-home tokens instead of the
+           hardcoded coral, so the palette lives in exactly one place.
+           `heroGlass` was a translucent glass pill that vanished against
+           the light canvas — it is now the reference's white outlined
+           secondary button. */
+        hero:       'bg-primary text-primary-foreground rounded-full px-7 py-3.5 text-base font-semibold tracking-[-0.01em] hover:bg-[hsl(var(--brand-red)/0.88)] hover:text-white transition-colors',
+        heroGlass:  'bg-white text-foreground border border-[hsl(var(--border)/0.22)] rounded-full px-7 py-3.5 text-base font-semibold tracking-[-0.01em] hover:bg-[hsl(var(--muted))] hover:border-[hsl(var(--border)/0.5)] transition-colors',
+        heroSolid:  'bg-foreground text-background rounded-full px-7 py-3.5 text-base font-semibold tracking-[-0.01em] hover:bg-foreground/85 transition-colors',
       },
       size: {
         default: 'h-10 px-4 py-2',

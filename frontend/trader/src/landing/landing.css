@@ -4,27 +4,33 @@
 
 /* ============================================================
    Landing Design System
-   Brand: gold mandala on near-black. Premium institutional.
+   Light institutional broker skin: white canvas, near-black ink,
+   a single red action colour.
    Tokens are scoped under .landing-root so they never leak
    into the trader app shell.
+
+   2026-09-01 redesign: inverted from the previous near-black /
+   coral skin. The --fx-gold-* names are kept (they feed ~60 rules
+   further down this file plus a handful of inner pages) but now
+   carry the red action colour, so the retheme lands everywhere
+   without renaming call sites.
    ============================================================ */
 
 .landing-root {
-  /* Palette pulled from logo */
-  --fx-bg:           #08090b;   /* near-black canvas */
-  --fx-bg-elev:      #101114;   /* card / panel */
-  --fx-bg-elev-2:    #16181c;   /* nested card */
-  --fx-line:         rgba(255, 255, 255, 0.06);
-  --fx-line-strong:  rgba(255, 255, 255, 0.12);
+  --fx-bg:           #ffffff;   /* page canvas */
+  --fx-bg-elev:      #f1f2f5;   /* card / panel */
+  --fx-bg-elev-2:    #e7e9ee;   /* nested card */
+  --fx-line:         rgba(11, 11, 12, 0.10);
+  --fx-line-strong:  rgba(11, 11, 12, 0.20);
 
-  --fx-gold:         #E85D3D;   /* primary accent — matches logo */
-  --fx-gold-light:   #F08063;   /* highlight */
-  --fx-gold-dark:    #C9482D;   /* deep gold */
-  --fx-gold-soft:    rgba(232, 93, 61, 0.12);
+  --fx-gold:         #e32219;   /* primary action colour */
+  --fx-gold-light:   #f0342b;   /* highlight */
+  --fx-gold-dark:    #c11a12;   /* pressed / deep */
+  --fx-gold-soft:    rgba(227, 34, 25, 0.07);
 
-  --fx-text:         #f5f5f5;
-  --fx-text-2:       rgba(245, 245, 245, 0.72);
-  --fx-text-3:       rgba(245, 245, 245, 0.48);
+  --fx-text:         #0b0b0c;
+  --fx-text-2:       rgba(11, 11, 12, 0.68);
+  --fx-text-3:       rgba(11, 11, 12, 0.45);
 
   /* Trader-app shell overrides */
   --text-primary:    var(--fx-text);
@@ -74,37 +80,42 @@
   }
 
   .fx-card-gold {
-    background: linear-gradient(180deg, rgba(232, 93, 61,0.06) 0%, rgba(232, 93, 61,0) 60%), var(--fx-bg-elev);
-    border: 1px solid rgba(232, 93, 61, 0.18);
+    background: var(--fx-gold-soft);
+    border: 1px solid rgba(227, 34, 25, 0.18);
     border-radius: 1rem;
   }
 
-  /* ── Buttons ───────────────────────────────────────────── */
+  /* ── Buttons ───────────────────────────────────────────────
+     Flat fills, not gradients: the reference's CTAs are solid
+     red pills. The old inset highlight + drop glow read as a
+     3D consumer button against white. */
   .fx-btn-primary {
     display: inline-flex; align-items: center; gap: .5rem;
-    background: linear-gradient(180deg, var(--fx-gold-light) 0%, var(--fx-gold) 100%);
-    color: #1a1408;
+    background: var(--fx-gold);
+    color: #ffffff;
     font-weight: 600;
-    padding: .75rem 1.4rem;
+    padding: .8rem 1.6rem;
     border-radius: 9999px;
-    border: 1px solid rgba(255,255,255,0.12);
-    box-shadow: 0 1px 0 rgba(255,255,255,0.25) inset, 0 8px 24px rgba(232, 93, 61,0.25);
-    transition: transform .15s ease, box-shadow .15s ease, filter .15s ease;
+    border: 1px solid transparent;
+    transition: background .2s ease, box-shadow .2s ease, transform .15s ease;
   }
-  .fx-btn-primary:hover { transform: translateY(-1px); filter: brightness(1.05); }
-  .fx-btn-primary:active { transform: translateY(0); }
+  .fx-btn-primary:hover {
+    background: var(--fx-gold-dark);
+    box-shadow: 0 8px 22px rgba(227, 34, 25, 0.22);
+  }
+  .fx-btn-primary:active { transform: scale(.985); }
 
   .fx-btn-ghost {
     display: inline-flex; align-items: center; gap: .5rem;
-    background: transparent;
+    background: #ffffff;
     color: var(--fx-text);
-    font-weight: 500;
-    padding: .75rem 1.4rem;
+    font-weight: 600;
+    padding: .8rem 1.6rem;
     border-radius: 9999px;
     border: 1px solid var(--fx-line-strong);
     transition: background .2s ease, border-color .2s ease;
   }
-  .fx-btn-ghost:hover { background: rgba(255,255,255,0.04); border-color: rgba(232, 93, 61,0.4); }
+  .fx-btn-ghost:hover { background: var(--fx-bg-elev); border-color: var(--fx-text); }
 
   .fx-btn-link {
     display: inline-flex; align-items: center; gap: .35rem;
@@ -174,22 +185,27 @@
     opacity: .5;
   }
 
+  /* Ambient bloom. On black this carried a lot of the depth; on white a
+     coloured wash reads as a rendering fault, so it drops to a barely
+     perceptible neutral tint that just stops large empty bands from
+     going flat. */
   .fx-glow-gold {
     position: absolute;
     inset: 0;
     pointer-events: none;
     background:
-      radial-gradient(60% 50% at 80% 30%, rgba(232, 93, 61,0.18) 0%, rgba(232, 93, 61,0) 60%),
-      radial-gradient(40% 40% at 20% 90%, rgba(232, 93, 61,0.08) 0%, rgba(232, 93, 61,0) 60%);
+      radial-gradient(60% 50% at 80% 30%, rgba(227, 34, 25, 0.035) 0%, rgba(227, 34, 25, 0) 60%),
+      radial-gradient(40% 40% at 20% 90%, rgba(11, 11, 12, 0.03) 0%, rgba(11, 11, 12, 0) 60%);
   }
 
+  /* Grid lines have to invert: white-on-white was invisible. */
   .fx-grid-bg {
     position: absolute;
     inset: 0;
     pointer-events: none;
     background-image:
-      linear-gradient(rgba(255,255,255,0.025) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(255,255,255,0.025) 1px, transparent 1px);
+      linear-gradient(rgba(11, 11, 12, 0.035) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(11, 11, 12, 0.035) 1px, transparent 1px);
     background-size: 64px 64px;
     mask-image: radial-gradient(ellipse 60% 80% at 50% 30%, black 50%, transparent 100%);
     -webkit-mask-image: radial-gradient(ellipse 60% 80% at 50% 30%, black 50%, transparent 100%);
@@ -245,51 +261,55 @@
 
   .btn-primary {
     display: inline-flex; align-items: center; gap: .5rem;
-    background: linear-gradient(180deg, var(--fx-gold-light) 0%, var(--fx-gold) 100%);
-    color: #1a1408;
+    background: var(--fx-gold);
+    color: #ffffff;
     font-weight: 600;
-    padding: .625rem 1.25rem;
+    padding: .7rem 1.4rem;
     border-radius: 9999px;
-    border: 1px solid rgba(255,255,255,0.12);
-    box-shadow: 0 1px 0 rgba(255,255,255,0.25) inset, 0 8px 24px rgba(232, 93, 61,0.25);
+    border: 1px solid transparent;
     font-size: 0.875rem;
-    transition: transform .15s ease, filter .15s ease;
+    transition: background .2s ease, box-shadow .2s ease, transform .15s ease;
   }
-  .btn-primary:hover { transform: translateY(-1px); filter: brightness(1.05); }
+  .btn-primary:hover {
+    background: var(--fx-gold-dark);
+    box-shadow: 0 8px 22px rgba(227, 34, 25, 0.22);
+  }
+  .btn-primary:active { transform: scale(.985); }
 
   .btn-ghost,
   .btn-outline {
     display: inline-flex; align-items: center; gap: .5rem;
-    background: transparent;
+    background: #ffffff;
     color: var(--fx-text);
-    font-weight: 500;
-    padding: .625rem 1.25rem;
+    font-weight: 600;
+    padding: .7rem 1.4rem;
     border-radius: 9999px;
     border: 1px solid var(--fx-line-strong);
     font-size: 0.875rem;
     transition: background .2s ease, border-color .2s ease;
   }
   .btn-ghost:hover, .btn-outline:hover {
-    background: rgba(255,255,255,0.04);
-    border-color: rgba(232, 93, 61,0.4);
+    background: var(--fx-bg-elev);
+    border-color: var(--fx-text);
   }
 
+  /* Flat, not gradient-filled: a vertical gradient inside glyphs muddies
+     the counters at headline weight and reads as decoration rather than
+     emphasis. Solid accent keeps the highlight, drops the sheen. */
   .gradient-text {
-    background: linear-gradient(180deg, var(--fx-gold-light), var(--fx-gold) 60%, var(--fx-gold-dark));
-    -webkit-background-clip: text;
-    background-clip: text;
-    color: transparent;
+    background: none;
+    -webkit-background-clip: border-box;
+    background-clip: border-box;
+    color: var(--fx-gold);
   }
 
   .neon-divider {
-    background: linear-gradient(90deg, transparent, var(--fx-gold) 50%, transparent);
-    opacity: 0.5;
+    background: var(--fx-line);
+    opacity: 1;
   }
 
   .hero-banner {
-    background: linear-gradient(to bottom, rgba(8,9,11,0.4), rgba(8,9,11,0.4)),
-                radial-gradient(60% 60% at 70% 30%, rgba(232, 93, 61,0.15) 0%, transparent 60%),
-                var(--fx-bg);
+    background: var(--fx-bg-elev);
   }
 
   /* ── Animations ────────────────────────────────────────── */
@@ -359,11 +379,13 @@
 .landing-root ::-webkit-scrollbar { width: 8px; height: 8px; }
 .landing-root ::-webkit-scrollbar-track { background: var(--fx-bg); }
 .landing-root ::-webkit-scrollbar-thumb {
-  background: linear-gradient(180deg, var(--fx-gold), var(--fx-gold-dark));
+  /* A red scrollbar is a lot of brand for a utility affordance — neutral
+     grey on the light canvas, matching the reference. */
+  background: rgba(11, 11, 12, 0.20);
   border-radius: 4px;
 }
 .landing-root ::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(180deg, var(--fx-gold-light), var(--fx-gold));
+  background: rgba(11, 11, 12, 0.34);
 }
 
 canvas { display: block; }

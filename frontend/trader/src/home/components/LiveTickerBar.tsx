@@ -39,11 +39,14 @@ export function LiveTickerBar() {
         { proName: 'BINANCE:SOLUSDT',   title: 'SOL/USD' },
       ],
       showSymbolLogo: true,
-      isTransparent: false,
+      /* Transparent so the strip inherits the band colour set below —
+         otherwise TradingView paints its own opaque canvas and the widget
+         stays a dark slab in the middle of the light page. */
+      isTransparent: true,
       displayMode: 'adaptive',
-      colorTheme: 'dark',
+      colorTheme: 'light',
       locale: 'en',
-      backgroundColor: 'rgba(11, 11, 12, 1)',
+      backgroundColor: 'rgba(255, 255, 255, 0)',
     });
     container.appendChild(script);
 

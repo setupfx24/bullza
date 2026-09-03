@@ -67,41 +67,41 @@ function AnimatedValue({ value }: { value: string }) {
   return <motion.span ref={ref} style={numberStyle} className="tabular-nums">{display}</motion.span>;
 }
 
+/**
+ * Rendered as the reference's tinted, rounded "trust" panel: a centred
+ * heading over a single row of figures, inset from the page rather than
+ * running full-bleed.
+ *
+ * The reference heads this panel with a client count ("Join 400,000+
+ * traders"). We have no audited figure to put there, so the heading is
+ * qualitative and the numbers below stay platform facts.
+ */
 export function Stats() {
   return (
-    <section className="mk-section mk-section--raised" style={{ borderBlock: '1px solid var(--mk-line)' }}>
+    <section className="mk-section">
       <div className="mk-container">
         <div
-          className="flex flex-col items-center text-center lg:flex-row lg:items-center lg:text-left"
-          style={{ gap: 'var(--mk-space-7)' }}
+          style={{
+            background: 'var(--mk-surface)',
+            borderRadius: 'var(--mk-radius-lg)',
+            padding: 'clamp(2rem, 1.25rem + 3vw, 3.5rem) clamp(1.25rem, 0.75rem + 2vw, 3rem)',
+          }}
         >
-          {/* Rating — qualitative by design (see compliance note above). */}
-          <div
-            className="flex shrink-0 flex-col items-center lg:items-start"
-            style={{ gap: 'var(--mk-space-2)' }}
-          >
+          <div className="flex flex-col items-center text-center" style={{ gap: 'var(--mk-space-3)' }}>
             <span className="flex" style={{ gap: 2, color: 'var(--mk-accent)' }} aria-hidden>
               {Array.from({ length: 5 }).map((_, i) => (
-                <Star key={i} size={16} className="fill-current" />
+                <Star key={i} size={15} className="fill-current" />
               ))}
             </span>
-            <span className="font-bold" style={{ fontSize: 'var(--mk-text-sm)' }}>
-              {SOCIAL_PROOF.ratingLabel}
-            </span>
-            <span style={{ fontSize: 'var(--mk-text-xs)', color: 'var(--mk-text-faint)' }}>
-              {SOCIAL_PROOF.ratingSub}
-            </span>
+            <h2 className="mk-h2">A platform traders rely on</h2>
+            <p className="mk-body" style={{ maxWidth: '46ch' }}>
+              {SOCIAL_PROOF.ratingLabel} {SOCIAL_PROOF.ratingSub}.
+            </p>
           </div>
 
-          <span
-            aria-hidden
-            className="hidden lg:block self-stretch"
-            style={{ width: 1, background: 'var(--mk-line)' }}
-          />
-
           <div
-            className="grid w-full grid-cols-2 lg:grid-cols-4"
-            style={{ gap: 'var(--mk-space-6) var(--mk-space-5)' }}
+            className="grid grid-cols-2 lg:grid-cols-4"
+            style={{ gap: 'var(--mk-space-6) var(--mk-space-5)', marginTop: 'var(--mk-space-7)' }}
           >
             {STATS.map((stat, i) => (
               <motion.div
@@ -110,7 +110,7 @@ export function Stats() {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true, amount: 0.5 }}
                 transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1], delay: 0.07 * i }}
-                className="flex flex-col items-center lg:items-start"
+                className="flex flex-col items-center text-center"
                 style={{ gap: 'var(--mk-space-2)' }}
               >
                 <AnimatedValue value={stat.value} />

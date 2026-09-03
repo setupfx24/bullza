@@ -1,21 +1,12 @@
 'use client';
 
 import { motion } from 'motion/react';
+import Image from 'next/image';
 import Link from 'next/link';
-import {
-  ArrowUpRight,
-  BadgeCheck,
-  Network,
-  ShieldCheck,
-  type LucideIcon,
-} from 'lucide-react';
+import { ArrowUpRight } from 'lucide-react';
 import { LiveTickerBar } from './LiveTickerBar';
 import { HERO, HERO_TRUST_PILLS, SIGNUP_HREF } from '../data';
 import { BRAND_NAME } from '@/lib/brand';
-
-/* Only the icons the hero pills actually reference — keeps the client
-   bundle off the full lucide catalogue. */
-const iconMap: Record<string, LucideIcon> = { Network, ShieldCheck, BadgeCheck };
 
 /** Shared entrance transition; the global reduced-motion guard in
  *  marketing/tokens.css neutralises it for users who ask for that. */
@@ -28,33 +19,27 @@ const rise = (delay: number) => ({
 export function Hero() {
   return (
     <section className="relative overflow-hidden">
-      {/* Soft coral bloom behind the headline — pure CSS, no image, no WebGL. */}
+      {/* The old skin layered a coral bloom and a hairline grid behind the
+          headline to keep a black canvas from going dead. On white both
+          read as printing artefacts, so the backdrop is now a single very
+          faint neutral wash that just stops the fold from being flat. */}
       <div
         aria-hidden
         className="pointer-events-none absolute inset-0"
         style={{
           background:
-            'radial-gradient(58% 46% at 50% 6%, var(--mk-accent-soft) 0%, transparent 70%)',
-        }}
-      />
-      {/* Faint hairline grid, fading out before it reaches the fold. */}
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0 opacity-[0.35]"
-        style={{
-          backgroundImage:
-            'linear-gradient(var(--mk-line) 1px, transparent 1px), linear-gradient(90deg, var(--mk-line) 1px, transparent 1px)',
-          backgroundSize: '72px 72px',
-          maskImage: 'radial-gradient(70% 60% at 50% 0%, #000 0%, transparent 78%)',
-          WebkitMaskImage: 'radial-gradient(70% 60% at 50% 0%, #000 0%, transparent 78%)',
+            'linear-gradient(180deg, var(--mk-bg-raised) 0%, var(--mk-bg) 62%)',
         }}
       />
 
       <div
         className="mk-container relative flex flex-col items-center text-center"
         style={{
-          paddingTop: 'clamp(7rem, 5rem + 9vw, 11rem)',
-          paddingBottom: 'var(--mk-section-y)',
+          /* Clears the fixed 64px header with room to breathe underneath.
+             Trimmed by 2.25rem when the 36px black utility strip above the
+             nav was removed, so the gap under the header is unchanged. */
+          paddingTop: 'clamp(6.25rem, 4.25rem + 8vw, 9.75rem)',
+          paddingBottom: 'var(--mk-space-8)',
           gap: 'var(--mk-space-5)',
         }}
       >
@@ -69,20 +54,15 @@ export function Hero() {
           {HERO.pill}
         </motion.span>
 
-        <motion.h1
-          {...rise(0.12)}
-          style={{
-            fontSize: 'var(--mk-text-display)',
-            lineHeight: 'var(--mk-leading-tight)',
-            letterSpacing: '-0.03em',
-            fontWeight: 800,
-            maxWidth: '16ch',
-          }}
-        >
+        {/* No measure cap here on purpose — a 17ch limit broke the
+            headline across two lines on desktop. At the clamped display
+            size the line fits the container down to roughly 500px, then
+            wraps on its own for phones. */}
+        <motion.h1 {...rise(0.12)} className="mk-display">
           {HERO.headline}
         </motion.h1>
 
-        <motion.p {...rise(0.2)} className="mk-lead" style={{ maxWidth: '58ch' }}>
+        <motion.p {...rise(0.2)} className="mk-lead" style={{ maxWidth: '56ch' }}>
           {HERO.sub}
         </motion.p>
 
@@ -91,87 +71,101 @@ export function Hero() {
           className="flex flex-wrap items-center justify-center"
           style={{ gap: 'var(--mk-space-3)', paddingTop: 'var(--mk-space-2)' }}
         >
-          <Link href={SIGNUP_HREF} className="mk-btn mk-btn--primary">
+          <Link href={SIGNUP_HREF} className="mk-btn mk-btn--primary mk-btn--lg">
             {HERO.ctaPrimary}
             <ArrowUpRight size={16} />
           </Link>
-          <Link href={HERO.ctaSecondaryHref} className="mk-btn mk-btn--ghost">
+          <Link href={HERO.ctaSecondaryHref} className="mk-btn mk-btn--ghost mk-btn--lg">
             {HERO.ctaSecondary}
           </Link>
         </motion.div>
+      </div>
 
-        {/* Standing first-deposit offer — the /bonus route stays reachable. */}
+      {/* Product shot — the fold's anchor, sitting directly under the CTAs.
+          Two deliberate departures from the placeholder it replaced: it is
+          rendered at the asset's own 2.04:1 ratio rather than forced into a
+          21:9 box (the artwork has hard-edged white and black regions, so
+          any crop would slice through them), and it runs wider than
+          .mk-container's 1200px measure on its own 1440px bound, keeping
+          just the page gutter either side. */}
+      <div
+        className="relative mx-auto w-full"
+        style={{
+          maxWidth: '1440px',
+          paddingInline: 'var(--mk-gutter)',
+          paddingBottom: 'var(--mk-space-8)',
+        }}
+      >
         <motion.div
-          {...rise(0.36)}
-          className="inline-flex flex-wrap items-center justify-center rounded-full"
-          style={{
-            gap: 'var(--mk-space-2)',
-            padding: '0.4rem 0.5rem 0.4rem 0.85rem',
-            background: 'var(--mk-accent-soft)',
-            border: '1px solid var(--mk-accent-line)',
-          }}
-        >
-          <span
-            className="font-semibold uppercase"
-            style={{
-              fontSize: 'var(--mk-text-xs)',
-              letterSpacing: '0.1em',
-              color: 'var(--mk-text)',
-            }}
-          >
-            {HERO.bonusLabel}
-          </span>
-          <Link
-            href={HERO.bonusHref}
-            className="inline-flex items-center gap-1 font-bold uppercase rounded-full px-2.5 py-1 transition-colors"
-            style={{
-              fontSize: 'var(--mk-text-xs)',
-              letterSpacing: '0.1em',
-              color: 'var(--mk-accent)',
-              background: 'rgba(0,0,0,0.25)',
-            }}
-          >
-            {HERO.bonusCta}
-            <ArrowUpRight size={13} />
-          </Link>
-        </motion.div>
-
-        {/* What we are, in three lines — no numbers, no unverifiable claims. */}
-        <motion.ul
           {...rise(0.44)}
-          className="grid w-full grid-cols-1 sm:grid-cols-3 text-left"
-          style={{ gap: 'var(--mk-space-4)', marginTop: 'var(--mk-space-5)' }}
+          className="overflow-hidden"
+          /* Scales with the viewport so the corners stay proportional to
+             the frame instead of flattening out as it grows. */
+          style={{ borderRadius: 'clamp(16px, 1.6vw, 28px)' }}
         >
-          {HERO_TRUST_PILLS.map(({ icon, label, sub }) => {
-            const Icon = iconMap[icon] ?? ShieldCheck;
-            return (
-              <li key={label} className="mk-card flex items-start" style={{ gap: 'var(--mk-space-3)', padding: 'var(--mk-space-5)' }}>
+          <Image
+            src="/images/home banner 2.png"
+            alt={`${BRAND_NAME} trading platform shown on mobile`}
+            width={1791}
+            height={878}
+            /* Above the fold, so it is the LCP candidate — preload it
+               rather than letting it lazy-load. */
+            priority
+            sizes="(max-width: 1440px) 100vw, 1360px"
+            className="h-auto w-full"
+          />
+        </motion.div>
+      </div>
+
+      {/* What we are, in three lines — no numbers, no unverifiable claims. */}
+      {/* A full --mk-section-y here stacked on top of the ticker strip AND
+          the next section's own section-y, leaving ~330px of dead band
+          under the trust pills. The ticker is a full-bleed divider in its
+          own right, so the hero only needs to clear it. */}
+      <div className="mk-container relative" style={{ paddingBottom: 'var(--mk-space-7)' }}>
+        <motion.ul
+          {...rise(0.5)}
+          className="grid w-full grid-cols-1 gap-4 text-left sm:grid-cols-3"
+        >
+          {HERO_TRUST_PILLS.map(({ icon, label, sub }) => (
+            <li
+              key={label}
+              className="mk-card mk-card--outline flex items-start"
+              style={{ gap: 'var(--mk-space-3)', padding: 'var(--mk-space-5)' }}
+            >
+              {/* Full-colour 3D marks, so no tinted plate behind them — that
+                  square only existed to give a monochrome line glyph a
+                  ground. Decorative: the label beside it carries the
+                  meaning, so the alt stays empty. */}
+              <Image
+                src={icon}
+                alt=""
+                aria-hidden
+                /* 128 rather than the rendered 56 so the mark stays crisp
+                   on 2x displays. */
+                width={128}
+                height={128}
+                className="h-14 w-14 shrink-0 object-contain"
+              />
+              <span className="min-w-0">
+                <span className="block font-bold" style={{ fontSize: 'var(--mk-text-sm)' }}>
+                  {label}
+                </span>
                 <span
-                  className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl"
-                  style={{ background: 'var(--mk-accent-soft)', color: 'var(--mk-accent)' }}
+                  className="block"
+                  style={{ fontSize: 'var(--mk-text-xs)', color: 'var(--mk-text-faint)', marginTop: 2 }}
                 >
-                  <Icon size={17} />
+                  {sub}
                 </span>
-                <span className="min-w-0">
-                  <span className="block font-bold" style={{ fontSize: 'var(--mk-text-sm)' }}>
-                    {label}
-                  </span>
-                  <span
-                    className="block"
-                    style={{ fontSize: 'var(--mk-text-xs)', color: 'var(--mk-text-faint)', marginTop: 2 }}
-                  >
-                    {sub}
-                  </span>
-                </span>
-              </li>
-            );
-          })}
+              </span>
+            </li>
+          ))}
         </motion.ul>
       </div>
 
       <p className="sr-only">
-        {BRAND_NAME} — decentralized exchange, insured trades and broker-grade
-        execution for forex and crypto.
+        {BRAND_NAME} — forex and CFD trading with major, minor and exotic
+        currency pairs, tight spreads and fast execution.
       </p>
 
       {/* Real market data, straight from the TradingView tape. */}

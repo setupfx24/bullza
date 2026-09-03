@@ -3,6 +3,12 @@ import Link from 'next/link';
 /**
  * Closing conversion band. Sits above the footer on every marketing page
  * so each one ends with the same next step.
+ *
+ * 2026-09-01 redesign: rendered as a full-bleed black band rather than a
+ * bordered card with an accent bloom. The reference uses one dark band per
+ * page as its strongest emphasis, and putting it here means every
+ * marketing page resolves to the same closing beat before the footer —
+ * which is also black, so the two now meet without a seam.
  */
 export function CtaBanner({
   title, lead, primary, secondary,
@@ -13,34 +19,20 @@ export function CtaBanner({
   secondary?: { label: string; href: string };
 }) {
   return (
-    <section className="mk-section">
+    <section className="mk-section mk-section--ink">
       <div className="mk-container">
-        <div
-          className="relative overflow-hidden text-center"
-          style={{
-            background: 'var(--mk-surface)',
-            border: '1px solid var(--mk-line)',
-            borderRadius: 'var(--mk-radius-lg)',
-            padding: 'clamp(2.5rem, 1.5rem + 4vw, 5rem) var(--mk-gutter)',
-          }}
-        >
-          <div
-            aria-hidden
-            className="pointer-events-none absolute inset-0"
-            style={{
-              background:
-                'radial-gradient(70% 120% at 50% 0%, var(--mk-accent-soft) 0%, transparent 65%)',
-            }}
-          />
-          <div className="relative flex flex-col items-center gap-4 mx-auto max-w-2xl">
-            <h2 className="mk-h2">{title}</h2>
-            {lead && <p className="mk-lead">{lead}</p>}
-            <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
-              <Link href={primary.href} className="mk-btn mk-btn--primary">{primary.label}</Link>
-              {secondary && (
-                <Link href={secondary.href} className="mk-btn mk-btn--ghost">{secondary.label}</Link>
-              )}
-            </div>
+        <div className="mx-auto flex max-w-2xl flex-col items-center gap-4 text-center">
+          <h2 className="mk-h2">{title}</h2>
+          {lead && <p className="mk-lead">{lead}</p>}
+          <div className="flex flex-wrap items-center justify-center gap-3 pt-3">
+            <Link href={primary.href} className="mk-btn mk-btn--primary mk-btn--lg">
+              {primary.label}
+            </Link>
+            {secondary && (
+              <Link href={secondary.href} className="mk-btn mk-btn--ghost mk-btn--lg">
+                {secondary.label}
+              </Link>
+            )}
           </div>
         </div>
       </div>

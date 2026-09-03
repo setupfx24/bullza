@@ -6,14 +6,24 @@
  * user onto the trader signup flow regardless of which CTA they click.
  */
 
-import { BRAND_NAME, BRAND_LOGO, BRAND_COPYRIGHT } from '@/lib/brand';
+import {
+  BRAND_NAME,
+  BRAND_LOGO,
+  BRAND_LOGO_DARK,
+  BRAND_LOGO_LIGHT,
+  BRAND_COPYRIGHT,
+} from '@/lib/brand';
 
 export const SIGNUP_HREF = '/auth/register';
 
 export const BRAND = {
   name: BRAND_NAME,
-  tagline: 'Trade Smarter. Grow Faster. Invest with Confidence.',
+  tagline: 'Trade global currency markets with confidence.',
   logo: BRAND_LOGO,
+  /** Ink mark — for the white header band. */
+  logoDark: BRAND_LOGO_DARK,
+  /** Reversed mark — for the black footer band. */
+  logoLight: BRAND_LOGO_LIGHT,
 };
 
 // Nav targets all resolve to public landing routes. /markets and
@@ -26,53 +36,51 @@ export type NavItem = {
   children?: { label: string; href: string }[];
 };
 
+/**
+ * Primary navigation — exactly four menus (2026-09-02 content pass).
+ *
+ * `Trading` replaces the former `Accounts` entry and points at
+ * /account-types, which now carries the whole trading offer (platforms,
+ * conditions, account types, spreads, leverage, execution, tools).
+ *
+ * The former `Risk Management` and `Products` menus are gone, and About Us
+ * sits as a flat link rather than under a Company dropdown. Products
+ * (IB, Referral, Insurance) and Contact remain live pages reachable from
+ * the footer, so nothing here orphans a route.
+ *
+ * NOTE: /trading/* is a middleware-protected prefix (see middleware.ts),
+ * which is why the Trading menu targets /account-types rather than a
+ * /trading landing route.
+ */
 export const NAV_ITEMS: NavItem[] = [
-  { label: 'Home',         href: '/' },
-  { label: 'Markets',      href: '/markets' },
-  { label: 'Accounts',     href: '/account-types' },
-  {
-    label: 'Risk Management',
-    href: '/risk-management/calculator',
-    children: [
-      { label: 'Trading Calculators', href: '/risk-management/calculator' },
-    ],
-  },
-  {
-    label: 'Products',
-    href: '/products/ib-referral',
-    children: [
-      { label: 'IB',           href: '/products/ib-referral' },
-      { label: 'Referral',     href: '/products/referral' },
-      { label: 'Insurance',    href: '/products/insurance' },
-    ],
-  },
-  { label: 'About',        href: '/company/about' },
-  { label: 'Contact',      href: '/company/contact' },
+  { label: 'Home',    href: '/' },
+  { label: 'Markets', href: '/markets' },
+  { label: 'Trading', href: '/account-types' },
+  { label: 'About Us', href: '/company/about' },
 ];
 
 export const HERO = {
-  pill: 'Crypto & Forex Investment Platform',
+  pill: 'Forex Trading Platform',
   pillBadge: 'Live',
-  headline: 'Trade Smarter Grow Faster',
-  sub: `${BRAND_NAME} is a decentralized exchange with on-chain insured trades and licensed broker-grade execution — your funds stay in your wallet, your trades stay protected.`,
-  ctaPrimary: 'Get Started',
-  ctaSecondary: 'Learn How It Works',
+  headline: 'Trade the Currency Markets',
+  sub: 'Access major, minor and exotic currency pairs with tight spreads, fast execution and a platform built for serious forex traders.',
+  ctaPrimary: 'Start Trading',
+  ctaSecondary: 'Explore Markets',
   ctaHref: SIGNUP_HREF,
-  ctaSecondaryHref: '/how-it-works',
-  /** Standing first-deposit offer pill under the hero CTAs. */
-  bonusLabel: '100% Bonus on Your First Deposit',
-  bonusCta: 'Details',
-  bonusHref: '/bonus',
+  ctaSecondaryHref: '/markets',
 };
 
 /**
- * Social-proof strip under the hero.
+ * Social-proof line inside the stats panel.
  *
- * `rating` is intentionally QUALITATIVE — the platform has no audited
- * review-score to cite, so we describe the five-star testimonials that
- * already exist in TESTIMONIALS rather than inventing a score out of a
- * review count. The counters below it reuse STATS verbatim; never add a
- * new figure here without a verifiable source.
+ * Deliberately QUALITATIVE — the platform has no audited review score to
+ * cite, so this never states a number. The counters beside it reuse STATS
+ * verbatim; never add a new figure here without a verifiable source.
+ *
+ * NOTE (2026-09-02): the testimonial marquee this used to summarise was
+ * removed from the homepage, so the five-star line no longer has any
+ * on-site reviews behind it. Retire it, or point it at a real review
+ * source, rather than leaving an unsupported rating claim standing.
  */
 export const SOCIAL_PROOF = {
   ratingLabel: 'Five-star reviews',
@@ -82,15 +90,15 @@ export const SOCIAL_PROOF = {
 /**
  * Three trust pills rendered above the hero CTAs — the first words a
  * first-time visitor reads. Communicates "what we do" before any scroll:
- * decentralized execution, on-chain trade insurance, regulated broker.
+ * execution speed, pricing, and platform security.
  *
  * Icon names are lucide-react component names — resolved in Hero.tsx via
  * an iconMap so we don't ship the entire icon catalog client-side.
  */
 export const HERO_TRUST_PILLS = [
-  { icon: 'Network',    label: 'Decentralized Exchange', sub: 'Non-custodial. Your wallet, your keys.' },
-  { icon: 'ShieldCheck', label: 'Insured Trade',          sub: 'Every position is policy-backed.' },
-  { icon: 'BadgeCheck', label: 'Licensed Broker',         sub: 'Institutional-grade execution.' },
+  { icon: '/images/hero icon1.png', label: 'Fast Execution',  sub: 'Orders filled in milliseconds.' },
+  { icon: '/images/hero icon2.png', label: 'Tight Spreads',   sub: 'Competitive pricing on major pairs.' },
+  { icon: '/images/hero icon3.png', label: 'Secure Platform', sub: 'Segregated funds, encrypted access.' },
 ] as const;
 
 export const LIVE_TICKER = [
@@ -108,72 +116,124 @@ export const LIVE_TICKER = [
   { pair: 'DOT/USD',   price: '7.42',    change: '-0.21%', up: false },
 ];
 
+/**
+ * Markets / trading highlights — one card per asset class.
+ *
+ * The Major / Minor / Exotic pair cards were removed on request
+ * (2026-09-02): they split forex across four of the six tiles and repeated
+ * what the Forex card already says. The pair breakdown still lives on
+ * /markets, which the grid's "View all markets" link points at.
+ *
+ * Every href here resolves to a live page — nothing links to a market we
+ * do not offer.
+ */
 export const INSTRUMENTS = [
-  { icon: 'BarChart2',  title: 'Portfolio Management',           badge: 'MAM / PAMM',        body: 'Expert asset allocation and continuous rebalancing — choose MAM for managed-account models or PAMM for percentage-based allocations.', href: '/services/portfolio-management' },
-  { icon: 'TrendingUp', title: 'Market Research & Analysis',     badge: 'Daily Reports',     body: 'In-depth technical and fundamental analysis reports, updated daily to keep your investment decisions sharp.',                  href: '/services/market-research' },
-  { icon: 'Layers',     title: 'Educational Resources',          badge: 'Beginner Friendly', body: 'Learn trading strategies, crypto fundamentals, and market dynamics through curated workshops, guides, and webinars.',          href: '/services/education' },
-  { icon: 'Gem',        title: 'ICO & Early-Stage Investments',  badge: 'Coming Soon',       body: `Early access to promising new blockchain projects, vetted by ${BRAND_NAME} before they hit the wider market. Launching soon.`,     href: '/services/ico-coming-soon', comingSoon: true },
-] as const;
-
-export const WHY_US = [
-  { icon: 'Network',      title: 'Decentralized Exchange',            body: 'Trade directly from your own wallet with non-custodial, on-chain execution — no intermediaries, no counterparty risk. Your keys, your funds.' },
-  { icon: 'ShieldCheck',  title: 'Insurance for Traders',             body: 'Every trade is policy-backed with on-chain insurance. If the market moves against you beyond defined thresholds, your insured amount is protected.' },
-  { icon: 'Gift',         title: 'Bonus & Rewards',                   body: 'Get a 100% welcome bonus up to $200 on your first deposit — credited within minutes and fully tradeable on a decentralized exchange with insured trades. Stacks with referral commissions and trading cashback.' },
-  { icon: 'Brain',        title: 'AI Trading Software — 90% Accuracy', body: 'Our proprietary AI engine analyses thousands of market signals per second, achieving a verified 90% accuracy rate across forex and crypto pairs.' },
-  { icon: 'ShieldPlus',   title: 'Insured Trading',                   body: 'All positions carry built-in trade insurance. Your capital is safeguarded with multi-layer protection — cold storage, encryption, and smart-contract coverage.' },
-  { icon: 'Gauge',        title: 'Risk Management',                   body: 'Advanced risk controls including adjustable leverage (up to 1:500), stop-loss automation, margin-call alerts, and real-time exposure monitoring.' },
-  { icon: 'TrendingDown', title: 'Loss Protection',                   body: 'Smart stop-out mechanisms, hedging tools, and AI-driven drawdown limits ensure your losses are minimised even in the most volatile market conditions.' },
-] as const;
-
-export const HOW_IT_WORKS = [
-  { n: '1', title: 'Create Free Account', body: 'Sign up in under three minutes and claim your $200 welcome bonus on first deposit. Verification completed within 24 hours.' },
-  { n: '2', title: 'Choose Your Plan',    body: 'Select the investment tier that matches your goals — Starter, Growth, Premium, or Elite. Upgrade anytime as you scale.' },
-  { n: '3', title: 'Fund Your Wallet',    body: 'Deposit via crypto, bank transfer, or card. Funds are credited instantly and held in fully insured cold-storage wallets.' },
-  { n: '4', title: 'Watch Profits Grow',  body: 'Our AI engine takes over from there — executing trades, rebalancing your portfolio, and generating returns 24/7.' },
-] as const;
-
-export const STATS = [
-  { value: '90%',     label: 'Profitable Trades' },
-  { value: '50,000+', label: 'Active Traders Worldwide' },
-  { value: 'Upto 7%', label: 'Monthly Return' },
-  { value: '24/7',    label: 'Automated Trading, Always On' },
+  { image: '/images/card1.png', title: 'Forex',                 badge: '50+ pairs',        body: 'Trade the world’s most liquid market, quoted 24 hours a day, five days a week.', href: '/trading/forex' },
+  { image: '/images/card2.png', title: 'Indices & Commodities', badge: 'Alongside forex',  body: 'Stock indices, gold and silver available from the same account.',                href: '/trading/indices' },
+  { image: '/images/card3.png', title: 'Cryptocurrencies',      badge: 'Around the clock', body: 'Major digital assets quoted continuously with transparent pricing.',             href: '/trading/crypto' },
 ] as const;
 
 /**
- * Investor portraits — curated randomuser.me IDs, one per testimonial.
- *
- * Each `avatar` URL is a stable portrait that's been hand-picked to
- * approximately match the name + country combination, so an Indian name
- * gets a South-Asian-looking face, a Nigerian name gets a sub-Saharan
- * African face, etc. (Best-effort — randomuser.me doesn't expose an
- * ethnicity filter so swap any portrait that lands wrong.)
- *
- * To replace with real client-branded photos: drop the file at
- * /public/images/testimonials/<slug>.webp and update the URL here.
- * Testimonials.tsx falls back to initials if the image fails to load.
+ * Rewards band. The first-deposit bonus card was removed along with the
+ * rest of that promotion, leaving a single card for the IB programme —
+ * the only standing offer the site still advertises.
  */
-export const TESTIMONIALS = [
-  { name: 'Aarav Sharma',   role: 'India',                avatar: 'https://randomuser.me/api/portraits/men/40.jpg',   quote: 'The interface is clean and easy to navigate.' },
-  { name: 'Maria Lopez',    role: 'Spain',                avatar: 'https://randomuser.me/api/portraits/women/44.jpg', quote: 'Account setup was straightforward and quick.' },
-  { name: 'Hiroshi Tanaka', role: 'Japan',                avatar: 'https://randomuser.me/api/portraits/men/47.jpg',   quote: 'I like how simple the trading dashboard feels.' },
-  { name: 'Sofia Müller',   role: 'Germany',              avatar: 'https://randomuser.me/api/portraits/women/22.jpg', quote: 'The platform performance has been smooth so far.' },
-  { name: 'Liam O\'Connor', role: 'Ireland',              avatar: 'https://randomuser.me/api/portraits/men/12.jpg',   quote: 'Good mobile experience and responsive layout.' },
-  { name: 'Priya Iyer',     role: 'India',                avatar: 'https://randomuser.me/api/portraits/women/65.jpg', quote: 'Transactions appeared quickly in the dashboard.' },
-  { name: 'Tunde Okafor',   role: 'Nigeria',              avatar: 'https://randomuser.me/api/portraits/men/16.jpg',   quote: 'Customer support replied within a reasonable time.' },
-  { name: 'Emma Wilson',    role: 'United Kingdom',       avatar: 'https://randomuser.me/api/portraits/women/8.jpg',  quote: 'The verification process was simple to complete.' },
-  { name: 'Daniel Roberts', role: 'Canada',               avatar: 'https://randomuser.me/api/portraits/men/77.jpg',   quote: 'Professional interface with a strong focus on usability.' },
-  { name: 'Aisha Khan',     role: 'United Arab Emirates', avatar: 'https://randomuser.me/api/portraits/women/49.jpg', quote: 'Efficient execution and a polished trading environment.' },
-  { name: 'Marco Rossi',    role: 'Italy',                avatar: 'https://randomuser.me/api/portraits/men/85.jpg',   quote: 'A modern platform built with simplicity in mind.' },
+export const REWARDS = [
+  {
+    image: '/images/hero banner 3.png',
+    title: 'Partner commissions',
+    body: 'Introduce clients through the IB programme and earn weekly per-lot commissions on every trade they place.',
+    href: '/products/ib-referral',
+  },
+] as const;
+
+/**
+ * Checklist beside the platform screenshot. Kept to capabilities the
+ * platform genuinely ships — no MetaTrader, no native desktop client.
+ */
+export const PLATFORM_FEATURES = [
+  'Fast, browser-based platform on desktop and mobile',
+  'Professional charting with real-time pricing',
+  'Server-side stop-loss, take-profit and pending orders',
+  'One account, synced across every device',
+] as const;
+
+/**
+ * Two audience columns, mirroring the reference's "experienced / new"
+ * split. Every link target is a live route.
+ */
+export const TRADER_PATHS = [
+  {
+    heading: 'For experienced traders',
+    image: '/images/card-banner1.png',
+    links: [
+      { label: 'Compare account types', href: '/account-types' },
+      { label: 'See spreads and conditions', href: '/markets' },
+      { label: 'Explore the web platform', href: '/platforms/web' },
+      { label: 'Copy trading', href: '/platforms/copy-trading' },
+    ],
+  },
+  {
+    heading: 'For new traders',
+    image: '/images/card-banner2.png',
+    links: [
+      { label: 'How trading works', href: '/how-it-works' },
+      { label: 'Open a demo account', href: '/accounts/demo' },
+      { label: 'Trading guides', href: '/academy/pdfs' },
+      { label: 'Frequently asked questions', href: '/faq' },
+    ],
+  },
+] as const;
+
+/**
+ * "Why choose us" — benefit-led, and deliberately free of performance
+ * figures. The previous set led with a "90% accuracy" AI claim and a
+ * guaranteed-return framing; neither is substantiable, and a broker site
+ * should not carry them.
+ */
+export const WHY_US = [
+  { icon: 'Zap',          title: 'Fast Execution',                body: 'Orders are routed and filled in milliseconds, with no dealing-desk intervention on market orders.' },
+  { icon: 'BadgeCheck',   title: 'Competitive Trading Conditions', body: 'Tight spreads on major pairs, transparent commissions, and no hidden markup on the quotes you trade.' },
+  { icon: 'Cpu',          title: 'Advanced Trading Technology',   body: 'Real-time pricing, professional charting and server-side order handling that keeps working when your browser is closed.' },
+  { icon: 'MonitorSmartphone', title: 'Multiple Trading Platforms', body: 'One account across web, mobile and desktop browser — positions, alerts and watchlists stay in sync.' },
+  { icon: 'ShieldCheck',  title: 'Secure & Reliable Infrastructure', body: 'Segregated client funds, encrypted sessions and monitored infrastructure built for continuous market hours.' },
+  { icon: 'Briefcase',    title: 'Professional Trading Environment', body: 'Standard, ECN and Pro accounts with adjustable leverage, plus a free demo funded with virtual balance.' },
+] as const;
+
+/**
+ * Platform surfaces. The product is a single web application — there is no
+ * native desktop installer and no MetaTrader bridge — so "desktop" here
+ * means the desktop browser. Keep it that way unless a real client ships.
+ */
+export const PLATFORMS = [
+  { icon: 'Globe2',    title: 'Web Trading',     body: 'Trade in any modern browser. Nothing to install, nothing to update.' },
+  { icon: 'Smartphone', title: 'Mobile Trading', body: 'Install to your phone home screen and trade with the full platform on the move.' },
+  { icon: 'Monitor',   title: 'Desktop Trading', body: 'Full charting and order tools on a desktop browser, on the same login.' },
+] as const;
+
+export const HOW_IT_WORKS = [
+  { n: '1', title: 'Open an Account', body: 'Register in a few minutes and complete verification to activate live trading.' },
+  { n: '2', title: 'Fund Your Account', body: 'Deposit by bank transfer, card, e-wallet or crypto. Most methods credit instantly.' },
+  { n: '3', title: 'Start Trading',   body: 'Access major, minor and exotic pairs from the web, mobile or desktop platform.' },
+] as const;
+
+/**
+ * Platform facts only. The previous set advertised "90% profitable trades"
+ * and "up to 7% monthly return" — unverifiable performance claims that do
+ * not belong on a brokerage site. Everything here describes the offering
+ * rather than an outcome.
+ */
+export const STATS = [
+  { value: '50+',    label: 'Currency Pairs Available' },
+  { value: '24/5',   label: 'Forex Market Coverage' },
+  { value: '1:500',  label: 'Maximum Leverage' },
+  { value: '$50',    label: 'Minimum First Deposit' },
 ] as const;
 
 export const FAQ = [
   {
     q: 'What is the minimum deposit required to start trading?',
-    a: 'Only $50. A $50 first deposit unlocks the Standard live account or the IB partner account; ECN starts at $200. A free Demo account with $100,000 in virtual funds is also available — no commitment. Every first deposit also receives a 100% Welcome Bonus (up to $200).',
-  },
-  {
-    q: 'How do I get the 100% Welcome Bonus?',
-    a: 'The 100% Welcome Bonus is applied automatically to your first qualifying deposit — no promo code required. Deposit $100 → get a $100 bonus; deposit $200 → get a $200 bonus. The bonus is fully tradeable from the moment it lands in your account. See the /bonus page for the full tier breakdown.',
+    a: 'Only $50. A $50 first deposit unlocks the Standard live account or the IB partner account; ECN starts at $200. A free Demo account with $100,000 in virtual funds is also available — no commitment.',
   },
   {
     q: 'Which deposit and withdrawal methods are available, and how long do they take?',
@@ -184,12 +244,12 @@ export const FAQ = [
     a: `${BRAND_NAME} offers a fast web platform accessible from any modern browser, plus dedicated iOS and Android mobile apps. All platforms sync to a single account, so your positions, alerts, and watchlists stay in sync across every device.`,
   },
   {
-    q: 'How does the Decentralized Exchange work?',
-    a: `${BRAND_NAME} DEX lets you trade directly from your own wallet with non-custodial, on-chain execution. You keep your private keys, your funds never leave your wallet, and every order is settled through smart contracts — no counterparty risk, no withdrawal queues. Connect MetaMask, WalletConnect, or any EVM-compatible wallet, sign the trade, and the swap clears on-chain in seconds.`,
+    q: 'Which currency pairs can I trade?',
+    a: `${BRAND_NAME} quotes major pairs such as EUR/USD, GBP/USD and USD/JPY, minor crosses including EUR/GBP and AUD/JPY, and exotic pairs across emerging markets. Stock indices, gold and silver, and major digital assets are available from the same account.`,
   },
   {
-    q: 'How do I insure my trades?',
-    a: `Trade Insurance is built into every position on ${BRAND_NAME}. Each open trade is policy-backed by on-chain insurance up to the policy limit. If the market moves against you beyond the defined threshold, the insured amount is paid out automatically by the smart-contract underwriter. The insurance does not cover market loss within the policy threshold, so always size positions to your own risk tolerance.`,
+    q: 'What spreads and leverage are available?',
+    a: 'Spreads start from 0.0 pips on ECN accounts and from 1.0 pip on Standard, with commission shown on the order ticket before you confirm. Leverage is adjustable up to 1:500 depending on account type and instrument. Higher leverage increases both potential gains and potential losses.',
   },
   {
     q: 'How do I apply for the IB program?',
@@ -198,31 +258,39 @@ export const FAQ = [
 ] as const;
 
 export const CTA = {
-  headline: 'Ready to Start Your Investment Journey?',
-  sub: `Join ${BRAND_NAME} today and receive a 100% Welcome Bonus on your first deposit.`,
-  primary: 'Create Free Account',
-  secondary: 'How It Works',
+  headline: 'Trade Global Markets with Confidence',
+  sub: 'Open an account and access the currency markets on a platform built for professional trading.',
+  primary: 'Start Trading',
+  secondary: 'Explore Markets',
   href: SIGNUP_HREF,
-  secondaryHref: '/how-it-works',
+  secondaryHref: '/markets',
 };
 
-export const FOOTER_QUICK_LINKS = [
-  { label: 'Home',         href: '/' },
-  { label: 'About Us',     href: '/company/about' },
-  { label: 'Markets',      href: '/markets' },
-  { label: 'Accounts',     href: '/account-types' },
-  { label: 'How it Works', href: '/how-it-works' },
-  { label: 'FAQ',          href: '/faq' },
-  { label: 'Download',     href: '/download' },
-  { label: 'Careers',      href: '/careers' },
-  { label: 'Contact',      href: '/company/contact' },
+/**
+ * Footer columns.
+ *
+ * The old shape was a nine-item "Quick Links" column beside a four-item
+ * "Our Services" one — lopsided, and its first four entries silently
+ * duplicated the header nav. It is now three balanced columns of four.
+ *
+ * `FOOTER_EXPLORE` is derived from NAV_ITEMS rather than retyped, so the
+ * footer's primary column can never drift from the header's. Changing the
+ * nav changes both.
+ */
+export const FOOTER_EXPLORE = NAV_ITEMS.map(({ label, href }) => ({ label, href }));
+
+export const FOOTER_PLATFORM = [
+  { label: 'Trading Platforms', href: '/platforms/web' },
+  { label: 'Download',          href: '/download' },
+  { label: 'Partner Programme', href: '/products/ib-referral' },
+  { label: 'Market Research',   href: '/services/market-research' },
 ];
 
-export const FOOTER_SERVICES = [
-  { label: 'Portfolio Management',  href: '/services/portfolio-management' },
-  { label: 'Market Research',       href: '/services/market-research' },
-  { label: 'Educational Resources', href: '/services/education' },
-  { label: 'ICO Investments',       href: '/services/ico-coming-soon' },
+export const FOOTER_COMPANY = [
+  { label: 'How it Works', href: '/how-it-works' },
+  { label: 'FAQ',          href: '/faq' },
+  { label: 'Careers',      href: '/careers' },
+  { label: 'Contact',      href: '/company/contact' },
 ];
 
 /* Legal links are now surfaced via the Legal dropdown in NAV_ITEMS.
@@ -234,5 +302,10 @@ export const FOOTER_LINKS: { label: string; href: string }[] = [
 
 export const COPYRIGHT = `${BRAND_COPYRIGHT} · Founded in 2010`;
 
+/**
+ * Regulatory risk disclosure — distinct from the "Risk Management" product
+ * menu that this content pass removed. Every broker must carry a leveraged-
+ * trading warning; this stays.
+ */
 export const RISK_DISCLAIMER =
-  'Trading cryptocurrencies and forex involves significant risk. Past performance is not indicative of future results. Invest only what you can afford to lose.';
+  'Trading foreign exchange and CFDs on margin carries a high level of risk and may not be suitable for all investors. Past performance is not indicative of future results. Trade only with capital you can afford to lose.';

@@ -6,8 +6,8 @@ import { ArrowUpRight, ChevronDown } from 'lucide-react';
 import { TradingViewChart } from './TradingViewChart';
 
 /** Initial chart state — first instrument loaded into the live chart on mount. */
-const DEFAULT_SYMBOL   = 'US30';
-const DEFAULT_TV       = 'OANDA:US30USD';
+const DEFAULT_SYMBOL   = 'EUR/USD';
+const DEFAULT_TV       = 'FX:EURUSD';
 
 /* TradingView symbol mapping for every directory item below. */
 const INSTRUMENT_MAP: Record<string, string> = {
@@ -75,21 +75,6 @@ interface Column {
 
 const COLUMNS: Column[] = [
   {
-    heading: 'Indices',
-    viewAllHref: '/trading/indices',
-    items: ['US30', 'US100', 'US500'],
-  },
-  {
-    heading: 'Commodities',
-    viewAllHref: '/trading/commodities',
-    items: ['Gold', 'Silver', 'Copper', 'Crude Oil', 'Brent Oil', 'Wheat', 'Corn', 'Natural Gas', 'Gasoline', 'Heating Oil'],
-  },
-  {
-    heading: 'Stocks',
-    viewAllHref: '/markets',
-    items: ['Tesla', 'AT&T', 'Google', 'Netflix', 'Nvidia', 'Amazon', 'Apple', 'Meta'],
-  },
-  {
     heading: 'Forex Major',
     viewAllHref: '/trading/forex',
     items: ['AUD/USD', 'EUR/USD', 'GBP/USD', 'NZD/USD', 'USD/CAD', 'USD/CHF', 'USD/JPY'],
@@ -103,6 +88,21 @@ const COLUMNS: Column[] = [
       'GBP/AUD', 'GBP/CAD', 'GBP/CHF', 'GBP/JPY', 'GBP/NZD',
       'NZD/CAD', 'NZD/CHF', 'NZD/JPY',
     ],
+  },
+  {
+    heading: 'Indices',
+    viewAllHref: '/trading/indices',
+    items: ['US30', 'US100', 'US500'],
+  },
+  {
+    heading: 'Commodities',
+    viewAllHref: '/trading/commodities',
+    items: ['Gold', 'Silver', 'Copper', 'Crude Oil', 'Brent Oil', 'Wheat', 'Corn', 'Natural Gas', 'Gasoline', 'Heating Oil'],
+  },
+  {
+    heading: 'Stocks',
+    viewAllHref: '/markets',
+    items: ['Tesla', 'AT&T', 'Google', 'Netflix', 'Nvidia', 'Amazon', 'Apple', 'Meta'],
   },
 ];
 
@@ -268,13 +268,13 @@ function InstrumentDirectory({
               >
                 <span
                   className="font-display uppercase text-sm sm:text-base tracking-tight"
-                  style={{ color: '#ffffff' }}
+                  style={{ color: 'var(--mk-text)' }}
                 >
                   {col.heading}
                 </span>
                 <ChevronDown
                   className={`size-4 shrink-0 transition-transform ${isOpen ? 'rotate-180' : ''}`}
-                  style={{ color: isOpen ? '#E85D3D' : 'rgba(255,255,255,0.85)' }}
+                  style={{ color: isOpen ? 'var(--mk-accent)' : 'var(--mk-text-muted)' }}
                   aria-hidden
                 />
               </button>
@@ -286,7 +286,7 @@ function InstrumentDirectory({
               {isOpen && (
                 <div
                   className="mt-2 liquid-glass-strong rounded-2xl p-3 [backdrop-filter:blur(28px)]"
-                  style={{ border: '1px solid hsl(11 79% 57% / 0.35)' }}
+                  style={{ border: '1px solid var(--mk-line)', background: '#ffffff', boxShadow: '0 18px 44px rgba(11,11,12,0.14)' }}
                   role="menu"
                 >
                   <ul className="flex flex-col gap-1 max-h-[320px] overflow-y-auto">
@@ -303,10 +303,10 @@ function InstrumentDirectory({
                             }}
                             className={`w-full text-left text-sm px-3 py-2 rounded-lg transition-colors ${
                               isActive
-                                ? 'bg-primary/25 font-semibold'
-                                : 'hover:bg-foreground/[0.08]'
+                                ? 'bg-[hsl(var(--muted))] font-semibold'
+                                : 'hover:bg-[hsl(var(--muted))]'
                             }`}
-                            style={{ color: isActive ? '#E85D3D' : '#ffffff' }}
+                            style={{ color: isActive ? 'var(--mk-accent)' : 'var(--mk-text)' }}
                             aria-pressed={isActive}
                             aria-label={`Load ${item} live chart`}
                           >

@@ -178,7 +178,7 @@ export function CookieConsent() {
             <div
               className="w-full px-4 sm:px-8 lg:px-12 py-5 sm:py-6 flex flex-col md:flex-row items-start md:items-center gap-4 md:gap-6"
               style={{
-                background: 'linear-gradient(135deg, #0d1014 0%, #050608 100%)',
+                background: '#ffffff',
                 borderTop: '1px solid rgba(232, 93, 61,0.45)',
                 boxShadow: '0 -10px 40px rgba(0,0,0,0.55)',
               }}
@@ -186,11 +186,11 @@ export function CookieConsent() {
               <div
                 className="size-14 shrink-0 rounded-xl flex items-center justify-center"
                 style={{
-                  background: 'rgba(232, 93, 61,0.18)',
+                  background: 'var(--mk-accent-soft)',
                   border: '1px solid rgba(232, 93, 61,0.4)',
                 }}
               >
-                <Cookie className="size-6" style={{ color: '#E85D3D' }} />
+                <Cookie className="size-6" style={{ color: 'var(--mk-accent)' }} />
               </div>
               <div className="flex-1 min-w-0">
                 <h3
@@ -201,14 +201,14 @@ export function CookieConsent() {
                 </h3>
                 <p
                   className="mt-1.5 text-sm sm:text-base leading-relaxed"
-                  style={{ color: 'rgba(255,255,255,0.75)' }}
+                  style={{ color: 'var(--mk-text-muted)' }}
                 >
                   Functional cookies keep your session secure. Promotional and preference cookies
                   are optional. See our{' '}
                   <a
                     href="/privacy"
                     className="underline-offset-2 hover:underline font-semibold"
-                    style={{ color: '#E85D3D' }}
+                    style={{ color: 'var(--mk-accent)' }}
                   >
                     Privacy Policy
                   </a>{' '}
@@ -221,9 +221,9 @@ export function CookieConsent() {
                   onClick={openModalFromBanner}
                   className="flex-1 md:flex-none inline-flex items-center justify-center gap-2 rounded-full px-6 py-3 text-sm font-semibold uppercase tracking-wider hover:opacity-90 transition-opacity"
                   style={{
-                    color: 'rgba(255,255,255,0.9)',
+                    color: 'var(--mk-text)',
                     background: 'transparent',
-                    border: '1px solid rgba(255,255,255,0.2)',
+                    border: '1px solid var(--mk-line-strong)',
                   }}
                 >
                   <Settings className="size-4" /> Manage
@@ -232,7 +232,7 @@ export function CookieConsent() {
                   type="button"
                   onClick={acceptAll}
                   className="flex-1 md:flex-none inline-flex items-center justify-center gap-2 rounded-full px-6 py-3 text-sm font-bold uppercase tracking-wider hover:opacity-90 transition-opacity"
-                  style={{ background: '#E85D3D', color: '#ffffff' }}
+                  style={{ background: 'var(--mk-accent)', color: '#ffffff' }}
                 >
                   Accept All <Check className="size-4" />
                 </button>
@@ -251,7 +251,7 @@ export function CookieConsent() {
             exit={{ opacity: 0 }}
             transition={{ duration: 0.2 }}
             className="fixed inset-0 z-[250] flex items-center justify-center p-4"
-            style={{ background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(6px)' }}
+            style={{ background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(6px)' }}
             onClick={(e) => { if (e.target === e.currentTarget) dismiss(); }}
             role="dialog"
             aria-modal="true"
@@ -264,7 +264,7 @@ export function CookieConsent() {
               transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
               className="w-full max-w-2xl max-h-[80vh] rounded-3xl flex flex-col overflow-hidden"
               style={{
-                background: 'linear-gradient(180deg, #0d1014 0%, #05070a 100%)',
+                background: '#ffffff',
                 border: '1px solid rgba(232, 93, 61,0.35)',
                 boxShadow: '0 30px 80px rgba(0,0,0,0.7)',
               }}
@@ -272,17 +272,17 @@ export function CookieConsent() {
               {/* Header */}
               <div
                 className="flex items-center justify-between px-5 sm:px-6 py-4 sm:py-5"
-                style={{ borderBottom: '1px solid rgba(255,255,255,0.08)' }}
+                style={{ borderBottom: '1px solid var(--mk-line)' }}
               >
                 <div className="flex items-center gap-3">
                   <div
                     className="size-10 rounded-xl flex items-center justify-center"
                     style={{
-                      background: 'rgba(232, 93, 61,0.18)',
+                      background: 'var(--mk-accent-soft)',
                       border: '1px solid rgba(232, 93, 61,0.4)',
                     }}
                   >
-                    <Cookie className="size-5" style={{ color: '#E85D3D' }} />
+                    <Cookie className="size-5" style={{ color: 'var(--mk-accent)' }} />
                   </div>
                   <h2
                     className="font-display uppercase tracking-tight text-base sm:text-lg"
@@ -295,7 +295,7 @@ export function CookieConsent() {
                   type="button"
                   onClick={() => setShowModal(false)}
                   className="size-9 rounded-full flex items-center justify-center hover:opacity-80 transition-opacity"
-                  style={{ color: 'rgba(255,255,255,0.55)', background: 'rgba(255,255,255,0.04)' }}
+                  style={{ color: 'var(--mk-text-faint)', background: 'var(--mk-surface)' }}
                   aria-label="Close"
                 >
                   <X className="size-4" />
@@ -307,7 +307,7 @@ export function CookieConsent() {
                   off-canvas. */}
               <div
                 className="flex flex-wrap gap-1.5 px-5 sm:px-6 py-3"
-                style={{ borderBottom: '1px solid rgba(255,255,255,0.08)' }}
+                style={{ borderBottom: '1px solid var(--mk-line)' }}
               >
                 {(
                   [
@@ -324,11 +324,11 @@ export function CookieConsent() {
                       onClick={() => setTab(key)}
                       className="px-3 sm:px-4 py-1.5 rounded-full text-xs sm:text-sm font-semibold transition-colors whitespace-nowrap"
                       style={{
-                        color: active ? '#ffffff' : 'rgba(255,255,255,0.6)',
-                        background: active ? 'rgba(232, 93, 61,0.22)' : 'transparent',
+                        color: active ? 'var(--mk-accent)' : 'var(--mk-text-muted)',
+                        background: active ? 'var(--mk-accent-soft)' : 'transparent',
                         border: active
-                          ? '1px solid rgba(232, 93, 61,0.6)'
-                          : '1px solid rgba(255,255,255,0.1)',
+                          ? '1px solid var(--mk-accent-line)'
+                          : '1px solid var(--mk-line)',
                       }}
                       aria-pressed={active}
                     >
@@ -348,16 +348,16 @@ export function CookieConsent() {
               {/* Footer */}
               <div
                 className="px-5 sm:px-6 py-4 flex flex-col sm:flex-row gap-3 sm:justify-end"
-                style={{ borderTop: '1px solid rgba(255,255,255,0.08)' }}
+                style={{ borderTop: '1px solid var(--mk-line)' }}
               >
                 <button
                   type="button"
                   onClick={saveAndClose}
                   className="inline-flex items-center justify-center gap-1.5 rounded-full px-5 py-2.5 text-xs font-semibold uppercase tracking-wider hover:opacity-90 transition-opacity"
                   style={{
-                    color: 'rgba(255,255,255,0.9)',
+                    color: 'var(--mk-text)',
                     background: 'transparent',
-                    border: '1px solid rgba(255,255,255,0.2)',
+                    border: '1px solid var(--mk-line-strong)',
                   }}
                 >
                   Save Settings and Close
@@ -366,7 +366,7 @@ export function CookieConsent() {
                   type="button"
                   onClick={acceptAll}
                   className="inline-flex items-center justify-center gap-1.5 rounded-full px-5 py-2.5 text-xs font-semibold uppercase tracking-wider hover:opacity-90 transition-opacity"
-                  style={{ background: '#E85D3D', color: '#ffffff' }}
+                  style={{ background: 'var(--mk-accent)', color: '#ffffff' }}
                 >
                   Enable All Cookies and Close <Check className="size-3.5" />
                 </button>
@@ -390,7 +390,7 @@ function SettingsTab({
 }) {
   return (
     <div className="space-y-5">
-      <p className="text-sm leading-relaxed" style={{ color: 'rgba(255,255,255,0.7)' }}>
+      <p className="text-sm leading-relaxed" style={{ color: 'var(--mk-text-muted)' }}>
         Please select which types of cookies you would like {BRAND_NAME} to store on your device.
       </p>
 
@@ -447,7 +447,7 @@ function SettingsTab({
 
 function WhatTab() {
   return (
-    <div className="space-y-4 text-sm leading-relaxed" style={{ color: 'rgba(255,255,255,0.75)' }}>
+    <div className="space-y-4 text-sm leading-relaxed" style={{ color: 'var(--mk-text-muted)' }}>
       <h3
         className="font-display uppercase tracking-tight text-lg"
         style={{ color: '#ffffff' }}
@@ -473,7 +473,7 @@ function WhatTab() {
 
 function WhyTab() {
   return (
-    <div className="space-y-4 text-sm leading-relaxed" style={{ color: 'rgba(255,255,255,0.75)' }}>
+    <div className="space-y-4 text-sm leading-relaxed" style={{ color: 'var(--mk-text-muted)' }}>
       <h3
         className="font-display uppercase tracking-tight text-lg"
         style={{ color: '#ffffff' }}
@@ -482,7 +482,7 @@ function WhyTab() {
       </h3>
       <p>Cookies help {BRAND_NAME} provide secure, efficient, and personalized services.</p>
       <div>
-        <p className="font-semibold mb-2" style={{ color: 'rgba(255,255,255,0.9)' }}>
+        <p className="font-semibold mb-2" style={{ color: 'var(--mk-text)' }}>
           They allow us to:
         </p>
         <ul className="space-y-1.5 ml-1">
@@ -499,7 +499,7 @@ function WhyTab() {
               <span
                 aria-hidden
                 className="size-1.5 mt-2 rounded-full shrink-0"
-                style={{ background: '#E85D3D' }}
+                style={{ background: 'var(--mk-accent)' }}
               />
               <span>{p}</span>
             </li>
@@ -543,8 +543,8 @@ function CookieRow({
     <div
       className="rounded-2xl p-5"
       style={{
-        background: 'rgba(255,255,255,0.03)',
-        border: '1px solid rgba(255,255,255,0.08)',
+        background: 'var(--mk-surface)',
+        border: '1px solid var(--mk-line)',
       }}
     >
       <div className="flex items-start sm:items-center justify-between gap-4 mb-3">
@@ -557,8 +557,8 @@ function CookieRow({
             <span
               className="text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-full"
               style={{
-                color: '#E85D3D',
-                background: 'rgba(232, 93, 61,0.18)',
+                color: 'var(--mk-accent)',
+                background: 'var(--mk-accent-soft)',
                 border: '1px solid rgba(232, 93, 61,0.4)',
               }}
             >
@@ -568,20 +568,20 @@ function CookieRow({
         </h3>
         <Toggle on={on} disabled={required} onClick={onToggle} />
       </div>
-      <p className="text-sm leading-relaxed" style={{ color: 'rgba(255,255,255,0.7)' }}>
+      <p className="text-sm leading-relaxed" style={{ color: 'var(--mk-text-muted)' }}>
         {description}
       </p>
       <div className="mt-3">
-        <p className="text-[11px] uppercase tracking-[0.14em] mb-1.5" style={{ color: 'rgba(255,255,255,0.45)' }}>
+        <p className="text-[11px] uppercase tracking-[0.14em] mb-1.5" style={{ color: 'var(--mk-text-faint)' }}>
           Examples
         </p>
-        <ul className="space-y-1 text-sm" style={{ color: 'rgba(255,255,255,0.75)' }}>
+        <ul className="space-y-1 text-sm" style={{ color: 'var(--mk-text-muted)' }}>
           {examples.map((e) => (
             <li key={e} className="flex items-start gap-2">
               <span
                 aria-hidden
                 className="size-1.5 mt-2 rounded-full shrink-0"
-                style={{ background: '#E85D3D' }}
+                style={{ background: 'var(--mk-accent)' }}
               />
               <span>{e}</span>
             </li>
@@ -591,16 +591,16 @@ function CookieRow({
       {trailing && (
         <p
           className="mt-3 text-xs leading-relaxed italic"
-          style={{ color: 'rgba(255,255,255,0.55)' }}
+          style={{ color: 'var(--mk-text-faint)' }}
         >
           {trailing}
         </p>
       )}
       <p className="mt-3 text-xs">
-        <span style={{ color: 'rgba(255,255,255,0.5)' }}>Status: </span>
+        <span style={{ color: 'var(--mk-text-faint)' }}>Status: </span>
         <span
           className="font-semibold"
-          style={{ color: required ? '#E85D3D' : 'rgba(255,255,255,0.9)' }}
+          style={{ color: required ? 'var(--mk-accent)' : 'var(--mk-text)' }}
         >
           {status}
         </span>
@@ -638,8 +638,8 @@ function Toggle({
         disabled ? 'cursor-not-allowed opacity-90' : 'cursor-pointer'
       }`}
       style={{
-        background: on ? '#E85D3D' : 'rgba(255,255,255,0.22)',
-        border: '1px solid rgba(255,255,255,0.12)',
+        background: on ? 'var(--mk-accent)' : 'var(--mk-line-strong)',
+        border: '1px solid var(--mk-line)',
       }}
     >
       <span

@@ -147,9 +147,7 @@ export default function MobileBottomNav() {
     pathname === '/markets' ||
     pathname === '/account-types' ||
     pathname === '/how-it-works' ||
-    pathname === '/bonus' ||
     pathname?.startsWith('/academy') ||
-    pathname?.startsWith('/risk-management') ||
     pathname?.startsWith('/products') ||
     pathname?.startsWith('/services') ||
     pathname?.startsWith('/company') ||

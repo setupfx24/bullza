@@ -50,10 +50,12 @@ const SECTIONS = [
     are not guaranteed to be free of exploits. Do not deposit crypto you cannot afford to lose.`,
   },
   {
-    h: '6. Welcome Bonus & Promotions',
-    p: `Bonus equity is credited as tradeable balance and is absorbed by losing trades before your
-    deposited capital. Bonus terms and unlock conditions are disclosed in your dashboard at the
-    time of opt-in. Bonus equity is not in itself withdrawable.`,
+    h: '6. Bonus Credit',
+    p: `${BRAND_NAME} does not currently run a deposit-bonus promotion. Where bonus credit does reach
+    an account — through a partner arrangement, for example — it is credited as tradeable balance
+    and is absorbed by losing trades before your deposited capital. Its terms and unlock conditions
+    are disclosed in your dashboard at the time it is granted, and bonus credit is not in itself
+    withdrawable.`,
   },
   {
     h: '7. Trade Insurance',

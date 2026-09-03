@@ -17,7 +17,7 @@ const POSTS = [
     category: 'Forex',
     date: 'March 15, 2025',
     excerpt: 'Master the most traded currency pair with our comprehensive guide to EUR/USD trading strategies.',
-    body: 'EUR/USD remains the world\'s most liquid currency pair, accounting for nearly 25% of daily forex volume. Successful traders watch ECB and Fed policy divergence, key technical levels around the 1.05–1.12 range, and macro releases like NFP and Eurozone CPI. Build a structured plan: identify the trend on the daily chart, refine entries on the 1H/15M, and always size positions so a single loss never exceeds 1–2% of your account. Combine this with disciplined risk management and you have an edge that compounds over months.',
+    body: 'EUR/USD remains the world\'s most liquid currency pair, accounting for nearly 25% of daily forex volume. Successful traders watch ECB and Fed policy divergence, key technical levels around the 1.05–1.12 range, and macro releases like NFP and Eurozone CPI. Build a structured plan: identify the trend on the daily chart, refine entries on the 1H/15M, and always size positions so a single loss never exceeds 1–2% of your account. Combine this with disciplined position sizing and you have an edge that compounds over months.',
     image: '📈',
   },
   {
@@ -53,10 +53,10 @@ const POSTS = [
     image: '💻',
   },
   {
-    title: 'Risk Management: The Key to Long-Term Success',
+    title: 'Position Sizing: The Key to Long-Term Success',
     category: 'Strategy',
     date: 'March 1, 2025',
-    excerpt: 'Protect your capital and maximize profits with proper risk management techniques.',
+    excerpt: 'How disciplined position sizing and stop placement keep a trading account alive.',
     body: 'The single biggest difference between traders who survive and those who blow up: position sizing. Rule one — never risk more than 1–2% of your account on a single trade. Rule two — always set a stop-loss BEFORE entering, never after. Rule three — keep a 1:2 minimum reward-to-risk ratio so even a 40% win rate is profitable. Rule four — never add to a losing position; that is how small losses become account-killers. Rule five — log every trade and review monthly. The market will pay you to be disciplined and punish you for being greedy. There is no exception.',
     image: '🛡️',
   },

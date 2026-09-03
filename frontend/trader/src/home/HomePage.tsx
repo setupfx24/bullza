@@ -3,23 +3,40 @@
 import './styles.css';
 import { Navbar } from './components/Navbar';
 import { Hero } from './components/Hero';
-import { LiveChartSection } from './components/LiveChartSection';
-import { ServicesBento } from './components/ServicesBento';
-import { Pourquoi } from './components/Pourquoi';
-import { Process } from './components/Process';
+import { MarketsGrid } from './components/MarketsGrid';
+import { Rewards } from './components/Rewards';
+import { PlatformShowcase } from './components/PlatformShowcase';
 import { Stats } from './components/Stats';
-import { Testimonials } from './components/Testimonials';
+import { TraderPaths } from './components/TraderPaths';
+import { JoinPanel } from './components/JoinPanel';
+import { Pourquoi } from './components/Pourquoi';
 import { Faq } from './components/Faq';
-import { QuoteSection } from './components/QuoteSection';
 import { CtaFooter } from './components/CtaFooter';
 
 /**
- * Public marketing home — ported from the standalone marketing-site
- * Vite project. Self-contained: brings its own Navbar, footer, fonts and
- * theme tokens via `./styles.css`. Drop into any Next.js page and that
- * page becomes the cinematic landing experience.
+ * Public marketing home.
  *
- * All "Get Started" / "Create Account" CTAs route to /auth/register.
+ * Section order follows the reference layout (2026-09-02):
+ *
+ *   1. Hero            headline, CTA pair, reserved product shot
+ *   2. Ticker          live market strip (rendered inside <Hero />)
+ *   3. MarketsGrid     3×2 market tiles + CTA pair
+ *   4. Rewards         two image-led offer cards + CTA pair
+ *   5. PlatformShowcase  screenshot left, ticked capability list right
+ *   6. Stats           tinted rounded trust panel
+ *   7. TraderPaths     "everything you need", split by audience
+ *   8. JoinPanel       numbered signup steps + portrait image
+ *   9. CtaFooter       closing CTA band + black footer
+ *
+ * `Pourquoi` (why-choose-us) and `Faq` have no counterpart in the
+ * reference, which runs straight from the join panel to the footer. They
+ * are kept — the copy is live content — and placed after the reference's
+ * own flow so the sequence above still reads as designed. The testimonial
+ * marquee that sat between them was removed on request (2026-09-02).
+ *
+ * `LiveChartSection` moved off the homepage to /markets, where the
+ * instrument directory belongs; the reference puts a market ticker here,
+ * not a full charting widget.
  */
 export default function BrandHomePage() {
   return (
@@ -27,14 +44,14 @@ export default function BrandHomePage() {
       <Navbar />
       <main>
         <Hero />
-        <LiveChartSection />
-        <ServicesBento />
-        <Pourquoi />
-        <Process />
+        <MarketsGrid />
+        <Rewards />
+        <PlatformShowcase />
         <Stats />
-        <Testimonials />
+        <TraderPaths />
+        <JoinPanel />
+        <Pourquoi />
         <Faq />
-        <QuoteSection />
         <CtaFooter />
       </main>
     </div>

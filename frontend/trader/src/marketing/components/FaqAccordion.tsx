@@ -13,38 +13,37 @@ export interface FaqItem { q: string; a: React.ReactNode }
 export function FaqAccordion({ items }: { items: FaqItem[] }) {
   const [open, setOpen] = useState<number | null>(0);
 
+  /* Redesign 2026-09-01: filled, individually-bordered cards became a
+     single ruled list. On a light canvas a stack of bordered boxes reads
+     as noise, and the reference resolves FAQs as hairline-separated rows
+     — which also lets a long question wrap without the row growing a
+     visible outline. */
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col" style={{ borderTop: '1px solid var(--mk-line)' }}>
       {items.map((item, i) => {
         const isOpen = open === i;
         return (
-          <div
-            key={item.q}
-            className="overflow-hidden"
-            style={{
-              background: 'var(--mk-surface)',
-              border: `1px solid ${isOpen ? 'var(--mk-accent-line)' : 'var(--mk-line)'}`,
-              borderRadius: 'var(--mk-radius)',
-              transition: 'border-color var(--mk-transition)',
-            }}
-          >
+          <div key={item.q} style={{ borderBottom: '1px solid var(--mk-line)' }}>
             <button
               type="button"
               onClick={() => setOpen(isOpen ? null : i)}
               aria-expanded={isOpen}
-              className="flex w-full items-center justify-between gap-4 px-5 py-4 text-left"
+              className="flex w-full items-center justify-between gap-4 py-5 text-left transition-colors"
             >
-              <span className="text-[15px] font-bold" style={{ color: 'var(--mk-text)' }}>
+              <span
+                className="text-[15px] font-semibold"
+                style={{ color: isOpen ? 'var(--mk-accent)' : 'var(--mk-text)' }}
+              >
                 {item.q}
               </span>
               <Plus
                 size={18}
                 className={clsx('shrink-0 transition-transform duration-200', isOpen && 'rotate-45')}
-                style={{ color: 'var(--mk-accent)' }}
+                style={{ color: isOpen ? 'var(--mk-accent)' : 'var(--mk-text-faint)' }}
               />
             </button>
             {isOpen && (
-              <div className="px-5 pb-5 -mt-1">
+              <div className="-mt-1 pb-6 pr-10">
                 <div className="mk-body">{item.a}</div>
               </div>
             )}

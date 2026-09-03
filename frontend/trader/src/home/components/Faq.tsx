@@ -33,7 +33,7 @@ export function Faq() {
             className="font-display uppercase text-3xl sm:text-4xl md:text-6xl leading-[0.9] tracking-tight"
           />
           <p className="font-body text-foreground/65 max-w-md">
-            Everything you need to know before your first investment. Still have questions? Our team is live 24/7.
+            Common questions about trading, accounts and funding. Still need help? Our team is available 24/5.
           </p>
           <div>
             <Button variant="heroGlass" asChild>

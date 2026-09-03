@@ -30,8 +30,8 @@ const COURSES: Array<{
     icon: '📊',
   },
   {
-    title: 'Risk Management & Psychology',
-    description: 'Develop the mental discipline and risk management skills essential for trading success.',
+    title: 'Position Sizing & Psychology',
+    description: 'Build the discipline and position-sizing habits that keep a trading account intact.',
     duration: '3 hours',
     level: 'Intermediate',
     lessons: 15,

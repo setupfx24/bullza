@@ -2,44 +2,42 @@ import Link from 'next/link'
 import { Facebook, Instagram, Linkedin, Youtube, Mail, Cookie } from 'lucide-react'
 import ScrollReveal from './animations/ScrollReveal'
 import { openCookieSettings } from '@/home/components/CookieConsent'
-import { BRAND_NAME, BRAND_DOMAIN, BRAND_LOGO, BRAND_SUPPORT_EMAIL, BRAND_COPYRIGHT } from '@/lib/brand'
+import { BRAND_NAME, BRAND_DOMAIN, BRAND_LOGO_LIGHT, BRAND_SUPPORT_EMAIL, BRAND_COPYRIGHT } from '@/lib/brand'
 
 const columns = {
-  Trading: [
+  Markets: [
     { name: 'Forex',       path: '/trading/forex' },
     { name: 'Indices',     path: '/trading/indices' },
     { name: 'Commodities', path: '/trading/commodities' },
     { name: 'Crypto',      path: '/trading/crypto' },
   ],
-  Services: [
-    { name: 'Portfolio Management',  path: '/services/portfolio-management' },
-    { name: 'Market Research',       path: '/services/market-research' },
-    { name: 'Education',             path: '/services/education' },
-    { name: 'ICO (Coming Soon)',     path: '/services/ico-coming-soon' },
+  Trading: [
+    { name: 'Account Types',     path: '/account-types' },
+    { name: 'Standard Account',  path: '/accounts/standard' },
+    { name: 'Pro Account',       path: '/accounts/pro' },
+    { name: 'Demo Account',      path: '/accounts/demo' },
   ],
-  Accounts: [
-    { name: 'Standard', path: '/accounts/standard' },
-    { name: 'Pro',      path: '/accounts/pro' },
-    { name: 'Demo',     path: '/accounts/demo' },
+  Platforms: [
+    { name: 'Web Platform',  path: '/platforms/web' },
+    { name: 'Copy Trading',  path: '/platforms/copy-trading' },
+    { name: 'Download',      path: '/download' },
   ],
-  Academy: [
-    { name: 'PDFs',   path: '/academy/pdfs' },
-    { name: 'Blogs',  path: '/academy/blogs' },
+  Partners: [
+    { name: 'IB Programme',    path: '/products/ib-referral' },
+    { name: 'Referral',        path: '/products/referral' },
+    { name: 'Trade Insurance', path: '/products/insurance' },
   ],
-  'Risk Management': [
-    { name: 'Trading Calculators', path: '/risk-management/calculator' },
-  ],
-  Products: [
-    { name: 'IB Referral',              path: '/products/ib-referral' },
-    { name: 'Referral',                 path: '/products/referral' },
-    { name: 'Trade Insurance',          path: '/products/insurance' },
+  Resources: [
+    { name: 'Market Research', path: '/services/market-research' },
+    { name: 'Education',       path: '/services/education' },
+    { name: 'Guides',          path: '/academy/pdfs' },
+    { name: 'Blog',            path: '/academy/blogs' },
   ],
   Company: [
-    { name: 'About Us',       path: '/company/about' },
-    { name: 'Contact',        path: '/company/contact' },
-    { name: 'Careers',        path: '/careers' },
-    { name: 'FAQ',            path: '/faq' },
-    { name: 'Download',       path: '/download' },
+    { name: 'About Us',  path: '/company/about' },
+    { name: 'Contact',   path: '/company/contact' },
+    { name: 'Careers',   path: '/careers' },
+    { name: 'FAQ',       path: '/faq' },
   ],
 }
 
@@ -52,11 +50,27 @@ const socials = [
 
 export default function Footer() {
   return (
+    /* 2026-09-01 redesign — solid black band, matching the homepage footer
+       and the reference. Previously a white→near-black vertical gradient,
+       which after the light retheme faded the ink copy straight into the
+       black half and left the lower half of the footer unreadable.
+
+       Rather than recolouring every descendant, the --fx-* text/surface
+       tokens are re-pointed to their inverted values for this subtree, so
+       every child that reads them (and there are many) follows. */
     <footer
       className="relative"
       style={{
-        background: 'linear-gradient(180deg, var(--fx-bg) 0%, #050608 100%)',
+        background: '#000000',
         borderTop: '1px solid var(--fx-line)',
+        '--fx-text': '#ffffff',
+        '--fx-text-2': 'rgba(255, 255, 255, 0.66)',
+        '--fx-text-3': 'rgba(255, 255, 255, 0.48)',
+        '--fx-line': 'rgba(255, 255, 255, 0.12)',
+        '--fx-line-strong': 'rgba(255, 255, 255, 0.22)',
+        '--fx-bg-elev': 'rgba(255, 255, 255, 0.05)',
+        '--fx-bg-elev-2': 'rgba(255, 255, 255, 0.08)',
+        color: '#ffffff',
       }}
     >
       <div className="fx-divider-gold" />
@@ -68,20 +82,20 @@ export default function Footer() {
           <div className="col-span-2 lg:col-span-2">
             <ScrollReveal variant="fadeLeft">
               <Link href="/" className="inline-block mb-5" aria-label={`${BRAND_NAME} home`}>
-                {BRAND_LOGO ? (
-                  <img src={BRAND_LOGO} alt={BRAND_NAME} className="h-10 w-auto" />
+                {BRAND_LOGO_LIGHT ? (
+                  <img src={BRAND_LOGO_LIGHT} alt={BRAND_NAME} className="h-10 w-auto" />
                 ) : (
                   <span className="text-2xl font-black tracking-tight" style={{ color: 'var(--fx-text)' }}>{BRAND_NAME}</span>
                 )}
               </Link>
               <p className="text-sm leading-relaxed max-w-sm mb-6" style={{ color: 'var(--fx-text-2)' }}>
-                {BRAND_NAME} is an institutional-grade forex, CFD broker, and decentralized exchange
-                built for serious traders. It offers fast execution, low spreads, transparent
-                pricing, insured trades, and fully automated trading with no human intervention.
+                {BRAND_NAME} is a forex and CFD trading platform built for serious traders —
+                offering fast execution, competitive spreads and transparent pricing across
+                major, minor and exotic currency pairs.
               </p>
               <p className="text-sm leading-relaxed max-w-sm mb-6" style={{ color: 'var(--fx-text-2)' }}>
-                {BRAND_NAME} also provides a rewarding IB (Introducing Broker) program with
-                profit-sharing opportunities for partners and affiliates.
+                Trade from the web, mobile or desktop browser on a single account, with an
+                Introducing Broker programme available for partners and affiliates.
               </p>
 
               <div className="flex items-center gap-2 text-sm mb-5" style={{ color: 'var(--fx-text-3)' }}>

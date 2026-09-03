@@ -19,12 +19,12 @@
  *                                 (existing live-movers computation)
  *   KYC card                    → existing user.kyc_status + /kyc
  *   invite friends              → /business/referral/me
- *   deposit bonus + banners     → existing /wallet CTA + /banners
+ *   banners                     → /banners
  */
 
 import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
-import { ArrowRight, Gift, Users } from 'lucide-react';
+import { ArrowRight, Users } from 'lucide-react';
 import toast from 'react-hot-toast';
 import DashboardShell from '@/components/layout/DashboardShell';
 import api from '@/lib/api/client';
@@ -256,10 +256,12 @@ function BrokerHome() {
         <div className="lg:col-span-5"><TopMoversCard movers={movers} /></div>
       </div>
 
+      {/* BonusCard used to sit between these two. It advertised an "up to
+          100% deposit bonus" that the platform no longer offers, so it is
+          gone and the row splits evenly instead. */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-5">
-        <div className="lg:col-span-4"><InviteFriendsCard /></div>
-        <div className="lg:col-span-4"><BonusCard /></div>
-        <div className="md:col-span-2 lg:col-span-4"><QuickLinksCard /></div>
+        <div className="lg:col-span-6"><InviteFriendsCard /></div>
+        <div className="lg:col-span-6"><QuickLinksCard /></div>
       </div>
     </div>
   );
@@ -349,34 +351,6 @@ function InviteFriendsCard() {
               Get your referral link <ArrowRight size={12} />
             </Link>
           )}
-        </div>
-      </div>
-    </PanelCard>
-  );
-}
-
-function BonusCard() {
-  return (
-    <PanelCard padding="lg" className="h-full">
-      <div className="flex items-start gap-4">
-        <div
-          className="shrink-0 w-11 h-11 rounded-xl flex items-center justify-center"
-          style={{ background: 'rgba(232, 93, 61,0.12)' }}
-        >
-          <Gift size={20} className="text-[#E85D3D]" />
-        </div>
-        <div className="min-w-0 flex-1">
-          <h3 className="text-sm font-bold text-text-primary">Up to 100% deposit bonus</h3>
-          <p className="text-[11px] text-text-secondary mt-0.5 leading-relaxed">
-            Top up your account and we&apos;ll add up to 100% extra trading credit. No expiry, fully tradeable.
-          </p>
-          <Link
-            href="/wallet"
-            className="inline-flex items-center gap-1.5 mt-3 px-3.5 py-1.5 text-[11px] font-extrabold rounded-full"
-            style={{ background: '#E85D3D', color: '#0c1105' }}
-          >
-            Get bonus <ArrowRight size={12} />
-          </Link>
         </div>
       </div>
     </PanelCard>

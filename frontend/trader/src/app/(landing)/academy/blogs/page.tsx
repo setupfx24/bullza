@@ -37,16 +37,24 @@ const CATEGORIES = ['Forex', 'Crypto', 'Strategy', 'Tools', 'Commodities', 'Guid
 export default function AcademyBlogsPage() {
   const [search, setSearch] = useState('');
   const [page, setPage]     = useState(1);
+  /* The sidebar category pills rendered as inert buttons. They now drive
+     the same list the search box does; clicking the active one clears it. */
+  const [category, setCategory] = useState<string | null>(null);
 
   const featured = POSTS.find((p) => p.featured) ?? POSTS[0];
   const rest = POSTS.filter((p) => p.id !== featured.id);
 
   const filtered = useMemo(() => {
-    if (!search) return rest;
-    return rest.filter((p) =>
-      `${p.title} ${p.excerpt} ${p.author} ${p.category}`.toLowerCase().includes(search.toLowerCase()),
-    );
-  }, [rest, search]);
+    let out = rest;
+    if (category) out = out.filter((p) => p.category === category);
+    if (search) {
+      const q = search.toLowerCase();
+      out = out.filter((p) =>
+        `${p.title} ${p.excerpt} ${p.author} ${p.category}`.toLowerCase().includes(q),
+      );
+    }
+    return out;
+  }, [rest, search, category]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const safePage = Math.min(page, totalPages);
@@ -215,22 +223,27 @@ export default function AcademyBlogsPage() {
             <div className="mk-card">
               <h3 className="mk-kicker" style={{ color: 'var(--mk-text-faint)' }}>Categories</h3>
               <div className="flex flex-wrap gap-2 mt-4">
-                {CATEGORIES.map((c) => (
-                  <button
-                    key={c}
-                    type="button"
-                    className="px-3 py-1"
-                    style={{
-                      borderRadius: 'var(--mk-radius-pill)',
-                      border: '1px solid var(--mk-line)',
-                      background: 'var(--mk-surface-2)',
-                      fontSize: 'var(--mk-text-xs)',
-                      color: 'var(--mk-text-muted)',
-                    }}
-                  >
-                    {c}
-                  </button>
-                ))}
+                {CATEGORIES.map((c) => {
+                  const on = category === c;
+                  return (
+                    <button
+                      key={c}
+                      type="button"
+                      aria-pressed={on}
+                      onClick={() => { setCategory(on ? null : c); setPage(1); }}
+                      className="px-3 py-1 transition-colors"
+                      style={{
+                        borderRadius: 'var(--mk-radius-pill)',
+                        border: `1px solid ${on ? 'var(--mk-accent)' : 'var(--mk-line)'}`,
+                        background: on ? 'var(--mk-accent)' : 'var(--mk-surface-2)',
+                        fontSize: 'var(--mk-text-xs)',
+                        color: on ? '#ffffff' : 'var(--mk-text-muted)',
+                      }}
+                    >
+                      {c}
+                    </button>
+                  );
+                })}
               </div>
             </div>
 

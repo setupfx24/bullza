@@ -25,9 +25,7 @@ function isPublicPath(pathname: string | null): boolean {
     p === '/markets' ||
     p === '/account-types' ||
     p === '/how-it-works' ||
-    p === '/bonus' ||
     p.startsWith('/academy') ||
-    p.startsWith('/risk-management') ||
     p.startsWith('/products') ||
     p.startsWith('/services') ||
     p.startsWith('/company') ||

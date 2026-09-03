@@ -29,7 +29,7 @@ export const metadata: Metadata = {
 const GETTING_STARTED: FaqItem[] = [
   {
     q: 'What is the minimum deposit required to start trading?',
-    a: 'Only $50. A $50 first deposit unlocks the Standard live account or the IB partner account; ECN starts at $200. A free Demo account with $100,000 in virtual funds is also available — no commitment. Every first deposit also receives a 100% Welcome Bonus (up to $200).',
+    a: 'Only $50. A $50 first deposit unlocks the Standard live account or the IB partner account; ECN starts at $200. A free Demo account with $100,000 in virtual funds is also available — no commitment.',
   },
   {
     q: `How is ${BRAND_NAME} different from a traditional broker?`,
@@ -90,8 +90,7 @@ const GETTING_STARTED: FaqItem[] = [
 ];
 
 /* ── Funding ───────────────────────────────────────────────────────────
-   Sources: deposit-withdrawal policy §2, §4.3, §7, §8, §10;
-   home/data.ts FAQ[1] for the welcome bonus. */
+   Sources: deposit-withdrawal policy §2, §4.3, §7, §8, §10. */
 const FUNDING: FaqItem[] = [
   {
     q: 'Which deposit and withdrawal methods are supported?',
@@ -170,26 +169,26 @@ const FUNDING: FaqItem[] = [
       </>
     ),
   },
-  {
-    q: 'How do I get the 100% Welcome Bonus?',
-    a: 'The 100% Welcome Bonus is applied automatically to your first qualifying deposit — no promo code required. Deposit $100 → get a $100 bonus; deposit $200 → get a $200 bonus. The bonus is fully tradeable from the moment it lands in your account. See the /bonus page for the full tier breakdown.',
-  },
 ];
 
 /* ── Trading ───────────────────────────────────────────────────────────
    Sources: home/data.ts FAQ[4], FAQ[5], FAQ[6]. */
 const TRADING: FaqItem[] = [
   {
-    q: 'How does the Decentralized Exchange work?',
-    a: `${BRAND_NAME} DEX lets you trade directly from your own wallet with non-custodial, on-chain execution. You keep your private keys, your funds never leave your wallet, and every order is settled through smart contracts — no counterparty risk, no withdrawal queues. Connect MetaMask, WalletConnect, or any EVM-compatible wallet, sign the trade, and the swap clears on-chain in seconds.`,
+    q: 'Which currency pairs can I trade?',
+    a: `${BRAND_NAME} quotes major pairs such as EUR/USD, GBP/USD and USD/JPY, minor crosses including EUR/GBP and AUD/JPY, and exotic pairs across emerging markets. Stock indices, gold and silver, and major digital assets are available from the same account.`,
   },
   {
-    q: 'How do I insure my trades?',
-    a: `Trade Insurance is built into every position on ${BRAND_NAME}. Each open trade is policy-backed by on-chain insurance up to the policy limit. If the market moves against you beyond the defined threshold, the insured amount is paid out automatically by the smart-contract underwriter. The insurance does not cover market loss within the policy threshold, so always size positions to your own risk tolerance.`,
+    q: 'What spreads and leverage are available?',
+    a: 'Spreads start from 0.0 pips on ECN accounts and from 1.0 pip on Standard, with commission shown on the order ticket before you confirm. Leverage is adjustable up to 1:500 depending on account type and instrument. Higher leverage increases both potential gains and potential losses.',
   },
   {
-    q: 'How do I apply for the IB program?',
-    a: 'Visit Products → IB Referral and fill out the short partner application (name, country, email, phone, and a brief note about your audience). Our partner team reviews and activates accounts within 24 hours. Once approved you receive a unique referral link plus a marketing kit, and you start earning weekly per-lot commissions (up to $7 / lot at Platinum tier) on every trade your referrals place — for life.',
+    q: 'How is my order executed?',
+    a: 'Market orders are filled at the live quote with no dealing-desk intervention. Pending orders, stop-loss and take-profit levels are held server-side, so they stay active even when your browser is closed.',
+  },
+  {
+    q: 'How do I apply for the IB programme?',
+    a: 'Open the IB Referral page from the footer and complete the short partner application (name, country, email, phone, and a brief note about your audience). Our partner team reviews and activates accounts within 24 hours. Once approved you receive a unique referral link plus a marketing kit, and you earn weekly per-lot commissions on every trade your referrals place.',
   },
 ];
 
