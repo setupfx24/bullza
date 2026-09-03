@@ -418,7 +418,13 @@ export default function OrderPanel() {
           className={clsx(
             'min-h-0',
             isTradingTerminal
-              ? 'flex-1 overflow-y-auto overscroll-y-contain'
+              // flex-initial (grow 0 / shrink 1), not flex-1: the terminal
+              // rail is full-page height, and growing pushed the exec-price
+              // footer and BUY button to the very bottom with a dead gap
+              // above them (client 2026-09-03). Sized to its content the
+              // footer follows the form; it still shrinks and scrolls when
+              // the form is taller than the rail.
+              ? 'flex-initial overflow-y-auto overscroll-y-contain'
               : 'flex-1 overflow-y-auto min-h-0',
           )}
         >
