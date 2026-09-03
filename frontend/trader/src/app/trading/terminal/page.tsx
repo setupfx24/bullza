@@ -6,7 +6,7 @@ import dynamic from 'next/dynamic';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { clsx } from 'clsx';
 import { Maximize2, Minimize2, Search, ShieldCheck, X } from 'lucide-react';
-import { useUIStore, WATCHLIST_LAYOUT } from '@/stores/uiStore';
+import { useUIStore, RAIL_INSTRUMENTS_LAYOUT } from '@/stores/uiStore';
 import { TERMINAL_RESIZE, maxBottomPanelHeightPx } from '@/lib/terminalLayout';
 import PanelResizeHandle from '@/components/trading/PanelResizeHandle';
 import { useTradingStore, InstrumentInfo } from '@/stores/tradingStore';
@@ -15,7 +15,6 @@ import { sounds, unlockAudio } from '@/lib/sounds';
 import { getMarketStatus } from '@/lib/marketHours';
 import { setPersistedTradingAccountId, tradingTerminalUrl } from '@/lib/tradingNav';
 import Watchlist from '@/components/trading/Watchlist';
-import InstrumentsTable from '@/components/trading/InstrumentsTable';
 import OrderPanel from '@/components/trading/OrderPanel';
 import RiskCalculator from '@/components/trading/RiskCalculator';
 import OrderPanelSymbolPicker from '@/components/trading/OrderPanelSymbolPicker';
@@ -38,6 +37,8 @@ const MarketNewsPanel = dynamic(() => import('@/components/charts/MarketNewsPane
 });
 
 const ORDER_MIN = 250;
+/** Rail space the order ticket keeps when the instruments list is stacked above it. */
+const ORDER_TICKET_MIN_HEIGHT = 260;
 const ORDER_MAX = 560;
 const BOTTOM_MIN = 160;
 
@@ -55,20 +56,20 @@ export default function TradingTerminalPage() {
     setOrderPanelWidth,
     setBottomPanelHeight,
     toggleTerminalMarkets,
-    watchlistWidth,
-    setWatchlistWidth,
+    terminalInstrumentsHeight,
+    setTerminalInstrumentsHeight,
   } = useUIStore();
 
   useDocumentTitle();
 
   const [opW, setOpW] = useState(orderPanelWidth);
-  /** Left instruments panel width (persisted as watchlistWidth). */
-  const [wlW, setWlW] = useState(watchlistWidth);
+  /** Height of the instruments list stacked above the order ticket. */
+  const [instrH, setInstrH] = useState(terminalInstrumentsHeight);
   const [bpH, setBpH] = useState(bottomPanelHeight);
   const [isMobile, setIsMobile] = useState(false);
 
   /** Snapshot at pointer-down: stable clamps while store updates mid-drag. */
-  const layoutDragStartRef = useRef({ op: 0, bp: 0, wl: 0, vw: 0, colH: 0 });
+  const layoutDragStartRef = useRef({ op: 0, bp: 0, instr: 0, vw: 0, colH: 0 });
   const centerColumnRef = useRef<HTMLDivElement>(null);
   const bottomRestoreRef = useRef(320);
   const [activeSpace, setActiveSpace] = useState<TerminalSpaceId>('balanced');
@@ -85,7 +86,7 @@ export default function TradingTerminalPage() {
     layoutDragStartRef.current = {
       op: s.orderPanelWidth,
       bp: s.bottomPanelHeight,
-      wl: s.watchlistWidth,
+      instr: s.terminalInstrumentsHeight,
       vw: typeof window !== 'undefined' ? window.innerWidth : 0,
       colH: Math.max(120, col),
     };
@@ -106,20 +107,21 @@ export default function TradingTerminalPage() {
     [setOrderPanelWidth],
   );
 
-  /** Between the chart and the instruments panel (panel sits to the RIGHT
-      of the handle): drag left widens it. */
-  const onInstrumentsDrag = useCallback(
-    (dx: number) => {
-      const { wl, op, vw } = layoutDragStartRef.current;
-      const maxWl = Math.min(
-        WATCHLIST_LAYOUT.max,
-        vw - op - TERMINAL_RESIZE.handlesSlack - TERMINAL_RESIZE.chartMinWidth,
+  /** Inside the right rail, between the instruments list and the order
+      ticket below it: drag down grows the list. Clamped so the order
+      ticket always keeps a usable slice of the rail. */
+  const onInstrumentsHeightDrag = useCallback(
+    (dy: number) => {
+      const { instr, colH } = layoutDragStartRef.current;
+      const maxInstr = Math.min(
+        RAIL_INSTRUMENTS_LAYOUT.max,
+        Math.max(RAIL_INSTRUMENTS_LAYOUT.min, colH - ORDER_TICKET_MIN_HEIGHT),
       );
-      const next = Math.max(WATCHLIST_LAYOUT.min, Math.min(maxWl, wl - dx));
-      setWlW(next);
-      setWatchlistWidth(next);
+      const next = Math.max(RAIL_INSTRUMENTS_LAYOUT.min, Math.min(maxInstr, instr + dy));
+      setInstrH(next);
+      setTerminalInstrumentsHeight(next);
     },
-    [setWatchlistWidth],
+    [setTerminalInstrumentsHeight],
   );
 
   const onBottomDrag = useCallback(
@@ -138,13 +140,13 @@ export default function TradingTerminalPage() {
   }, [orderPanelWidth]);
 
   useEffect(() => {
-    setWlW(watchlistWidth);
-  }, [watchlistWidth]);
+    setInstrH(terminalInstrumentsHeight);
+  }, [terminalInstrumentsHeight]);
 
-  // NOTE: the old "auto-widen the rail to 55vw for the Markets view" effect
-  // is gone — the instruments panel is a permanent right-side neighbour of
-  // the order ticket now (client 2026-09-03), so widening the rail again
-  // would just re-squeeze the chart. terminalMarketsOpen still drives the
+  // NOTE: no auto-widen effect for the Markets view. The instruments list
+  // now opens INSIDE the right rail, stacked above the order ticket
+  // (client 2026-09-03), so the rail keeps its width and the chart is
+  // never re-squeezed. terminalMarketsOpen drives that stack plus the
   // left-rail button state and the symbol-search focus.
 
   useEffect(() => {
@@ -797,27 +799,6 @@ export default function TradingTerminalPage() {
             </div>
           </div>
 
-          {/* Instruments panel — lives on the RIGHT next to the order ticket
-              (client 2026-09-03: chart was squeezed between the left markets
-              list and the right rail; both trade panels now share the right
-              side so the chart anchors the full remaining width). Hidden
-              below lg where the mobile layout (separate branch above)
-              takes over. */}
-          <div className="hidden lg:block">
-            <PanelResizeHandle
-              axis="vertical"
-              hitSize={TERMINAL_RESIZE.handleHitPx}
-              onDragStart={snapshotLayout}
-              onDrag={onInstrumentsDrag}
-            />
-          </div>
-          <div
-            className="hidden lg:flex shrink-0 flex-col h-full min-h-0 overflow-hidden bg-bg-base border-l border-border-primary"
-            style={{ width: wlW }}
-          >
-            <InstrumentsTable />
-          </div>
-
           <PanelResizeHandle
             axis="vertical"
             hitSize={TERMINAL_RESIZE.handleHitPx}
@@ -863,9 +844,43 @@ export default function TradingTerminalPage() {
                 </div>
               </div>
             ) : (
-              <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
-                <OrderPanel />
-              </div>
+              <>
+                {/* Instruments stack — hidden while the order ticket is the
+                    only thing on the rail; the left-rail Markets button
+                    opens it ABOVE the ticket so picking a symbol never
+                    hides the ticket (client 2026-09-03). It stacks inside
+                    the rail rather than taking a column of its own, so it
+                    costs the chart no width and stays available at every
+                    desktop size (below 768px the mobile layout takes over). */}
+                {terminalMarketsOpen ? (
+                  <>
+                    <div
+                      className="flex shrink-0 flex-col min-h-0 overflow-hidden border-b border-border-primary"
+                      /* maxHeight (not just the drag clamp) keeps the ticket
+                         usable on short viewports: the persisted height can
+                         outlive the window it was chosen in. */
+                      style={{
+                        height: instrH,
+                        maxHeight: `calc(100% - ${ORDER_TICKET_MIN_HEIGHT}px)`,
+                      }}
+                    >
+                      <Watchlist
+                        variant="terminalRail"
+                        onExitMarkets={() => setTerminalMarketsOpen(false)}
+                      />
+                    </div>
+                    <PanelResizeHandle
+                      axis="horizontal"
+                      hitSize={TERMINAL_RESIZE.handleHitPx}
+                      onDragStart={snapshotLayout}
+                      onDrag={onInstrumentsHeightDrag}
+                    />
+                  </>
+                ) : null}
+                <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+                  <OrderPanel />
+                </div>
+              </>
             )}
           </div>
         </div>

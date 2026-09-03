@@ -16,6 +16,8 @@ interface UIState {
   sidebarCollapsed: boolean;
   /** Trading terminal: symbol list drawer under order panel. */
   terminalMarketsOpen: boolean;
+  /** Trading terminal: height (px) of the instruments list stacked ABOVE the order ticket. */
+  terminalInstrumentsHeight: number;
   /** Trading terminal: right rail shows TradingView live news timeline. */
   terminalNewsOpen: boolean;
 
@@ -29,6 +31,7 @@ interface UIState {
   setChartType: (ct: string) => void;
   setSidebarCollapsed: (v: boolean) => void;
   setTerminalMarketsOpen: (v: boolean) => void;
+  setTerminalInstrumentsHeight: (h: number) => void;
   toggleTerminalMarkets: () => void;
   setTerminalNewsOpen: (v: boolean) => void;
 }
@@ -39,6 +42,14 @@ export const WATCHLIST_LAYOUT = {
   max: 800,
   /** First visit: compact so rows are not one wide empty band between symbol and prices. */
   default: 400,
+} as const;
+
+/** Instruments list stacked above the order ticket in the right rail. */
+export const RAIL_INSTRUMENTS_LAYOUT = {
+  min: 180,
+  max: 900,
+  /** Tall enough to show ~7 rows without burying the order ticket. */
+  default: 340,
 } as const;
 
 const WATCHLIST_MIN_PX = WATCHLIST_LAYOUT.min;
@@ -60,6 +71,7 @@ export const useUIStore = create<UIState>()(
       chartType: 'candlestick',
       sidebarCollapsed: false,
       terminalMarketsOpen: false,
+      terminalInstrumentsHeight: RAIL_INSTRUMENTS_LAYOUT.default,
       terminalNewsOpen: false,
 
       setTheme: (t) => {
@@ -88,6 +100,13 @@ export const useUIStore = create<UIState>()(
       setChartType: (ct) => set({ chartType: ct }),
       setSidebarCollapsed: (v) => set({ sidebarCollapsed: v }),
       setTerminalMarketsOpen: (v) => set({ terminalMarketsOpen: v }),
+      setTerminalInstrumentsHeight: (h) =>
+        set({
+          terminalInstrumentsHeight: Math.max(
+            RAIL_INSTRUMENTS_LAYOUT.min,
+            Math.min(RAIL_INSTRUMENTS_LAYOUT.max, h),
+          ),
+        }),
       toggleTerminalMarkets: () =>
         set((s) => ({
           terminalMarketsOpen: !s.terminalMarketsOpen,
@@ -97,7 +116,7 @@ export const useUIStore = create<UIState>()(
     }),
     {
       name: STORAGE_KEY_UI,
-      version: 11,
+      version: 12,
       onRehydrateStorage: () => (rehydrated, err) => {
         if (err || !rehydrated || typeof window === 'undefined') return;
         if (window.innerWidth < 768) return;
@@ -135,6 +154,17 @@ export const useUIStore = create<UIState>()(
           v < 9
             ? false
             : Boolean((state as UIState & { terminalNewsOpen?: boolean }).terminalNewsOpen);
+        // v12: instruments moved from a permanent column into the right rail,
+        // stacked above the order ticket — seed its height for existing users.
+        const rawInstrH = (state as UIState & { terminalInstrumentsHeight?: number })
+          .terminalInstrumentsHeight;
+        const terminalInstrumentsHeight =
+          v < 12 || typeof rawInstrH !== 'number' || !Number.isFinite(rawInstrH)
+            ? RAIL_INSTRUMENTS_LAYOUT.default
+            : Math.max(
+                RAIL_INSTRUMENTS_LAYOUT.min,
+                Math.min(RAIL_INSTRUMENTS_LAYOUT.max, rawInstrH),
+              );
         const theme = state.theme ?? 'light';
         return {
           ...state,
@@ -143,6 +173,7 @@ export const useUIStore = create<UIState>()(
           orderPanelWidth: op,
           bottomPanelHeight: bp,
           terminalMarketsOpen,
+          terminalInstrumentsHeight,
           terminalNewsOpen,
         };
       },

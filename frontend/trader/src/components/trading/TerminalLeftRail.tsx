@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { BrandWordmark } from '@/components/layout/BrandWordmark';
 import {
   Search,
+  ListOrdered,
   LayoutTemplate,
   Newspaper,
   MessageCircle,
@@ -105,6 +106,16 @@ export default function TerminalLeftRail({
           onClick={onPanelsSelectOrder}
         >
           <LayoutTemplate size={17} strokeWidth={1.75} />
+        </RailBtn>
+        {/* Markets — opens the instrument list stacked above the order
+            ticket. Without this the list has no entry point: it is no
+            longer a permanent column (client 2026-09-03). */}
+        <RailBtn
+          title="Markets — instrument list"
+          active={terminalMarketsOpen && !chartExpanded && !terminalNewsOpen}
+          onClick={onToggleMarkets}
+        >
+          <ListOrdered size={17} strokeWidth={1.75} />
         </RailBtn>
         <RailBtn
           title="Live news â€” TradingView timeline"
