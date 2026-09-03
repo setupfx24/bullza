@@ -4,11 +4,13 @@ import { BRAND_LOGO, BRAND_NAME } from '@/lib/brand';
 
 import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import Link from 'next/link';
 import { motion, AnimatePresence, MotionConfig } from 'framer-motion';
 import { Eye, EyeOff, Loader2 } from 'lucide-react';
 import { useAuthStore } from '@/stores/authStore';
 import toast from 'react-hot-toast';
 import GoogleAuthButton from '@/components/auth/GoogleAuthButton';
+import { AuthLeftPanel } from '@/components/auth/AuthLeftPanel';
 // import ConnectWalletButton from '@/components/auth/ConnectWalletButton'; // Re-enable when wallet login goes live
 import PhoneInput from '@/components/forms/PhoneInput';
 import TurnstileWidget from '@/components/forms/TurnstileWidget';
@@ -26,17 +28,6 @@ const formVariants = {
   initial: { opacity: 0, y: 20 },
   animate: { opacity: 1, y: 0 },
   exit: { opacity: 0, y: -16 },
-};
-
-/* ── step config ── */
-const STEPS = [
-  { number: 1, label: 'Sign in to your account' },
-  { number: 2, label: 'Sign up your account' },
-];
-
-const LEFT_CONFIG: Record<number, { title: string; subtitle: string }> = {
-  1: { title: 'Welcome Back', subtitle: 'Sign in to continue where you left off.' },
-  2: { title: 'Get Started with Us', subtitle: 'Complete these easy steps to register your account.' },
 };
 
 /* ── Input Field ── */
@@ -122,9 +113,14 @@ function RegisterContent() {
   const [agreedToTerms, setAgreedToTerms] = useState(false);
 
   // Company / 'House' IB referral code, fetched once on mount. Powers the
-  // 'Apply' shortcut on the referral input so an unreferred signup can
-  // still claim the welcome bonus via the broker's own IB code.
+  // 'Apply' shortcut on the referral input so an unreferred signup still
+  // lands under the broker's own IB code.
   const [companyIbCode, setCompanyIbCode] = useState<string | null>(null);
+  /* Referral is optional and most signups have no code, so the field stays
+     folded behind a one-line link rather than occupying a labelled input
+     plus an Apply button plus two lines of helper text on first paint. It
+     opens on its own when a ?ref= link pre-filled a code. */
+  const [referralOpen, setReferralOpen] = useState(false);
 
   useEffect(() => {
     const ref = searchParams.get('ref');
@@ -153,7 +149,7 @@ function RegisterContent() {
       return;
     }
     setForm((prev) => ({ ...prev, referral_code: companyIbCode }));
-    toast.success(`Applied ${companyIbCode} — claim your 100% first-deposit bonus.`);
+    toast.success(`Applied ${companyIbCode} — house referral code added to your signup.`);
   };
 
   const update = (field: string, value: string) => {
@@ -231,14 +227,7 @@ function RegisterContent() {
     form.last_name,
   ]);
   const strength = pwCheck.score;
-
-  /* ── Step change ── */
-  const handleStepClick = (step: number) => {
-    if (step === 1) {
-      router.push('/auth/login');
-      return;
-    }
-  };
+  const missingRequirements = PASSWORD_REQUIREMENTS.filter((r) => !pwCheck.checks[r.id]);
 
   return (
     <MotionConfig reducedMotion="always">
@@ -246,43 +235,10 @@ function RegisterContent() {
       <div className="auth-card-wrapper">
         <div className="auth-card">
           {/* ── LEFT PANEL ── */}
-          <motion.div
-            className="auth-left"
-            initial={{ x: -60, opacity: 0 }}
-            animate={{ x: 0, opacity: 1 }}
-            transition={{ duration: 0.7, ease: 'easeOut' }}
-          >
-            <motion.div
-              className="auth-left__bg"
-              animate={{ scale: [1, 1.18, 1], y: [0, -20, 0] }}
-              transition={{ duration: 6, repeat: Infinity, ease: 'easeInOut' }}
-            />
-            <div className="auth-left__mandala" aria-hidden="true" />
-            <div className="auth-left__content">
-              <motion.h1 className="auth-left__title" {...fadeUp(0.3)}>
-                {LEFT_CONFIG[2].title}
-              </motion.h1>
-              <motion.p className="auth-left__subtitle" {...fadeUp(0.4)}>
-                {LEFT_CONFIG[2].subtitle}
-              </motion.p>
-              <div className="auth-left__steps">
-                {STEPS.map((s, i) => (
-                  <motion.div key={s.number} {...fadeUp(0.45 + i * 0.08)}>
-                    <div
-                      className={`auth-step ${s.number === 2 ? 'auth-step--active' : 'auth-step--inactive'}`}
-                      onClick={() => handleStepClick(s.number)}
-                    >
-                      <span className="auth-step__num">{s.number}</span>
-                      <span className="auth-step__label">{s.label}</span>
-                    </div>
-                  </motion.div>
-                ))}
-              </div>
-            </div>
-          </motion.div>
+          <AuthLeftPanel />
 
           {/* ── RIGHT PANEL ── */}
-          <div className="auth-right">
+          <div className="auth-right auth-right--top">
             <AnimatePresence mode="wait">
               <motion.div
                 key="signup"
@@ -294,22 +250,22 @@ function RegisterContent() {
                 style={{ width: '100%', maxWidth: 380 }}
               >
                 <form className="auth-form" onSubmit={handleSubmit} noValidate>
-                  <motion.div {...fadeUp(0.25)} className="flex justify-center mb-1">
+                  <motion.div {...fadeUp(0.25)} className="mb-1">
                     {BRAND_LOGO ? (
-                      <img
-                        src={BRAND_LOGO}
-                        alt={BRAND_NAME}
-                        className="w-12 h-12 object-contain"
-                      />
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={BRAND_LOGO} alt={BRAND_NAME} className="h-9 w-auto object-contain" />
                     ) : (
-                      <span className="text-2xl font-black tracking-tight text-text-primary select-none">
+                      <span className="text-xl font-black tracking-tight text-text-primary select-none">
                         {BRAND_NAME}
                       </span>
                     )}
                   </motion.div>
                   <motion.div {...fadeUp(0.3)}>
-                    <h2 className="auth-form__title">Sign Up Account</h2>
-                    <p className="auth-form__subtitle">Enter your personal data to create your account.</p>
+                    <h2 className="auth-form__title">Get Started</h2>
+                    <p className="auth-form__subtitle">
+                      Already have an account?{' '}
+                      <Link href="/auth/login" className="auth-inline-link">Sign in</Link>
+                    </p>
                   </motion.div>
 
                   <motion.div className="auth-name-row" {...fadeUp(0.37)}>
@@ -358,60 +314,55 @@ function RegisterContent() {
 
                   <motion.div {...fadeUp(0.56)}>
                     {/*
-                     * Referral input + Apply shortcut. Apply pulls the
-                     * company / house IB code so an unreferred user can
-                     * still claim the welcome bonus. If they arrived via
-                     * ?ref=<friend-code>, that's already pre-filled by
-                     * the useEffect above and Apply is unnecessary.
+                     * Referral input + Apply shortcut, folded away until
+                     * asked for. Apply pulls the company / house IB code so
+                     * an unreferred user is still attributed. A ?ref=<code>
+                     * link pre-fills the input via the useEffect above,
+                     * which also forces the row open.
                      */}
-                    <div className="auth-field">
-                      <label className="auth-field__label">
-                        Referral Code (optional)
-                      </label>
-                      <div className="auth-field__wrap" style={{ display: 'flex', gap: '0.5rem' }}>
-                        <input
-                          className="auth-field__input"
-                          type="text"
-                          placeholder="Enter code"
-                          value={form.referral_code}
-                          onChange={(e) => update('referral_code', e.target.value)}
-                          style={{ flex: 1 }}
-                        />
-                        <button
-                          type="button"
-                          onClick={applyCompanyIb}
-                          disabled={!companyIbCode && !form.referral_code}
-                          className="auth-field__icon"
-                          style={{
-                            position: 'static',
-                            transform: 'none',
-                            padding: '0 0.9rem',
-                            height: 'auto',
-                            background: 'rgba(232, 93, 61,0.18)',
-                            color: '#E85D3D',
-                            border: '1px solid rgba(232, 93, 61,0.45)',
-                            borderRadius: '8px',
-                            fontWeight: 600,
-                            fontSize: '0.78rem',
-                            letterSpacing: '0.04em',
-                            textTransform: 'uppercase',
-                            cursor: companyIbCode ? 'pointer' : 'not-allowed',
-                            opacity: companyIbCode ? 1 : 0.4,
-                          }}
-                          title={
-                            companyIbCode
-                              ? 'Apply the platform welcome code to claim a 100% bonus on your first deposit'
-                              : 'No house code configured'
-                          }
-                        >
-                          Apply
-                        </button>
+                    {!referralOpen && !form.referral_code ? (
+                      <button
+                        type="button"
+                        className="auth-reveal"
+                        onClick={() => setReferralOpen(true)}
+                      >
+                        Have a referral code?
+                      </button>
+                    ) : (
+                      <div className="auth-field">
+                        <label className="auth-field__label">
+                          Referral Code (optional)
+                        </label>
+                        <div className="auth-field__wrap" style={{ display: 'flex', gap: '0.5rem' }}>
+                          <input
+                            className="auth-field__input"
+                            type="text"
+                            placeholder="Enter code"
+                            value={form.referral_code}
+                            onChange={(e) => update('referral_code', e.target.value)}
+                            style={{ flex: 1 }}
+                            /* Focus only when the trader opened the row
+                               themselves — a ?ref= link renders it already
+                               open, and stealing focus on load would scroll
+                               the form past the name fields. */
+                            autoFocus={referralOpen}
+                          />
+                          <button
+                            type="button"
+                            onClick={applyCompanyIb}
+                            className="auth-apply-btn"
+                            disabled={!companyIbCode}
+                            title={
+                              companyIbCode
+                                ? 'Apply the platform house referral code'
+                                : 'No house code configured'
+                            }
+                          >
+                            Apply
+                          </button>
+                        </div>
                       </div>
-                      <span className="auth-field__helper">
-                        Apply to get <strong style={{ color: '#E85D3D' }}>100% bonus on your first deposit</strong>.
-                        Already from a friend&apos;s link? Their code is filled in for you.
-                      </span>
-                    </div>
+                    )}
                   </motion.div>
 
                   <motion.div {...fadeUp(0.62)}>
@@ -422,7 +373,6 @@ function RegisterContent() {
                       value={form.password}
                       onChange={(e) => update('password', e.target.value)}
                       error={errors.password}
-                      helper="Use 8+ characters with a mix of upper, lower, number, and symbol."
                       rightIcon={showPass ? <Eye size={18} /> : <EyeOff size={18} />}
                       onIconClick={() => setShowPass(!showPass)}
                     />
@@ -445,21 +395,14 @@ function RegisterContent() {
                         >
                           {pwCheck.label}
                         </div>
-                        {/* Requirement checklist — only render until the
-                            password is acceptable so it disappears once the
-                            trader has picked a strong enough one. */}
-                        {!pwCheck.acceptable && (
-                          <ul style={{ marginTop: 6, padding: 0, listStyle: 'none', fontSize: 11, lineHeight: 1.6 }}>
-                            {PASSWORD_REQUIREMENTS.map((req) => {
-                              const ok = pwCheck.checks[req.id];
-                              return (
-                                <li key={req.id} style={{ color: ok ? '#22c55e' : '#9ca3af' }}>
-                                  <span style={{ marginRight: 6 }}>{ok ? '✓' : '○'}</span>
-                                  {req.label}
-                                </li>
-                              );
-                            })}
-                          </ul>
+                        {/* Only what is still missing. The six-line ✓/○
+                            checklist this replaced restated every rule on
+                            every keystroke, including the ones already
+                            satisfied — four fifths of it was noise. */}
+                        {!pwCheck.acceptable && missingRequirements.length > 0 && (
+                          <p className="auth-field__helper" style={{ marginTop: 4 }}>
+                            Still needed: {missingRequirements.map((r) => r.label).join(' · ')}
+                          </p>
                         )}
                       </>
                     )}
@@ -572,10 +515,6 @@ function RegisterContent() {
                     </button>
                   </motion.div>
 
-                  <motion.p className="auth-footer" {...fadeUp(0.78)}>
-                    Already have an account?{' '}
-                    <a onClick={() => router.push('/auth/login')}>Log in</a>
-                  </motion.p>
                 </form>
               </motion.div>
             </AnimatePresence>

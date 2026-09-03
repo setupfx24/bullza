@@ -22,7 +22,7 @@ import { BRAND_NAME } from '@/lib/brand';
 const COVER_BULLETS = [
   'Higher policy caps for verified accounts',
   'Same one-click activation, no paperwork',
-  'Stackable with the welcome bonus on first deposits',
+  'Cover applies from your very first funded trade',
 ];
 const COVER_TIERS = [
   {
@@ -56,15 +56,13 @@ export default function InsurancePage() {
         secondary={{ label: 'See Coverage Tiers', href: '#coverage' }}
       />
 
-      {/* Hero banner */}
+      {/* Hero banner. The previous image came from the cloned site and was
+          deleted with its other assets; this reserves the same footprint
+          until Bullza artwork replaces it. */}
       <Section>
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src="/images/insurance_banner1.png"
-          alt={`${BRAND_NAME} Trade Insurance — protect every position`}
-          className="w-full max-h-[420px] object-cover"
-          style={{ borderRadius: 'var(--mk-radius-lg)', border: '1px solid var(--mk-line)' }}
-        />
+        <div className="mk-media mk-media--ratio-21x9">
+          Trade insurance — 2560×1100
+        </div>
       </Section>
 
       {/* Features */}

@@ -181,17 +181,12 @@ export default function ReferralPage() {
               <Link href="#tiers" className="mk-btn mk-btn--ghost">See Payouts</Link>
             </div>
           </div>
-          {/* Referral illustration — branded artwork dropped by the client. */}
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src="/images/refer_banner.png"
-            alt="Referral program illustration"
-            className="w-full min-h-[260px] max-h-[340px] object-cover"
-            style={{
-              borderRadius: 'var(--mk-radius-lg)',
-              border: '1px solid var(--mk-accent-line)',
-            }}
-          />
+          {/* Reserved illustration area. The previous artwork came from the
+              cloned site and was deleted with the rest of its images, so
+              this holds the exact footprint until Bullza artwork exists. */}
+          <div className="mk-media mk-media--ratio-3x2">
+            Referral programme — 1120×740
+          </div>
         </div>
       </Section>
 

@@ -32,6 +32,25 @@ const PROTECTED_PREFIXES = [
   '/insurance', '/risk-calculator', '/more', '/support', '/trading',
 ];
 
+// Public marketing pages that sit UNDER a protected prefix.
+//
+// `/trading` and `/accounts` above guard the authenticated app (the
+// terminal, the account list), but the marketing site also publishes
+// per-instrument and per-account-type landing pages beneath those same
+// paths. Prefix matching captured them, so seven public pages redirected
+// logged-out visitors to /auth/login — including four linked from the
+// footer. Checked before isProtected(); exact matches only, so nothing
+// deeper (e.g. /accounts/<uuid>) is exposed.
+const PUBLIC_EXACT = new Set<string>([
+  '/trading/forex',
+  '/trading/indices',
+  '/trading/commodities',
+  '/trading/crypto',
+  '/accounts/standard',
+  '/accounts/pro',
+  '/accounts/demo',
+]);
+
 // Must match ACCESS_TOKEN_COOKIE_NAME / REFRESH_TOKEN_COOKIE_NAME in
 // backend/packages/common/src/config.py. Either cookie counts: an expired
 // access token with a live refresh cookie is a recoverable session.
@@ -48,6 +67,7 @@ function isNeutral(path: string): boolean {
 }
 
 function isProtected(path: string): boolean {
+  if (PUBLIC_EXACT.has(path)) return false;
   return PROTECTED_PREFIXES.some((p) => path === p || path.startsWith(p + '/'));
 }
 

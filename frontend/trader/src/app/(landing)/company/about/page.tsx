@@ -1,230 +1,186 @@
-import Link from 'next/link';
-import {
-  Users, Globe, Award, TrendingUp, Wallet, Zap, Handshake, Moon,
-} from 'lucide-react';
-import { Section, SectionHeading, PageHero, FeatureGrid, CtaBanner } from '@/marketing/components';
+import Image from 'next/image';
+import { Crosshair, RefreshCw, Sparkles } from 'lucide-react';
+import { CtaBanner } from '@/marketing/components';
 import { BRAND_NAME } from '@/lib/brand';
 
 /**
- * Company → About. Restyled onto the shared marketing design system;
- * every line of copy is carried over from the previous landing page.
+ * Company → About Us.
+ *
+ * Laid out to the 2026-09-02 reference: an inset dark hero card with the
+ * page title over it, a "Principles" band (two-tone statement + three
+ * cards with dark icon tiles), a team grid, and the shared closing CTA.
+ * Four sections total, as requested.
+ *
+ * The previous version also carried a stats row and a full account-tier
+ * ladder. Both are dropped here: the ladder duplicated /account-types
+ * verbatim, and About is not where a visitor compares deposits.
  */
 
-const STATS = [
-  { value: '15+', label: 'Years in Business' },
-  { value: '50,000+', label: 'Active Traders' },
-  { value: '150+', label: 'Countries Served' },
-  { value: '2.3B+', label: 'Daily Trading Volume' },
+const PRINCIPLES = [
+  {
+    icon: Crosshair,
+    title: 'Transparency',
+    body: 'Spreads, commission and required margin are shown on the order ticket before you confirm.',
+  },
+  {
+    icon: RefreshCw,
+    title: 'Reliability',
+    body: 'Orders are held server-side and keep working through volatile sessions, whether or not you are signed in.',
+  },
+  {
+    icon: Sparkles,
+    title: 'Focus',
+    body: 'One platform, one account, every device — built for currency trading rather than bolted together.',
+  },
 ];
 
-const ACCOUNT_TYPES = [
-  {
-    icon: Wallet,
-    name: 'Standard',
-    min: '$50',
-    tagline: 'Designed for new traders',
-    points: ['Competitive spreads from 1.1 pips', 'Zero commission', 'Full platform access', '24/7 multilingual support'],
-  },
-  {
-    icon: Zap,
-    name: 'ECN',
-    min: '$200',
-    tagline: 'Raw spreads for serious traders',
-    popular: true,
-    points: ['Raw spreads from 0.0 pips', 'Direct liquidity access', 'Ultra-low commission per lot', 'Scalping and algo trading allowed'],
-  },
-  {
-    icon: Handshake,
-    name: 'IB',
-    min: '$50',
-    tagline: 'For partners and introducing brokers',
-    points: ['Lifetime per-lot commissions', 'Multi-tier earnings', 'Marketing kit and dashboard', 'Dedicated partner manager'],
-  },
-  {
-    icon: Moon,
-    name: 'Swap',
-    min: '$200',
-    tagline: 'Sharia-compliant · Swap-free',
-    points: ['Zero overnight swap charges', 'Sharia-compliant trading', 'Full platform & instrument access', 'Hold positions indefinitely'],
-  },
+/**
+ * Team grid. Deliberately role-only: we have no roster to publish, and
+ * inventing names and headshots for a brokerage's "our team" section
+ * would be fabricating credibility. Swap in real people and portraits
+ * when they exist — the layout is already sized for them.
+ */
+/* Sources are 1254×1254 — square, exactly the ratio the slot reserved. */
+const TEAM = [
+  { role: 'Trading Operations', body: 'Execution, pricing and market coverage.',           image: '/images/about_card1.png' },
+  { role: 'Client Support',     body: 'Account opening, funding and day-to-day questions.', image: '/images/about_card2.png' },
+  { role: 'Technology',         body: 'Platform, infrastructure and market data.',          image: '/images/about_card3.png' },
 ];
 
 export default function AboutUsPage() {
   return (
     <main>
-      <PageHero
-        kicker={`About ${BRAND_NAME}`}
-        title={`Who We Are — ${BRAND_NAME}`}
-        lead="A globally regulated forex and CFD broker — and a decentralized exchange with on-chain insured trades — committed to transparency, innovation, and excellence."
-        primary={{ label: 'Open Account', href: '/auth/register' }}
-        secondary={{ label: 'Compare All Accounts', href: '/account-types' }}
-      />
+      {/* ── Hero: inset dark card with the title over it ──────────────── */}
+      <section style={{ paddingTop: 'clamp(5.5rem, 4rem + 5vw, 7.5rem)' }}>
+        <div className="mk-container">
+          {/* The banner alone — no overlaid title. The artwork already
+              carries the bullza wordmark across the middle of the frame,
+              so a headline on top of it read as the brand stated twice.
+              The scrim that used to sit here existed only to keep that
+              headline legible, so it went with it.
 
-      {/* Story + headline numbers */}
-      <Section raised>
-        <div className="flex flex-col gap-6 mx-auto max-w-4xl">
-          <p className="mk-lead">
-            Founded in 2010, {BRAND_NAME} is a globally regulated forex and CFD broker headquartered at
-            Office 23US, 18 Young St, UNIT LGE 1/1, Edinburgh EH2 4JB, Scotland, and a decentralized
-            exchange offering on-chain insured trades and non-custodial wallet trading. With over
-            500,000 clients across 150+ countries, we&apos;ve built our reputation on transparency,
-            speed, and trust.
-          </p>
-          <p className="mk-lead">
-            Our mission is to democratize access to global financial markets by providing cutting-edge
-            technology, competitive pricing, and world-class support. Whether you&apos;re a beginner
-            taking your first steps in trading or a seasoned professional, {BRAND_NAME} provides the
-            tools, platforms, and expertise you need to succeed.
-          </p>
+              The <h1> stays for screen readers and search engines: a page
+              with no level-one heading is a real accessibility defect, and
+              this is the only h1 on the page — everything below is h2. */}
+          <h1 className="sr-only">About {BRAND_NAME}</h1>
+          <div
+            className="relative overflow-hidden"
+            style={{
+              background: 'var(--mk-ink)',
+              borderRadius: 'var(--mk-radius-lg)',
+              minHeight: 'clamp(18rem, 12rem + 22vw, 30rem)',
+            }}
+          >
+            <Image
+              src="/images/about banner.png"
+              alt={`${BRAND_NAME} brand banner`}
+              fill
+              priority
+              sizes="(max-width: 1360px) 100vw, 1280px"
+              className="object-cover"
+            />
+          </div>
         </div>
+      </section>
 
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-5 mt-12">
-          {STATS.map((s) => (
-            <div key={s.label} className="mk-card text-center">
-              <div
-                className="font-extrabold"
-                style={{ fontSize: 'var(--mk-text-h2)', color: 'var(--mk-accent)', lineHeight: 1.1 }}
-              >
-                {s.value}
-              </div>
-              <div
-                className="mt-2"
-                style={{
-                  fontSize: 'var(--mk-text-label)',
-                  letterSpacing: 'var(--mk-tracking-label)',
-                  textTransform: 'uppercase',
-                  color: 'var(--mk-text-faint)',
-                }}
-              >
-                {s.label}
-              </div>
-            </div>
-          ))}
-        </div>
-      </Section>
+      {/* ── Principles ────────────────────────────────────────────────── */}
+      <section className="mk-section">
+        <div className="mk-container">
+          <span className="mk-badge">Principles</span>
 
-      {/* Mission & vision */}
-      <Section>
-        <SectionHeading kicker="Purpose" title="Our Mission & Vision" />
-        <div className="grid md:grid-cols-2 gap-5 mt-12">
-          <article className="mk-card mk-card--hover flex flex-col gap-3">
-            <span
-              className="inline-flex h-11 w-11 items-center justify-center rounded-xl shrink-0"
-              style={{ background: 'var(--mk-accent-soft)', color: 'var(--mk-accent)' }}
-            >
-              <Award size={20} />
+          {/* Two-tone statement: the emphasis carries in ink, the
+              connective copy drops to muted — as in the reference. */}
+          <p
+            className="mk-display"
+            style={{
+              marginTop: 'var(--mk-space-5)',
+              maxWidth: '24ch',
+              fontSize: 'clamp(1.6rem, 1.1rem + 2.2vw, 2.75rem)',
+              lineHeight: 1.18,
+              letterSpacing: '-0.028em',
+              color: 'var(--mk-text-muted)',
+            }}
+          >
+            <span style={{ color: 'var(--mk-text)' }}>{BRAND_NAME} is built on a simple idea:</span>{' '}
+            trading should feel clear, not complicated.{' '}
+            <span style={{ color: 'var(--mk-text)' }}>
+              We focus on execution, pricing and the conditions that decide a trade.
             </span>
-            <h3 className="mk-h3">Our Mission</h3>
-            <p className="mk-body">
-              To empower traders worldwide with transparent, reliable, and innovative trading solutions
-              that enable them to achieve their financial goals with confidence.
-            </p>
-          </article>
-          <article className="mk-card mk-card--hover flex flex-col gap-3">
-            <span
-              className="inline-flex h-11 w-11 items-center justify-center rounded-xl shrink-0"
-              style={{ background: 'var(--mk-accent-soft)', color: 'var(--mk-accent)' }}
-            >
-              <TrendingUp size={20} />
-            </span>
-            <h3 className="mk-h3">Our Vision</h3>
-            <p className="mk-body">
-              To become the world&apos;s most trusted and technologically advanced trading platform,
-              setting new standards for excellence in the financial services industry.
-            </p>
-          </article>
-        </div>
+          </p>
 
-        <FeatureGrid
-          className="mt-5"
-          columns={3}
-          items={[
-            {
-              icon: Users,
-              title: 'Client-Focused',
-              body: 'Your success is our priority. We’re committed to providing exceptional service and support.',
-            },
-            {
-              icon: Globe,
-              title: 'Global Reach',
-              body: 'Serving traders in 150+ countries with localized support and multilingual platforms.',
-            },
-            {
-              icon: Award,
-              title: 'Award-Winning',
-              body: 'Recognized by industry leaders for excellence in trading technology and customer service.',
-            },
-          ]}
-        />
-      </Section>
-
-      {/* Account ladder */}
-      <Section raised>
-        <SectionHeading
-          kicker="Accounts"
-          title="Account Types for Every Trader"
-          lead="Start small with a Standard account, scale up to ECN raw spreads, partner with us through the IB program, or hold positions overnight on the swap-free Swap account — same platform, same execution, different conditions."
-        />
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mt-12">
-          {ACCOUNT_TYPES.map((a) => (
-            <article
-              key={a.name}
-              className="mk-card mk-card--hover flex flex-col gap-3"
-              style={a.popular ? { borderColor: 'var(--mk-accent-line)' } : undefined}
-            >
-              {a.popular && (
+          <div
+            className="grid grid-cols-1 sm:grid-cols-3"
+            style={{ gap: 'var(--mk-space-5)', marginTop: 'var(--mk-space-8)' }}
+          >
+            {PRINCIPLES.map(({ icon: Icon, title, body }) => (
+              <article key={title} className="mk-card flex flex-col" style={{ gap: 'var(--mk-space-5)' }}>
                 <span
-                  className="self-start rounded-full px-2.5 py-1 font-bold uppercase"
+                  className="inline-flex h-11 w-11 shrink-0 items-center justify-center"
                   style={{
-                    background: 'var(--mk-accent)',
-                    color: '#fff',
-                    fontSize: '10px',
-                    letterSpacing: '0.12em',
+                    background: 'var(--mk-ink)',
+                    color: 'var(--mk-text-invert)',
+                    borderRadius: 'var(--mk-radius-sm)',
                   }}
+                  aria-hidden
                 >
-                  Most Popular
+                  <Icon size={19} />
                 </span>
-              )}
-              <span
-                className="inline-flex h-11 w-11 items-center justify-center rounded-xl shrink-0"
-                style={{ background: 'var(--mk-accent-soft)', color: 'var(--mk-accent)' }}
-              >
-                <a.icon size={20} />
-              </span>
-              <div>
-                <h3 className="mk-h3">{a.name}</h3>
-                <div
-                  className="font-extrabold"
-                  style={{ color: 'var(--mk-accent)', fontSize: 'var(--mk-text-h3)' }}
-                >
-                  {a.min}
+                <div className="flex flex-col" style={{ gap: 'var(--mk-space-2)' }}>
+                  <h3 className="mk-h3">{title}</h3>
+                  <p className="mk-body" style={{ fontSize: 'var(--mk-text-sm)' }}>{body}</p>
                 </div>
-                <p className="mk-body" style={{ fontSize: 'var(--mk-text-sm)' }}>{a.tagline}</p>
+              </article>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── Our team ──────────────────────────────────────────────────── */}
+      <section className="mk-section mk-section--raised">
+        <div className="mk-container">
+          <span className="mk-badge">Our Team</span>
+
+          <h2
+            className="mk-h2"
+            style={{ marginTop: 'var(--mk-space-5)', maxWidth: '20ch' }}
+          >
+            The people behind your trading environment
+          </h2>
+
+          <div
+            className="grid grid-cols-1 sm:grid-cols-3"
+            style={{ gap: 'var(--mk-space-5)', marginTop: 'var(--mk-space-7)' }}
+          >
+            {TEAM.map(({ role, body, image }) => (
+              <div key={role} className="flex flex-col" style={{ gap: 'var(--mk-space-4)' }}>
+                {/* Decorative — the role heading right below names the card. */}
+                <div
+                  className="relative w-full overflow-hidden"
+                  style={{ aspectRatio: '1 / 1', borderRadius: 'var(--mk-radius)' }}
+                >
+                  <Image
+                    src={image}
+                    alt=""
+                    aria-hidden
+                    fill
+                    sizes="(max-width: 640px) 100vw, 33vw"
+                    className="object-cover"
+                  />
+                </div>
+                <div className="flex flex-col" style={{ gap: 'var(--mk-space-1)' }}>
+                  <h3 className="mk-h3">{role}</h3>
+                  <p className="mk-body" style={{ fontSize: 'var(--mk-text-sm)' }}>{body}</p>
+                </div>
               </div>
-              <ul className="flex flex-col gap-2 mt-1">
-                {a.points.map((p) => (
-                  <li key={p} className="flex items-start gap-2 mk-body" style={{ fontSize: 'var(--mk-text-sm)' }}>
-                    <span
-                      className="mt-2 h-1.5 w-1.5 rounded-full shrink-0"
-                      style={{ background: 'var(--mk-accent)' }}
-                    />
-                    <span>{p}</span>
-                  </li>
-                ))}
-              </ul>
-            </article>
-          ))}
+            ))}
+          </div>
         </div>
-        <div className="text-center mt-10">
-          <Link href="/account-types" className="mk-btn mk-btn--ghost">Compare All Accounts</Link>
-        </div>
-      </Section>
+      </section>
 
       <CtaBanner
-        title={`Join the ${BRAND_NAME} Family`}
-        lead="Experience the difference of trading with a broker that puts your success first."
-        primary={{ label: 'Open Account Now', href: '/auth/register' }}
-        secondary={{ label: 'Contact Us', href: '/company/contact' }}
+        title="Trade Global Markets with Confidence"
+        lead="Open an account and access the currency markets on a platform built for professional trading."
+        primary={{ label: 'Start Trading', href: '/auth/register' }}
       />
     </main>
   );

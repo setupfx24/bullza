@@ -23,7 +23,7 @@ interface Pdf {
 
 const PDFS: Pdf[] = [
   { id: 'p1', title: 'The Beginner Forex Handbook',          description: 'Pip basics, lot sizing, margin, leverage and your first 30 days.', pages: 42, size: '3.1 MB', category: 'Guides'   },
-  { id: 'p2', title: 'Risk Management Playbook',             description: 'Position sizing, stop-loss placement, and the math behind the 1% rule.', pages: 28, size: '1.8 MB', category: 'Guides'   },
+  { id: 'p2', title: 'Position Sizing Playbook',             description: 'Position sizing, stop-loss placement, and the math behind the 1% rule.', pages: 28, size: '1.8 MB', category: 'Guides'   },
   { id: 'p3', title: 'Advanced Price Action Patterns',       description: 'Breakouts, retests, double tops, head & shoulders — high-probability setups.', pages: 56, size: '5.4 MB', category: 'Guides'   },
   { id: 'p4', title: 'Crypto Trading: 0 → Pro',              description: 'BTC market structure, alt rotation, on-chain signals, and tax basics.', pages: 78, size: '6.9 MB', category: 'E-books'  },
   { id: 'p5', title: 'Algorithmic Trading 101',              description: 'Python basics, backtesting, paper trading, and going live with capital.', pages: 64, size: '4.7 MB', category: 'E-books'  },

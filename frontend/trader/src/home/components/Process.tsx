@@ -10,9 +10,9 @@ import { BRAND_NAME } from '@/lib/brand';
 /* Three steps only — the account tiers / "choose your plan" step was
    dropped with the pricing section the client asked us to remove. */
 const STEPS = [
-  { n: 1, title: 'Register', body: 'Complete our secure online application in minutes.' },
-  { n: 2, title: 'Fund',     body: 'Choose from multiple fee-free deposit options.' },
-  { n: 3, title: 'Trade',    body: `Access the world's largest markets directly from your ${BRAND_NAME} account.` },
+  { n: 1, title: 'Open an Account', body: 'Register and complete verification to activate live trading.' },
+  { n: 2, title: 'Fund',            body: 'Deposit by bank transfer, card, e-wallet or crypto.' },
+  { n: 3, title: 'Trade',           body: `Trade major, minor and exotic currency pairs from your ${BRAND_NAME} account.` },
 ];
 
 export function Process() {
@@ -21,7 +21,7 @@ export function Process() {
       <SectionHeading
         kicker="How It Works"
         title="Start trading in three steps"
-        lead="From signup to your first live position — no paperwork, no hold-ups, no surprises."
+        lead="From registration to your first live position on the currency markets."
       />
 
       <div
@@ -61,11 +61,11 @@ export function Process() {
         style={{ gap: 'var(--mk-space-3)', marginTop: 'var(--mk-space-7)' }}
       >
         <Link href={SIGNUP_HREF} className="mk-btn mk-btn--primary">
-          Open an account
+          Start Trading
           <ArrowUpRight size={16} />
         </Link>
-        <Link href="/how-it-works" className="mk-btn mk-btn--ghost">
-          Read the full walkthrough
+        <Link href="/markets" className="mk-btn mk-btn--ghost">
+          Explore Markets
         </Link>
       </div>
     </Section>

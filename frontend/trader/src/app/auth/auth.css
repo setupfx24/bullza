@@ -3,55 +3,53 @@
    ══════════════════════════════════════════════ */
 
 :root {
-  --auth-bg: #08090b;
-  --auth-input-bg: #14151a;
-  --auth-border: #232428;
-  --auth-accent: #E85D3D;        /* brand accent */
-  --auth-accent-light: #F08063;
-  --auth-accent-dark: #C9482D;
-  --auth-text: #ffffff;
-  --auth-muted: #8a8a92;
+  /* 2026-09-01 redesign — light institutional skin, matching the
+     marketing site's tokens in src/marketing/tokens.css. */
+  --auth-bg: #ffffff;
+  --auth-input-bg: #ffffff;
+  --auth-border: rgba(11, 11, 12, 0.14);
+  --auth-accent: #e32219;        /* action red */
+  --auth-accent-light: #f0342b;
+  --auth-accent-dark: #c11a12;
+  --auth-text: #0b0b0c;
+  --auth-muted: #5b6069;
   --auth-radius-md: 12px;
   --auth-radius-lg: 16px;
 }
 
 /* ── OUTER WRAPPER — centers the card ── */
+/* Full-bleed two-column split: artwork on the left, form on the right.
+   This replaced a centred rounded card floating on a grey page — the
+   card's own left panel was a gradient, so half the screen was spent on
+   decoration that said nothing about the product. */
 .auth-wrapper {
   display: flex;
-  align-items: center;
-  justify-content: center;
+  align-items: stretch;
+  justify-content: stretch;
   min-height: 100vh;
   height: 100vh;
   width: 100%;
-  padding: 24px;
-  background: #111111 !important;
-  color: #ffffff;
-  color-scheme: dark;
+  padding: 0;
+  background: #ffffff !important;
+  color: var(--auth-text);
+  color-scheme: light;
   overflow: hidden;
 }
 
 .auth-wrapper *, .auth-wrapper *::before, .auth-wrapper *::after {
-  color-scheme: dark;
+  color-scheme: light;
 }
 
 
 .auth-card-wrapper {
   position: relative;
   width: 100%;
-  max-width: 1080px;
-  height: min(92vh, 780px);
-  border-radius: 24px;
-  padding: 1px;
-  background: linear-gradient(
-    135deg,
-    rgba(125,194,79, 0.55) 0%,
-    rgba(232, 93, 61, 0.30) 50%,
-    rgba(201, 72, 45, 0.20) 100%
-  );
-  box-shadow:
-    0 4px 8px rgba(0, 0, 0, 0.3),
-    0 16px 48px rgba(0, 0, 0, 0.55),
-    0 0 120px rgba(232, 93, 61, 0.08);
+  max-width: none;
+  height: 100%;
+  border-radius: 0;
+  padding: 0;
+  background: none;
+  box-shadow: none;
 }
 
 .auth-card {
@@ -59,211 +57,79 @@
   display: flex;
   width: 100%;
   height: 100%;
-  border-radius: 23px;
+  border-radius: 0;
   overflow: hidden;
-  background: linear-gradient(
-    160deg,
-    rgba(60, 60, 80, 0.25) 0%,
-    rgba(20, 20, 25, 0.92) 30%,
-    rgba(10, 10, 10, 0.97) 60%,
-    rgba(15, 15, 20, 0.95) 100%
-  );
-  backdrop-filter: blur(20px);
+  background: #ffffff;
+  backdrop-filter: none;
 }
 
-/* Glossy shine sweep */
-.auth-card::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: 23px;
-  background:
-    linear-gradient(
-      115deg,
-      rgba(255, 255, 255, 0.12) 0%,
-      rgba(255, 255, 255, 0.06) 10%,
-      rgba(255, 255, 255, 0.02) 25%,
-      transparent 45%,
-      transparent 70%,
-      rgba(255, 255, 255, 0.015) 90%,
-      rgba(255, 255, 255, 0.03) 100%
-    );
-  z-index: 10;
-  pointer-events: none;
-}
+/* Glossy shine sweep — removed in the light redesign (it only read on a
+   dark card; on white it left a grey diagonal wash). */
+.auth-card::before { content: none; }
 
-/* Glossy top edge highlight */
-.auth-card::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 5%;
-  right: 5%;
-  height: 1px;
-  background: linear-gradient(
-    90deg,
-    transparent 0%,
-    rgba(255, 255, 255, 0.15) 20%,
-    rgba(255, 255, 255, 0.4) 50%,
-    rgba(255, 255, 255, 0.15) 80%,
-    transparent 100%
-  );
-  z-index: 11;
-  pointer-events: none;
-}
+/* Glossy top edge highlight — removed for the same reason. */
+.auth-card::after { content: none; }
 
-/* ── LEFT PANEL ── */
+/* ── LEFT PANEL — artwork ──
+   Holds <AuthLeftPanel />: a fill <Image> plus the back-to-site button.
+   The gradient/mandala/step-list rules that used to live here are gone
+   along with the markup that used them. */
 .auth-left {
   position: relative;
-  width: 44%;
+  width: 50%;
   flex-shrink: 0;
   overflow: hidden;
-  border-radius: 24px 0 0 24px;
+  border-radius: 0;
+  background: var(--auth-text);
 }
 
-.auth-left__bg {
+.auth-left__image {
+  object-fit: cover;
+  object-position: center;
+}
+
+/* Circular back button, floated over the artwork. */
+.auth-back {
   position: absolute;
-  top: -50px;
-  left: 0;
-  right: 0;
-  bottom: -50px;
-  background:
-    radial-gradient(ellipse 80% 50% at 50% 35%, rgba(232, 93, 61,0.55) 0%, rgba(201, 72, 45,0.35) 28%, rgba(40,30,8,0.55) 55%, transparent 85%),
-    radial-gradient(circle at 80% 90%, rgba(125,194,79,0.18) 0%, transparent 40%),
-    var(--auth-bg);
+  top: 24px;
+  left: 24px;
+  z-index: 10;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  color: #ffffff;
+  background: rgba(0, 0, 0, 0.28);
+  backdrop-filter: blur(6px);
+  transition: background 0.2s;
+}
+
+.auth-back:hover {
+  background: rgba(0, 0, 0, 0.45);
 }
 
 /* Faded mandala motif on the left panel — static, no rotation */
-.auth-left__mandala {
-  position: absolute;
-  inset: 0;
-  /* Set --auth-mandala (e.g. url('/images/your-logo.png')) to restore the
-     faded brand motif; none by default so a fresh white-label build never
-     ships the previous brand's artwork. */
-  background-image: var(--auth-mandala, none);
-  background-repeat: no-repeat;
-  background-position: center 18%;
-  background-size: 90% auto;
-  opacity: 0.06;
-  pointer-events: none;
-  z-index: 1;
-}
-
-.auth-left__bg::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  opacity: 0.045;
-  mix-blend-mode: overlay;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-  background-repeat: repeat;
-  pointer-events: none;
-}
-
-.auth-left__content {
-  position: relative;
-  z-index: 2;
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-end;
-  padding: 40px 36px;
-}
-
-.auth-left__title {
-  font-size: 2rem;
-  font-weight: 700;
-  line-height: 1.15;
-  max-width: 280px;
-  letter-spacing: -0.02em;
-  color: var(--auth-text);
-}
-
-.auth-left__subtitle {
-  color: var(--auth-muted);
-  font-size: 0.82rem;
-  margin-top: 8px;
-  max-width: 250px;
-  line-height: 1.5;
-}
-
-.auth-left__steps {
-  margin-top: 28px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
 /* ── STEP CARD ── */
-.auth-step {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  height: 46px;
-  padding: 0 16px;
-  border-radius: 14px;
-  font-size: 0.82rem;
-  cursor: pointer;
-  transition: background 0.2s, color 0.2s;
-}
-
-.auth-step--active {
-  background: linear-gradient(180deg, var(--auth-accent-light) 0%, var(--auth-accent) 100%);
-  color: #1a1408;
-  font-weight: 600;
-  box-shadow: 0 8px 24px rgba(232, 93, 61, 0.25), 0 1px 0 rgba(255,255,255,0.2) inset;
-}
-
-.auth-step--inactive {
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  color: var(--auth-muted);
-  transition: background 0.2s, border-color 0.2s;
-}
-
-.auth-step--inactive:hover {
-  background: #1a1a1a;
-  border-color: #333;
-}
-
-.auth-step__num {
-  width: 22px;
-  height: 22px;
-  border-radius: 7px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 0.65rem;
-  font-weight: 600;
-  flex-shrink: 0;
-}
-
-.auth-step--active .auth-step__num {
-  background: rgba(0,0,0,0.35);
-  color: #fff;
-}
-
-.auth-step--inactive .auth-step__num {
-  background: rgba(255, 255, 255, 0.07);
-  color: #555;
-}
-
-.auth-step__label {
-  font-size: 0.82rem;
-}
-
-/* ── RIGHT PANEL ── */
+/* ── RIGHT PANEL — form ── */
 .auth-right {
-  width: 56%;
+  width: 50%;
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: center;
   padding: 32px 52px;
-  background: #0a0a0a !important;
-  color: #ffffff;
-  border-radius: 0 24px 24px 0;
+  background: #ffffff !important;
+  color: var(--auth-text);
+  border-radius: 0;
   overflow-y: auto;
   scrollbar-width: none;
+}
+
+/* The register form is tall enough to overflow on short viewports; align
+   it to the top there so the first field is never scrolled out of view. */
+.auth-right--top {
+  align-items: flex-start;
 }
 
 .auth-right::-webkit-scrollbar {
@@ -284,11 +150,11 @@
   font-size: 1.6rem;
   font-weight: 700;
   letter-spacing: -0.02em;
-  color: #ffffff !important;
+  color: var(--auth-text) !important;
 }
 
 .auth-form__subtitle {
-  color: #6b7280 !important;
+  color: var(--auth-muted) !important;
   font-size: 0.82rem;
   margin-top: 4px;
   line-height: 1.4;
@@ -304,7 +170,7 @@
   font-size: 0.78rem;
   font-weight: 500;
   margin-bottom: 6px;
-  color: #ffffff !important;
+  color: var(--auth-text) !important;
 }
 
 .auth-field__wrap {
@@ -313,23 +179,23 @@
 
 .auth-field__input {
   width: 100%;
-  background: #161616 !important;
-  border: 1px solid #2a2a2a;
+  background: #ffffff !important;
+  border: 1px solid var(--auth-border);
   border-radius: var(--auth-radius-md);
   padding: 11px 14px;
-  color: #ffffff !important;
+  color: var(--auth-text) !important;
   font-size: 0.85rem;
   outline: none;
   transition: border-color 0.2s, box-shadow 0.2s;
 }
 
 .auth-field__input::placeholder {
-  color: #4b5563 !important;
+  color: #9ca3af !important;
 }
 
 .auth-field__input:focus {
   border-color: var(--auth-accent);
-  box-shadow: 0 0 0 3px rgba(232, 93, 61, 0.18);
+  box-shadow: 0 0 0 3px rgba(227, 34, 25, 0.16);
 }
 
 .auth-field__input--has-icon {
@@ -353,7 +219,7 @@
   background: none;
   border: none;
   cursor: pointer;
-  color: #6b7280 !important;
+  color: var(--auth-muted) !important;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -366,7 +232,7 @@
 }
 
 .auth-field__helper {
-  color: #6b7280 !important;
+  color: var(--auth-muted) !important;
   font-size: 0.72rem;
   margin-top: 5px;
 }
@@ -381,25 +247,24 @@
 .auth-btn {
   width: 100%;
   height: 46px;
-  background: linear-gradient(180deg, var(--auth-accent-light) 0%, var(--auth-accent) 100%) !important;
-  color: #1a1408 !important;
+  background: var(--auth-accent) !important;
+  color: #ffffff !important;
   font-weight: 700;
   font-size: 0.9rem;
   border-radius: var(--auth-radius-md);
-  border: 1px solid rgba(255,255,255,0.1);
+  border: 1px solid var(--auth-border);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
   transition: box-shadow 0.2s, transform 0.2s, filter 0.2s;
-  box-shadow: 0 8px 24px rgba(232, 93, 61, 0.22), 0 1px 0 rgba(255,255,255,0.2) inset;
+  box-shadow: 0 8px 22px rgba(227, 34, 25, 0.22);
 }
 
 .auth-btn:hover:not(:disabled) {
-  box-shadow: 0 10px 32px rgba(232, 93, 61, 0.35), 0 1px 0 rgba(255,255,255,0.25) inset;
-  transform: translateY(-1px);
-  filter: brightness(1.05);
+  background: var(--auth-accent-dark) !important;
+  box-shadow: 0 10px 28px rgba(227, 34, 25, 0.28);
 }
 
 .auth-btn:disabled {
@@ -409,29 +274,29 @@
 
 .auth-btn--outline {
   background: transparent !important;
-  color: #ffffff !important;
-  border: 1px solid #2a2a2a;
+  color: var(--auth-text) !important;
+  border: 1px solid var(--auth-border);
 }
 
 .auth-btn--outline:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.04);
-  border-color: #3a3a3a;
+  background: var(--mk-surface, #f1f2f5);
+  border-color: var(--auth-text);
   box-shadow: none;
   transform: none;
 }
 
 .auth-btn--demo {
   background: transparent !important;
-  color: #6b7280 !important;
-  border: 1px solid #2a2a2a;
+  color: var(--auth-muted) !important;
+  border: 1px solid var(--auth-border);
   font-weight: 500;
   font-size: 0.82rem;
   height: 42px;
 }
 
 .auth-btn--demo:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.04);
-  border-color: #3a3a3a;
+  background: var(--mk-surface, #f1f2f5);
+  border-color: var(--auth-text);
   box-shadow: none;
   transform: none;
   color: var(--auth-text);
@@ -445,11 +310,75 @@
   animation: authSpin 1s linear infinite;
 }
 
+/* One-line disclosure that stands in for a whole optional field — used by
+   the referral row on /auth/register. */
+.auth-reveal {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--auth-muted);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-color: var(--auth-border);
+}
+
+.auth-reveal:hover {
+  color: var(--auth-text);
+  text-decoration-color: currentColor;
+}
+
+/* "Apply" affordance beside the referral input. Previously a stack of
+   inline styles on an .auth-field__icon, which is absolutely positioned —
+   it needed four overrides just to sit back in the flow. */
+.auth-apply-btn {
+  flex-shrink: 0;
+  padding: 0 0.95rem;
+  border-radius: var(--auth-radius-md);
+  border: 1px solid var(--auth-border);
+  background: var(--mk-surface, #f1f2f5);
+  color: var(--auth-text);
+  font-weight: 600;
+  font-size: 0.72rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s;
+}
+
+.auth-apply-btn:hover:not(:disabled) {
+  background: #ffffff;
+  border-color: var(--auth-text);
+}
+
+.auth-apply-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* Inline link inside the form's subtitle — "Don't have an account? Sign
+   up". The reference design used blue here; Bullza's action colour is the
+   same red the submit button and the marketing site use, so a blue link
+   would be the only blue pixel on the page. */
+.auth-inline-link {
+  color: var(--auth-accent) !important;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.auth-inline-link:hover {
+  color: var(--auth-accent-dark) !important;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
 /* ── FOOTER ── */
 .auth-footer {
   text-align: center;
   font-size: 0.82rem;
-  color: #6b7280 !important;
+  color: var(--auth-muted) !important;
 }
 
 .auth-footer a {
@@ -474,7 +403,7 @@
   align-items: flex-start;
   gap: 10px;
   padding: 12px 14px;
-  background: rgba(255, 255, 255, 0.02);
+  background: var(--mk-surface, #f1f2f5);
   border: 1px solid var(--auth-border);
   border-radius: var(--auth-radius-md);
   cursor: pointer;
@@ -482,8 +411,8 @@
 }
 
 .auth-terms:hover {
-  border-color: #3a3a3a;
-  background: rgba(255, 255, 255, 0.035);
+  border-color: var(--auth-text);
+  background: var(--mk-surface, #f1f2f5);
 }
 
 .auth-terms__checkbox {
@@ -547,8 +476,8 @@
   align-items: center;
   gap: 8px;
   padding: 10px 16px;
-  background: rgba(232, 93, 61, 0.10);
-  border: 1px solid rgba(232, 93, 61, 0.28);
+  background: rgba(227, 34, 25, 0.08);
+  border: 1px solid rgba(227, 34, 25, 0.26);
   border-radius: 10px;
   color: var(--auth-accent-light);
   font-size: 0.78rem;
@@ -560,7 +489,7 @@
   height: 6px;
   border-radius: 50%;
   background: var(--auth-accent-light);
-  box-shadow: 0 0 8px rgba(232, 93, 61, 0.6);
+  box-shadow: 0 0 8px rgba(227, 34, 25, 0.45);
   flex-shrink: 0;
 }
 
@@ -604,23 +533,24 @@
 .auth-modal {
   width: 100%;
   max-width: 400px;
-  background: #111111 !important;
-  border: 1px solid #2a2a2a;
+  background: #ffffff !important;
+  border: 1px solid var(--auth-border);
   border-radius: 20px;
   padding: 28px;
-  color: #ffffff;
+  color: var(--auth-text);
+  box-shadow: 0 24px 60px rgba(11, 11, 12, 0.22);
 }
 
 .auth-modal__title {
   font-size: 1.1rem;
   font-weight: 700;
-  color: #ffffff !important;
+  color: var(--auth-text) !important;
   margin-bottom: 4px;
 }
 
 .auth-modal__desc {
   font-size: 0.78rem;
-  color: #6b7280 !important;
+  color: var(--auth-muted) !important;
   margin-bottom: 16px;
   line-height: 1.4;
 }
@@ -666,37 +596,23 @@
     display: none;
   }
 
+  /* Stacked: the artwork becomes a short banner above the form. The
+     <Image> inside is `fill`, so it takes its height from here. */
   .auth-left {
     width: 100%;
-    height: auto;
-    min-height: 140px;
+    height: 180px;
+    min-height: 180px;
     border-radius: 0;
     flex-shrink: 0;
   }
 
-  .auth-left__content {
-    flex-direction: row;
-    align-items: center;
-    justify-content: flex-start;
-    gap: 16px;
-    padding: 20px 24px;
-    padding-top: 32px;
+  .auth-back {
+    top: 16px;
+    left: 16px;
   }
 
-  .auth-left__title {
-    font-size: 1.25rem;
-    max-width: none;
-  }
-
-  .auth-left__subtitle {
-    display: none;
-  }
-
-  .auth-left__steps {
-    display: none;
-  }
-
-  .auth-right {
+  .auth-right,
+  .auth-right--top {
     width: 100%;
     flex: 1;
     padding: 32px 24px 48px;

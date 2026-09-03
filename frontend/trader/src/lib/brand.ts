@@ -22,6 +22,18 @@ export const BRAND_DOMAIN = process.env.NEXT_PUBLIC_BRAND_DOMAIN || 'bullza.com'
  */
 export const BRAND_LOGO = process.env.NEXT_PUBLIC_BRAND_LOGO || '';
 
+/**
+ * Marketing-site artwork, in the two tones the site actually needs.
+ * The header sits on the white canvas so it takes the ink mark; the
+ * footer bands are solid black so they take the reversed one. Both are
+ * overridable for a white-label build, same as BRAND_LOGO.
+ */
+export const BRAND_LOGO_DARK =
+  process.env.NEXT_PUBLIC_BRAND_LOGO_DARK || '/images/logo.png';
+
+export const BRAND_LOGO_LIGHT =
+  process.env.NEXT_PUBLIC_BRAND_LOGO_LIGHT || '/images/logo1.png';
+
 /** Support inbox shown across the site. */
 export const BRAND_SUPPORT_EMAIL =
   process.env.NEXT_PUBLIC_BRAND_SUPPORT_EMAIL || `support@${BRAND_DOMAIN}`;

@@ -6,6 +6,7 @@
  * over unchanged from the previous page.
  */
 import { useState } from 'react';
+import Link from 'next/link';
 import { Calendar, TrendingUp, ArrowRight } from 'lucide-react';
 import { Section, SectionHeading, PageHero, CtaBanner } from '@/marketing/components';
 import { BRAND_NAME } from '@/lib/brand';
@@ -89,11 +90,13 @@ const CALENDAR = [
   { when: 'Tomorrow, 12:00 GMT', title: 'ECB Speech', impact: 'High' as Impact },
 ];
 
-const QUICK_LINKS = [
-  'Trading Strategies',
-  'Market Analysis',
-  'Educational Resources',
-  'Trading Platforms',
+/* Each label now carries the route it names — these rendered as inert
+   placeholder anchors that went nowhere. */
+const QUICK_LINKS: { label: string; href: string }[] = [
+  { label: 'Trading Strategies',     href: '/education/tutorials' },
+  { label: 'Market Analysis',        href: '/services/market-research' },
+  { label: 'Educational Resources',  href: '/services/education' },
+  { label: 'Trading Platforms',      href: '/platforms/web' },
 ];
 
 function impactColor(impact: Impact): string {
@@ -202,9 +205,9 @@ export default function MarketNewsPage() {
               <h3 className="mk-h3">Quick Links</h3>
               <div className="flex flex-col gap-3">
                 {QUICK_LINKS.map((l) => (
-                  <a key={l} href="#" className="mk-body" style={{ fontSize: 'var(--mk-text-sm)' }}>
-                    → {l}
-                  </a>
+                  <Link key={l.href} href={l.href} className="mk-body" style={{ fontSize: 'var(--mk-text-sm)' }}>
+                    → {l.label}
+                  </Link>
                 ))}
               </div>
             </div>

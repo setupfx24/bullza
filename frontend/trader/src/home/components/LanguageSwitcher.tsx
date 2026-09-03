@@ -163,7 +163,10 @@ export function LanguageSwitcher() {
         aria-haspopup="dialog"
         aria-expanded={open}
         aria-label={`Change language. Current: ${activeLabel}`}
-        className="inline-flex items-center gap-1.5 rounded-full liquid-glass px-3 py-1.5 text-xs font-semibold text-foreground/85 hover:text-foreground transition-colors notranslate"
+        /* Sits in the white primary nav next to Log in / Get Started —
+           the black utility strip it used to invert against is gone, so
+           it now reads as ink-on-white like the rest of the bar. */
+        className="notranslate inline-flex items-center gap-1.5 rounded-full px-2.5 py-2 text-xs font-medium text-foreground/70 transition-colors hover:bg-[hsl(var(--muted))] hover:text-foreground"
         translate="no"
         // Browser extensions (form fillers, password managers, etc.) inject
         // `fdprocessedid` onto interactive elements after the server HTML
@@ -187,7 +190,7 @@ export function LanguageSwitcher() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="brand-home fixed inset-0 z-[300] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm notranslate"
+              className="brand-home fixed inset-0 z-[300] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm notranslate"
               translate="no"
               onClick={(e) => { if (e.target === e.currentTarget) setOpen(false); }}
             >
@@ -196,11 +199,11 @@ export function LanguageSwitcher() {
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.96, y: 10 }}
                 transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
-                className="liquid-glass-strong rounded-3xl p-5 sm:p-8 max-w-5xl w-full max-h-[90vh] overflow-y-auto [backdrop-filter:blur(40px)]"
+                className="w-full max-w-5xl max-h-[90vh] overflow-y-auto rounded-2xl border border-[hsl(var(--border)/0.10)] bg-white p-5 shadow-[0_28px_70px_rgba(11,11,12,0.28)] sm:p-8"
               >
                 <div className="flex items-center justify-between mb-6">
                   <div className="flex items-center gap-3">
-                    <div className="size-10 rounded-xl bg-primary/25 flex items-center justify-center">
+                    <div className="flex size-10 items-center justify-center rounded-xl bg-[hsl(var(--muted))]">
                       <Globe className="size-5 text-primary" />
                     </div>
                     <div>
@@ -212,7 +215,7 @@ export function LanguageSwitcher() {
                     type="button"
                     aria-label="Close"
                     onClick={() => setOpen(false)}
-                    className="size-9 rounded-full liquid-glass flex items-center justify-center text-foreground hover:bg-foreground/5"
+                    className="flex size-9 items-center justify-center rounded-full border border-[hsl(var(--border)/0.12)] text-foreground transition-colors hover:bg-[hsl(var(--muted))]"
                   >
                     <X className="size-4" />
                   </button>
@@ -228,8 +231,8 @@ export function LanguageSwitcher() {
                           onClick={() => pick(lang.code)}
                           className={`w-full inline-flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm transition-colors text-left ${
                             isActive
-                              ? 'bg-primary/25 text-primary font-semibold'
-                              : 'text-foreground/85 hover:bg-foreground/5'
+                              ? 'bg-[hsl(var(--muted))] text-primary font-semibold'
+                              : 'text-foreground/80 hover:bg-[hsl(var(--muted))]'
                           }`}
                           aria-pressed={isActive}
                         >

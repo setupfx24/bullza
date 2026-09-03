@@ -7,7 +7,6 @@ import { usePathname } from 'next/navigation';
 import { motion, useScroll, useMotionValueEvent, AnimatePresence } from 'motion/react';
 import { ArrowUpRight, Menu, X, ChevronDown } from 'lucide-react';
 import { Button } from '../ui/Button';
-import { LanguageSwitcher } from './LanguageSwitcher';
 import { NAV_ITEMS, BRAND, SIGNUP_HREF, type NavItem } from '../data';
 
 const useIsomorphicLayoutEffect =
@@ -86,16 +85,15 @@ function DesktopNavLink({ item, pathname }: { item: NavItem; pathname: string })
     return (
       <Link
         href={item.href}
-        className={`relative px-2.5 py-1.5 text-[13px] font-semibold whitespace-nowrap transition-colors font-body focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded-full ${
-          active ? 'text-foreground' : 'text-foreground/75 hover:text-foreground'
+        className={`relative whitespace-nowrap rounded px-3 py-5 font-body text-[15px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+          active ? 'text-foreground' : 'text-foreground/70 hover:text-foreground'
         }`}
       >
         {item.label}
+        {/* Full-width underline rather than a floating dot — it reads as a
+            tab indicator and sits flush with the nav's bottom hairline. */}
         {active && (
-          <span
-            aria-hidden
-            className="absolute left-1/2 -translate-x-1/2 -bottom-0.5 h-1 w-1 rounded-full bg-primary"
-          />
+          <span aria-hidden className="absolute inset-x-2 bottom-0 h-0.5 rounded-full bg-primary" />
         )}
       </Link>
     );
@@ -113,17 +111,14 @@ function DesktopNavLink({ item, pathname }: { item: NavItem; pathname: string })
         onFocus={() => { cancelClose(); setOpen(true); }}
         onClick={() => setOpen((v) => !v)}
         suppressHydrationWarning
-        className={`relative inline-flex items-center gap-1 px-2.5 py-1.5 text-[13px] font-semibold whitespace-nowrap transition-colors font-body rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
-          active ? 'text-foreground' : 'text-foreground/75 hover:text-foreground'
+        className={`relative inline-flex items-center gap-1 whitespace-nowrap rounded px-3 py-5 font-body text-[15px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+          active ? 'text-foreground' : 'text-foreground/70 hover:text-foreground'
         }`}
       >
         {item.label}
         <ChevronDown className={`size-3.5 transition-transform ${open ? 'rotate-180' : ''}`} />
         {active && (
-          <span
-            aria-hidden
-            className="absolute left-1/2 -translate-x-1/2 -bottom-0.5 h-1 w-1 rounded-full bg-primary"
-          />
+          <span aria-hidden className="absolute inset-x-2 bottom-0 h-0.5 rounded-full bg-primary" />
         )}
       </button>
 
@@ -140,7 +135,7 @@ function DesktopNavLink({ item, pathname }: { item: NavItem; pathname: string })
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -6 }}
                 transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
-                className="brand-home fixed z-[200] min-w-[230px] liquid-glass-strong rounded-2xl p-2 [backdrop-filter:blur(28px)]"
+                className="brand-home fixed z-[200] min-w-[240px] rounded-xl border border-[hsl(var(--border)/0.10)] bg-white p-1.5 shadow-[0_18px_44px_rgba(11,11,12,0.14)]"
                 style={{
                   top: coords.top,
                   left: coords.left,
@@ -155,10 +150,10 @@ function DesktopNavLink({ item, pathname }: { item: NavItem; pathname: string })
                       href={c.href}
                       role="menuitem"
                       onClick={() => setOpen(false)}
-                      className={`block px-3.5 py-2.5 text-sm font-semibold rounded-xl font-body transition-colors ${
+                      className={`block rounded-lg px-3.5 py-2.5 font-body text-sm font-medium transition-colors ${
                         isActive
-                          ? 'bg-primary/25 text-primary'
-                          : 'text-foreground/80 hover:bg-foreground/5 hover:text-foreground'
+                          ? 'bg-[hsl(var(--muted))] text-primary'
+                          : 'text-foreground/75 hover:bg-[hsl(var(--muted))] hover:text-foreground'
                       }`}
                     >
                       {c.label}
@@ -245,51 +240,54 @@ export function Navbar() {
 
   return (
     <>
+      {/* Single-tier white chrome. The black utility strip that used to sit
+          above the nav is gone; the affordances it carried (locale, sign-in)
+          moved into the primary bar next to the CTA, so the header is one
+          64px band instead of 36px + 64px. Both hero paddings were trimmed
+          by the same 36px to keep the gap under the header unchanged. */}
       <motion.header
         data-scrolled={scrolled}
-        className={`fixed inset-x-0 z-50 px-4 transition-[top] duration-500 ${
-          scrolled ? 'top-2' : 'top-4'
-        }`}
+        className="fixed inset-x-0 top-0 z-50"
         initial={{ y: -24, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
       >
-        <div className="relative mx-auto w-full max-w-[1440px] flex items-center justify-center gap-3" suppressHydrationWarning>
-          <nav
-            className={`liquid-glass rounded-full w-full max-w-[1320px] px-2 py-2 flex items-center justify-between gap-3 transition-[backdrop-filter] ${
-              scrolled ? '[backdrop-filter:blur(28px)]' : ''
-            }`}
-            aria-label="Primary"
-            suppressHydrationWarning
-          >
-            <Link href="/" className="flex items-center gap-2 pl-3 group shrink-0" aria-label={`${BRAND.name} home`}>
-              {BRAND.logo ? (
-                <img
-                  src={BRAND.logo}
-                  alt={BRAND.name}
-                  className="h-8 w-auto object-contain"
-                />
+        <nav
+          className={`border-b bg-white transition-shadow ${
+            scrolled
+              ? 'border-transparent shadow-[0_1px_16px_rgba(11,11,12,0.10)]'
+              : 'border-[hsl(var(--border)/0.10)]'
+          }`}
+          aria-label="Primary"
+          suppressHydrationWarning
+        >
+          <div className="mx-auto flex h-16 w-full max-w-[1320px] items-center gap-8 px-4 sm:px-6">
+            <Link href="/" className="group flex shrink-0 items-center gap-2" aria-label={`${BRAND.name} home`}>
+              {BRAND.logoDark ? (
+                <img src={BRAND.logoDark} alt={BRAND.name} className="h-8 w-auto object-contain" />
               ) : (
-                <span className="font-display font-black tracking-tight text-lg text-foreground whitespace-nowrap">
+                <span className="whitespace-nowrap font-display text-xl font-extrabold tracking-tight text-foreground">
                   {BRAND.name}
                 </span>
               )}
             </Link>
 
-            <div className="hidden lg:flex items-center gap-0.5 flex-1 justify-center">
+            {/* Left-aligned next to the brand rather than centred — the
+                reference anchors navigation to the wordmark. */}
+            <div className="hidden flex-1 items-center gap-0.5 lg:flex">
               {NAV_ITEMS.map((item) => (
                 <DesktopNavLink key={item.label} item={item} pathname={pathname} />
               ))}
             </div>
 
-            <div className="hidden lg:flex items-center gap-2 shrink-0">
+            <div className="ml-auto hidden shrink-0 items-center gap-2 lg:flex">
               <Link
                 href="/auth/login"
-                className="text-sm font-medium text-foreground/85 hover:text-foreground transition-colors px-3 py-1.5 rounded-full"
+                className="whitespace-nowrap rounded-full px-4 py-2.5 font-body text-[15px] font-medium text-foreground/70 transition-colors hover:text-foreground"
               >
                 Log in
               </Link>
-              <Button variant="hero" className="rounded-full px-4 py-1.5 text-sm h-auto" asChild>
+              <Button variant="hero" className="h-auto rounded-full px-5 py-2.5 text-sm" asChild>
                 <Link href={SIGNUP_HREF}>
                   Get Started
                   <ArrowUpRight className="ml-1 size-4" />
@@ -297,26 +295,19 @@ export function Navbar() {
               </Button>
             </div>
 
-            <div className="lg:hidden flex items-center gap-2 mr-2">
+            <div className="ml-auto flex items-center gap-1 lg:hidden">
               <button
                 type="button"
                 aria-label="Open menu"
                 aria-expanded={open}
-                className="size-9 rounded-full liquid-glass-strong flex items-center justify-center text-foreground"
+                className="flex size-9 items-center justify-center rounded-full border border-[hsl(var(--border)/0.14)] text-foreground transition-colors hover:bg-[hsl(var(--muted))]"
                 onClick={() => setOpen(true)}
               >
                 <Menu className="size-4" />
               </button>
             </div>
-          </nav>
-
-          {/* Language switcher — sits OUTSIDE the navbar pill on the right.
-              On small screens it tucks just inside the header padding so it
-              doesn't overlap the hamburger. */}
-          <div className="shrink-0">
-            <LanguageSwitcher />
           </div>
-        </div>
+        </nav>
       </motion.header>
 
       <AnimatePresence>
@@ -325,13 +316,13 @@ export function Navbar() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="lg:hidden fixed inset-0 z-[60] liquid-glass-strong [backdrop-filter:blur(40px)] overflow-y-auto"
+            className="fixed inset-0 z-[60] overflow-y-auto bg-white lg:hidden"
           >
-            <div className="absolute top-4 right-4">
+            <div className="absolute right-4 top-4">
               <button
                 type="button"
                 aria-label="Close menu"
-                className="size-10 rounded-full liquid-glass flex items-center justify-center text-foreground"
+                className="flex size-10 items-center justify-center rounded-full border border-[hsl(var(--border)/0.14)] text-foreground transition-colors hover:bg-[hsl(var(--muted))]"
                 onClick={() => setOpen(false)}
               >
                 <X className="size-4" />

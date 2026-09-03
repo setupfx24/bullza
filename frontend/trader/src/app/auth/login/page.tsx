@@ -12,6 +12,7 @@ import { useAuthStore } from '@/stores/authStore';
 import { usePlatformStatusStore } from '@/stores/platformStatusStore';
 import toast from 'react-hot-toast';
 import GoogleAuthButton from '@/components/auth/GoogleAuthButton';
+import { AuthLeftPanel } from '@/components/auth/AuthLeftPanel';
 // import ConnectWalletButton from '@/components/auth/ConnectWalletButton'; // Re-enable when wallet login goes live
 import '../auth.css';
 
@@ -26,18 +27,6 @@ const formVariants = {
   initial: { opacity: 0, y: 20 },
   animate: { opacity: 1, y: 0 },
   exit: { opacity: 0, y: -16 },
-};
-
-/* ── step config ── */
-const STEPS = [
-  { number: 1, label: 'Sign in to your account' },
-  { number: 2, label: 'Sign up your account' },
-];
-
-const LEFT_CONFIG: Record<number, { title: string; subtitle: string }> = {
-  1: { title: 'Welcome Back', subtitle: 'Sign in to continue where you left off.' },
-  2: { title: 'Try It Out', subtitle: 'Explore the app with a demo account.' },
-  3: { title: 'Get Started with Us', subtitle: 'Complete these easy steps to register your account.' },
 };
 
 /* ── error helper ── */
@@ -100,7 +89,6 @@ function LoginContent() {
   const searchParams = useSearchParams();
   const justVerified = searchParams.get('verified') === '1';
   const { login, demoLogin, forgotPassword, isLoading } = useAuthStore();
-  const [activeStep, setActiveStep] = useState(1);
 
   /* Sign-in state */
   const [email, setEmail] = useState('');
@@ -213,17 +201,6 @@ function LoginContent() {
     }
   };
 
-  /* ── Step change: 2 → go to register ── */
-  const handleStepClick = (step: number) => {
-    if (step === 2) {
-      router.push('/auth/register');
-      return;
-    }
-    setActiveStep(step);
-  };
-
-  const cfg = LEFT_CONFIG[activeStep];
-
   return (
     <MotionConfig reducedMotion="always">
     <div className="auth-wrapper">
@@ -255,42 +232,13 @@ function LoginContent() {
       <div className="auth-card-wrapper">
         <div className="auth-card">
           {/* ── LEFT PANEL ── */}
-          <motion.div
-            className="auth-left"
-            initial={{ x: -60, opacity: 0 }}
-            animate={{ x: 0, opacity: 1 }}
-            transition={{ duration: 0.7, ease: 'easeOut' }}
-          >
-            <motion.div
-              className="auth-left__bg"
-              animate={{ scale: [1, 1.18, 1], y: [0, -20, 0] }}
-              transition={{ duration: 6, repeat: Infinity, ease: 'easeInOut' }}
-            />
-            <div className="auth-left__mandala" aria-hidden="true" />
-            <div className="auth-left__content">
-              <motion.h1 className="auth-left__title" {...fadeUp(0.3)}>{cfg.title}</motion.h1>
-              <motion.p className="auth-left__subtitle" {...fadeUp(0.4)}>{cfg.subtitle}</motion.p>
-              <div className="auth-left__steps">
-                {STEPS.map((s, i) => (
-                  <motion.div key={s.number} {...fadeUp(0.45 + i * 0.08)}>
-                    <div
-                      className={`auth-step ${activeStep === s.number ? 'auth-step--active' : 'auth-step--inactive'}`}
-                      onClick={() => handleStepClick(s.number)}
-                    >
-                      <span className="auth-step__num">{s.number}</span>
-                      <span className="auth-step__label">{s.label}</span>
-                    </div>
-                  </motion.div>
-                ))}
-              </div>
-            </div>
-          </motion.div>
+          <AuthLeftPanel />
 
           {/* ── RIGHT PANEL ── */}
           <div className="auth-right">
             <AnimatePresence mode="wait">
               <motion.div
-                key={activeStep}
+                key="signin"
                 variants={formVariants}
                 initial="initial"
                 animate="animate"
@@ -299,24 +247,23 @@ function LoginContent() {
                 style={{ width: '100%', maxWidth: 380 }}
               >
                 {/* ── SIGN IN ── */}
-                {activeStep === 1 && (
                   <form className="auth-form" onSubmit={handleSignIn} noValidate>
-                    <motion.div {...fadeUp(0.25)} className="flex justify-center mb-1">
+                    <motion.div {...fadeUp(0.25)} className="mb-1">
                       {BRAND_LOGO ? (
-                        <img
-                          src={BRAND_LOGO}
-                          alt={BRAND_NAME}
-                          className="w-12 h-12 object-contain"
-                        />
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={BRAND_LOGO} alt={BRAND_NAME} className="h-9 w-auto object-contain" />
                       ) : (
-                        <span className="text-2xl font-black tracking-tight text-text-primary select-none">
+                        <span className="text-xl font-black tracking-tight text-text-primary select-none">
                           {BRAND_NAME}
                         </span>
                       )}
                     </motion.div>
                     <motion.div {...fadeUp(0.3)}>
-                      <h2 className="auth-form__title">Sign In</h2>
-                      <p className="auth-form__subtitle">Enter your credentials to access your account.</p>
+                      <h2 className="auth-form__title">Welcome Back</h2>
+                      <p className="auth-form__subtitle">
+                        Don&apos;t have an account?{' '}
+                        <Link href="/auth/register" className="auth-inline-link">Sign up</Link>
+                      </p>
                     </motion.div>
 
                     {justVerified && (
@@ -417,13 +364,7 @@ function LoginContent() {
                         {demoLoading ? <Loader2 size={18} className="auth-spinner" /> : 'Try with Demo Account'}
                       </button>
                     </motion.div>
-
-                    <motion.p className="auth-footer" {...fadeUp(0.62)}>
-                      Don&apos;t have an account?{' '}
-                      <a onClick={() => handleStepClick(2)}>Sign Up</a>
-                    </motion.p>
                   </form>
-                )}
               </motion.div>
             </AnimatePresence>
           </div>

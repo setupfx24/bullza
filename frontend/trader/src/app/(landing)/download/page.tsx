@@ -14,11 +14,10 @@ import { BRAND_NAME } from '@/lib/brand';
  * Play Store listing. Everything below describes what actually exists:
  * the browser platform and the add-to-home-screen install flow.
  *
- * Note on <AppStoreButtons />: the (landing) layout already renders it
- * beneath every inner page, so it is not imported here — importing it
- * would double the badge row. It still points at placeholder hrefs and
- * should be wired to the real store URLs (or removed) once native apps
- * ship; that component is outside this page's scope.
+ * The AppStoreButtons badge row that the (landing) layout used to render
+ * under every page has been deleted — it linked to "#" because no native
+ * app exists, which is exactly what this page explains. Re-add a store
+ * badge row here, wired to real listing URLs, if native apps ever ship.
  */
 
 export const metadata: Metadata = {

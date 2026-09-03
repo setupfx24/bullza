@@ -110,9 +110,10 @@ export default function AppHeader() {
 
         {/* RIGHT — Bonus/Referral chips + balance + bell + user */}
         <div className="flex items-center gap-1.5 sm:gap-3">
-          {/* Bonus chip — anchors into /wallet#bonus where the trader
-              sees active offers + their bonus history. (`/bonus` alone
-              falls through to the marketing landing group.) */}
+          {/* Bonus chip — anchors into /wallet#bonus where the trader sees
+              any bonus credit on their account and its history. This is the
+              wallet ledger, not a promotion: the first-deposit bonus offer
+              and its /bonus marketing page were both withdrawn. */}
           <Link
             href="/wallet#bonus"
             className="hidden md:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-[#E85D3D]/25 bg-[#E85D3D]/5 hover:bg-[#E85D3D]/10 transition-colors"

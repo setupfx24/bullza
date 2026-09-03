@@ -53,8 +53,8 @@ interface WalletData {
    *  user's first approved withdrawal. */
   main_wallet_bonus: number;
   /** ISO timestamp when admin first approved a withdrawal — once set,
-   *  any leftover bonus has been forfeited and future deposits will
-   *  not grant a new welcome bonus. */
+   *  any leftover bonus has been forfeited and future deposits will not
+   *  grant a new one, whatever the admin's bonus settings say. */
   bonus_forfeited_at: string | null;
   total_deposited: number;
   total_withdrawn: number;
@@ -1631,7 +1631,7 @@ function WalletPageContent() {
                         <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
                         <div className="text-[11px] text-amber-200/90 leading-relaxed">
                           <span className="font-bold text-amber-300">Heads-up — bonus forfeiture.</span>{' '}
-                          You currently have a welcome bonus credit. Submitting your
+                          You currently have bonus credit on your account. Submitting your
                           first withdrawal clears it immediately (both main-wallet bonus
                           and any bonus credit currently on a trading account). Trading
                           profits already in your account balance are unaffected.

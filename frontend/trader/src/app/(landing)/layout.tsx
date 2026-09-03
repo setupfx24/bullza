@@ -6,10 +6,7 @@ import { PopupProvider } from '@/landing/components/PopupContext'
 import ScrollProgress from '@/landing/components/animations/ScrollProgress'
 import Footer from '@/landing/components/Footer'
 import { Navbar as HomeNavbar } from '@/home/components/Navbar'
-import { ChatBot } from '@/home/components/ChatBot'
 import { ScrollToTopButton } from '@/home/components/ScrollToTopButton'
-import { TrustBadges } from '@/home/components/TrustBadges'
-import { AppStoreButtons } from '@/home/components/AppStoreButtons'
 import '@/marketing/tokens.css'
 import '@/home/styles.css'
 import '@/landing/landing.css'
@@ -25,16 +22,26 @@ export default function LandingLayout({ children }: { children: React.ReactNode 
   const pathname = usePathname()
   const isHome = pathname === '/'
 
-  /* Override trader-app theme for landing pages */
+  /* Override trader-app theme for landing pages.
+     The marketing site is light-only after the 2026-09-01 redesign — it
+     no longer flips the document to dark on entry. We still pin the
+     attribute (rather than inheriting) so a visitor who left the trader
+     app in dark mode doesn't land on a half-dark marketing page, and we
+     restore whatever the app had on the way out. */
   useEffect(() => {
     const html = document.documentElement
-    html.setAttribute('data-theme', 'dark')
-    html.style.backgroundColor = '#050505'
-    html.style.color = '#f5f5f5'
+    const prevTheme = html.getAttribute('data-theme')
+    const prevBg = html.style.backgroundColor
+    const prevColor = html.style.color
+
+    html.setAttribute('data-theme', 'light')
+    html.style.backgroundColor = '#ffffff'
+    html.style.color = '#0b0b0c'
+
     return () => {
-      html.setAttribute('data-theme', 'light')
-      html.style.backgroundColor = '#F2EFE9'
-      html.style.color = '#000000'
+      if (prevTheme) html.setAttribute('data-theme', prevTheme)
+      html.style.backgroundColor = prevBg
+      html.style.color = prevColor
     }
   }, [])
 
@@ -44,7 +51,6 @@ export default function LandingLayout({ children }: { children: React.ReactNode 
       <PopupProvider>
         <ScrollProgress />
         <div className="mk">{children}</div>
-        <ChatBot />
         <ScrollToTopButton />
       </PopupProvider>
     )
@@ -56,11 +62,8 @@ export default function LandingLayout({ children }: { children: React.ReactNode 
       <div className="mk brand-home landing-root min-h-screen">
         <HomeNavbar />
         {children}
-        <AppStoreButtons />
-        <TrustBadges />
         <Footer />
       </div>
-      <ChatBot />
       <ScrollToTopButton />
     </PopupProvider>
   )

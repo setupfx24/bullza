@@ -25,12 +25,18 @@ export function QuoteSection({
   quote,
   author = 'Warren Buffett',
   role = 'Chairman & CEO — Berkshire Hathaway',
-  portrait: portraitProp = '/images/image1.png',
+  /* No default portrait: the file this used to point at came from the
+     cloned site and is gone, so the initials monogram below is the
+     default until a real portrait is passed in. */
+  portrait: portraitProp = '',
   initials = 'WB',
   eyebrow = 'Investor Wisdom',
 }: QuoteSectionProps = {}) {
   const [imgErrored, setImgErrored] = useState(false);
   const portrait = portraitProp;
+  /* An empty src makes the browser re-request the page itself instead of
+     firing onError, so an absent portrait skips the <img> outright. */
+  const showPortrait = Boolean(portrait) && !imgErrored;
   const defaultQuote = (
     <>
       &ldquo;Rule No. 1 is <span className="text-primary font-bold">never lose money.</span>{' '}
@@ -43,10 +49,9 @@ export function QuoteSection({
       <div
         className="max-w-[1200px] mx-auto rounded-3xl overflow-hidden relative"
         style={{
-          background:
-            'linear-gradient(135deg, hsl(11 45% 22%) 0%, hsl(0 0% 8%) 55%, hsl(0 60% 14%) 100%)',
-          border: '1px solid hsl(11 79% 57% / 0.35)',
-          boxShadow: '0 20px 60px rgba(0,0,0,0.45)',
+          background: 'var(--mk-bg-raised)',
+          border: '1px solid var(--mk-line)',
+          boxShadow: 'none',
         }}
       >
         {/* Subtle decorative ring on the right side (mirrors the reference design) */}
@@ -54,15 +59,14 @@ export function QuoteSection({
           aria-hidden
           className="absolute -right-24 -top-24 size-[360px] rounded-full pointer-events-none hidden md:block"
           style={{
-            border: '1px solid hsl(11 79% 57% / 0.25)',
-            background:
-              'radial-gradient(circle at 50% 50%, hsl(11 79% 57% / 0.08) 0%, transparent 60%)',
+            border: '1px solid var(--mk-line)',
+            background: 'transparent',
           }}
         />
         <div
           aria-hidden
           className="absolute -right-44 top-12 size-[300px] rounded-full pointer-events-none hidden md:block"
-          style={{ border: '1px solid hsl(11 79% 57% / 0.18)' }}
+          style={{ border: '1px solid var(--mk-line)' }}
         />
 
         <div className="relative grid md:grid-cols-[2fr_1fr] gap-6 sm:gap-10 p-5 sm:p-10 md:p-14 items-center">
@@ -109,16 +113,14 @@ export function QuoteSection({
             <div
               className="size-[180px] sm:size-[220px] md:size-[260px] rounded-2xl overflow-hidden flex items-center justify-center font-display font-bold"
               style={{
-                background: imgErrored
-                  ? 'linear-gradient(135deg, hsl(11 79% 57% / 0.25) 0%, hsl(0 0% 8%) 100%)'
-                  : 'transparent',
-                color: 'hsl(11 79% 57%)',
-                border: '1px solid hsl(11 79% 57% / 0.4)',
-                boxShadow: '0 12px 30px rgba(0,0,0,0.4)',
+                background: showPortrait ? 'var(--mk-surface)' : 'var(--mk-surface-2)',
+                color: 'var(--mk-accent)',
+                border: '1px solid var(--mk-line)',
+                boxShadow: 'none',
               }}
               aria-hidden
             >
-              {!imgErrored ? (
+              {showPortrait ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
                   src={portrait}

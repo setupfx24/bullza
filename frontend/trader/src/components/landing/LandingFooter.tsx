@@ -32,7 +32,7 @@ export default function LandingFooter() {
     <footer
       className="border-t py-12"
       style={{
-        background: 'linear-gradient(180deg, #0a0c10 0%, #05070a 100%)',
+        background: '#000000',
         borderColor: 'rgba(255,255,255,0.08)',
         color: 'rgba(255,255,255,0.75)',
       }}

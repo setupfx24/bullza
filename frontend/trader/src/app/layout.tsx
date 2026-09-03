@@ -20,7 +20,14 @@ export const metadata: Metadata = {
   description: `${BRAND_NAME} — professional forex and CFD trading platform`,
   /* Favicons are served via Next.js file conventions:
      src/app/icon.png and src/app/apple-icon.png. Adding manual
-     metadata.icons here would override that — leave them out. */
+     metadata.icons here would override that — leave them out.
+
+     Both, plus public/favicon.ico and the two public/icons PWA sizes, are
+     generated from public/images/fevicon.png — the Bullza bull mark. That
+     source is white art on transparency, so every generated icon composites
+     it onto the #0a0a0a ink plate the manifest already uses: untouched, the
+     mark is invisible against a light tab strip and iOS would flatten the
+     alpha to black anyway. Regenerate all five together from that source. */
   // PWA: the manifest (src/app/manifest.ts) is auto-linked by Next.
   applicationName: BRAND_NAME,
   // iOS reads these, NOT the manifest — this is what makes "Add to Home

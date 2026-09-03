@@ -27,13 +27,16 @@ const RULES: { keys: string[]; reply: string; cta?: { label: string; href: strin
   {
     keys: ['hi', 'hello', 'hey', 'namaste', 'hola', 'good morning', 'good afternoon', 'good evening'],
     reply:
-      `Hi! 👋 I'm your ${BRAND_NAME} assistant. I can help with account types, deposits, the welcome bonus, our DEX, insurance, IB program, and more. What would you like to know?`,
+      `Hi! 👋 I'm your ${BRAND_NAME} assistant. I can help with account types, deposits, insurance, the IB program, and more. What would you like to know?`,
   },
   {
-    keys: ['bonus', 'welcome bonus', '100%', 'promo', 'first deposit bonus'],
+    keys: ['bonus', 'welcome bonus', '100%', 'promo', 'promo code', 'first deposit bonus'],
     reply:
-      'The 100% Welcome Bonus is applied automatically on your first deposit — no promo code needed. Every tier is a true 100% match capped at $200: $50 deposit → $50 bonus, $100 → $100 bonus, $200 or more → full $200 match. Maximum bonus is $200.',
-    cta: [{ label: 'See bonus details', href: '/bonus' }],
+      'We do not run a deposit bonus or promo-code offer at the moment. What you deposit is what you trade with — no bonus terms, no turnover requirement attached to your withdrawals.',
+    cta: [
+      { label: 'Compare accounts', href: '/account-types' },
+      { label: 'Open account',     href: '/auth/register' },
+    ],
   },
   {
     keys: ['minimum deposit', 'min deposit', 'minimum', 'start with', 'how much to start', 'deposit kitna'],
@@ -97,10 +100,10 @@ const RULES: { keys: string[]; reply: string; cta?: { label: string; href: strin
     cta: [{ label: 'Browse markets', href: '/markets' }],
   },
   {
-    keys: ['calculator', 'lot size', 'risk calculator', 'position size'],
+    keys: ['spread', 'leverage', 'lot size', 'position size', 'trading conditions', 'commission'],
     reply:
-      'Our lot-size & profit calculator sizes positions from your account risk %. Punch in your balance, risk %, stop pips, target pips, and pair — it returns the exact lot size, money at risk, and potential profit.',
-    cta: [{ label: 'Open calculator', href: '/risk-management/calculator' }],
+      'Spreads start from 0.0 pips on ECN and 1.0 pip on Standard, with commission shown on the order ticket before you confirm. Leverage is adjustable up to 1:500 depending on account type and instrument.',
+    cta: [{ label: 'Trading conditions', href: '/account-types' }],
   },
   {
     keys: ['support', 'help', 'human', 'agent', 'contact', 'live chat', 'speak to someone', 'whatsapp', 'phone', 'call'],
@@ -144,7 +147,6 @@ const RULES: { keys: string[]; reply: string; cta?: { label: string; href: strin
 ];
 
 const QUICK_REPLIES = [
-  'Welcome bonus',
   'Minimum deposit',
   'Account types',
   'Trade insurance',
@@ -157,7 +159,7 @@ const INITIAL: Msg[] = [
     id: 'm0',
     sender: 'bot',
     text:
-      `Hi! 👋 I'm the ${BRAND_NAME} Assistant. Ask me about the welcome bonus, account types, our DEX, insurance, the IB program — or pick a topic below.`,
+      `Hi! 👋 I'm the ${BRAND_NAME} Assistant. Ask me about account types, deposits, insurance, the IB program — or pick a topic below.`,
     ts: Date.now(),
   },
 ];
@@ -176,7 +178,7 @@ function matchRule(input: string): { reply: string; cta?: { label: string; href:
   // Default fallback
   return {
     reply:
-      "I didn't quite catch that — try asking about the welcome bonus, minimum deposit, account types, our DEX, trade insurance, or the IB program. Or pick a chip below 👇",
+      "I didn't quite catch that — try asking about the minimum deposit, account types, trade insurance, or the IB program. Or pick a chip below 👇",
   };
 }
 
@@ -242,7 +244,7 @@ export function ChatBot() {
             transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
             className="fixed bottom-20 right-5 sm:bottom-24 sm:right-6 z-[80] size-14 rounded-full flex items-center justify-center shadow-2xl"
             style={{
-              background: 'linear-gradient(135deg, hsl(11 79% 57%) 0%, hsl(11 79% 57%) 100%)',
+              background: 'var(--mk-accent)',
               boxShadow: '0 8px 28px rgba(232, 93, 61,0.45), 0 0 0 4px rgba(232, 93, 61,0.15)',
             }}
           >
@@ -259,7 +261,7 @@ export function ChatBot() {
             <span
               aria-hidden
               className="absolute inset-0 rounded-full animate-ping"
-              style={{ background: 'hsl(11 79% 57% / 0.4)' }}
+              style={{ background: 'rgba(227, 34, 25, 0.35)' }}
             />
           </motion.button>
         )}
@@ -276,9 +278,9 @@ export function ChatBot() {
             className="fixed bottom-20 right-5 sm:bottom-24 sm:right-6 z-[80] w-[min(380px,calc(100vw-2.5rem))] flex flex-col rounded-3xl overflow-hidden"
             style={{
               height: minimised ? 'auto' : 'min(580px, calc(100vh - 11rem))',
-              background: 'hsl(0 0% 7%)',
-              border: '1px solid hsl(11 79% 57% / 0.35)',
-              boxShadow: '0 20px 60px rgba(0,0,0,0.6), 0 0 0 1px rgba(232, 93, 61,0.08)',
+              background: '#ffffff',
+              border: '1px solid var(--mk-line)',
+              boxShadow: '0 24px 60px rgba(11, 11, 12, 0.20)',
             }}
             role="dialog"
             aria-label={`${BRAND_NAME} assistant chat`}
@@ -286,14 +288,14 @@ export function ChatBot() {
             {/* Header */}
             <div
               className="flex items-center gap-3 px-4 py-3 border-b border-foreground/10"
-              style={{ background: 'linear-gradient(135deg, hsl(11 79% 57% / 0.18) 0%, hsl(0 0% 7%) 100%)' }}
+              style={{ background: 'var(--mk-bg-raised)' }}
             >
-              <div className="size-9 rounded-full flex items-center justify-center" style={{ background: 'hsl(11 79% 57% / 0.3)' }}>
+              <div className="size-9 rounded-full flex items-center justify-center" style={{ background: 'var(--mk-accent-soft)' }}>
                 <Bot className="size-5 text-primary" />
               </div>
               <div className="flex-1 min-w-0">
-                <div className="font-display uppercase text-sm tracking-tight" style={{ color: '#ffffff' }}>{BRAND_NAME} Assistant</div>
-                <div className="flex items-center gap-1.5 text-[11px]" style={{ color: 'rgba(255,255,255,0.7)' }}>
+                <div className="font-display uppercase text-sm tracking-tight" style={{ color: 'var(--mk-text)' }}>{BRAND_NAME} Assistant</div>
+                <div className="flex items-center gap-1.5 text-[11px]" style={{ color: 'var(--mk-text-muted)' }}>
                   <span className="relative inline-flex">
                     <span className="absolute inset-0 rounded-full bg-primary opacity-60 animate-ping" />
                     <span className="relative size-1.5 rounded-full bg-primary" />
@@ -338,8 +340,8 @@ export function ChatBot() {
                         className="text-xs font-semibold px-3.5 py-2 rounded-full transition"
                         style={{
                           color: '#ffffff',
-                          background: 'hsl(11 79% 57% / 0.22)',
-                          border: '1px solid hsl(11 79% 57% / 0.65)',
+                          background: 'var(--mk-accent-soft)',
+                          border: '1px solid var(--mk-accent-line)',
                         }}
                       >
                         {q}
@@ -352,7 +354,7 @@ export function ChatBot() {
                 <form
                   onSubmit={onSubmit}
                   className="flex items-center gap-2 px-3 py-3 border-t border-foreground/10"
-                  style={{ background: 'hsl(0 0% 7%)' }}
+                  style={{ background: '#ffffff' }}
                 >
                   <input
                     type="text"
@@ -363,7 +365,7 @@ export function ChatBot() {
                     className="flex-1 bg-transparent rounded-full px-4 py-2.5 text-sm outline-none border focus:border-primary/60"
                     style={{
                       color: '#ffffff',
-                      borderColor: 'rgba(255,255,255,0.15)',
+                      borderColor: 'var(--mk-line)',
                     }}
                   />
                   <button
@@ -373,7 +375,7 @@ export function ChatBot() {
                     className="size-10 rounded-full flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed"
                     style={{
                       background:
-                        'linear-gradient(135deg, hsl(11 79% 57%) 0%, hsl(11 79% 57%) 100%)',
+                        'var(--mk-accent)',
                     }}
                   >
                     <Send className="size-4 text-white" />
@@ -394,7 +396,7 @@ function MessageBubble({ m }: { m: Msg }) {
     <div className={`flex items-end gap-2 ${isUser ? 'flex-row-reverse' : ''}`}>
       <div
         className={`size-7 rounded-full flex items-center justify-center shrink-0 ${isUser ? '' : ''}`}
-        style={{ background: isUser ? 'hsl(11 79% 57% / 0.25)' : 'hsl(0 0% 14%)' }}
+        style={{ background: isUser ? 'var(--mk-accent-soft)' : 'var(--mk-surface)' }}
       >
         {isUser ? <User className="size-3.5 text-primary" /> : <Bot className="size-3.5 text-primary" />}
       </div>
@@ -404,9 +406,9 @@ function MessageBubble({ m }: { m: Msg }) {
             isUser ? 'rounded-br-md' : 'rounded-bl-md'
           }`}
           style={{
-            background: isUser ? 'hsl(11 79% 57% / 0.28)' : 'hsl(0 0% 16%)',
-            color: '#ffffff',
-            border: isUser ? '1px solid hsl(11 79% 57% / 0.5)' : '1px solid hsl(0 0% 22%)',
+            background: isUser ? 'var(--mk-accent-soft)' : 'var(--mk-surface)',
+            color: 'var(--mk-text)',
+            border: isUser ? '1px solid var(--mk-accent-line)' : '1px solid var(--mk-line)',
           }}
         >
           {m.text}
@@ -442,7 +444,7 @@ function MessageBubble({ m }: { m: Msg }) {
 function TypingIndicator() {
   return (
     <div className="flex items-end gap-2">
-      <div className="size-7 rounded-full flex items-center justify-center shrink-0" style={{ background: 'hsl(0 0% 14%)' }}>
+      <div className="size-7 rounded-full flex items-center justify-center shrink-0" style={{ background: 'var(--mk-surface)' }}>
         <Bot className="size-3.5 text-primary" />
       </div>
       <div
