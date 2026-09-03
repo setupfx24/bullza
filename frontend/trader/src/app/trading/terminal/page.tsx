@@ -769,6 +769,26 @@ export default function TradingTerminalPage() {
             <div className="flex-1 min-w-0 min-h-0 overflow-hidden relative">
               <LiveChart />
             </div>
+
+            {/* Positions live under the CHART, not across the whole width:
+                that makes the right rail a full-height sibling of the chart
+                column, so the Markets list runs to the bottom of the page
+                instead of being cut off above this panel (client
+                2026-09-03, matching the reference platform). */}
+            <PanelResizeHandle
+              axis="horizontal"
+              hitSize={TERMINAL_RESIZE.bottomHandleHitPx}
+              onDragStart={snapshotLayout}
+              onDrag={onBottomDrag}
+              className="z-[80]"
+            />
+
+            <div
+              className="shrink-0 overflow-hidden min-h-0 flex flex-col relative z-[1] border-t border-border-primary"
+              style={{ height: bpH }}
+            >
+              <PositionsPanel variant="terminal" />
+            </div>
           </div>
 
           <PanelResizeHandle
@@ -866,21 +886,6 @@ export default function TradingTerminalPage() {
               </>
             )}
           </div>
-        </div>
-
-        <PanelResizeHandle
-          axis="horizontal"
-          hitSize={TERMINAL_RESIZE.bottomHandleHitPx}
-          onDragStart={snapshotLayout}
-          onDrag={onBottomDrag}
-          className="z-[80]"
-        />
-
-        <div
-          className="shrink-0 overflow-hidden min-h-0 flex flex-col relative z-[1] border-t border-border-primary"
-          style={{ height: bpH }}
-        >
-          <PositionsPanel variant="terminal" />
         </div>
       </div>
     </div>
