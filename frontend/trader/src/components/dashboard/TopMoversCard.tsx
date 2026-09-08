@@ -1,6 +1,6 @@
 'use client';
 
-import { Loader2, TrendingDown, TrendingUp } from 'lucide-react';
+import { Flame, Loader2, TrendingDown, TrendingUp } from 'lucide-react';
 import { PanelCard } from './PanelCard';
 
 export interface Mover { symbol: string; pct: number; price: number }
@@ -16,7 +16,7 @@ const fmtNum = (n: number, dp = 2) =>
  */
 export function TopMoversCard({ movers }: { movers: Mover[] }) {
   return (
-    <PanelCard title="Top daily movers">
+    <PanelCard title="Top daily movers" icon={Flame}>
       {movers.length === 0 ? (
         <p className="py-8 text-center text-xs text-text-tertiary flex items-center justify-center gap-2">
           <Loader2 size={13} className="animate-spin" /> Loading…

@@ -8,7 +8,6 @@
 
 import {
   BRAND_NAME,
-  BRAND_LOGO,
   BRAND_LOGO_DARK,
   BRAND_LOGO_LIGHT,
   BRAND_COPYRIGHT,
@@ -19,7 +18,8 @@ export const SIGNUP_HREF = '/auth/register';
 export const BRAND = {
   name: BRAND_NAME,
   tagline: 'Trade global currency markets with confidence.',
-  logo: BRAND_LOGO,
+  /* `logo` (the unset NEXT_PUBLIC_BRAND_LOGO) was dropped — nothing read
+     it once the header and footer moved to the two tone-specific marks. */
   /** Ink mark — for the white header band. */
   logoDark: BRAND_LOGO_DARK,
   /** Reversed mark — for the black footer band. */

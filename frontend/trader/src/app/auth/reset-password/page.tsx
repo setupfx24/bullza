@@ -1,6 +1,6 @@
 'use client';
 
-import { BRAND_LOGO, BRAND_NAME } from '@/lib/brand';
+import { BrandLogo } from '@/components/BrandLogo';
 
 import { Suspense, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -55,11 +55,7 @@ function ResetPasswordForm() {
     <div className="auth-page min-h-screen relative overflow-hidden bg-bg-primary flex flex-col items-center justify-center px-6 py-10">
       <div className="w-full max-w-[400px]">
         <div className="mb-8 flex justify-center">
-          {BRAND_LOGO ? (
-            <img src={BRAND_LOGO} alt={BRAND_NAME} className="w-20 h-20 object-contain" />
-          ) : (
-            <span className="text-3xl font-black tracking-tight text-text-primary select-none">{BRAND_NAME}</span>
-          )}
+          <BrandLogo className="w-20 h-20 object-contain" />
         </div>
         <div className="glass-panel rounded-3xl p-8 noise-texture overflow-hidden">
           <h1 className="text-xl font-bold text-text-primary mb-2">Reset password</h1>

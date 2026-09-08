@@ -1,6 +1,7 @@
 'use client';
 
-import { BRAND_LOGO, BRAND_NAME } from '@/lib/brand';
+import { BRAND_NAME } from '@/lib/brand';
+import { BrandLogo } from '@/components/BrandLogo';
 
 /**
  * /auth/verify-email — landing page the email-verify link points at.
@@ -62,30 +63,21 @@ function VerifyEmailContent() {
         <div className="auth-card" style={{ minHeight: 'auto' }}>
           <div className="auth-right" style={{ width: '100%' }}>
             <div style={{ width: '100%', maxWidth: 380, textAlign: 'center', padding: '40px 20px' }}>
-              {BRAND_LOGO ? (
-                <img
-                  src={BRAND_LOGO}
-                  alt={BRAND_NAME}
-                  style={{ width: 64, height: 64, objectFit: 'contain', margin: '0 auto 24px' }}
-                />
-              ) : (
-                <div
-                  className="text-2xl font-black tracking-tight text-text-primary select-none"
-                  style={{ margin: '0 auto 24px' }}
-                >
-                  {BRAND_NAME}
-                </div>
-              )}
+              {/* auth-card is white in both themes — pinned to ink. */}
+              <BrandLogo
+                tone="ink"
+                style={{ width: 64, height: 64, objectFit: 'contain', margin: '0 auto 24px' }}
+              />
               {state === 'loading' && (
                 <>
-                  <Loader2 size={36} className="auth-spinner" style={{ margin: '0 auto 16px', color: '#E85D3D' }} />
+                  <Loader2 size={36} className="auth-spinner" style={{ margin: '0 auto 16px', color: '#E12019' }} />
                   <h2 className="auth-form__title">Verifying…</h2>
                   <p className="auth-form__subtitle">Hold on while we confirm your email.</p>
                 </>
               )}
               {state === 'ok' && (
                 <>
-                  <CheckCircle2 size={48} style={{ color: '#E85D3D', margin: '0 auto 16px', display: 'block' }} />
+                  <CheckCircle2 size={48} style={{ color: '#E12019', margin: '0 auto 16px', display: 'block' }} />
                   <h2 className="auth-form__title">Email verified</h2>
                   <p className="auth-form__subtitle">{message}</p>
                 </>

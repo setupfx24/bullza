@@ -129,7 +129,7 @@ export default function TopNavMenu() {
                           border: '1px solid var(--border-secondary)',
                         }}
                       >
-                        <item.icon size={15} strokeWidth={1.9} className="text-[#E85D3D]" />
+                        <item.icon size={15} strokeWidth={1.9} className="text-[#E12019]" />
                       </span>
                       <span className="truncate">{item.label}</span>
                     </Link>

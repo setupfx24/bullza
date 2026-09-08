@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { TrendingDown, TrendingUp } from 'lucide-react';
+import { Layers, TrendingDown, TrendingUp } from 'lucide-react';
 import { PanelCard } from './PanelCard';
 
 export interface HoldingRow {
@@ -27,6 +27,7 @@ export function OpenPositionsCard({ holdings, count }: { holdings: HoldingRow[];
   return (
     <PanelCard
       title={`Open positions${count > 0 ? ` (${count})` : ''}`}
+      icon={Layers}
       action={
         <Link
           href="/portfolio"

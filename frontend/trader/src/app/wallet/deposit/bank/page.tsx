@@ -1,6 +1,7 @@
 'use client';
 
-import { BRAND_LOGO, BRAND_NAME } from '@/lib/brand';
+import { BRAND_NAME } from '@/lib/brand';
+import { BrandLogo } from '@/components/BrandLogo';
 
 /**
  * Dedicated bank-deposit page (client 2026-06-23: "bank se deposit lenge tab
@@ -154,7 +155,7 @@ export default function BankDepositPage() {
           <p className="text-[10px] uppercase tracking-wide text-text-tertiary">{label}</p>
           <p className="text-sm text-text-primary font-mono break-all">{value}</p>
         </div>
-        <button type="button" onClick={() => copyText(value, label)} className="text-[10px] font-semibold text-[#E85D3D] hover:underline shrink-0">Copy</button>
+        <button type="button" onClick={() => copyText(value, label)} className="text-[10px] font-semibold text-[#E12019] hover:underline shrink-0">Copy</button>
       </div>
     ) : null;
 
@@ -164,12 +165,7 @@ export default function BankDepositPage() {
           chrome (client 2026-06-24: render like the NOWPayments checkout). */}
       <div className="sticky top-0 z-10 flex items-center justify-between border-b border-border-glass/60 bg-bg-base/95 backdrop-blur px-4 py-3">
         <div className="flex items-center gap-2 min-w-0">
-          {/* Brand mark — tenant logo image when configured, wordmark text otherwise. */}
-          {BRAND_LOGO ? (
-            <img src={BRAND_LOGO} alt={BRAND_NAME} className="h-7 w-auto object-contain shrink-0" />
-          ) : (
-            <span className="text-base font-black tracking-tight text-text-primary select-none shrink-0">{BRAND_NAME}</span>
-          )}
+          <BrandLogo className="h-7 w-auto object-contain shrink-0" />
           <span className="text-[11px] font-semibold text-text-secondary border-l border-border-primary pl-2 ml-1 hidden sm:inline">Secure Bank Deposit</span>
         </div>
         <button type="button" onClick={() => router.push('/wallet')} aria-label="Close" className="p-1.5 rounded-lg text-text-secondary hover:bg-bg-hover hover:text-text-primary transition-fast">
@@ -245,7 +241,7 @@ export default function BankDepositPage() {
             <p className="text-[10px] uppercase tracking-wide text-amber-500/90">Payment reference — add this in your transfer remark</p>
             <div className="flex items-center justify-between gap-2">
               <p className="font-mono font-bold text-sm text-text-primary select-all break-all">{reference}</p>
-              <button type="button" onClick={() => copyText(reference, 'Reference')} className="text-[10px] font-semibold text-[#E85D3D] hover:underline shrink-0">Copy</button>
+              <button type="button" onClick={() => copyText(reference, 'Reference')} className="text-[10px] font-semibold text-[#E12019] hover:underline shrink-0">Copy</button>
             </div>
           </div>
           {bank ? (
@@ -281,7 +277,7 @@ export default function BankDepositPage() {
           </label>
         </div>
 
-        <button type="button" onClick={requestConfirm} disabled={submitting || !amount || !utr.trim() || !proof} className="w-full py-3.5 rounded-xl bg-[#E85D3D] text-sm font-bold text-white hover:bg-[#4a9329] transition-fast disabled:opacity-50 disabled:cursor-not-allowed">
+        <button type="button" onClick={requestConfirm} disabled={submitting || !amount || !utr.trim() || !proof} className="w-full py-3.5 rounded-xl bg-[#E12019] text-sm font-bold text-white hover:bg-[#4a9329] transition-fast disabled:opacity-50 disabled:cursor-not-allowed">
           {submitting ? 'Submitting…' : 'Submit Bank Deposit'}
         </button>
       </div>
@@ -292,16 +288,16 @@ export default function BankDepositPage() {
           <div className="relative w-full max-w-md rounded-2xl border border-border-primary bg-bg-base shadow-2xl p-5 sm:p-6 space-y-4">
             <h3 className="text-base font-bold text-text-primary">Before your deposit is processed</h3>
             <ul className="space-y-2.5 text-xs text-text-secondary">
-              <li className="flex gap-2"><span className="text-[#E85D3D] font-bold">•</span><span>Pay the <strong className="text-text-primary">exact amount</strong> requested.</span></li>
+              <li className="flex gap-2"><span className="text-[#E12019] font-bold">•</span><span>Pay the <strong className="text-text-primary">exact amount</strong> requested.</span></li>
               <li className="flex gap-2"><span className="text-amber-500 font-bold">•</span><span>Add the <strong className="text-amber-500">payment reference</strong> ({reference}) in your transfer remark.</span></li>
-              <li className="flex gap-2"><span className="text-[#E85D3D] font-bold">•</span><span>Bank deposits are credited after admin verification — usually within a few hours.</span></li>
+              <li className="flex gap-2"><span className="text-[#E12019] font-bold">•</span><span>Bank deposits are credited after admin verification — usually within a few hours.</span></li>
             </ul>
             <div className="rounded-lg bg-bg-secondary border border-border-primary px-3 py-2.5 text-xs text-text-secondary">
               Depositing <strong className="text-text-primary">${parseFloat(amount || '0').toLocaleString()}</strong> · UTR: <span className="font-mono text-text-primary break-all">{utr.trim()}</span>
             </div>
             <div className="flex gap-2 pt-1">
               <button type="button" onClick={() => setShowConfirm(false)} className="flex-1 py-2.5 rounded-xl border border-border-primary bg-bg-secondary text-sm font-semibold text-text-secondary hover:bg-bg-hover transition-fast">Cancel</button>
-              <button type="button" disabled={submitting} onClick={submit} className="flex-1 py-2.5 rounded-xl bg-[#E85D3D] text-sm font-bold text-white hover:bg-[#4a9329] transition-fast disabled:opacity-50">Confirm &amp; Submit</button>
+              <button type="button" disabled={submitting} onClick={submit} className="flex-1 py-2.5 rounded-xl bg-[#E12019] text-sm font-bold text-white hover:bg-[#4a9329] transition-fast disabled:opacity-50">Confirm &amp; Submit</button>
             </div>
           </div>
         </div>

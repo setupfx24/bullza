@@ -723,7 +723,7 @@ function SummaryCard({
   valueColor?: string;
 }) {
   const colorMap = {
-    blue: { bg: 'rgba(232, 93, 61,0.04)', border: 'rgba(232, 93, 61,0.25)', text: 'text-[#E85D3D]', grad: 'rgba(232, 93, 61,0.2)' },
+    blue: { bg: 'rgba(225, 32, 25,0.04)', border: 'rgba(225, 32, 25,0.25)', text: 'text-[#E12019]', grad: 'rgba(225, 32, 25,0.2)' },
     amber: { bg: 'rgba(245,158,11,0.04)', border: 'rgba(245,158,11,0.25)', text: 'text-amber-400', grad: 'rgba(245,158,11,0.2)' },
     green: { bg: 'rgba(34,197,94,0.04)', border: 'rgba(34,197,94,0.25)', text: 'text-buy', grad: 'rgba(34,197,94,0.2)' },
     red: { bg: 'rgba(239,68,68,0.04)', border: 'rgba(239,68,68,0.25)', text: 'text-sell', grad: 'rgba(239,68,68,0.2)' },

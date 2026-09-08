@@ -478,7 +478,7 @@ export default function Watchlist({ variant = 'default', onExitMarkets }: Watchl
                               </div>
                               <div className="flex flex-col items-end gap-0.5">
                                 {tick ? (
-                                  <span className="text-xs font-mono font-semibold tabular-nums text-[#E85D3D]">
+                                  <span className="text-xs font-mono font-semibold tabular-nums text-[#E12019]">
                                     {tick.ask.toFixed(digits)}
                                   </span>
                                 ) : (

@@ -12,8 +12,8 @@
    "show only current month days" is satisfied by showOutsideDays={false}
    in the component; these rules just style what's visible. */
 .dob-popover .rdp-root {
-  --rdp-accent-color: #E85D3D;
-  --rdp-accent-background-color: rgba(232, 93, 61, 0.18);
+  --rdp-accent-color: #E12019;
+  --rdp-accent-background-color: rgba(225, 32, 25, 0.18);
   --rdp-day-height: 36px;
   --rdp-day-width: 36px;
   --rdp-day_button-height: 36px;
@@ -44,18 +44,18 @@
   color: var(--text-primary, #f5f5f5);
 }
 .dob-popover .rdp-day_button:hover:not(.rdp-day_disabled .rdp-day_button) {
-  background: rgba(232, 93, 61, 0.12);
+  background: rgba(225, 32, 25, 0.12);
 }
 .dob-popover .rdp-day_disabled {
   opacity: 0.32;
   pointer-events: none;
 }
 .dob-popover .rdp-today:not(.rdp-selected) .rdp-day_button {
-  color: #E85D3D;
+  color: #E12019;
   font-weight: 700;
 }
 .dob-popover .rdp-selected .rdp-day_button {
-  background: #E85D3D !important;
+  background: #E12019 !important;
   color: #0a0a0a !important;
   font-weight: 700;
 }
@@ -78,11 +78,14 @@
 
 /* Dark theme — vantablack: pure #000 canvas, near-black surfaces, coral accent */
 [data-theme="dark"], .theme-dark {
-  /* Vantablack — a true #000 canvas. Surfaces lift in tiny steps
-     (0 → 6 → 10 → 18) so cards read as distinct planes without ever
-     turning grey; borders carry most of the separation at this depth. */
-  --bg-page: #000000;
-  --bg-base: #000000;
+  /* Page canvas is #3B3B3B (client request, 2026-09-05) — a mid charcoal
+     rather than the previous true-black. --bg-page and --bg-base are kept
+     identical: DashboardShell paints the canvas with bg-bg-base, body with
+     var(--bg-base), and --bg-page exists for the same role, so a split
+     value would leave one surface stale. Card/primary surfaces below stay
+     near-black on purpose so they still read as distinct planes. */
+  --bg-page: #3B3B3B;
+  --bg-base: #3B3B3B;
   --bg-primary: #000000;
   --bg-secondary: #060606;
   --bg-tertiary: #030303;
@@ -115,11 +118,11 @@
   --input-bg: #070707;
   --input-border: #1c1c1c;
   --input-shadow: inset 0 2px 6px rgba(0,0,0,0.65), inset 0 0 0 1px rgba(0,0,0,0.3), 0 1px 0 rgba(255,255,255,0.02);
-  --input-focus-border: rgba(232, 93, 61, 0.55);
-  --input-focus-shadow: inset 0 2px 6px rgba(0,0,0,0.65), inset 0 0 0 1px rgba(232, 93, 61, 0.12), 0 0 0 3px rgba(232, 93, 61, 0.12);
+  --input-focus-border: rgba(225, 32, 25, 0.55);
+  --input-focus-shadow: inset 0 2px 6px rgba(0,0,0,0.65), inset 0 0 0 1px rgba(225, 32, 25, 0.12), 0 0 0 3px rgba(225, 32, 25, 0.12);
   --input-placeholder: #555555;
 
-  --selection-bg: rgba(232, 93, 61, 0.22);
+  --selection-bg: rgba(225, 32, 25, 0.22);
 
   --noise-opacity: 0.012;
   --emboss-bg: rgba(0, 0, 0, 0.6);
@@ -128,7 +131,7 @@
   /* react-hot-toast — always dark surface (readable on charts + light UI) */
   --toast-bg: #0a0a0a;
   --toast-fg: #f0f0f0;
-  --toast-border: rgba(232, 93, 61, 0.28);
+  --toast-border: rgba(225, 32, 25, 0.28);
 
   color-scheme: dark;
 }
@@ -200,12 +203,13 @@
 /* ======================================= */
 
 .theme-dark {
-  /* Mirrors the vantablack [data-theme="dark"] palette above. This wrapper
-     class is applied by ThemeProvider; it sits later in the file at equal
+  /* Mirrors the [data-theme="dark"] palette above. This wrapper class is
+     applied by ThemeProvider; it sits later in the file at equal
      specificity, so any value it omits — or declares stale — wins. Keep the
-     two blocks in lockstep. */
-  --bg-page: #000000;
-  --bg-base: #000000;
+     two blocks in lockstep. (Canvas moved to #3B3B3B 2026-09-05 — this
+     block is exactly where a stale #000 would have reasserted itself.) */
+  --bg-page: #3B3B3B;
+  --bg-base: #3B3B3B;
   --bg-primary: #000000;
   --bg-secondary: #060606;
   --bg-tertiary: #030303;
@@ -231,12 +235,12 @@
   --scrollbar-hover: #333333;
   --input-bg: #070707;
   --input-border: #1c1c1c;
-  --input-focus-border: rgba(232, 93, 61, 0.55);
-  --input-focus-shadow: inset 0 2px 6px rgba(0,0,0,0.65), 0 0 0 3px rgba(232, 93, 61, 0.12);
-  --selection-bg: rgba(232, 93, 61, 0.22);
+  --input-focus-border: rgba(225, 32, 25, 0.55);
+  --input-focus-shadow: inset 0 2px 6px rgba(0,0,0,0.65), 0 0 0 3px rgba(225, 32, 25, 0.12);
+  --selection-bg: rgba(225, 32, 25, 0.22);
   --toast-bg: #0a0a0a;
   --toast-fg: #f0f0f0;
-  --toast-border: rgba(232, 93, 61, 0.28);
+  --toast-border: rgba(225, 32, 25, 0.28);
   color-scheme: dark;
 }
 
@@ -328,6 +332,21 @@ html, body {
    Splash / loading screen — shown on every full page load + refresh.
    See src/components/SplashScreen.tsx (mounted in the root layout).
    ────────────────────────────────────────────────────────────────────── */
+/* ── Brand logo tone swap ──────────────────────────────────────────
+   <BrandLogo tone="auto"> renders both marks; exactly one is shown,
+   chosen by the data-theme the inline script in app/layout.tsx stamps on
+   <html> before hydration. Doing it in CSS rather than JS means the right
+   mark is painted on the first frame, with no swap and no mismatch.
+
+   Only the light-theme mark is visible by default, so a surface that
+   somehow loses its data-theme still shows a readable logo rather than
+   none. The second copy is aria-hidden in the component, so screen
+   readers never hear the brand twice. */
+.brand-logo--reversed { display: none; }
+
+[data-theme='dark'] .brand-logo--ink { display: none; }
+[data-theme='dark'] .brand-logo--reversed { display: inline-block; }
+
 .brand-splash {
   position: fixed;
   inset: 0;
@@ -385,8 +404,8 @@ html, body {
   width: 34px;
   height: 34px;
   border-radius: 50%;
-  border: 3px solid rgba(232, 93, 61, 0.22);
-  border-top-color: #E85D3D;
+  border: 3px solid rgba(225, 32, 25, 0.22);
+  border-top-color: #E12019;
   animation: brand-splash-spin 0.8s linear infinite;
 }
 @keyframes brand-splash-pop {
@@ -626,6 +645,43 @@ html {
   box-shadow: none;
 }
 
+/* ── Stat tile ───────────────────────────────────────────
+   The dashboard P&L figures sit inside one shared panel, and each tile
+   now carries its own artwork, which is what separates it from the panel
+   and from its neighbours. The inner highlight and drop shadow this used
+   to add for that job are gone — over the artwork they only read as a
+   dark rim. */
+.stat-tile {
+  border-radius: 16px;
+  /* The tile carries a full-bleed artwork layer (see PnlTiles), so the
+     surface itself is just the frame. The red gradient tint that used to
+     live here is gone — it sat under the image and only muddied its
+     bottom edge where the two disagreed. A near-black ground stays behind
+     it so the tile reads correctly for the instant before the image
+     paints, and if the file ever goes missing. */
+  background: #14090a;
+  /* No border and no dark drop shadow: both drew a dark line around the
+     tile, which is the outline the artwork crop was fixing. The tiles sit
+     on a white panel, so their own colour is separation enough. */
+  border: 0;
+  box-shadow: none;
+  transition: transform 160ms ease;
+}
+.stat-tile:hover {
+  transform: translateY(-2px);
+}
+
+/* No light-theme variant any more: the artwork is the tile's surface in
+   both themes, and its own contrast is what the white type sits on. The
+   pale pink gradient that used to override this in light mode would have
+   shown through nowhere. */
+
+/* Respect a reduced-motion preference — the lift is decorative. */
+@media (prefers-reduced-motion: reduce) {
+  .stat-tile { transition: none; }
+  .stat-tile:hover { transform: none; }
+}
+
 .skeu-inset {
   background: var(--bg-primary);
   border: 1px solid var(--border-primary);
@@ -656,30 +712,30 @@ html {
 }
 
 .skeu-btn-buy {
-  background: linear-gradient(180deg, #F08063 0%, #E85D3D 50%, #C9482D 100%);
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.18), inset 0 -2px 0 rgba(0,0,0,0.15), 0 4px 16px rgba(232, 93, 61,0.28), 0 2px 4px rgba(0,0,0,0.15);
+  background: linear-gradient(180deg, #EE4C45 0%, #E12019 50%, #B31810 100%);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.18), inset 0 -2px 0 rgba(0,0,0,0.15), 0 4px 16px rgba(225, 32, 25,0.28), 0 2px 4px rgba(0,0,0,0.15);
   color: #ffffff;
 }
 .skeu-btn-buy:hover {
-  background: linear-gradient(180deg, #f5d984 0%, #F08063 50%, #E85D3D 100%);
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.22), inset 0 -2px 0 rgba(0,0,0,0.12), 0 6px 24px rgba(232, 93, 61,0.38);
+  background: linear-gradient(180deg, #f5d984 0%, #EE4C45 50%, #E12019 100%);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.22), inset 0 -2px 0 rgba(0,0,0,0.12), 0 6px 24px rgba(225, 32, 25,0.38);
 }
 .skeu-btn-buy:active {
-  background: linear-gradient(180deg, #E85D3D 0%, #C9482D 100%);
-  box-shadow: inset 0 2px 6px rgba(0,0,0,0.35), 0 2px 8px rgba(232, 93, 61,0.2);
+  background: linear-gradient(180deg, #E12019 0%, #B31810 100%);
+  box-shadow: inset 0 2px 6px rgba(0,0,0,0.35), 0 2px 8px rgba(225, 32, 25,0.2);
   transform: translateY(1px);
 }
 [data-theme="light"] .skeu-btn-buy,
 .theme-light .skeu-btn-buy {
-  background: #E85D3D;
+  background: #E12019;
   color: #ffffff;
   border: none;
-  box-shadow: 0 2px 8px rgba(232, 93, 61, 0.3);
+  box-shadow: 0 2px 8px rgba(225, 32, 25, 0.3);
 }
 [data-theme="light"] .skeu-btn-buy:hover,
 .theme-light .skeu-btn-buy:hover {
-  background: #C9482D;
-  box-shadow: 0 4px 12px rgba(232, 93, 61, 0.4);
+  background: #B31810;
+  box-shadow: 0 4px 12px rgba(225, 32, 25, 0.4);
 }
 
 .skeu-btn-sell {
@@ -756,7 +812,7 @@ html {
 
 .flash-blue { animation: flashAccent 0.15s ease-out; }
 .flash-red { animation: flashRed 0.15s ease-out; }
-@keyframes flashAccent { 0% { background-color: rgba(232, 93, 61,0.22); } 100% { background-color: transparent; } }
+@keyframes flashAccent { 0% { background-color: rgba(225, 32, 25,0.22); } 100% { background-color: transparent; } }
 @keyframes flashRed { 0% { background-color: rgba(239,68,68,0.2); } 100% { background-color: transparent; } }
 
 /* react-hot-toast — library defaults are washed-out white squares; reskin
@@ -822,8 +878,8 @@ html {
 
 /* Sidebar icon glow pulse */
 @keyframes iconGlowPulse {
-  0%, 100% { filter: drop-shadow(0 0 4px rgba(232, 93, 61,0.15)); }
-  50%      { filter: drop-shadow(0 0 10px rgba(232, 93, 61,0.55)); }
+  0%, 100% { filter: drop-shadow(0 0 4px rgba(225, 32, 25,0.15)); }
+  50%      { filter: drop-shadow(0 0 10px rgba(225, 32, 25,0.55)); }
 }
 .sidebar-icon-glow {
   animation: iconGlowPulse 2.5s ease-in-out infinite;
@@ -837,7 +893,7 @@ html {
 
 .resize-handle-h { cursor: col-resize; }
 .resize-handle-v { cursor: row-resize; }
-.focus-ring:focus { outline: 1px solid #E85D3D; outline-offset: -1px; }
+.focus-ring:focus { outline: 1px solid #E12019; outline-offset: -1px; }
 .no-drag { -webkit-user-drag: none; user-select: none; }
 
 @layer components {
@@ -994,8 +1050,8 @@ html {
     box-shadow: none !important;
   }
   .accounts-native-select:focus {
-    border-color: rgba(232, 93, 61, 0.55) !important;
-    box-shadow: 0 0 0 2px rgba(232, 93, 61, 0.2) !important;
+    border-color: rgba(225, 32, 25, 0.55) !important;
+    box-shadow: 0 0 0 2px rgba(225, 32, 25, 0.2) !important;
   }
   .accounts-native-select option {
     background-color: var(--bg-secondary);
@@ -1036,4 +1092,116 @@ html[data-page="accounts"] div:has(> header.h-\[65px\]) {
   border-radius: 6px;
   padding: 4px 6px;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+}
+
+/* ── Accounts page ────────────────────────────────────────────
+   Tab cards, the transfer panel and its fields. Surfaces resolve from
+   theme tokens so one rule set serves light and dark; only the red
+   gradients are literal, since the brand colour is identical in both. */
+.accounts-tab {
+  transition: transform 160ms ease, box-shadow 160ms ease, background-color 160ms ease;
+}
+.accounts-tab--idle {
+  background: var(--bg-card);
+  border: 1px solid var(--border-glass-bright);
+}
+.accounts-tab--idle:hover { background: var(--bg-hover); transform: translateY(-1px); }
+.accounts-tab--idle .accounts-tab__chip {
+  background: rgba(225, 32, 25, 0.10);
+  color: #E12019;
+}
+/* On the near-black canvas the tinted chip reads as a muddy patch, so the
+   idle chip goes neutral there — matching the dark reference. */
+[data-theme="dark"] .accounts-tab--idle .accounts-tab__chip,
+.theme-dark .accounts-tab--idle .accounts-tab__chip {
+  background: rgba(255, 255, 255, 0.07);
+  color: #ffffff;
+}
+.accounts-tab--active {
+  background: linear-gradient(105deg, #F0342C 0%, #E12019 42%, #8d1009 100%);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  box-shadow: 0 12px 34px rgba(225, 32, 25, 0.34);
+}
+.accounts-tab--active .accounts-tab__chip {
+  background: rgba(255, 255, 255, 0.18);
+  color: #ffffff;
+}
+
+.accounts-panel {
+  background: var(--bg-card);
+  border: 1px solid var(--border-glass-bright);
+  box-shadow: 0 1px 2px rgba(11, 11, 12, 0.05);
+}
+.accounts-panel__mark {
+  background: rgba(225, 32, 25, 0.12);
+  border: 1px solid rgba(225, 32, 25, 0.30);
+  color: #E12019;
+}
+
+/* From / To field. The --from tint is what makes the direction readable
+   at a glance, before you read either label. */
+.accounts-field {
+  background: var(--bg-base);
+  border: 1px solid var(--border-primary);
+  transition: border-color 160ms ease, background-color 160ms ease;
+}
+.accounts-field:hover { border-color: rgba(225, 32, 25, 0.45); }
+.accounts-field:focus-within { border-color: rgba(225, 32, 25, 0.65); }
+.accounts-field--from {
+  background: rgba(225, 32, 25, 0.06);
+  border-color: rgba(225, 32, 25, 0.32);
+}
+
+.accounts-swap {
+  background: var(--bg-card);
+  border: 1px solid rgba(225, 32, 25, 0.35);
+  color: #E12019;
+  transition: background-color 160ms ease, transform 160ms ease;
+}
+.accounts-swap:hover { background: rgba(225, 32, 25, 0.10); }
+.accounts-swap:active { transform: scale(0.94); }
+
+.accounts-amount {
+  background: var(--bg-base);
+  border: 1px solid var(--border-primary);
+  transition: border-color 160ms ease;
+}
+.accounts-amount:focus-within { border-color: rgba(225, 32, 25, 0.55); }
+.accounts-amount__sigil {
+  background: rgba(225, 32, 25, 0.10);
+  color: #E12019;
+}
+
+.accounts-pct {
+  background: var(--bg-hover);
+  border: 1px solid transparent;
+  color: var(--text-primary);
+  transition: background-color 140ms ease, border-color 140ms ease;
+}
+.accounts-pct:hover {
+  background: rgba(225, 32, 25, 0.10);
+  border-color: rgba(225, 32, 25, 0.35);
+}
+
+.accounts-note {
+  background: rgba(225, 32, 25, 0.06);
+  border: 1px solid rgba(225, 32, 25, 0.18);
+}
+.accounts-note__chip { background: rgba(225, 32, 25, 0.12); color: #E12019; }
+
+.accounts-submit {
+  background: linear-gradient(100deg, #F0342C 0%, #E12019 50%, #B3160F 100%);
+  box-shadow: 0 10px 26px rgba(225, 32, 25, 0.30);
+  transition: filter 160ms ease, box-shadow 160ms ease;
+}
+.accounts-submit:hover:not(:disabled) {
+  filter: brightness(1.07);
+  box-shadow: 0 12px 32px rgba(225, 32, 25, 0.42);
+}
+.accounts-submit:disabled { opacity: 0.45; box-shadow: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .accounts-tab, .accounts-swap, .accounts-submit { transition: none; }
+  .accounts-tab--idle:hover { transform: none; }
+  .accounts-swap:active { transform: none; }
 }

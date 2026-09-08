@@ -179,7 +179,7 @@ export function CookieConsent() {
               className="w-full px-4 sm:px-8 lg:px-12 py-5 sm:py-6 flex flex-col md:flex-row items-start md:items-center gap-4 md:gap-6"
               style={{
                 background: '#ffffff',
-                borderTop: '1px solid rgba(232, 93, 61,0.45)',
+                borderTop: '1px solid rgba(225, 32, 25,0.45)',
                 boxShadow: '0 -10px 40px rgba(0,0,0,0.55)',
               }}
             >
@@ -187,7 +187,7 @@ export function CookieConsent() {
                 className="size-14 shrink-0 rounded-xl flex items-center justify-center"
                 style={{
                   background: 'var(--mk-accent-soft)',
-                  border: '1px solid rgba(232, 93, 61,0.4)',
+                  border: '1px solid rgba(225, 32, 25,0.4)',
                 }}
               >
                 <Cookie className="size-6" style={{ color: 'var(--mk-accent)' }} />
@@ -265,7 +265,7 @@ export function CookieConsent() {
               className="w-full max-w-2xl max-h-[80vh] rounded-3xl flex flex-col overflow-hidden"
               style={{
                 background: '#ffffff',
-                border: '1px solid rgba(232, 93, 61,0.35)',
+                border: '1px solid rgba(225, 32, 25,0.35)',
                 boxShadow: '0 30px 80px rgba(0,0,0,0.7)',
               }}
             >
@@ -279,7 +279,7 @@ export function CookieConsent() {
                     className="size-10 rounded-xl flex items-center justify-center"
                     style={{
                       background: 'var(--mk-accent-soft)',
-                      border: '1px solid rgba(232, 93, 61,0.4)',
+                      border: '1px solid rgba(225, 32, 25,0.4)',
                     }}
                   >
                     <Cookie className="size-5" style={{ color: 'var(--mk-accent)' }} />
@@ -559,7 +559,7 @@ function CookieRow({
               style={{
                 color: 'var(--mk-accent)',
                 background: 'var(--mk-accent-soft)',
-                border: '1px solid rgba(232, 93, 61,0.4)',
+                border: '1px solid rgba(225, 32, 25,0.4)',
               }}
             >
               Required

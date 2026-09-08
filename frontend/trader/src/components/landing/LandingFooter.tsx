@@ -1,7 +1,7 @@
 import Link from 'next/link'
-import { Phone, Cookie } from 'lucide-react'
-import { openCookieSettings } from '@/home/components/CookieConsent'
-import { BRAND_NAME, BRAND_LOGO, BRAND_COPYRIGHT } from '@/lib/brand'
+import { Phone } from 'lucide-react'
+import { BRAND_NAME, BRAND_COPYRIGHT } from '@/lib/brand'
+import { BrandLogo } from '@/components/BrandLogo'
 
 /**
  * Dark-themed landing footer.
@@ -40,14 +40,8 @@ export default function LandingFooter() {
       <div className="max-w-7xl mx-auto px-6 lg:px-8">
         <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-10 mb-10">
           <div className="lg:col-span-2">
-            {BRAND_LOGO ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={BRAND_LOGO} alt={BRAND_NAME} className="h-10 w-auto mb-4" />
-            ) : (
-              <span className="block font-black tracking-tight text-2xl mb-4" style={{ color: 'rgba(255,255,255,0.95)' }}>
-                {BRAND_NAME}
-              </span>
-            )}
+            {/* Black band regardless of theme — reversed mark. */}
+            <BrandLogo tone="reversed" className="h-10 w-auto mb-4" />
             <p className="text-sm leading-relaxed mb-3 max-w-sm" style={{ color: 'rgba(255,255,255,0.6)' }}>
               Professional multi-asset trading platform. Licensed under Investment Dealer Licence
               No. MAK21098161, St. Lucia.
@@ -67,10 +61,10 @@ export default function LandingFooter() {
               Products
             </p>
             <ul className="space-y-2 text-sm" style={{ color: 'rgba(255,255,255,0.6)' }}>
-              <li><Link href="/platforms" className="hover:text-[#E85D3D] transition-colors">Trading Platforms</Link></li>
-              <li><Link href="/white-label" className="hover:text-[#E85D3D] transition-colors">White Label</Link></li>
-              <li><Link href="/auth/register" className="hover:text-[#E85D3D] transition-colors">Open Live Account</Link></li>
-              <li><Link href="/auth/register" className="hover:text-[#E85D3D] transition-colors">Demo Account</Link></li>
+              <li><Link href="/platforms" className="hover:text-[#E12019] transition-colors">Trading Platforms</Link></li>
+              <li><Link href="/white-label" className="hover:text-[#E12019] transition-colors">White Label</Link></li>
+              <li><Link href="/auth/register" className="hover:text-[#E12019] transition-colors">Open Live Account</Link></li>
+              <li><Link href="/auth/register" className="hover:text-[#E12019] transition-colors">Demo Account</Link></li>
             </ul>
           </div>
 
@@ -79,9 +73,9 @@ export default function LandingFooter() {
               Company
             </p>
             <ul className="space-y-2 text-sm" style={{ color: 'rgba(255,255,255,0.6)' }}>
-              <li><Link href="/company/about" className="hover:text-[#E85D3D] transition-colors">About Us</Link></li>
-              <li><Link href="/company/contact" className="hover:text-[#E85D3D] transition-colors">Contact</Link></li>
-              <li><Link href="/white-label" className="hover:text-[#E85D3D] transition-colors">Partnerships</Link></li>
+              <li><Link href="/company/about" className="hover:text-[#E12019] transition-colors">About Us</Link></li>
+              <li><Link href="/company/contact" className="hover:text-[#E12019] transition-colors">Contact</Link></li>
+              <li><Link href="/white-label" className="hover:text-[#E12019] transition-colors">Partnerships</Link></li>
             </ul>
           </div>
 
@@ -91,7 +85,7 @@ export default function LandingFooter() {
             </p>
             <ul className="space-y-2 text-sm" style={{ color: 'rgba(255,255,255,0.6)' }}>
               <li>
-                <Link href="/company/contact" className="hover:text-[#E85D3D] transition-colors">
+                <Link href="/company/contact" className="hover:text-[#E12019] transition-colors">
                   Contact Support
                 </Link>
               </li>
@@ -99,7 +93,7 @@ export default function LandingFooter() {
                 <Phone className="w-4 h-4 shrink-0" />
                 <a
                   href="tel:+447737119978"
-                  className="hover:text-[#E85D3D] transition-colors"
+                  className="hover:text-[#E12019] transition-colors"
                 >
                   +44 7737 119978
                 </a>
@@ -110,7 +104,7 @@ export default function LandingFooter() {
                   href="https://wa.me/447737119978"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="hover:text-[#E85D3D] transition-colors"
+                  className="hover:text-[#E12019] transition-colors"
                 >
                   WhatsApp
                 </a>
@@ -127,17 +121,9 @@ export default function LandingFooter() {
             {BRAND_COPYRIGHT}
           </p>
           <div className="flex items-center gap-5 text-sm" style={{ color: 'rgba(255,255,255,0.55)' }}>
-            <Link href="/privacy" className="hover:text-[#E85D3D] transition-colors">Privacy Policy</Link>
-            <Link href="/terms" className="hover:text-[#E85D3D] transition-colors">Terms of Service</Link>
-            <Link href="/risk" className="hover:text-[#E85D3D] transition-colors">Risk Disclosure</Link>
-            <button
-              type="button"
-              onClick={openCookieSettings}
-              className="inline-flex items-center gap-1.5 hover:text-[#E85D3D] transition-colors"
-              aria-label="Open cookie settings"
-            >
-              <Cookie className="w-3.5 h-3.5" /> Cookie Settings
-            </button>
+            <Link href="/privacy" className="hover:text-[#E12019] transition-colors">Privacy Policy</Link>
+            <Link href="/terms" className="hover:text-[#E12019] transition-colors">Terms of Service</Link>
+            <Link href="/risk" className="hover:text-[#E12019] transition-colors">Risk Disclosure</Link>
           </div>
         </div>
       </div>

@@ -23,16 +23,24 @@ export const BRAND_DOMAIN = process.env.NEXT_PUBLIC_BRAND_DOMAIN || 'bullza.com'
 export const BRAND_LOGO = process.env.NEXT_PUBLIC_BRAND_LOGO || '';
 
 /**
- * Marketing-site artwork, in the two tones the site actually needs.
- * The header sits on the white canvas so it takes the ink mark; the
- * footer bands are solid black so they take the reversed one. Both are
- * overridable for a white-label build, same as BRAND_LOGO.
+ * Brand artwork in the two tones every surface needs.
+ *
+ * Naming is by the MARK's colour, not the surface's: the ink mark is dark
+ * artwork and therefore belongs on LIGHT backgrounds (light theme, white
+ * header, marketing pages), and the reversed mark is white artwork for
+ * DARK backgrounds (dark theme, black footer, splash screen). Getting
+ * this backwards renders the logo invisible, so prefer <BrandLogo />,
+ * which picks the right one from the active theme for you.
  */
-export const BRAND_LOGO_DARK =
+export const BRAND_LOGO_INK =
   process.env.NEXT_PUBLIC_BRAND_LOGO_DARK || '/images/logo.png';
 
-export const BRAND_LOGO_LIGHT =
+export const BRAND_LOGO_REVERSED =
   process.env.NEXT_PUBLIC_BRAND_LOGO_LIGHT || '/images/logo1.png';
+
+/** Legacy aliases — the marketing site imports these names. */
+export const BRAND_LOGO_DARK = BRAND_LOGO_INK;
+export const BRAND_LOGO_LIGHT = BRAND_LOGO_REVERSED;
 
 /** Support inbox shown across the site. */
 export const BRAND_SUPPORT_EMAIL =

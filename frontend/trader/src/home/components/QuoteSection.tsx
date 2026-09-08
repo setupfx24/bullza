@@ -2,7 +2,8 @@
 
 import { useState, type ReactNode } from 'react';
 import { Quote } from 'lucide-react';
-import { BRAND_LOGO, BRAND_NAME } from '@/lib/brand';
+import { BRAND_NAME } from '@/lib/brand';
+import { BrandLogo } from '@/components/BrandLogo';
 
 /**
  * Famous-investor quote band. Drop in any page — accepts a custom quote,
@@ -73,17 +74,8 @@ export function QuoteSection({
           {/* Left — quote */}
           <div>
             <div className="flex items-center gap-2 mb-6">
-              {BRAND_LOGO ? (
-                <img
-                  src={BRAND_LOGO}
-                  alt={BRAND_NAME}
-                  className="h-7 w-auto opacity-90"
-                />
-              ) : (
-                <span className="font-display font-black tracking-tight text-base text-foreground opacity-90">
-                  {BRAND_NAME}
-                </span>
-              )}
+              {/* Marketing canvas is white in every theme — ink mark. */}
+              <BrandLogo tone="ink" className="h-7 w-auto opacity-90" />
               <span className="text-[11px] uppercase tracking-[0.22em] text-foreground/55 font-semibold ml-2">
                 {eyebrow}
               </span>

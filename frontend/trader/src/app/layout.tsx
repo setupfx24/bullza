@@ -12,7 +12,6 @@ import ProfileCompleteGate from '@/components/profile/ProfileCompleteGate';
 import TopLoader from '@/components/TopLoader';
 import GoogleTranslate from '@/components/GoogleTranslate';
 import SplashScreen from '@/components/SplashScreen';
-import { CookieConsent } from '@/home/components/CookieConsent';
 import { BRAND_NAME } from '@/lib/brand';
 
 export const metadata: Metadata = {
@@ -74,10 +73,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             of every full page load / refresh. Client component; auto-unmounts
             after ~650 ms so it never blocks clicks. */}
         <SplashScreen />
-        {/* GDPR-style cookie banner + settings modal. Shows once on first
-            visit; preferences persist in localStorage. Re-open the modal
-            via openCookieSettings() exported from the same component. */}
-        <CookieConsent />
         {/* Google Translate — loaded client-side after hydration to avoid DOM mismatch */}
         <GoogleTranslate />
         <Suspense fallback={null}>
@@ -113,7 +108,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                   className: 'brand-hot-toast',
                   // White check on a gold disc reads as "good" instantly on
                   // dark surface without losing the brand accent.
-                  iconTheme: { primary: '#E85D3D', secondary: '#1a1408' },
+                  iconTheme: { primary: '#E12019', secondary: '#1a1408' },
                 },
                 error: {
                   duration: 4000,
@@ -125,7 +120,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 loading: {
                   duration: Infinity,
                   className: 'brand-hot-toast',
-                  iconTheme: { primary: '#E85D3D', secondary: 'var(--toast-bg)' },
+                  iconTheme: { primary: '#E12019', secondary: 'var(--toast-bg)' },
                 },
               }}
             />

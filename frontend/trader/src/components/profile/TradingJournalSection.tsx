@@ -4,7 +4,7 @@ import { BookOpen, BarChart3, DollarSign, Info, PieChart, TrendingUp, Wallet } f
 import { clsx } from 'clsx';
 import type { TradingJournalBlock } from '@/lib/trading-dashboard';
 
-const NEON = '#E85D3D';
+const NEON = '#E12019';
 const CARD = 'var(--bg-card)';
 const BORDER = 'var(--border-primary)';
 
@@ -55,7 +55,7 @@ function RingGauge({
             strokeWidth={6}
             strokeLinecap="round"
             strokeDasharray={`${dash} ${c}`}
-            className="drop-shadow-[0_0_6px_rgba(232, 93, 61,0.45)]"
+            className="drop-shadow-[0_0_6px_rgba(225, 32, 25,0.45)]"
           />
         </svg>
         <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
@@ -77,8 +77,8 @@ export default function TradingJournalSection({
   return (
     <section className="text-text-primary">
       <div className="flex items-center gap-2 mb-4">
-        <div className="w-10 h-10 rounded-xl bg-[#E85D3D]/12 border border-[#E85D3D]/25 flex items-center justify-center">
-          <BookOpen className="w-5 h-5 text-[#E85D3D]" />
+        <div className="w-10 h-10 rounded-xl bg-[#E12019]/12 border border-[#E12019]/25 flex items-center justify-center">
+          <BookOpen className="w-5 h-5 text-[#E12019]" />
         </div>
         <h2 className="text-lg md:text-xl font-bold tracking-tight">{title}</h2>
       </div>
@@ -88,13 +88,13 @@ export default function TradingJournalSection({
           <div className="flex items-start justify-between gap-2">
             <div>
               <p className="text-[10px] font-bold text-text-tertiary uppercase tracking-wider flex items-center gap-1.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-[#E85D3D]" />
+                <span className="w-1.5 h-1.5 rounded-full bg-[#E12019]" />
                 Balance
               </p>
               <p className="text-2xl md:text-3xl font-bold mt-1 tabular-nums">{fmtUsd(j.balance)}</p>
             </div>
             <div className="w-10 h-10 rounded-full bg-bg-secondary border border-border-primary flex items-center justify-center">
-              <Wallet className="w-5 h-5 text-[#E85D3D]" />
+              <Wallet className="w-5 h-5 text-[#E12019]" />
             </div>
           </div>
         </div>
@@ -102,7 +102,7 @@ export default function TradingJournalSection({
           <div className="flex items-start justify-between gap-2">
             <div>
               <p className="text-[10px] font-bold text-text-tertiary uppercase tracking-wider flex items-center gap-1.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-[#E85D3D]" />
+                <span className="w-1.5 h-1.5 rounded-full bg-[#E12019]" />
                 Equity
               </p>
               <p className="text-2xl md:text-3xl font-bold mt-1 tabular-nums">{fmtUsd(j.equity)}</p>
@@ -113,7 +113,7 @@ export default function TradingJournalSection({
               )}
             </div>
             <div className="w-10 h-10 rounded-full bg-bg-secondary border border-border-primary flex items-center justify-center">
-              <DollarSign className="w-5 h-5 text-[#E85D3D]" />
+              <DollarSign className="w-5 h-5 text-[#E12019]" />
             </div>
           </div>
         </div>
@@ -125,14 +125,14 @@ export default function TradingJournalSection({
             label: 'Net P&L',
             icon: DollarSign,
             value: fmtCompactSigned(j.netPl),
-            valueClass: j.netPl >= 0 ? 'text-[#E85D3D]' : 'text-red-400',
+            valueClass: j.netPl >= 0 ? 'text-[#E12019]' : 'text-red-400',
             sub: `${j.netPlTradeCount} trades`,
           },
           {
             label: 'Profit factor',
             icon: TrendingUp,
             value: String(j.profitFactor),
-            valueClass: 'text-[#E85D3D]',
+            valueClass: 'text-[#E12019]',
             sub: j.profitFactorNote,
           },
           {
@@ -179,7 +179,7 @@ export default function TradingJournalSection({
         </div>
         <div className="rounded-xl p-4 border" style={{ backgroundColor: CARD, borderColor: BORDER }}>
           <div className="flex items-center gap-2 text-sm font-semibold text-text-primary mb-3">
-            <PieChart className="w-4 h-4 text-[#E85D3D]" />
+            <PieChart className="w-4 h-4 text-[#E12019]" />
             Account stats
           </div>
           <ul className="space-y-2.5 text-sm">

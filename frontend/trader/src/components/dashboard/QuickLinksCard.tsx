@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { ArrowUpRight, Wallet, Users, Calculator } from 'lucide-react';
+import { ArrowUpRight, Compass, Wallet, Users, Calculator } from 'lucide-react';
 import { PanelCard } from './PanelCard';
 
 /**
@@ -16,7 +16,7 @@ const LINKS = [
 
 export function QuickLinksCard() {
   return (
-    <PanelCard title="Explore" padding="sm">
+    <PanelCard title="Explore" icon={Compass} padding="sm">
       <ul>
         {LINKS.map(({ href, label, Icon }) => (
           <li key={href}>

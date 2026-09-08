@@ -334,10 +334,10 @@ export default function InstrumentsTable() {
                   className={clsx(
                     'text-right text-[13px] font-mono font-semibold tabular-nums tracking-tight',
                     bFlash === 'up'
-                      ? 'text-[#E85D3D]'
+                      ? 'text-[#E12019]'
                       : bFlash === 'down'
                         ? 'text-[#ef5350]'
-                        : 'text-[#E85D3D]',
+                        : 'text-[#E12019]',
                   )}
                 >
                   {tick ? tick.bid.toFixed(digits) : '—'}
@@ -348,10 +348,10 @@ export default function InstrumentsTable() {
                   className={clsx(
                     'text-right text-[13px] font-mono font-semibold tabular-nums tracking-tight',
                     aFlash === 'up'
-                      ? 'text-[#E85D3D]'
+                      ? 'text-[#E12019]'
                       : aFlash === 'down'
                         ? 'text-[#ef5350]'
-                        : 'text-[#E85D3D]',
+                        : 'text-[#E12019]',
                   )}
                 >
                   {tick ? tick.ask.toFixed(digits) : '—'}

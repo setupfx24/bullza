@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { Activity } from 'lucide-react';
 import { PanelCard } from './PanelCard';
 import { EquitySparkline } from './EquitySparkline';
 
@@ -32,6 +33,7 @@ export function PerformanceCard({
       padding="lg"
       className="h-full flex flex-col"
       title="Performance"
+      icon={Activity}
       action={
         <Link
           href="/portfolio?tab=performance"

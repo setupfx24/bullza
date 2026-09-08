@@ -23,10 +23,10 @@
   --fx-line:         rgba(11, 11, 12, 0.10);
   --fx-line-strong:  rgba(11, 11, 12, 0.20);
 
-  --fx-gold:         #e32219;   /* primary action colour */
+  --fx-gold:         #E12019;   /* primary action colour */
   --fx-gold-light:   #f0342b;   /* highlight */
   --fx-gold-dark:    #c11a12;   /* pressed / deep */
-  --fx-gold-soft:    rgba(227, 34, 25, 0.07);
+  --fx-gold-soft:    rgba(225, 32, 25, 0.07);
 
   --fx-text:         #0b0b0c;
   --fx-text-2:       rgba(11, 11, 12, 0.68);
@@ -81,7 +81,7 @@
 
   .fx-card-gold {
     background: var(--fx-gold-soft);
-    border: 1px solid rgba(227, 34, 25, 0.18);
+    border: 1px solid rgba(225, 32, 25, 0.18);
     border-radius: 1rem;
   }
 
@@ -101,7 +101,7 @@
   }
   .fx-btn-primary:hover {
     background: var(--fx-gold-dark);
-    box-shadow: 0 8px 22px rgba(227, 34, 25, 0.22);
+    box-shadow: 0 8px 22px rgba(225, 32, 25, 0.22);
   }
   .fx-btn-primary:active { transform: scale(.985); }
 
@@ -194,7 +194,7 @@
     inset: 0;
     pointer-events: none;
     background:
-      radial-gradient(60% 50% at 80% 30%, rgba(227, 34, 25, 0.035) 0%, rgba(227, 34, 25, 0) 60%),
+      radial-gradient(60% 50% at 80% 30%, rgba(225, 32, 25, 0.035) 0%, rgba(225, 32, 25, 0) 60%),
       radial-gradient(40% 40% at 20% 90%, rgba(11, 11, 12, 0.03) 0%, rgba(11, 11, 12, 0) 60%);
   }
 
@@ -234,8 +234,8 @@
     transition: border-color .25s ease, transform .25s ease, background .25s ease;
   }
   .glass-card:hover {
-    border-color: rgba(232, 93, 61, 0.32);
-    background: linear-gradient(180deg, rgba(232, 93, 61,0.04), rgba(232, 93, 61,0)) , var(--fx-bg-elev);
+    border-color: rgba(225, 32, 25, 0.32);
+    background: linear-gradient(180deg, rgba(225, 32, 25,0.04), rgba(225, 32, 25,0)) , var(--fx-bg-elev);
   }
 
   .feature-icon {
@@ -246,7 +246,7 @@
     justify-content: center;
     background: var(--fx-gold-soft);
     color: var(--fx-gold-light);
-    border: 1px solid rgba(232, 93, 61,0.22);
+    border: 1px solid rgba(225, 32, 25,0.22);
   }
 
   .badge {
@@ -256,7 +256,7 @@
     font-weight: 500;
     background: var(--fx-gold-soft);
     color: var(--fx-gold-light);
-    border: 1px solid rgba(232, 93, 61,0.22);
+    border: 1px solid rgba(225, 32, 25,0.22);
   }
 
   .btn-primary {
@@ -272,7 +272,7 @@
   }
   .btn-primary:hover {
     background: var(--fx-gold-dark);
-    box-shadow: 0 8px 22px rgba(227, 34, 25, 0.22);
+    box-shadow: 0 8px 22px rgba(225, 32, 25, 0.22);
   }
   .btn-primary:active { transform: scale(.985); }
 

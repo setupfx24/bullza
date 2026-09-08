@@ -1,6 +1,6 @@
 'use client';
 
-import { BRAND_LOGO, BRAND_NAME } from '@/lib/brand';
+import { BrandLogo } from '@/components/BrandLogo';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Maximize2, Minimize2 } from 'lucide-react';
@@ -338,17 +338,10 @@ export default function AdvancedChart() {
         aria-hidden="true"
         className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center select-none"
       >
-        {BRAND_LOGO ? (
-          <img
-            src={BRAND_LOGO}
-            alt=""
-            className="pointer-events-none w-[40%] max-w-[480px] min-w-[200px] object-contain opacity-[0.10] dark:opacity-[0.07]"
-          />
-        ) : (
-          <span className="pointer-events-none font-black tracking-tight text-4xl md:text-6xl text-text-primary opacity-[0.06]">
-            {BRAND_NAME}
-          </span>
-        )}
+        <BrandLogo
+          decorative
+          className="pointer-events-none w-[40%] max-w-[480px] min-w-[200px] object-contain opacity-[0.10] dark:opacity-[0.07]"
+        />
       </div>
 
       {/* Timezone picker — click to open dropdown of common timezones.

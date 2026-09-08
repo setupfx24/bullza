@@ -5,7 +5,11 @@ import Link from 'next/link';
 import { clsx } from 'clsx';
 import toast from 'react-hot-toast';
 import {
+  ArrowDownUp,
+  ArrowRight,
   ChevronDown,
+  ChevronRight,
+  ShieldCheck,
   Pencil,
   TrendingDown,
   TrendingUp,
@@ -68,6 +72,79 @@ function fmt(n: number, currency = 'USD') {
 // USD totals (transfer flows) still use fmt() since the main wallet
 // is always USD regardless of which trading-account currency we're
 // moving funds to.
+interface TransferOption {
+  id: string;
+  label: string;
+  sublabel: string;
+  balance: number;
+}
+
+/**
+ * One side of the transfer ("From" / "To"), drawn as the reference's card:
+ * an icon chip, the account name over its type and balance, and a chevron.
+ *
+ * The control underneath is still a native <select>, laid over the card at
+ * zero opacity. That keeps the existing behaviour exactly as it was —
+ * keyboard focus, type-ahead, the platform's own picker on mobile — while
+ * the card supplies the design. The visible text is aria-hidden so the
+ * select's own accessible name is the one announced.
+ */
+function TransferEndpoint({
+  label, value, options, onChange, tone, disabledId,
+}: {
+  label: string;
+  value: string;
+  options: TransferOption[];
+  onChange: (id: string) => void;
+  tone: 'from' | 'to';
+  disabledId?: string;
+}) {
+  const opt = options.find((o) => o.id === value) ?? options[0];
+  const isWallet = opt?.id === 'wallet';
+  const Icon = isWallet ? Wallet : Landmark;
+
+  return (
+    <div className="min-w-0">
+      <p className="mb-2 text-sm font-semibold text-text-primary">{label}</p>
+      <div
+        className={clsx(
+          'accounts-field relative flex items-center gap-3 rounded-2xl px-4 py-3.5',
+          tone === 'from' && 'accounts-field--from',
+        )}
+      >
+        <span
+          className="accounts-field__chip flex size-10 shrink-0 items-center justify-center rounded-xl"
+          style={{ background: 'rgba(225, 32, 25, 0.12)', color: '#E12019' }}
+          aria-hidden
+        >
+          <Icon size={20} strokeWidth={2} />
+        </span>
+        <span className="min-w-0 flex-1" aria-hidden>
+          <span className="block truncate text-[15px] font-bold text-text-primary">
+            {opt ? opt.label : '—'}
+          </span>
+          <span className="mt-0.5 block truncate text-[13px] text-text-secondary">
+            {opt ? `${opt.sublabel} — ${fmt(opt.balance)}` : ''}
+          </span>
+        </span>
+        <ChevronDown size={20} className="shrink-0 text-text-tertiary" aria-hidden />
+        <select
+          aria-label={`${label} account`}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+        >
+          {options.map((o) => (
+            <option key={o.id} value={o.id} disabled={o.id === disabledId}>
+              {o.label} — {o.sublabel} — {fmt(o.balance)}
+            </option>
+          ))}
+        </select>
+      </div>
+    </div>
+  );
+}
+
 function fmtRow(row: { account_group?: AccountGroupInfo | null } | null | undefined, n: number) {
   return fmtAccountMoney(n, isCentAccount(row ?? null));
 }
@@ -508,7 +585,7 @@ export default function AccountsPage() {
   };
 
   const newAccountCtaClass =
-    'inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-lg border-2 border-[#E85D3D] text-[#E85D3D] text-sm font-bold hover:bg-[#E85D3D]/10 transition-colors shrink-0';
+    'inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-lg border-2 border-[#E12019] text-[#E12019] text-sm font-bold hover:bg-[#E12019]/10 transition-colors shrink-0';
 
   /** Open the account-type picker. Picker now hosts a Real/Demo toggle —
    *  Demo accounts don't need KYC, so we open the picker regardless of KYC
@@ -587,7 +664,7 @@ export default function AccountsPage() {
             <Link
               href="/kyc"
               onClick={() => setKycGateOpen(false)}
-              className="px-5 py-2.5 rounded-lg bg-[#E85D3D] text-white text-sm font-bold hover:bg-[#C9482D] transition-colors text-center"
+              className="px-5 py-2.5 rounded-lg bg-[#E12019] text-white text-sm font-bold hover:bg-[#B31810] transition-colors text-center"
             >
               Complete KYC
             </Link>
@@ -616,74 +693,53 @@ export default function AccountsPage() {
             <Link
               href="/auth/register"
               onClick={() => setDemoUpgradeOpen(false)}
-              className="px-5 py-2.5 rounded-lg bg-[#E85D3D] text-white text-sm font-bold hover:bg-[#C9482D] transition-colors text-center"
+              className="px-5 py-2.5 rounded-lg bg-[#E12019] text-white text-sm font-bold hover:bg-[#B31810] transition-colors text-center"
             >
               Register Real Account
             </Link>
           </div>
         </div>
       </Modal>
-      {/* Accounts / Internal Transfer — full-width edge-to-edge, straight top line
-          meeting the sidebar's right border; only the active-tab indicator curves. */}
-      <div className="relative -mx-4 md:-mx-6 -mt-4 md:-mt-6 mb-8">
-        <div className="overflow-hidden border-b border-accent/40 bg-card">
-          <div className="relative flex min-h-[64px] sm:min-h-[100px] border-t border-accent/40 bg-card">
-              <div className="pointer-events-none absolute inset-0 z-0" aria-hidden>
-                <div
-                  className="absolute top-0 h-full w-1/2 transition-[transform] duration-500 ease-[cubic-bezier(0.34,1.45,0.64,1)] will-change-transform"
-                  style={{
-                    transform: tab === 'accounts' ? 'translate3d(0,0,0)' : 'translate3d(100%,0,0)',
-                  }}
-                >
-                  {/* Only the inner edge (facing the other tab) curves; the outer edge
-                      drops flush with the panel's left/right border. */}
-                  <div
-                    className={clsx(
-                      'absolute top-0 h-full border-t-2 border-b-0 border-accent bg-card-nested',
-                      'animate-wallet-main-tab-glow',
-                      tab === 'accounts'
-                        ? 'left-0 right-1.5 rounded-tr-2xl border-r-2'
-                        : 'left-1.5 right-0 rounded-tl-2xl border-l-2',
-                    )}
-                  />
-                </div>
-              </div>
-              {(
-                [
-                  { id: 'accounts' as const, label: 'Accounts' },
-                  { id: 'transfer' as const, label: 'Internal Transfer' },
-                ] as const
-              ).map((t) => {
-                const active = tab === t.id;
-                return (
-                  <button
-                    key={t.id}
-                    type="button"
-                    role="tab"
-                    aria-selected={active}
-                    onClick={() => setTab(t.id)}
-                    className={clsx(
-                      'relative z-10 flex-1 border-0 bg-transparent px-4 py-5 text-center text-sm font-semibold outline-none sm:py-7 sm:text-lg',
-                      'transition-colors duration-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent/50',
-                      active ? 'text-accent' : 'text-text-secondary hover:text-text-primary',
-                    )}
-                  >
-                    {active ? (
-                      <span
-                        key={tab}
-                        className="relative inline-block animate-wallet-main-tab-text drop-shadow-[0_0_20px_rgba(232, 93, 61,0.7)]"
-                      >
-                        {t.label}
-                      </span>
-                    ) : (
-                      <span className="relative inline-block">{t.label}</span>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        </div>
+      {/* Accounts / Internal Transfer — two cards side by side, the active
+          one filled with the brand gradient. Replaces the joined tab bar so
+          each destination carries its own icon and one-line description. */}
+      <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2" role="tablist">
+        {(
+          [
+            { id: 'accounts' as const, label: 'Accounts', sub: 'View and manage your trading accounts', Icon: Wallet },
+            { id: 'transfer' as const, label: 'Internal Transfer', sub: 'Move funds between your accounts', Icon: ArrowLeftRight },
+          ] as const
+        ).map((t) => {
+          const active = tab === t.id;
+          return (
+            <button
+              key={t.id}
+              type="button"
+              role="tab"
+              aria-selected={active}
+              onClick={() => setTab(t.id)}
+              className={clsx(
+                'accounts-tab group relative flex items-center gap-4 rounded-2xl px-5 py-4 text-left',
+                'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent/60',
+                active ? 'accounts-tab--active' : 'accounts-tab--idle',
+              )}
+            >
+              <span className="accounts-tab__chip flex size-12 shrink-0 items-center justify-center rounded-full">
+                <t.Icon size={20} strokeWidth={2.25} />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className={clsx('block text-base font-bold tracking-tight', active ? 'text-white' : 'text-text-primary')}>
+                  {t.label}
+                </span>
+                <span className={clsx('mt-0.5 block truncate text-[13px]', active ? 'text-white/80' : 'text-text-secondary')}>
+                  {t.sub}
+                </span>
+              </span>
+              <ChevronRight size={20} className={active ? 'text-white/90' : 'text-text-tertiary'} aria-hidden />
+            </button>
+          );
+        })}
+      </div>
 
       <div className="page-main w-full space-y-6">
         {tab === 'accounts' && (
@@ -762,200 +818,190 @@ export default function AccountsPage() {
         )}
 
         {tab === 'transfer' && (
-          <div
-            key="tab-transfer"
-            className="w-full max-w-full animate-wallet-fund-enter-lg space-y-6"
-          >
-            <div className="rounded-2xl border border-accent/20 bg-card p-5 sm:p-6 shadow-[0_2px_12px_rgba(0,0,0,0.08)]">
-              <div className="flex items-start gap-3 mb-6">
-                <div className="w-11 h-11 rounded-xl bg-accent/15 border border-accent/35 flex items-center justify-center shrink-0 text-accent">
-                  <ArrowLeftRight size={22} strokeWidth={2.25} />
-                </div>
-                <div>
-                  <h1 className="text-xl font-bold text-text-primary tracking-tight">Internal Transfer</h1>
-                  <p className="text-sm text-text-secondary mt-1 leading-relaxed max-w-prose">
-                    Move funds between your main wallet and live trading accounts, or between accounts.
-                  </p>
-                </div>
-              </div>
+          <div key="tab-transfer" className="w-full max-w-full animate-wallet-fund-enter-lg">
+            <div className="accounts-panel relative overflow-hidden rounded-3xl p-5 sm:p-7">
+              {/* Dotted globe bleeding out of the top-right corner, as in the
+                  reference. Drawn as a masked dot-grid rather than an image so
+                  it costs no asset and inherits the brand colour. */}
+              <div
+                aria-hidden
+                className="pointer-events-none absolute -right-20 -top-24 hidden h-[360px] w-[360px] rounded-full opacity-60 sm:block"
+                style={{
+                  backgroundImage: 'radial-gradient(currentColor 1.15px, transparent 1.15px)',
+                  backgroundSize: '7px 7px',
+                  color: '#E12019',
+                  WebkitMaskImage: 'radial-gradient(circle at 50% 50%, #000 52%, transparent 72%)',
+                  maskImage: 'radial-gradient(circle at 50% 50%, #000 52%, transparent 72%)',
+                }}
+              />
 
-              {demoFundingBlocked && (
-                <div className="mb-5 rounded-xl border border-amber-500/25 bg-amber-500/5 px-4 py-3 text-sm text-amber-600">
-                  {DEMO_FUNDING_MSG}
+              <div className="relative z-[1]">
+                <div className="flex items-start gap-4">
+                  <span className="accounts-panel__mark flex size-14 shrink-0 items-center justify-center rounded-2xl">
+                    <ArrowLeftRight size={26} strokeWidth={2.25} />
+                  </span>
+                  <div className="min-w-0">
+                    <h1 className="text-2xl font-extrabold tracking-tight text-text-primary">Internal Transfer</h1>
+                    <p className="mt-1 text-sm leading-relaxed text-text-secondary">
+                      Move funds between your main wallet and live trading accounts, or between accounts.
+                    </p>
+                  </div>
                 </div>
-              )}
 
-              {liveAccounts.length === 0 ? (
-                <div className="rounded-xl border border-dashed border-border-secondary bg-bg-base px-5 py-10 text-center">
-                  <p className="text-sm text-white/80 mb-4">No live trading accounts yet. Open one to deposit and transfer.</p>
-                  {!user?.is_demo && (
+                {demoFundingBlocked && (
+                  <div className="mt-5 rounded-xl border border-amber-500/25 bg-amber-500/5 px-4 py-3 text-sm text-amber-600">
+                    {DEMO_FUNDING_MSG}
+                  </div>
+                )}
+
+                {liveAccounts.length === 0 ? (
+                  <div className="mt-6 rounded-2xl border border-dashed border-border-secondary bg-bg-base px-5 py-10 text-center">
+                    <p className="mb-4 text-sm text-text-secondary">
+                      No live trading accounts yet. Open one to deposit and transfer.
+                    </p>
+                    {!user?.is_demo && (
+                      <button
+                        type="button"
+                        onClick={() => { setTab('accounts'); handleOpenNewAccount(); }}
+                        className="text-sm font-bold text-[#E12019] hover:underline"
+                      >
+                        Open live account
+                      </button>
+                    )}
+                  </div>
+                ) : (
+                  <div className="mt-7 space-y-5">
+                    {/* From -> swap -> To. The middle column collapses to a
+                        centred button below lg, where the fields stack. */}
+                    <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_auto_1fr] lg:items-end">
+                      <TransferEndpoint
+                        label="From"
+                        tone="from"
+                        value={uniFrom}
+                        options={transferOptions}
+                        disabledId={uniTo}
+                        onChange={(v) => {
+                          setUniFrom(v);
+                          setTransferAgree(false);
+                          if (uniTo === v) {
+                            const alt = transferOptions.find((o) => o.id !== v);
+                            if (alt) setUniTo(alt.id);
+                          }
+                        }}
+                      />
+
+                      <div className="flex items-center justify-center gap-3 lg:flex-col lg:gap-0 lg:pb-3">
+                        <span className="h-px w-8 bg-border-primary lg:h-7 lg:w-px" aria-hidden />
+                        <button
+                          type="button"
+                          onClick={swapFromTo}
+                          title="Swap direction"
+                          aria-label="Swap source and destination"
+                          className="accounts-swap flex size-12 shrink-0 items-center justify-center rounded-full"
+                        >
+                          <ArrowDownUp size={18} strokeWidth={2.25} />
+                        </button>
+                        <span className="h-px w-8 bg-border-primary lg:h-7 lg:w-px" aria-hidden />
+                      </div>
+
+                      <TransferEndpoint
+                        label="To"
+                        tone="to"
+                        value={uniTo}
+                        options={transferOptions.filter((o) => o.id !== uniFrom)}
+                        onChange={(v) => {
+                          setUniTo(v);
+                          setTransferAgree(false);
+                          if (uniFrom === v) {
+                            const alt = transferOptions.find((o) => o.id !== v);
+                            if (alt) setUniFrom(alt.id);
+                          }
+                        }}
+                      />
+                    </div>
+
+                    <div>
+                      <label htmlFor="transfer-amount" className="text-sm font-semibold text-text-primary">
+                        Amount
+                      </label>
+                      <div className="accounts-amount mt-2 flex items-stretch overflow-hidden rounded-2xl">
+                        <span
+                          className="accounts-amount__sigil flex w-14 shrink-0 items-center justify-center text-lg font-bold"
+                          aria-hidden
+                        >
+                          $
+                        </span>
+                        <input
+                          id="transfer-amount"
+                          type="number"
+                          min="0.01"
+                          step="0.01"
+                          value={transferAmount}
+                          onChange={(e) => { setTransferAmount(e.target.value); setTransferAgree(false); }}
+                          onWheel={(e) => e.currentTarget.blur()}
+                          placeholder="Enter amount"
+                          className="min-w-0 flex-1 bg-transparent px-4 py-4 text-base font-semibold text-text-primary outline-none placeholder:font-normal placeholder:text-text-tertiary"
+                        />
+                        <span className="flex shrink-0 items-center border-l border-border-primary px-5 text-sm font-bold text-text-primary">
+                          USD
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Quick amounts - 100% is the old "Max" button. */}
+                    <div className="grid grid-cols-4 gap-3">
+                      {[25, 50, 75, 100].map((pct) => (
+                        <button
+                          key={pct}
+                          type="button"
+                          disabled={uniFromBalance <= 0}
+                          onClick={() => {
+                            const v = (uniFromBalance * pct) / 100;
+                            setTransferAmount(v > 0 ? v.toFixed(2) : '');
+                            setTransferAgree(false);
+                          }}
+                          className="accounts-pct rounded-xl py-3 text-sm font-bold disabled:pointer-events-none disabled:opacity-40"
+                        >
+                          {pct}%
+                        </button>
+                      ))}
+                    </div>
+
+                    <div className="accounts-note flex items-start gap-4 rounded-2xl p-4">
+                      <span className="accounts-note__chip flex size-11 shrink-0 items-center justify-center rounded-xl">
+                        <ShieldCheck size={22} strokeWidth={2.25} />
+                      </span>
+                      <div className="min-w-0">
+                        <p className="text-sm font-bold text-text-primary">Secure Transfer</p>
+                        <p className="mt-0.5 text-sm leading-relaxed text-text-secondary">
+                          Your funds are transferred instantly and securely between your accounts.
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Credit-forfeit transfers still route through the
+                        agreement modal before anything is submitted. */}
                     <button
                       type="button"
                       onClick={() => {
-                        setTab('accounts');
-                        handleOpenNewAccount();
+                        if (uniWouldForfeit) { setTransferAgree(false); setForfeitConfirmOpen(true); }
+                        else { void submitUnifiedTransfer(); }
                       }}
-                      className="text-sm font-bold text-[#E85D3D] hover:underline"
+                      disabled={
+                        demoFundingBlocked ||
+                        transferSubmitting ||
+                        !transferAmount.trim() ||
+                        uniFromBalance <= 0 ||
+                        uniFrom === uniTo
+                      }
+                      className="accounts-submit flex w-full items-center justify-center gap-2.5 rounded-2xl py-4 text-base font-bold text-white"
                     >
-                      Open live account
-                    </button>
-                  )}
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {/* ── FROM ── */}
-                  <div className="space-y-2">
-                    <p className="text-xs font-bold uppercase tracking-wider text-white/50">From</p>
-                    <select
-                      value={uniFrom}
-                      onChange={(e) => {
-                        const v = e.target.value;
-                        setUniFrom(v);
-                        if (uniTo === v) {
-                          const alt = transferOptions.find((o) => o.id !== v);
-                          if (alt) setUniTo(alt.id);
-                        }
-                      }}
-                      className="accounts-native-select w-full px-4 py-3 rounded-xl text-sm font-semibold"
-                    >
-                      {transferOptions.map((o) => (
-                        <option key={o.id} value={o.id} disabled={o.id === uniTo}>
-                          {o.label} — {o.sublabel} — {fmt(o.balance)}
-                        </option>
-                      ))}
-                    </select>
-                    {/* From card */}
-                    {(() => {
-                      const opt = transferOptions.find((o) => o.id === uniFrom);
-                      if (!opt) return null;
-                      const isWallet = uniFrom === 'wallet';
-                      return (
-                        <div className="rounded-xl border border-accent/35 bg-bg-base p-4 flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-full bg-[#E85D3D]/12 flex items-center justify-center text-[#E85D3D] shrink-0">
-                            {isWallet ? <Wallet size={20} strokeWidth={2} /> : <Landmark size={20} strokeWidth={2} />}
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <div className="text-sm font-semibold text-text-primary">{opt.label}</div>
-                            <div className="text-[10px] uppercase tracking-wide text-text-tertiary font-semibold mt-0.5">
-                              {isWallet ? 'Balance' : 'Available'}
-                            </div>
-                          </div>
-                          <div className="text-xl font-bold text-accent tabular-nums font-mono shrink-0">
-                            {fmt(opt.balance)}
-                          </div>
-                        </div>
-                      );
-                    })()}
-                  </div>
-
-                  {/* ── SWAP BUTTON ── */}
-                  <div className="flex justify-center">
-                    <button
-                      type="button"
-                      onClick={swapFromTo}
-                      className="group w-10 h-10 rounded-full border border-accent/30 bg-bg-base flex items-center justify-center text-accent/80 hover:bg-accent/10 hover:border-accent/60 transition-all active:scale-95"
-                      title="Swap direction"
-                    >
-                      <ArrowLeftRight size={16} className="rotate-90 group-hover:scale-110 transition-transform" />
+                      {transferSubmitting ? 'Transferring…' : 'Transfer Funds'}
+                      {!transferSubmitting && <ArrowRight size={20} strokeWidth={2.5} />}
                     </button>
                   </div>
-
-                  {/* ── TO ── */}
-                  <div className="space-y-2">
-                    <p className="text-xs font-bold uppercase tracking-wider text-text-tertiary">To</p>
-                    <select
-                      value={uniTo}
-                      onChange={(e) => {
-                        const v = e.target.value;
-                        setUniTo(v);
-                        if (uniFrom === v) {
-                          const alt = transferOptions.find((o) => o.id !== v);
-                          if (alt) setUniFrom(alt.id);
-                        }
-                      }}
-                      className="accounts-native-select w-full px-4 py-3 rounded-xl text-sm font-semibold"
-                    >
-                      {transferOptions
-                        .filter((o) => o.id !== uniFrom)
-                        .map((o) => (
-                          <option key={o.id} value={o.id}>
-                            {o.label} — {o.sublabel} — {fmt(o.balance)}
-                          </option>
-                        ))}
-                    </select>
-                    {/* To card */}
-                    {(() => {
-                      const opt = transferOptions.find((o) => o.id === uniTo);
-                      if (!opt) return null;
-                      const isWallet = uniTo === 'wallet';
-                      return (
-                        <div className="rounded-xl border border-border-primary bg-bg-base p-4 flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-full bg-[#E85D3D]/12 flex items-center justify-center text-[#E85D3D] shrink-0">
-                            {isWallet ? <Wallet size={20} strokeWidth={2} /> : <Landmark size={20} strokeWidth={2} />}
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <div className="text-sm font-semibold text-text-primary">{opt.label}</div>
-                            <div className="text-[10px] uppercase tracking-wide text-text-tertiary font-semibold mt-0.5">
-                              {isWallet ? 'Wallet' : 'Balance'}
-                            </div>
-                          </div>
-                          <div className="text-lg font-bold text-text-primary tabular-nums font-mono shrink-0">
-                            {fmt(opt.balance)}
-                          </div>
-                        </div>
-                      );
-                    })()}
-                  </div>
-
-                  {/* ── AMOUNT ── */}
-                  <div className="pt-3 space-y-2 border-t border-border-primary">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <label className="text-sm font-medium text-text-primary">Amount</label>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setTransferAmount(uniFromBalance > 0 ? uniFromBalance.toFixed(2) : '')
-                        }
-                        disabled={uniFromBalance <= 0}
-                        className="text-sm font-bold text-[#E85D3D] hover:underline disabled:opacity-40 disabled:pointer-events-none"
-                      >
-                        Max: {fmt(uniFromBalance)}
-                      </button>
-                    </div>
-                    <input
-                      type="number"
-                      min="0.01"
-                      step="0.01"
-                      value={transferAmount}
-                      onChange={(e) => { setTransferAmount(e.target.value); setTransferAgree(false); }}
-                      onWheel={(e) => e.currentTarget.blur()}
-                      placeholder="0.00"
-                      className="w-full px-4 py-3.5 rounded-xl border border-border-primary bg-bg-base font-mono font-semibold text-text-primary text-base placeholder:text-text-tertiary focus:outline-none focus:ring-2 focus:ring-accent/40 focus:border-accent/50"
-                    />
-                  </div>
-
-                  {/* ── SUBMIT ── (credit-forfeit case opens the agreement
-                      modal below; the inline red banner was replaced by it) */}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (uniWouldForfeit) { setTransferAgree(false); setForfeitConfirmOpen(true); }
-                      else { void submitUnifiedTransfer(); }
-                    }}
-                    disabled={
-                      demoFundingBlocked ||
-                      transferSubmitting ||
-                      !transferAmount.trim() ||
-                      uniFromBalance <= 0 ||
-                      uniFrom === uniTo
-                    }
-                    className="w-full py-3.5 rounded-xl bg-[#E85D3D] text-white text-base font-bold hover:bg-[#C9482D] disabled:opacity-45 disabled:pointer-events-none transition-colors flex items-center justify-center gap-2"
-                  >
-                    <ArrowLeftRight size={20} />
-                    {transferSubmitting ? 'Transferring…' : 'Transfer'}
-                  </button>
-                </div>
-              )}
+                )}
+              </div>
             </div>
           </div>
         )}
@@ -1165,7 +1211,7 @@ function BalanceTrendBlock({ accountId }: { accountId: string }) {
       <div className="rounded-xl bg-bg-base border border-border-primary relative overflow-hidden" style={{ minHeight: '140px', maxHeight: '220px', aspectRatio: `${W}/${H + 10}` }}>
         {loading ? (
           <div className="absolute inset-0 flex items-center justify-center">
-            <div className="h-5 w-5 border-2 border-[#E85D3D] border-t-transparent rounded-full animate-spin" />
+            <div className="h-5 w-5 border-2 border-[#E12019] border-t-transparent rounded-full animate-spin" />
           </div>
         ) : (
           <svg className="w-full h-full" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="xMidYMid meet">
@@ -1325,7 +1371,7 @@ function AccountCard({
         <span
           className={clsx(
             'mt-2 h-2.5 w-2.5 rounded-full shrink-0',
-            row.is_demo ? 'bg-sky-400 shadow-[0_0_6px_rgba(56,189,248,0.7)]' : 'bg-[#E85D3D] shadow-[0_0_6px_rgba(232, 93, 61,0.7)]',
+            row.is_demo ? 'bg-sky-400 shadow-[0_0_6px_rgba(56,189,248,0.7)]' : 'bg-[#E12019] shadow-[0_0_6px_rgba(225, 32, 25,0.7)]',
           )}
           aria-hidden
         />
@@ -1376,14 +1422,14 @@ function AccountCard({
                 )}
               </p>
               <div className="flex items-center gap-1">
-                <span className={clsx('text-sm sm:text-lg font-bold tabular-nums font-mono truncate', pnlPositive ? 'text-[#E85D3D]' : 'text-red-400')}>
+                <span className={clsx('text-sm sm:text-lg font-bold tabular-nums font-mono truncate', pnlPositive ? 'text-[#E12019]' : 'text-red-400')}>
                   {/* Lifetime P&L is exact (equity − allocation), so drop
                       the "~ approximation" prefix that the floating-only
                       path uses. */}
                   {row.is_managed_account ? '' : '~ '}{pnlPositive ? '+' : ''}{fmtRow(row, pnl)}
                 </span>
               </div>
-              <p className={clsx('text-[10px] sm:text-xs font-semibold tabular-nums', pnlPositive ? 'text-[#E85D3D]/70' : 'text-red-400/70')}>
+              <p className={clsx('text-[10px] sm:text-xs font-semibold tabular-nums', pnlPositive ? 'text-[#E12019]/70' : 'text-red-400/70')}>
                 ({pnlPositive ? '+' : ''}{pct.toFixed(2)}%)
               </p>
             </div>
@@ -1458,7 +1504,7 @@ function AccountCard({
                 <Link
                   href={`/portfolio?account_id=${encodeURIComponent(row.id)}&account_no=${encodeURIComponent(row.account_number)}&tab=history`}
                   onClick={(e) => e.stopPropagation()}
-                  className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-lg bg-[#E85D3D] text-white text-sm font-bold hover:bg-[#C9482D] transition-colors"
+                  className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-lg bg-[#E12019] text-white text-sm font-bold hover:bg-[#B31810] transition-colors"
                 >
                   <BookOpen size={16} />
                   View Trades
@@ -1483,7 +1529,7 @@ function AccountCard({
                   target="_blank"
                   rel="noopener noreferrer"
                   onClick={(e) => { e.stopPropagation(); onTradePrepare(); handleTerminalOpen(e, tradeHref); }}
-                  className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-lg bg-[#E85D3D] text-white text-sm font-bold hover:bg-[#C9482D] transition-colors"
+                  className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-lg bg-[#E12019] text-white text-sm font-bold hover:bg-[#B31810] transition-colors"
                 >
                   Trade
                   <ExternalLink size={14} />
@@ -1511,7 +1557,7 @@ function AccountCard({
                   target="_blank"
                   rel="noopener noreferrer"
                   onClick={(e) => { e.stopPropagation(); onTradePrepare(); handleTerminalOpen(e, tradeHref); }}
-                  className="inline-flex items-center justify-center gap-1.5 px-4 sm:px-5 py-2 sm:py-2.5 rounded-lg bg-[#E85D3D] text-white text-xs sm:text-sm font-bold hover:bg-[#C9482D] transition-colors"
+                  className="inline-flex items-center justify-center gap-1.5 px-4 sm:px-5 py-2 sm:py-2.5 rounded-lg bg-[#E12019] text-white text-xs sm:text-sm font-bold hover:bg-[#B31810] transition-colors"
                 >
                   Trade
                   <ExternalLink size={13} />

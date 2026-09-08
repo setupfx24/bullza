@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import Image from 'next/image'
-import { BRAND_NAME, BRAND_LOGO } from '@/lib/brand'
+import { BrandLogo } from '@/components/BrandLogo'
 
 export default function LandingHeader() {
   return (
@@ -10,15 +10,11 @@ export default function LandingHeader() {
       <div className="max-w-7xl mx-auto px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           <Link href="/" className="flex items-center gap-2 shrink-0">
-            {/* LandingHeader sits on a hard-coded white bar, so a
-                white-bg friendly logo works here regardless of the
-                user's chosen theme. */}
-            {BRAND_LOGO ? (
-              <img src={BRAND_LOGO} alt={BRAND_NAME} className="h-9 sm:h-10 w-auto object-contain" />
-            ) : null}
-            <span className="font-bold italic tracking-tight text-lg select-none">
-              <span className="text-gray-800">{BRAND_NAME}</span>
-            </span>
+            {/* Hard-coded white bar, so the ink mark is pinned here
+                regardless of the user's chosen theme. The italic text
+                wordmark that sat beside it is gone — the artwork already
+                spells the name, so the two read as the brand twice. */}
+            <BrandLogo tone="ink" className="h-9 sm:h-10 w-auto object-contain" />
           </Link>
 
           <nav className="hidden md:flex items-center gap-7">

@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { BRAND_LOGO, BRAND_NAME } from '@/lib/brand';
+import { BRAND_NAME } from '@/lib/brand';
+import { BrandLogo } from '@/components/BrandLogo';
 
 /**
  * Full-screen branded splash shown on every full page load / refresh.
@@ -29,23 +30,14 @@ export default function SplashScreen() {
 
   return (
     <div className={`brand-splash${hidden ? ' brand-splash--hidden' : ''}`} aria-hidden="true">
-      {BRAND_LOGO ? (
-        <>
-          {/* Soft background aura — brand logo, blurred + low opacity */}
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={BRAND_LOGO} alt="" className="brand-splash__bg" />
+      {/* The splash ground is a fixed #08090b whatever the user's theme,
+          so this is one of the few places that pins the reversed mark
+          instead of following data-theme. */}
+      <BrandLogo tone="reversed" decorative className="brand-splash__bg" />
 
-          <div className="brand-splash__inner">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={BRAND_LOGO} alt={BRAND_NAME} className="brand-splash__logo" />
-          </div>
-        </>
-      ) : (
-        /* No logo configured — styled text wordmark fallback. */
-        <div className="brand-splash__inner">
-          <span className="brand-splash__logo brand-splash__wordmark">{BRAND_NAME}</span>
-        </div>
-      )}
+      <div className="brand-splash__inner">
+        <BrandLogo tone="reversed" alt={BRAND_NAME} className="brand-splash__logo" />
+      </div>
     </div>
   );
 }

@@ -245,7 +245,7 @@ export function ChatBot() {
             className="fixed bottom-20 right-5 sm:bottom-24 sm:right-6 z-[80] size-14 rounded-full flex items-center justify-center shadow-2xl"
             style={{
               background: 'var(--mk-accent)',
-              boxShadow: '0 8px 28px rgba(232, 93, 61,0.45), 0 0 0 4px rgba(232, 93, 61,0.15)',
+              boxShadow: '0 8px 28px rgba(225, 32, 25,0.45), 0 0 0 4px rgba(225, 32, 25,0.15)',
             }}
           >
             <MessageCircle className="size-6 text-white" />
@@ -261,7 +261,7 @@ export function ChatBot() {
             <span
               aria-hidden
               className="absolute inset-0 rounded-full animate-ping"
-              style={{ background: 'rgba(227, 34, 25, 0.35)' }}
+              style={{ background: 'rgba(225, 32, 25, 0.35)' }}
             />
           </motion.button>
         )}

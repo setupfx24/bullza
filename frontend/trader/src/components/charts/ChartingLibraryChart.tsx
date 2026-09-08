@@ -17,7 +17,7 @@ import { createPortal } from 'react-dom';
 import { useTradingStore, defaultContractSize, livePnlFor } from '@/stores/tradingStore';
 import { useUIStore } from '@/stores/uiStore';
 import { brandDatafeed } from '@/lib/charting/datafeed';
-import { BRAND_LOGO, BRAND_NAME } from '@/lib/brand';
+import { BrandLogo } from '@/components/BrandLogo';
 import api from '@/lib/api/client';
 import toast from 'react-hot-toast';
 import { createBroker, disposeBroker } from '@/lib/charting/broker';
@@ -1089,22 +1089,11 @@ export default function ChartingLibraryChart() {
       {/* Brand watermark — faint, centered, non-interactive. Sits over the
           chart canvas but under the SL/TP overlay (DOM order). */}
       <div className="pointer-events-none absolute inset-0 flex items-center justify-center overflow-hidden">
-        {BRAND_LOGO ? (
-          <img
-            src={BRAND_LOGO}
-            alt=""
-            aria-hidden
-            draggable={false}
-            className="w-40 h-40 md:w-56 md:h-56 object-contain opacity-[0.06] select-none"
-          />
-        ) : (
-          <span
-            aria-hidden
-            className="font-black tracking-tight text-4xl md:text-6xl text-text-primary opacity-[0.06] select-none"
-          >
-            {BRAND_NAME}
-          </span>
-        )}
+        <BrandLogo
+          decorative
+          draggable={false}
+          className="w-40 h-40 md:w-56 md:h-56 object-contain opacity-[0.06] select-none"
+        />
       </div>
       <div ref={overlayRef} className="pointer-events-none absolute inset-0 overflow-hidden" />
       {dialog &&

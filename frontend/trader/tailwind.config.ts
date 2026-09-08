@@ -36,10 +36,14 @@ const config: Config = {
           tertiary: 'var(--text-tertiary)',
           inverse: 'var(--text-inverse)',
         },
+        /* Semantic, not brand. These were coral while bg/glow stayed
+           green — with the brand now red, a red BUY would be
+           indistinguishable from the red SELL below, so DEFAULT/light/dark
+           are back in line with the green bg/glow they always had. */
         buy: {
-          DEFAULT: '#E85D3D',
-          light: '#F08063',
-          dark: '#C9482D',
+          DEFAULT: '#55A630',
+          light: '#6FBF44',
+          dark: '#3F7D22',
           bg: 'rgba(85,166,48,0.1)',
           glow: 'rgba(85,166,48,0.22)',
         },
@@ -50,8 +54,8 @@ const config: Config = {
           bg: 'rgba(239,68,68,0.1)',
           glow: 'rgba(239,68,68,0.2)',
         },
-        accent: { DEFAULT: '#E85D3D', light: '#F08063', dark: '#C9482D' },
-        success: '#C9482D',
+        accent: { DEFAULT: '#E12019', light: '#EE4C45', dark: '#B31810' },
+        success: '#55A630',
         warning: '#FFB300',
         info: '#29B6F6',
         danger: '#FF1744',
@@ -68,12 +72,12 @@ const config: Config = {
         'primary': {
           bg: '#08090b',
           secondary: '#101114',
-          accent: '#E85D3D',
-          purple: '#C9482D',
+          accent: '#E12019',
+          purple: '#B31810',
         },
       },
       backgroundImage: {
-        'gradient-primary': 'linear-gradient(135deg, #F08063 0%, #E85D3D 50%, #C9482D 100%)',
+        'gradient-primary': 'linear-gradient(135deg, #EE4C45 0%, #E12019 50%, #B31810 100%)',
         'gradient-hero': 'linear-gradient(135deg, #08090b 0%, #0e0d09 50%, #08090b 100%)',
         'gradient-section': 'linear-gradient(180deg, #08090b 0%, #101114 100%)',
         'gradient-section-alt': 'linear-gradient(180deg, #101114 0%, #08090b 100%)',

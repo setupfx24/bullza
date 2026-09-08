@@ -75,14 +75,14 @@ const IconMore = ({ active }: { active: boolean }) => (
 
 /* More-sheet items */
 const SHEET_ITEMS: { name: string; path: string; color: string; icon: LucideIcon }[] = [
-  { name: 'Deposit', path: '/wallet', color: '#E85D3D', icon: ArrowDownToLine },
+  { name: 'Deposit', path: '/wallet', color: '#E12019', icon: ArrowDownToLine },
   { name: 'Wallet', path: '/wallet', color: '#3b82f6', icon: Wallet },
   { name: 'Portfolio', path: '/portfolio', color: '#8b5cf6', icon: PieChart },
   { name: 'MAMM', path: '/social', color: '#f59e0b', icon: Copy },
   { name: 'Affiliates', path: '/business', color: '#ec4899', icon: Users },
   { name: 'PAMM', path: '/pamm', color: '#06b6d4', icon: TrendingUp },
   { name: 'History', path: '/transactions', color: '#a855f7', icon: HistoryIcon },
-  { name: 'News', path: '/news', color: '#f97316', icon: Newspaper },
+  { name: 'News', path: '/news', color: '#E12019', icon: Newspaper },
   { name: 'Profile', path: '/profile', color: '#8b5cf6', icon: UserRound },
   { name: 'Support', path: '/support', color: '#14b8a6', icon: MessageCircle },
 ];
@@ -192,7 +192,7 @@ export default function MobileBottomNav() {
       >
         <div className="relative bg-bg-base">
           {/* Top border glow */}
-          <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-[#E85D3D]/20 to-transparent" />
+          <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-[#E12019]/20 to-transparent" />
 
           <div className="flex items-end justify-around h-[62px] px-1">
             {/* Home */}
@@ -224,7 +224,7 @@ export default function MobileBottomNav() {
               <div className={clsx(
                 'w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg transition-all',
                 isChart
-                  ? 'bg-accent text-text-inverse shadow-[0_4px_20px_rgba(232, 93, 61,0.4)]'
+                  ? 'bg-accent text-text-inverse shadow-[0_4px_20px_rgba(225, 32, 25,0.4)]'
                   : 'bg-bg-secondary text-text-secondary border border-border-primary',
               )}>
                 <IconChart />

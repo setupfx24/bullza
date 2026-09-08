@@ -27,7 +27,7 @@ export function MarginDonut({
           />
           <circle
             cx={size / 2} cy={size / 2} r={r} fill="none"
-            stroke="#E85D3D" strokeWidth={11} strokeLinecap="round"
+            stroke="#E12019" strokeWidth={11} strokeLinecap="round"
             strokeDasharray={`${dash} ${c}`}
           />
         </svg>

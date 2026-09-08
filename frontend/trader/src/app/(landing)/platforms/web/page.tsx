@@ -1,7 +1,8 @@
 import Link from 'next/link';
 import { Check, Globe, Zap, BarChart3, Bell } from 'lucide-react';
 import { Section, SectionHeading, PageHero, FeatureGrid, CtaBanner } from '@/marketing/components';
-import { BRAND_NAME, BRAND_LOGO } from '@/lib/brand';
+import { BRAND_NAME } from '@/lib/brand';
+import { BrandLogo } from '@/components/BrandLogo';
 
 /**
  * Platforms → Web. Restyled onto the shared marketing design system.
@@ -69,22 +70,13 @@ export default function WebPlatformPage() {
 
           <article className="mk-card overflow-hidden" style={{ padding: 0 }}>
             <div className="aspect-video overflow-hidden">
-              {BRAND_LOGO ? (
-                /* eslint-disable-next-line @next/next/no-img-element */
-                <img
-                  src={BRAND_LOGO}
-                  alt={`${BRAND_NAME} Web Platform`}
-                  className="w-full h-full object-contain p-16"
-                  style={{ background: 'var(--mk-surface-2)' }}
-                />
-              ) : (
-                <div
-                  className="w-full h-full flex items-center justify-center p-10 text-center"
-                  style={{ background: 'var(--mk-surface-2)' }}
-                >
-                  <span className="mk-h1">{BRAND_NAME}</span>
-                </div>
-              )}
+              {/* Light marketing canvas — ink mark. */}
+              <BrandLogo
+                tone="ink"
+                alt={`${BRAND_NAME} Web Platform`}
+                className="w-full h-full object-contain p-16"
+                style={{ background: 'var(--mk-surface-2)' }}
+              />
             </div>
             <div className="flex flex-col gap-4" style={{ padding: 'var(--mk-space-6)' }}>
               <h3 className="mk-h3">Access Anywhere</h3>

@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
-import { BRAND_LOGO, BRAND_NAME } from '@/lib/brand';
+import { BRAND_NAME } from '@/lib/brand';
+import { BrandLogo } from '@/components/BrandLogo';
 
 type Props = {
   href?: string;
@@ -12,10 +13,11 @@ type Props = {
 };
 
 /**
- * Brand mark for dashboard chrome. Renders the tenant's logo image when
- * NEXT_PUBLIC_BRAND_LOGO is configured, otherwise a styled text wordmark
- * of BRAND_NAME — so an unconfigured white-label build never ships
- * another brand's artwork.
+ * Brand mark for dashboard chrome — the linked wrapper around
+ * <BrandLogo />, which picks the ink or reversed artwork from the active
+ * theme. The text-wordmark fallback this used to carry is gone: it only
+ * existed because BRAND_LOGO defaulted to empty, and the logo now always
+ * resolves to one of the two marks.
  */
 export function BrandWordmark({
   href = '/dashboard',
@@ -30,38 +32,18 @@ export function BrandWordmark({
         title="Trading home"
         className={cn(
           'flex items-center justify-center rounded-md hover:bg-bg-hover w-9 h-9 transition-colors',
-          'focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-2 focus-visible:outline-[#E85D3D]',
+          'focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-2 focus-visible:outline-[#E12019]',
           className,
         )}
       >
-        {BRAND_LOGO ? (
-          <img src={BRAND_LOGO} alt={BRAND_NAME} className="w-7 h-7 object-contain" />
-        ) : (
-          <span className="text-sm font-black tracking-tight text-text-primary select-none">
-            {BRAND_NAME.slice(0, 2).toUpperCase()}
-          </span>
-        )}
+        <BrandLogo className="w-7 h-7 object-contain" />
       </Link>
     );
   }
 
-  const mark = BRAND_LOGO ? (
+  const mark = (
     <span className={cn('inline-flex items-center select-none', className)}>
-      <img
-        src={BRAND_LOGO}
-        alt={BRAND_NAME}
-        className="h-9 sm:h-10 w-auto object-contain shrink-0"
-      />
-    </span>
-  ) : (
-    <span
-      className={cn(
-        'inline-flex items-center select-none font-black tracking-tight text-lg text-text-primary',
-        textClassName,
-        className,
-      )}
-    >
-      {BRAND_NAME}
+      <BrandLogo className="h-9 sm:h-10 w-auto object-contain shrink-0" />
     </span>
   );
 
@@ -69,7 +51,7 @@ export function BrandWordmark({
     <Link
       href={href}
       className={cn(
-        'min-w-0 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#E85D3D]/60 focus-visible:rounded-md',
+        'min-w-0 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#E12019]/60 focus-visible:rounded-md',
         className,
       )}
     >

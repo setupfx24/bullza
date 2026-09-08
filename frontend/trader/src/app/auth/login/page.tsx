@@ -1,6 +1,7 @@
 'use client';
 
-import { BRAND_LOGO, BRAND_NAME } from '@/lib/brand';
+import { BRAND_NAME } from '@/lib/brand';
+import { BrandLogo } from '@/components/BrandLogo';
 
 import { Suspense, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -249,14 +250,10 @@ function LoginContent() {
                 {/* ── SIGN IN ── */}
                   <form className="auth-form" onSubmit={handleSignIn} noValidate>
                     <motion.div {...fadeUp(0.25)} className="mb-1">
-                      {BRAND_LOGO ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={BRAND_LOGO} alt={BRAND_NAME} className="h-9 w-auto object-contain" />
-                      ) : (
-                        <span className="text-xl font-black tracking-tight text-text-primary select-none">
-                          {BRAND_NAME}
-                        </span>
-                      )}
+                      {/* auth.css pins this card to white in both themes,
+                          so the mark is pinned to ink rather than following
+                          data-theme — the reversed one would vanish. */}
+                      <BrandLogo tone="ink" className="h-9 w-auto object-contain" />
                     </motion.div>
                     <motion.div {...fadeUp(0.3)}>
                       <h2 className="auth-form__title">Welcome Back</h2>
@@ -270,8 +267,8 @@ function LoginContent() {
                       <motion.div
                         {...fadeUp(0.32)}
                         style={{
-                          background: 'rgba(232, 93, 61, 0.10)',
-                          border: '1px solid rgba(232, 93, 61, 0.35)',
+                          background: 'rgba(225, 32, 25, 0.10)',
+                          border: '1px solid rgba(225, 32, 25, 0.35)',
                           borderRadius: 10,
                           padding: '10px 12px',
                           marginTop: 4,

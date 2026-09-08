@@ -1,7 +1,6 @@
 import Link from 'next/link'
-import { Facebook, Instagram, Linkedin, Youtube, Mail, Cookie } from 'lucide-react'
+import { Facebook, Instagram, Linkedin, Youtube, Mail } from 'lucide-react'
 import ScrollReveal from './animations/ScrollReveal'
-import { openCookieSettings } from '@/home/components/CookieConsent'
 import { BRAND_NAME, BRAND_DOMAIN, BRAND_LOGO_LIGHT, BRAND_SUPPORT_EMAIL, BRAND_COPYRIGHT } from '@/lib/brand'
 
 const columns = {
@@ -121,7 +120,7 @@ export default function Footer() {
                     }}
                     onMouseEnter={(e) => {
                       e.currentTarget.style.color = 'var(--fx-gold-light)'
-                      e.currentTarget.style.borderColor = 'rgba(232, 93, 61,0.4)'
+                      e.currentTarget.style.borderColor = 'rgba(225, 32, 25,0.4)'
                     }}
                     onMouseLeave={(e) => {
                       e.currentTarget.style.color = 'var(--fx-text-2)'
@@ -241,18 +240,6 @@ export default function Footer() {
           <p className="text-xs" style={{ color: 'var(--fx-text-3)' }}>
             {BRAND_COPYRIGHT} · Founded in 2010
           </p>
-          {/* Cookie Settings — surfaces the consent modal even after
-              the user has already accepted/saved a preference, so the
-              choice stays revisable per GDPR. */}
-          <button
-            type="button"
-            onClick={openCookieSettings}
-            className="inline-flex items-center gap-1.5 text-xs hover:underline transition-colors"
-            style={{ color: 'var(--fx-text-2)' }}
-            aria-label="Open cookie settings"
-          >
-            <Cookie size={13} /> Cookie Settings
-          </button>
         </div>
       </div>
     </footer>

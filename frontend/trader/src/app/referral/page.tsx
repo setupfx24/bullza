@@ -68,7 +68,7 @@ function getOrigin() {
 
 const STATUS_BADGE: Record<ReferralRow['status'], { label: string; bg: string; fg: string }> = {
   pending:   { label: 'PENDING',   bg: '#f5a52422', fg: '#f5a524' },
-  claimable: { label: 'CLAIMABLE', bg: '#E85D3D22', fg: '#E85D3D' },
+  claimable: { label: 'CLAIMABLE', bg: '#E1201922', fg: '#E12019' },
   claimed:   { label: 'CLAIMED',   bg: '#2e2e2e',   fg: '#9ca3af' },
 };
 

@@ -208,17 +208,20 @@ function BrokerHome() {
 
   return (
     <div className="space-y-5 pb-10 max-w-[1240px] mx-auto w-full">
-      {/* Greeting — big, quiet, reference-style hierarchy. */}
+      {/* Greeting. The reference leads with a large, light page title over
+          a small date line, so the heading steps up from 20/24px and the
+          date drops to a quiet caption above it. */}
       <div className="flex flex-wrap items-end justify-between gap-3 px-1">
         <div>
           <p className="text-[11px] font-semibold text-text-tertiary">{today}</p>
-          <h1 className="mt-0.5 text-xl md:text-2xl font-extrabold tracking-tight text-text-primary">
+          <h1 className="mt-1 text-[26px] md:text-[34px] font-extrabold tracking-[-0.02em] leading-none text-text-primary">
             {user?.first_name ? `Hey, ${user.first_name} 👋` : 'Welcome back 👋'}
           </h1>
         </div>
         <Link
           href="/support"
-          className="text-[11px] font-bold text-text-tertiary hover:text-text-primary transition-colors"
+          className="rounded-full px-3 py-1.5 text-[11px] font-bold text-text-tertiary transition-colors hover:bg-bg-hover hover:text-text-primary"
+          style={{ border: '1px solid var(--border-glass-bright)' }}
         >
           Need help? →
         </Link>
@@ -319,12 +322,12 @@ function InviteFriendsCard() {
                   readOnly
                   value={link}
                   onFocus={(e) => e.currentTarget.select()}
-                  className="flex-1 min-w-0 text-[10px] font-mono bg-bg-secondary border border-border-primary rounded-full px-3 py-1.5 text-text-primary outline-none focus:border-[#E85D3D]/40"
+                  className="flex-1 min-w-0 text-[10px] font-mono bg-bg-secondary border border-border-primary rounded-full px-3 py-1.5 text-text-primary outline-none focus:border-[#E12019]/40"
                 />
                 <button
                   type="button"
                   onClick={() => onCopy(link)}
-                  className="shrink-0 px-3 py-1.5 text-[10px] font-extrabold rounded-full border border-[#E85D3D]/40 text-[#E85D3D] hover:bg-[#E85D3D]/10 transition-colors"
+                  className="shrink-0 px-3 py-1.5 text-[10px] font-extrabold rounded-full border border-[#E12019]/40 text-[#E12019] hover:bg-[#E12019]/10 transition-colors"
                 >
                   Copy
                 </button>
@@ -335,7 +338,7 @@ function InviteFriendsCard() {
                   <button
                     type="button"
                     onClick={() => onCopy(code)}
-                    className="text-[#E85D3D] font-mono font-bold cursor-pointer hover:underline"
+                    className="text-[#E12019] font-mono font-bold cursor-pointer hover:underline"
                     title="Click to copy your referral code"
                   >
                     {code}
@@ -346,7 +349,7 @@ function InviteFriendsCard() {
           ) : (
             <Link
               href="/referral"
-              className="inline-flex items-center gap-1.5 mt-3 text-[11px] font-extrabold text-[#E85D3D] hover:underline"
+              className="inline-flex items-center gap-1.5 mt-3 text-[11px] font-extrabold text-[#E12019] hover:underline"
             >
               Get your referral link <ArrowRight size={12} />
             </Link>
@@ -369,7 +372,7 @@ function BannerStrip({ banners }: { banners: Banner[] }) {
   // Fixed 5:1 aspect ratio everywhere a banner shows (dashboard + admin
   // preview list). Recommended upload size: 1500×300.
   return (
-    <div className="relative w-full rounded-2xl overflow-hidden" style={{ border: '1px solid var(--border-glass-bright)' }}>
+    <div className="relative w-full rounded-3xl overflow-hidden" style={{ border: '1px solid var(--border-glass-bright)' }}>
       <div className="relative w-full aspect-[5/1] bg-bg-secondary">
         {b.link_url ? (
           <a href={b.link_url} target="_blank" rel="noopener noreferrer" className="absolute inset-0 block">
@@ -385,7 +388,7 @@ function BannerStrip({ banners }: { banners: Banner[] }) {
             <span
               key={i}
               className="w-1.5 h-1.5 rounded-full transition-colors"
-              style={{ background: i === index ? '#E85D3D' : 'rgba(255,255,255,0.4)' }}
+              style={{ background: i === index ? '#E12019' : 'rgba(255,255,255,0.4)' }}
             />
           ))}
         </div>

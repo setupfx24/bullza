@@ -1,6 +1,7 @@
 'use client';
 
-import { BRAND_LOGO, BRAND_NAME } from '@/lib/brand';
+import { BRAND_NAME } from '@/lib/brand';
+import { BrandLogo } from '@/components/BrandLogo';
 
 import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -251,14 +252,8 @@ function RegisterContent() {
               >
                 <form className="auth-form" onSubmit={handleSubmit} noValidate>
                   <motion.div {...fadeUp(0.25)} className="mb-1">
-                    {BRAND_LOGO ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={BRAND_LOGO} alt={BRAND_NAME} className="h-9 w-auto object-contain" />
-                    ) : (
-                      <span className="text-xl font-black tracking-tight text-text-primary select-none">
-                        {BRAND_NAME}
-                      </span>
-                    )}
+                    {/* Pinned to ink — see the note on the login page. */}
+                    <BrandLogo tone="ink" className="h-9 w-auto object-contain" />
                   </motion.div>
                   <motion.div {...fadeUp(0.3)}>
                     <h2 className="auth-form__title">Get Started</h2>
