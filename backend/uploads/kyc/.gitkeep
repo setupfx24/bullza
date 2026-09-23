@@ -1,0 +1,4 @@
+# Git does not track empty directories, but the gateway and admin-api
+# create files here at import time. Without these the containers (which
+# run as uid 1001, not root) cannot mkdir under the root-owned bind mount
+# and crash on boot with PermissionError.
