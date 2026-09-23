@@ -148,7 +148,6 @@ class Settings(BaseSettings):
     SMTP_FROM_INSURE: str = ""       # insured-trade payouts + reminders
     SMTP_FROM_AFFILIATES: str = ""   # IB / PAMM / MAM
     SMTP_FROM_VOUCHER: str = ""      # bonus + referral
-    SMTP_FROM_STACKING: str = ""     # fixed-return + staking
     SMTP_FROM_INFO: str = ""         # generic website-side mails (default)
     SMTP_FROM_SUPPORT: str = ""      # auth / KYC / password reset
 

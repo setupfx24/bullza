@@ -175,7 +175,6 @@ def _category_address(category: str) -> str | None:
         "insure":     getattr(s, "SMTP_FROM_INSURE", "") or "",
         "affiliates": getattr(s, "SMTP_FROM_AFFILIATES", "") or "",
         "voucher":    getattr(s, "SMTP_FROM_VOUCHER", "") or "",
-        "stacking":   getattr(s, "SMTP_FROM_STACKING", "") or "",
         "info":       getattr(s, "SMTP_FROM_INFO", "") or "",
         "support":    getattr(s, "SMTP_FROM_SUPPORT", "") or "",
     }.get(category, "")
