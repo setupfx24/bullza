@@ -24,7 +24,7 @@ class Settings(BaseSettings):
     # any server-rendered copy. Set BRAND_NAME / BRAND_DOMAIN in .env when
     # deploying for a tenant; everything brand-visible flows from here.
     BRAND_NAME: str = "Bullza"
-    BRAND_DOMAIN: str = "bullza.com"
+    BRAND_DOMAIN: str = "bullza.exchange"
 
     DATABASE_URL: str = "postgresql+asyncpg://broker:broker_dev@localhost:5432/broker"
     TIMESCALE_URL: str = "postgresql+asyncpg://broker:broker_dev@localhost:5433/marketdata"

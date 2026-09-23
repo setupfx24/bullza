@@ -34,8 +34,8 @@ services:
     restart: always
     environment:
       # Defaults target the Bullza tenant; override in .env for another tenant.
-      CORS_ORIGINS: ${CORS_ORIGINS:-https://bullza.com,https://trade.bullza.com,https://admin.bullza.com}
-      COOKIE_DOMAIN: ${COOKIE_DOMAIN:-.bullza.com}
+      CORS_ORIGINS: ${CORS_ORIGINS:-https://bullza.exchange,https://trade.bullza.exchange,https://admin.bullza.exchange}
+      COOKIE_DOMAIN: ${COOKIE_DOMAIN:-.bullza.exchange}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
       # Mobile app stores its own tokens (no cookies), so it needs the
       # refresh token returned in the login JSON body. The web app keeps
@@ -60,7 +60,7 @@ services:
       dockerfile: Dockerfile
       args:
         NEXT_PUBLIC_APP_VERSION: ${APP_VERSION:-production}
-        NEXT_PUBLIC_WS_URL: ${NEXT_PUBLIC_WS_URL:-wss://api.bullza.com}
+        NEXT_PUBLIC_WS_URL: ${NEXT_PUBLIC_WS_URL:-wss://api.bullza.exchange}
         # White-label branding — baked into the bundle at build time (see lib/brand.ts).
         NEXT_PUBLIC_BRAND_NAME: ${NEXT_PUBLIC_BRAND_NAME:-}
         NEXT_PUBLIC_BRAND_SLUG: ${NEXT_PUBLIC_BRAND_SLUG:-}
@@ -95,7 +95,7 @@ services:
       INTERNAL_API_URL: http://gateway:8000/api/v1
       TRADER_API_PROXY_TARGET: http://gateway:8000
       # Browser WebSocket connects directly to api subdomain
-      NEXT_PUBLIC_WS_URL: ${NEXT_PUBLIC_WS_URL:-wss://api.bullza.com}
+      NEXT_PUBLIC_WS_URL: ${NEXT_PUBLIC_WS_URL:-wss://api.bullza.exchange}
       # NEXT_PUBLIC_MARKETING_HOST / NEXT_PUBLIC_TRADE_HOST intentionally unset —
       # single-origin app for the PWA (see build args note above).
       # DO NOT set NEXT_PUBLIC_GATEWAY_URL — browser uses same-origin /api/v1 proxy (avoids CORS)

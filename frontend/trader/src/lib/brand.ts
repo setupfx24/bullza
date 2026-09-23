@@ -12,8 +12,8 @@ export const BRAND_NAME = process.env.NEXT_PUBLIC_BRAND_NAME || 'Bullza';
 /** Lowercase machine-safe slug (storage keys, ids). */
 export const BRAND_SLUG = process.env.NEXT_PUBLIC_BRAND_SLUG || 'bullza';
 
-/** Public web domain (no scheme), e.g. "bullza.com". */
-export const BRAND_DOMAIN = process.env.NEXT_PUBLIC_BRAND_DOMAIN || 'bullza.com';
+/** Public web domain (no scheme), e.g. "bullza.exchange". */
+export const BRAND_DOMAIN = process.env.NEXT_PUBLIC_BRAND_DOMAIN || 'bullza.exchange';
 
 /**
  * Logo image path. Empty string means "no image logo" — components fall
