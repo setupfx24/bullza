@@ -4,7 +4,7 @@
 
 /* ═══════════════════════════════════════════════════════════
    Admin — Dark-first premium theme
-   Matches trader dashboard: green (#55a630) accent, glassmorphism,
+   Matches trader dashboard: vermilion (#E85D3D) accent, glassmorphism,
    skeuomorphic buttons, smooth animations.
    ═══════════════════════════════════════════════════════════ */
 
@@ -146,7 +146,7 @@ p, label, span { font-weight: inherit; }
 
 /* ── Utility ── */
 .transition-fast { transition: all 150ms ease; }
-.focus-ring:focus { outline: 1px solid #55a630; outline-offset: -1px; }
+.focus-ring:focus { outline: 1px solid #E85D3D; outline-offset: -1px; }
 
 /* ═══════════════════════════════════════════════════════════
    Glassmorphism
@@ -179,7 +179,7 @@ p, label, span { font-weight: inherit; }
   box-shadow: 0 2px 8px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.08);
 }
 .skeu-btn-accent {
-  background: linear-gradient(180deg, #7dc24f 0%, #55a630 40%, #3f7d22 100%);
+  background: linear-gradient(180deg, #F08063 0%, #E85D3D 40%, #C9482D 100%);
   border: 1px solid rgba(85,166,48,0.5);
   box-shadow: 0 2px 8px rgba(85,166,48,0.3), 0 1px 2px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.2);
   color: #1a1408;
@@ -260,8 +260,8 @@ p, label, span { font-weight: inherit; }
    ═══════════════════════════════════════════════════════════ */
 .nav-active {
   background: rgba(85,166,48,0.08);
-  border-left: 2px solid #55a630;
-  color: #55a630;
+  border-left: 2px solid #E85D3D;
+  color: #E85D3D;
   box-shadow: inset 3px 0 12px rgba(85,166,48,0.06);
 }
 

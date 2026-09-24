@@ -30,9 +30,9 @@ const config: Config = {
         },
         /* Brand accent — matches trader */
         buy: {
-          DEFAULT: '#55a630',
-          light: '#7dc24f',
-          dark: '#3f7d22',
+          DEFAULT: '#E85D3D',
+          light: '#F08063',
+          dark: '#C9482D',
           bg: 'rgba(85,166,48,0.08)',
           glow: 'rgba(85,166,48,0.25)',
         },
@@ -42,7 +42,7 @@ const config: Config = {
           dark: '#dc2626',
           bg: 'rgba(239,68,68,0.07)',
         },
-        accent: { DEFAULT: '#55a630', light: '#7dc24f', dark: '#3f7d22' },
+        accent: { DEFAULT: '#E85D3D', light: '#F08063', dark: '#C9482D' },
         success: '#22c55e',
         warning: '#FFB300',
         info: '#29B6F6',

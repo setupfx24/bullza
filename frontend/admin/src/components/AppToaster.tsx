@@ -17,7 +17,7 @@ export default function AppToaster() {
       position="top-right"
       toastOptions={{
         style: toastStyle,
-        success: { iconTheme: { primary: '#55a630', secondary: '#000' } },
+        success: { iconTheme: { primary: '#E85D3D', secondary: '#000' } },
         error: { iconTheme: { primary: '#ef4444', secondary: '#fff' } },
       }}
     />
