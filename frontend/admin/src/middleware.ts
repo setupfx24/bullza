@@ -19,7 +19,15 @@ import { NextResponse, type NextRequest } from 'next/server';
 const ADMIN_COOKIE = process.env.NEXT_PUBLIC_ADMIN_COOKIE_NAME || 'admin_access';
 
 const PUBLIC_PREFIXES = ['/login', '/admin-api', '/_next', '/images', '/fonts'];
-const PUBLIC_EXACT = new Set<string>(['/favicon.ico', '/robots.txt']);
+// App Router serves the tab icon from src/app/icon.png at /icon.png (and
+// /apple-icon.png), NOT /favicon.ico — so gating those behind auth made the
+// browser 307 to /login when fetching the favicon and silently keep whatever
+// icon it had cached. /logo.png is the auth page's background wordmark and is
+// needed before anyone is logged in.
+const PUBLIC_EXACT = new Set<string>([
+  '/favicon.ico', '/robots.txt',
+  '/icon.png', '/apple-icon.png', '/logo.png',
+]);
 
 function isPublic(pathname: string): boolean {
   if (PUBLIC_EXACT.has(pathname)) return true;
