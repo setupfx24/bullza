@@ -321,6 +321,18 @@ async def distribute_ib_commission(
     Either gate failing → no commission this trade. The IB still earns
     from the same trader on every subsequent qualifying trade.
     """
+    # Idempotency. The outbox retries on failure, and this used to be called
+    # from a fire-and-forget task, so a second call for one fill was always
+    # possible — and would have paid the whole chain twice. Bail if this order
+    # already produced commission rows. Migration 0108 adds a unique index as
+    # the database-level backstop.
+    already = (await db.execute(
+        select(func.count(IBCommission.id)).where(IBCommission.source_trade_id == order_id)
+    )).scalar() or 0
+    if already:
+        logger.info("IB commission already distributed for order %s — skipping", order_id)
+        return
+
     # referrals.referred_id has no unique constraint — if a duplicate row
     # ever slips in, scalar_one_or_none() would raise and silently kill the
     # commission for that trader forever. First referral (oldest) wins.

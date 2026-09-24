@@ -33,6 +33,7 @@ from .engines.statement_engine import statement_engine
 from .engines.payout_engine import payout_engine
 from .engines.nowpayments_reconcile_engine import nowpayments_reconcile_engine
 from .engines.abook_outbox_engine import abook_outbox_engine
+from .engines.commission_outbox_engine import commission_outbox_engine
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)-5s [%(name)s] %(message)s")
 logger = logging.getLogger("gateway")
@@ -91,7 +92,9 @@ async def lifespan(app: FastAPI):
     await payout_engine.start()
     await nowpayments_reconcile_engine.start()
     await abook_outbox_engine.start()
+    await commission_outbox_engine.start()
     yield
+    await commission_outbox_engine.stop()
     await abook_outbox_engine.stop()
     await nowpayments_reconcile_engine.stop()
     await payout_engine.stop()

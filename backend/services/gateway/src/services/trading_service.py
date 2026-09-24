@@ -16,7 +16,7 @@ from packages.common.src.models import (
     Order, OrderType, OrderSide, OrderStatus, Position, PositionStatus,
     TradingAccount, Instrument, InstrumentConfig,
     TradeHistory, Transaction, CopyTrade, UserAuditLog, User,
-    MasterAccount,
+    MasterAccount, CommissionOutbox,
 )
 from packages.common.src.instrument_pricing import (
     resolve_commission, resolve_spread_config, symmetric_quote_from_mid,
@@ -135,7 +135,6 @@ async def place_order(
     db: AsyncSession,
 ) -> dict:
     from packages.common.src.settings_store import get_bool_setting, get_int_setting, get_float_setting
-    from ..engines.ib_engine import distribute_ib_commission
 
     # --- Parallel: settings from Redis (no DB session needed) ---
     # Global platform caps sit on top of per-instrument limits (InstrumentConfig).
@@ -612,9 +611,24 @@ async def place_order(
                 "trading_account_id": str(account.id),
             },
         )
+    # ── IB commission: durable outbox, enqueued in THIS transaction ────
+    # Previously distributed from a detached task AFTER commit, so a restart
+    # between the two silently lost the partner's payout. The row now commits
+    # atomically with the fill; commission_outbox_engine drains it with
+    # retry/backoff. order_id is UNIQUE, so this is idempotent.
+    if req.order_type == "market":
+        db.add(
+            CommissionOutbox(
+                order_id=order.id,
+                trader_user_id=user_id,
+                lots=Decimal(str(req.lots)),
+                instrument_symbol=instrument.symbol,
+            )
+        )
+
     await db.commit()
 
-    # Fire-and-forget: notification + IB commission run in background (don't block response)
+    # Fire-and-forget: notification only (commission is on the outbox above)
     if req.order_type == "market":
 
         async def _post_order_tasks():
@@ -628,12 +642,6 @@ async def place_order(
                     )
                 except Exception as e:
                     logger.warning("Post-order notification error: %s", e)
-                try:
-                    await distribute_ib_commission(
-                        bg_db, user_id, order.id, req.lots, instrument.symbol
-                    )
-                except Exception as e:
-                    logger.error("IB commission error: %s", e)
                 await bg_db.commit()
         asyncio.create_task(_post_order_tasks())
 

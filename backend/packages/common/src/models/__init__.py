@@ -59,6 +59,7 @@ from .share import SharedTrade
 from .rm import RMFundingRequest, RmManualRequest
 from .referral_bonus_campaign import ReferralBonusCampaign, ReferralBonusClaim
 from .abook import ABookOutbox
+from .commission_outbox import CommissionOutbox
 
 __all__ = [
     "Base",
@@ -94,4 +95,6 @@ __all__ = [
     "ReferralBonusCampaign", "ReferralBonusClaim",
     # A-Book LP forwarding outbox
     "ABookOutbox",
+    # IB commission distribution outbox
+    "CommissionOutbox",
 ]
