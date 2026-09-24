@@ -22,6 +22,18 @@ const nextConfig = {
   }),
   webpack: (config) => {
     config.resolve.alias['react-router-dom'] = path.resolve(__dirname, 'src/landing/router-shim.tsx');
+    // @coinbase/cdp-sdk (pulled in transitively by RainbowKit ->
+    // wagmi/connectors -> @base-org/account) statically imports @x402/*,
+    // which it does not depend on and npm therefore never installs. Next
+    // 15.5.14's webpack tolerated the dangling import; 15.5.26 fails the
+    // build on it. The code path is x402 micro-payments, which this app
+    // never calls, so resolve them to false rather than pin Next back to a
+    // release with a known DoS advisory.
+    config.resolve.alias['@x402/evm/upto/client'] = false;
+    config.resolve.alias['@x402/evm/exact/client'] = false;
+    config.resolve.alias['@x402/core/client'] = false;
+    config.resolve.alias['@x402/evm'] = false;
+    config.resolve.alias['@x402/core'] = false;
     return config;
   },
   /* Turbopack ignores the webpack hook above — duplicate the alias here so
