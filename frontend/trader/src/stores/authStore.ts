@@ -25,8 +25,6 @@ interface User {
   /** True when first_name, last_name, phone, country, and DOB are all set.
    * The ProfileCompleteGate modal blocks the app until this flips true. */
   profile_complete?: boolean;
-  /** Linked SIWE wallet (lowercase 0x). Drives the LinkedWalletCard UI. */
-  wallet_address?: string | null;
   /** Whether the user has each non-wallet sign-in method available. Used
    * to disable Unlink when wallet is the only credential. */
   has_password?: boolean;

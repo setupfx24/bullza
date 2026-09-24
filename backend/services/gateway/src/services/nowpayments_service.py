@@ -125,11 +125,11 @@ async def create_payment(
 #
 # /v1/payment returns a single pay_address + pay_amount + expires_at,
 # rather than redirecting the user to NOWPayments' hosted page. The
-# trader keeps the user on our app and shows the address + a wallet-
-# connect button (wagmi/RainbowKit) that signs the transfer.
+# trader keeps the user on our app and shows the address + amount for
+# the user to send from whatever wallet or exchange they already use.
 
-# Frontend network IDs we surface back to the wallet-connect layer so
-# it can pre-switch the user's wallet to the right chain. Maps from the
+# Network IDs we surface to the frontend so it can label the address
+# with the right chain. Maps from the
 # user's selected asset → chain slug.
 NETWORK_MAP: dict[str, str] = {
     "ETH": "eth",
@@ -169,7 +169,7 @@ async def create_direct_payment(
       pay_address    — admin's deposit address
       pay_amount     — exact crypto amount (string, preserves precision)
       pay_currency   — NOWPayments code (usdterc20, eth, …)
-      network        — wagmi-friendly slug (eth, bsc, …)
+      network        — chain slug shown to the user (eth, bsc, …)
       expires_at     — ISO timestamp string from NOWPayments
     Raises ValueError on missing config or non-2xx response.
     """
