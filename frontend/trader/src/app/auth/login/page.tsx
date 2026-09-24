@@ -13,7 +13,6 @@ import { usePlatformStatusStore } from '@/stores/platformStatusStore';
 import toast from 'react-hot-toast';
 import GoogleAuthButton from '@/components/auth/GoogleAuthButton';
 import { AuthLeftPanel } from '@/components/auth/AuthLeftPanel';
-// import ConnectWalletButton from '@/components/auth/ConnectWalletButton'; // Re-enable when wallet login goes live
 import '../auth.css';
 
 /* ── animation helpers ── */
@@ -346,13 +345,6 @@ function LoginContent() {
                       </Suspense>
                     </motion.div>
 
-                    {/* Connect wallet — hidden for now, will re-enable when wallet login is ready.
-                       <motion.div {...fadeUp(0.595)}>
-                         <ConnectWalletButton
-                           variant="login"
-                           disabled={loading || isLoading || demoLoading || maintenance}
-                         />
-                       </motion.div> */}
 
                     <motion.div {...fadeUp(0.6)}>
                       <button

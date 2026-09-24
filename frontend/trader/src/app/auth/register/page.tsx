@@ -11,7 +11,6 @@ import { useAuthStore } from '@/stores/authStore';
 import toast from 'react-hot-toast';
 import GoogleAuthButton from '@/components/auth/GoogleAuthButton';
 import { AuthLeftPanel } from '@/components/auth/AuthLeftPanel';
-// import ConnectWalletButton from '@/components/auth/ConnectWalletButton'; // Re-enable when wallet login goes live
 import PhoneInput from '@/components/forms/PhoneInput';
 import TurnstileWidget from '@/components/forms/TurnstileWidget';
 import { scorePassword, PASSWORD_REQUIREMENTS } from '@/lib/passwordPolicy';
@@ -496,13 +495,6 @@ function RegisterContent() {
                     <GoogleAuthButton disabled={loading || isLoading || demoLoading} />
                   </motion.div>
 
-                  {/* Connect wallet — hidden for now, will re-enable when wallet login is ready.
-                     <motion.div {...fadeUp(0.755)}>
-                       <ConnectWalletButton
-                         variant="login"
-                         disabled={loading || isLoading || demoLoading}
-                       />
-                     </motion.div> */}
 
                   <motion.div {...fadeUp(0.76)}>
                     <button

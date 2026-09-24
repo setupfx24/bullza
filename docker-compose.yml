@@ -202,7 +202,6 @@ services:
         # for the value to actually reach the browser.
         NEXT_PUBLIC_CLOUDFLARE_TURNSTILE_SITE_KEY: ${NEXT_PUBLIC_CLOUDFLARE_TURNSTILE_SITE_KEY:-}
         NEXT_PUBLIC_GOOGLE_CLIENT_ID: ${NEXT_PUBLIC_GOOGLE_CLIENT_ID:-}
-        NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID: ${NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID:-}
         NEXT_PUBLIC_MARKETING_HOST: ${NEXT_PUBLIC_MARKETING_HOST:-}
         NEXT_PUBLIC_TRADE_HOST: ${NEXT_PUBLIC_TRADE_HOST:-}
         # White-label branding — also baked in at build time (see lib/brand.ts).

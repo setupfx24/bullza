@@ -10,10 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from packages.common.src.database import get_db
 from packages.common.src.auth import get_current_user
 from packages.common.src.models import User
-from packages.common.src.schemas import (
-    WalletNonceRequest, WalletNonceResponse, WalletVerifyRequest,
-)
-from ..services import profile_service, auth_service, wallet_auth_service
+from ..services import profile_service, auth_service
 
 router = APIRouter()
 
@@ -181,91 +178,3 @@ async def get_kyc_file(
             "X-Content-Type-Options": "nosniff",
         },
     )
-
-
-# ── Wallet linking (SIWE) ───────────────────────────────────────────────────
-
-
-@router.post("/wallet/link/nonce", response_model=WalletNonceResponse)
-async def link_wallet_nonce(
-    req: WalletNonceRequest, request: Request,
-    current_user: dict = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    """Issue a single-use SIWE nonce bound to *this* authenticated user.
-    Used by the profile page's 'Link Wallet' flow — separate from the
-    sign-in nonce because we need to ensure the eventual signature
-    verification can only succeed inside the original session."""
-    try:
-        return await wallet_auth_service.issue_nonce(
-            req.address, req.chain_id, request, db,
-            issued_for="link", user_id=current_user["user_id"],
-        )
-    except wallet_auth_service.AuthServiceError as e:
-        raise HTTPException(status_code=e.status_code, detail=e.detail)
-
-
-@router.post("/wallet/link")
-async def link_wallet(
-    req: WalletVerifyRequest, request: Request,
-    current_user: dict = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    """Verify a SIWE signature for the authenticated user and persist the
-    wallet address on their account row. Rejects 409 if the wallet is
-    already linked to a different user."""
-    try:
-        addr_lower, _nonce_row = await wallet_auth_service.verify_message(
-            req.message, req.signature, request, db,
-            expected_user_id=current_user["user_id"],
-        )
-    except wallet_auth_service.AuthServiceError as e:
-        raise HTTPException(status_code=e.status_code, detail=e.detail)
-
-    user_q = await db.execute(select(User).where(User.id == current_user["user_id"]))
-    user = user_q.scalar_one_or_none()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-
-    # Conflict guard: another row already owns this address.
-    existing_q = await db.execute(
-        select(User.id).where(
-            func.lower(User.wallet_address) == addr_lower,
-            User.id != user.id,
-        )
-    )
-    if existing_q.scalar_one_or_none():
-        raise HTTPException(
-            status_code=409,
-            detail="Wallet already linked to another account",
-        )
-
-    user.wallet_address = addr_lower
-    await db.commit()
-    return await auth_service.get_me(user.id, db)
-
-
-@router.delete("/wallet/link")
-async def unlink_wallet(
-    current_user: dict = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    """Remove the linked wallet from the authenticated user's account.
-    Refused when the wallet is the user's only sign-in method — they'd
-    lock themselves out."""
-    user_q = await db.execute(select(User).where(User.id == current_user["user_id"]))
-    user = user_q.scalar_one_or_none()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-
-    has_password = bool(user.password_hash)
-    has_google = bool(user.google_id)
-    if not (has_password or has_google):
-        raise HTTPException(
-            status_code=400,
-            detail="Cannot unlink your only sign-in method. Set a password first.",
-        )
-
-    user.wallet_address = None
-    await db.commit()
-    return await auth_service.get_me(user.id, db)

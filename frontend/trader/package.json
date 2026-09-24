@@ -17,7 +17,6 @@
     "@fontsource/oswald": "^5.1.0",
     "@radix-ui/react-accordion": "^1.2.1",
     "@radix-ui/react-slot": "^1.1.0",
-    "@rainbow-me/rainbowkit": "^2.2.10",
     "@react-oauth/google": "^0.12.2",
     "@tanstack/react-query": "^5.100.7",
     "autoprefixer": "^10.4.20",
@@ -25,7 +24,6 @@
     "clsx": "^2.1.1",
     "country-state-city": "^3.2.1",
     "date-fns": "^3.6.0",
-    "ethers": "^6.13.1",
     "flag-icons": "^7.5.0",
     "framer-motion": "^12.38.0",
     "gsap": "^3.14.2",
@@ -44,12 +42,9 @@
     "react-dom": "^18.3.1",
     "react-hot-toast": "^2.4.1",
     "react-intersection-observer": "^10.0.3",
-    "siwe": "^2.3.2",
     "tailwind-merge": "^2.5.0",
     "tailwindcss": "^3.4.10",
     "three": "^0.183.2",
-    "viem": "^2.48.7",
-    "wagmi": "^2.19.5",
     "zustand": "^4.5.4"
   },
   "overrides": {

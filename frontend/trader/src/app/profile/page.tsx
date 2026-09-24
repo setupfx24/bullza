@@ -11,7 +11,6 @@ import { useUIStore } from '@/stores/uiStore';
 import { useTradingStore } from '@/stores/tradingStore';
 import { Button } from '@/components/ui/Button';
 import DashboardShell from '@/components/layout/DashboardShell';
-import LinkedWalletCard from '@/components/profile/LinkedWalletCard';
 import DOBPicker from '@/components/forms/DOBPicker';
 import api from '@/lib/api/client';
 
@@ -570,7 +569,6 @@ export default function ProfilePage() {
               )}
             </div>
 
-            <LinkedWalletCard />
           </div>
         )}
 

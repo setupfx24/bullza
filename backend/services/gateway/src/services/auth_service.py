@@ -1432,7 +1432,6 @@ async def get_me(user_id: UUID, db: AsyncSession) -> dict:
         "language": user.language or "en",
         "theme": user.theme or "dark",
         "profile_complete": complete,
-        "wallet_address": user.wallet_address,
         "has_password": bool(user.password_hash),
         "has_google": bool(user.google_id),
         "created_at": user.created_at,

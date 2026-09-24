@@ -28,7 +28,7 @@ from ._enums import (
 # ── Domain modules (eagerly imported so SQLAlchemy registers every class) ──
 from .users import (
     User, UserSession, PasswordResetToken, UserRefreshToken, KYCDocument,
-    IPLog, AuditLog, UserAuditLog, Employee, WalletAuthNonce,
+    IPLog, AuditLog, UserAuditLog, Employee,
     EmployeeCustomRole, EmployeeTask,
 )
 from .instruments import (

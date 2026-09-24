@@ -11,7 +11,6 @@ import DemoLockGate from '@/components/demo/DemoLockGate';
 import { useAuthStore } from '@/stores/authStore';
 import api from '@/lib/api/client';
 import { fmtAccountMoney, isCentAccount, CENT_PER_USD, CENT_SYMBOL } from '@/lib/wallet/centDisplay';
-import WalletDepositModal from '@/components/wallet/WalletDepositModal';
 import P2PMarketplace from '@/components/wallet/P2PMarketplace';
 import {
   ArrowUpRight,
@@ -2216,17 +2215,6 @@ function WalletPageContent() {
         </div>
       )}
 
-      <WalletDepositModal
-        open={walletDepositOpen}
-        onClose={() => setWalletDepositOpen(false)}
-        amountUsd={walletDepositAmount}
-        cryptoAsset={walletDepositAsset}
-        onSettled={() => {
-          // The IPN webhook already credited balance + sent the email; just
-          // refresh the wallet view so the user sees the new total.
-          void fetchData(true);
-        }}
-      />
 
       {/* XM-style pre-deposit confirmation (client 2026-06-20). */}
       {showDepositConfirm && (

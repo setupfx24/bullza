@@ -9,7 +9,6 @@ from .auth import (
     RegisterRequest, LoginRequest, ForgotPasswordRequest, ResetPasswordRequest,
     BootstrapSessionRequest, OpenLiveAccountRequest, GoogleAuthRequest,
     RefreshTokenRequest,
-    WalletNonceRequest, WalletNonceResponse, WalletVerifyRequest,
     TokenResponse, UserResponse, MessageResponse,
 )
 from .trading import (
@@ -38,7 +37,6 @@ __all__ = [
     "RegisterRequest", "LoginRequest", "ForgotPasswordRequest", "ResetPasswordRequest",
     "BootstrapSessionRequest", "OpenLiveAccountRequest", "GoogleAuthRequest",
     "RefreshTokenRequest",
-    "WalletNonceRequest", "WalletNonceResponse", "WalletVerifyRequest",
     "TokenResponse", "UserResponse", "MessageResponse",
     # trading
     "TradingAccountResponse", "AccountSummary",
