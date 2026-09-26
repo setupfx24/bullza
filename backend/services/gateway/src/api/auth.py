@@ -275,14 +275,39 @@ async def auth_refresh(request: Request, db: AsyncSession = Depends(get_db)):
         raise HTTPException(status_code=e.status_code, detail=e.detail)
 
 
-@router.post("/bootstrap-session")
-async def bootstrap_session(
-    req: BootstrapSessionRequest, request: Request, db: AsyncSession = Depends(get_db),
+# The public POST /auth/bootstrap-session route was removed: it let any holder
+# of an access token mint a fresh session + 7-day refresh token. Admin "Login
+# As" now goes exclusively through the single-use code below.
+
+
+class _ImpersonateRedeemRequest(BaseModel):
+    code: str
+
+
+@router.post("/impersonate/redeem")
+async def impersonate_redeem(
+    body: _ImpersonateRedeemRequest, request: Request, db: AsyncSession = Depends(get_db),
 ):
+    """Exchange an admin-issued single-use impersonation code (60 s TTL) for a
+    trader session. GETDEL makes the code strictly one-shot."""
+    from ..services.auth_service import rate_limit_http
+    from packages.common.src.redis_client import redis_client
+
+    await rate_limit_http(request, "impersonate-redeem", 10, 60.0)
+    code = (body.code or "").strip()
+    if not (16 <= len(code) <= 64) or not all(c in "0123456789abcdef" for c in code.lower()):
+        raise HTTPException(status_code=404, detail="Invalid or expired link")
+    raw = await redis_client.getdel(f"impersonation:{code}")
+    if not raw:
+        raise HTTPException(status_code=404, detail="Invalid or expired link")
     try:
-        return await _bootstrap_session(
-            access_token=req.access_token, request=request, db=db,
-        )
+        if isinstance(raw, bytes):
+            raw = raw.decode("utf-8")
+        access_token = json.loads(raw)["access_token"]
+    except (ValueError, KeyError, TypeError):
+        raise HTTPException(status_code=404, detail="Invalid or expired link")
+    try:
+        return await _bootstrap_session(access_token=access_token, request=request, db=db)
     except AuthServiceError as e:
         raise HTTPException(status_code=e.status_code, detail=e.detail)
 

@@ -118,6 +118,12 @@ async def get_current_user(
     if not token:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
     payload = decode_token(token)
+    # The raw admin-impersonation token (carries impersonated_by) is only valid
+    # as input to the one-time /auth/impersonate/redeem exchange. Used directly
+    # as a Bearer it would be a 2h credential outside any session — refuse it.
+    # (The session minted by the exchange uses a normal token without the claim.)
+    if payload.get("impersonated_by"):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
     return {
         "user_id": UUID(payload["sub"]),
         "role": payload["role"],

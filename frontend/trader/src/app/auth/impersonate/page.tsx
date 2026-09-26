@@ -5,16 +5,22 @@ import { useSearchParams } from 'next/navigation';
 import api from '@/lib/api/client';
 
 /**
- * Impersonation landing — admin opens this tab with ?token=<JWT>.
- * Establishes HttpOnly session cookies via POST /auth/bootstrap-session (same-origin proxy).
+ * Impersonation landing — admin opens this tab with ?code=<single-use code>
+ * (60 s TTL). POST /auth/impersonate/redeem GETDELs it server-side and sets
+ * HttpOnly session cookies (same-origin proxy). The old ?token=<JWT> form is
+ * no longer accepted — it put a 2-hour credential in the URL.
  */
 function ImpersonateInner() {
   const searchParams = useSearchParams();
   const [error, setError] = useState('');
 
   useEffect(() => {
-    const token = searchParams.get('token');
-    if (!token) {
+    const code = searchParams.get('code');
+    // Scrub any legacy ?token= from the address bar immediately; never use it.
+    if (searchParams.get('token')) {
+      try { window.history.replaceState(null, '', window.location.pathname + (code ? `?code=${encodeURIComponent(code)}` : '')); } catch { /* ignore */ }
+    }
+    if (!code) {
       window.location.replace('/auth/login');
       return;
     }
@@ -35,8 +41,8 @@ function ImpersonateInner() {
           /* api client may not expose clearToken in this build */
         }
 
-        // 2) Start the impersonated session.
-        await api.post('/auth/bootstrap-session', { access_token: token });
+        // 2) Start the impersonated session via the single-use code.
+        await api.post('/auth/impersonate/redeem', { code });
 
         // 3) Hard redirect so the auth store rehydrates from scratch.
         window.location.replace('/accounts');

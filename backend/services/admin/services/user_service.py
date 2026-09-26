@@ -1,7 +1,12 @@
 """Admin User Service — user listing, detail, fund/credit ops, ban, kill switch, login-as."""
+import json
+import os
+import secrets
 import uuid
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
+
+import redis.asyncio as aioredis
 
 import jwt
 from fastapi import HTTPException
@@ -27,6 +32,11 @@ from packages.common.src.admin_schemas import (
     FundRequest, CreditRequest,
 )
 from dependencies import write_audit_log
+
+# Gateway-shared Redis db 0 — where the single-use impersonation codes live so
+# the gateway's /auth/impersonate/redeem can GETDEL them.
+_redis_url = os.getenv("REDIS_URL", "redis://redis:6379/0")
+_redis_db0 = aioredis.from_url(_redis_url.rsplit("/", 1)[0] + "/0", decode_responses=True)
 
 settings = get_settings()
 
@@ -973,9 +983,18 @@ async def login_as_user(
         "exp": expire,
         "iat": datetime.utcnow(),
     }
-    # Sign with the gateway's JWT_SECRET so /auth/bootstrap-session (which uses
-    # decode_token → settings.JWT_SECRET) accepts the impersonation token.
+    # Sign with the gateway's JWT_SECRET so the gateway's redeem → bootstrap
+    # (decode_token → settings.JWT_SECRET) accepts the impersonation token.
     token = jwt.encode(payload, settings.JWT_SECRET, algorithm=settings.JWT_ALGORITHM)
+
+    # Never hand the 2h JWT to the browser for a URL (it would land in history,
+    # logs and Referer). Park it in Redis under a single-use, 60-second code;
+    # the trader app redeems the code via GETDEL at /auth/impersonate/redeem.
+    code = secrets.token_hex(16)  # 128 bits
+    await _redis_db0.setex(
+        f"impersonation:{code}", 60,
+        json.dumps({"access_token": token, "user_id": str(user.id), "admin_id": str(admin_id)}),
+    )
 
     await write_audit_log(
         db, admin_id, "login_as_user", "user", user_id,
@@ -984,7 +1003,7 @@ async def login_as_user(
     )
     await db.commit()
 
-    return {"access_token": token, "token_type": "bearer", "user_email": user.email}
+    return {"code": code, "user_email": user.email, "expires_in": 60}
 
 
 async def delete_user(

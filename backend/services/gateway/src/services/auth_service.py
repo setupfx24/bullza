@@ -198,7 +198,7 @@ def attach_auth_cookies(
     *,
     access_token: str,
     access_expires_at: datetime,
-    raw_refresh: str,
+    raw_refresh: str | None,
 ) -> None:
     st = get_settings()
     secure = _cookie_secure_flag(request)
@@ -222,6 +222,14 @@ def attach_auth_cookies(
     if not st.JWT_REFRESH_SESSION_COOKIE:
         access_kw["max_age"] = max_age_access
     response.set_cookie(**access_kw)
+    if raw_refresh is None:
+        # Session issued WITHOUT a refresh token (admin impersonation): clear any
+        # refresh cookie already in this browser so a later /auth/refresh can't
+        # silently resurrect a different identity.
+        if domain:
+            response.delete_cookie(st.REFRESH_TOKEN_COOKIE_NAME, path="/", domain=domain)
+        response.delete_cookie(st.REFRESH_TOKEN_COOKIE_NAME, path="/")
+        return
     refresh_kw: dict = {
         "key": st.REFRESH_TOKEN_COOKIE_NAME,
         "value": raw_refresh,
@@ -567,12 +575,16 @@ async def issue_auth_json_response(
     status_code: int = 200,
     user_audit_action: str | None = None,
     audit_metadata: dict | None = None,
+    issue_refresh: bool = True,
 ) -> JSONResponse:
     """Create user_session + refresh row, commit, return JSON (+ HttpOnly cookies).
 
     All inserts (session, refresh, optional audit log) are flushed together and
     committed atomically. Any exception raised before this commit leaves the
-    transaction open for the route handler to roll back."""
+    transaction open for the route handler to roll back.
+
+    issue_refresh=False → no refresh token: the session ends with the access
+    token (used for admin impersonation so it can't outlive its window)."""
     token, expires = create_access_token(str(user.id), user.role)
     new_session = UserSession(
         user_id=user.id,
@@ -583,16 +595,18 @@ async def issue_auth_json_response(
     )
     db.add(new_session)
     st = get_settings()
-    raw_refresh = secrets.token_urlsafe(48)
+    raw_refresh: str | None = None
     ref_exp = datetime.now(timezone.utc) + timedelta(days=st.JWT_REFRESH_EXPIRY_DAYS)
-    db.add(
-        UserRefreshToken(
-            user_id=user.id,
-            token_hash=hash_token(raw_refresh),
-            expires_at=ref_exp,
-            revoked=False,
+    if issue_refresh:
+        raw_refresh = secrets.token_urlsafe(48)
+        db.add(
+            UserRefreshToken(
+                user_id=user.id,
+                token_hash=hash_token(raw_refresh),
+                expires_at=ref_exp,
+                revoked=False,
+            )
         )
-    )
     if user_audit_action:
         ua = (request.headers.get("user-agent") or "").strip()
         # device_info is plain Text; embed structured audit metadata (e.g. Google sub/email)
@@ -1202,6 +1216,12 @@ async def bootstrap_session(access_token: str, request: Request, db: AsyncSessio
     # session — without this a leaked verify-email token could mint full cookies.
     if payload.get("type") not in (None, "user"):
         raise AuthServiceError("Invalid token", 401)
+    # ONLY the admin-impersonation token may be exchanged for a session.
+    # Previously ANY valid access token was accepted and turned into a fresh
+    # session + 7-day refresh token — so a stolen ~short-lived access token
+    # became a week-long foothold. An ordinary access token already IS a session.
+    if not payload.get("impersonated_by"):
+        raise AuthServiceError("Invalid token", 401)
     try:
         uid = UUID(str(payload["sub"]))
     except (KeyError, ValueError, TypeError):
@@ -1212,7 +1232,9 @@ async def bootstrap_session(access_token: str, request: Request, db: AsyncSessio
     _blk = login_block_message(user.status)
     if _blk:
         raise AuthServiceError(_blk, 403)
-    return await issue_auth_json_response(user, request, db)
+    # No refresh token: the impersonated session ends with its access token
+    # instead of outliving the admin's short impersonation window by a week.
+    return await issue_auth_json_response(user, request, db, issue_refresh=False)
 
 
 # ─── Forgot / Reset password ─────────────────────────────────────────────
